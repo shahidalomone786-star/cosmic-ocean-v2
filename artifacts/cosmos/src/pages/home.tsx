@@ -29,7 +29,7 @@ function QuantumField() {
   });
   return (
     <group ref={ref}>
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <Stars radius={50} depth={50} count={8000} factor={9} saturation={0} fade speed={2} />
     </group>
   );
 }
@@ -47,7 +47,7 @@ export default function MasterpieceHome() {
             <QuantumField />
           </Canvas>
         </WebGLErrorBoundary>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.85)_100%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] pointer-events-none" />
       </div>
 
       <motion.div 
