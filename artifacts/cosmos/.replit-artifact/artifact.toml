@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Cosmos"
+version = "1.0.0"
+id = "artifacts/cosmos"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22618
+
+[services.development]
+run = "pnpm --filter @workspace/cosmos run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cosmos", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/cosmos/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22618"
+BASE_PATH = "/"
