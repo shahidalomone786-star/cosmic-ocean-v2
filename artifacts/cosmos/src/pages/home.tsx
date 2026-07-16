@@ -21,8 +21,7 @@ class WebGLErrorBoundary extends Component<
   }
 }
 
-/** Generates a soft circular glow texture via an offscreen canvas. */
-function makeGlowTexture(): THREE.CanvasTexture {
+function makeGlowTexture(innerAlpha = 1.0): THREE.CanvasTexture {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -30,15 +29,15 @@ function makeGlowTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const half = size / 2;
 
-  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
-  gradient.addColorStop(0.0,  "rgba(255,255,255,1.0)");
-  gradient.addColorStop(0.15, "rgba(255,255,255,0.85)");
-  gradient.addColorStop(0.4,  "rgba(255,255,255,0.3)");
-  gradient.addColorStop(0.75, "rgba(255,255,255,0.05)");
-  gradient.addColorStop(1.0,  "rgba(255,255,255,0.0)");
+  const g = ctx.createRadialGradient(half, half, 0, half, half, half);
+  g.addColorStop(0.0,  `rgba(255,255,255,${innerAlpha})`);
+  g.addColorStop(0.12, "rgba(255,240,180,0.95)");
+  g.addColorStop(0.3,  "rgba(255,180,80,0.55)");
+  g.addColorStop(0.6,  "rgba(180,100,255,0.15)");
+  g.addColorStop(1.0,  "rgba(0,0,0,0)");
 
   ctx.clearRect(0, 0, size, size);
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(half, half, half, 0, Math.PI * 2);
   ctx.fill();
@@ -49,94 +48,142 @@ function makeGlowTexture(): THREE.CanvasTexture {
 }
 
 function SpiralGalaxy() {
-  const ref = useRef<THREE.Points>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
-  const glowTexture = useMemo(() => makeGlowTexture(), []);
+  // Two textures: core is purer white, arms use the full warm glow
+  const armTexture  = useMemo(() => makeGlowTexture(1.0), []);
+  const coreTexture = useMemo(() => makeGlowTexture(1.0), []);
 
-  const { positions, colors } = useMemo(() => {
+  // ── Spiral arm particles ──────────────────────────────────────────────
+  const armGeo = useMemo(() => {
     const COUNT      = 35_000;
     const ARMS       = 4;
-    const MAX_RADIUS = 5.0;
+    const MAX_RADIUS = 4.5;
 
     const positions = new Float32Array(COUNT * 3);
     const colors    = new Float32Array(COUNT * 3);
 
-    // 5-stop cinematic color ramp: hot amber core → crimson → violet → cobalt → icy cyan
-    const c0 = new THREE.Color("#ffe066"); // bright core flash
-    const c1 = new THREE.Color("#ff5500"); // amber-orange
-    const c2 = new THREE.Color("#cc0044"); // crimson inner arm
-    const c3 = new THREE.Color("#5510bb"); // deep violet
-    const c4 = new THREE.Color("#0055ff"); // cold cobalt
-    const c5 = new THREE.Color("#00ffee"); // icy cyan tip
-
+    const c0 = new THREE.Color("#ffe566");
+    const c1 = new THREE.Color("#ff6600");
+    const c2 = new THREE.Color("#dd0044");
+    const c3 = new THREE.Color("#6622cc");
+    const c4 = new THREE.Color("#1155ff");
+    const c5 = new THREE.Color("#00eeff");
     const tmp = new THREE.Color();
 
     for (let i = 0; i < COUNT; i++) {
       const arm       = i % ARMS;
       const armOffset = (arm / ARMS) * Math.PI * 2;
 
-      // Bias heavily toward inner region so the core is densely glowing
-      const u = Math.random();
-      const t = 1 - Math.sqrt(1 - u); // concave mapping → inner density
+      const u      = Math.random();
+      const t      = 1 - Math.sqrt(1 - u);           // inner-biased
       const radius = t * MAX_RADIUS;
 
-      // Spin angle increases with radius for realistic arm curvature
-      const spinAngle = radius * 2.0;
-      const angle     = armOffset + spinAngle;
+      const spinAngle    = radius * 2.2;
+      const angle        = armOffset + spinAngle;
 
-      // Radial dust scatter – gaussian-ish by squaring
-      const scatter      = Math.pow(Math.random(), 1.2) * 0.6 * (0.3 + t * 0.7);
+      const scatter      = Math.pow(Math.random(), 1.3) * 0.5 * (0.2 + t * 0.8);
       const scatterAngle = Math.random() * Math.PI * 2;
-
-      // Disk thickness tapers sharply toward the edge
-      const diskH = (Math.random() - 0.5) * 0.35 * Math.pow(1 - t, 1.5);
+      const diskH        = (Math.random() - 0.5) * 0.3 * Math.pow(1 - t, 1.4);
 
       positions[i * 3]     = Math.cos(angle) * radius + Math.cos(scatterAngle) * scatter;
       positions[i * 3 + 1] = diskH;
       positions[i * 3 + 2] = Math.sin(angle) * radius + Math.sin(scatterAngle) * scatter;
 
-      // Smooth 6-stop color interpolation based on normalised radius
-      const n = radius / MAX_RADIUS; // 0 → core, 1 → tip
-
-      if (n < 0.05)       tmp.lerpColors(c0, c1, n / 0.05);
-      else if (n < 0.2)   tmp.lerpColors(c1, c2, (n - 0.05) / 0.15);
-      else if (n < 0.45)  tmp.lerpColors(c2, c3, (n - 0.2)  / 0.25);
-      else if (n < 0.72)  tmp.lerpColors(c3, c4, (n - 0.45) / 0.27);
-      else                tmp.lerpColors(c4, c5, (n - 0.72) / 0.28);
+      const n = radius / MAX_RADIUS;
+      if      (n < 0.06) tmp.lerpColors(c0, c1, n / 0.06);
+      else if (n < 0.22) tmp.lerpColors(c1, c2, (n - 0.06) / 0.16);
+      else if (n < 0.48) tmp.lerpColors(c2, c3, (n - 0.22) / 0.26);
+      else if (n < 0.74) tmp.lerpColors(c3, c4, (n - 0.48) / 0.26);
+      else               tmp.lerpColors(c4, c5, (n - 0.74) / 0.26);
 
       colors[i * 3]     = tmp.r;
       colors[i * 3 + 1] = tmp.g;
       colors[i * 3 + 2] = tmp.b;
     }
 
-    return { positions, colors };
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }, []);
+
+  // ── Dense supercharged nucleus ────────────────────────────────────────
+  const coreGeo = useMemo(() => {
+    const COUNT = 4_000;
+    const positions = new Float32Array(COUNT * 3);
+    const colors    = new Float32Array(COUNT * 3);
+
+    const cWhite  = new THREE.Color("#ffffff");
+    const cGold   = new THREE.Color("#ffe88a");
+    const cOrange = new THREE.Color("#ff9933");
+    const tmp     = new THREE.Color();
+
+    for (let i = 0; i < COUNT; i++) {
+      // Gaussian-ish cluster strictly within radius 0.5
+      const r     = Math.pow(Math.random(), 1.8) * 0.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = (Math.random() - 0.5) * 0.18;    // tight disk
+
+      positions[i * 3]     = Math.cos(theta) * r;
+      positions[i * 3 + 1] = phi;
+      positions[i * 3 + 2] = Math.sin(theta) * r;
+
+      // Very centre → pure white, mid → gold, edge → orange
+      const n = r / 0.5;
+      if (n < 0.35) tmp.lerpColors(cWhite, cGold,   n / 0.35);
+      else          tmp.lerpColors(cGold,  cOrange, (n - 0.35) / 0.65);
+
+      colors[i * 3]     = tmp.r;
+      colors[i * 3 + 1] = tmp.g;
+      colors[i * 3 + 2] = tmp.b;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+    return geo;
   }, []);
 
   useFrame(() => {
-    if (ref.current) {
-      ref.current.rotation.y += 0.0005; // slow majestic Y-axis spin
+    if (groupRef.current) {
+      groupRef.current.rotation.y += 0.0005;
     }
   });
 
+  const sharedMat = {
+    vertexColors: true,
+    transparent:  true,
+    depthWrite:   false,
+    blending:     THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    alphaTest:    0.001,
+  } as const;
+
   return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-color"    args={[colors,    3]} />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.022}
-        map={glowTexture}
-        alphaMap={glowTexture}
-        vertexColors
-        transparent
-        opacity={1.0}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        sizeAttenuation
-        alphaTest={0.001}
-      />
-    </points>
+    <group ref={groupRef}>
+      {/* Spiral arms */}
+      <points geometry={armGeo}>
+        <pointsMaterial
+          {...sharedMat}
+          size={0.09}
+          map={armTexture}
+          alphaMap={armTexture}
+          opacity={1.0}
+        />
+      </points>
+
+      {/* Blinding nucleus */}
+      <points geometry={coreGeo}>
+        <pointsMaterial
+          {...sharedMat}
+          size={0.25}
+          map={coreTexture}
+          alphaMap={coreTexture}
+          opacity={1.0}
+        />
+      </points>
+    </group>
   );
 }
 
@@ -146,16 +193,14 @@ export default function MasterpieceHome() {
   return (
     <main className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center">
 
-      {/* ── 3D Galaxy Background ── */}
+      {/* ── Galaxy canvas — no vignette, pure WebGL colors ── */}
       <div className="absolute inset-0 z-0">
         <WebGLErrorBoundary fallback={<div className="w-full h-full bg-black" />}>
-          <Canvas camera={{ position: [0, 4, 7], fov: 58 }}>
+          <Canvas camera={{ position: [0, 2.5, 4.5], fov: 60 }}>
             <color attach="background" args={["#000000"]} />
             <SpiralGalaxy />
           </Canvas>
         </WebGLErrorBoundary>
-        {/* Subtle edge vignette — keeps centre fully visible */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.55)_100%)] pointer-events-none" />
       </div>
 
       {/* ── UI Layer ── */}
