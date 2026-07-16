@@ -1,9 +1,8 @@
-import { useState, useRef, Component } from "react";
+import { useState, useRef, useMemo, Component } from "react";
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
-import type { Group } from "three";
+import * as THREE from "three";
 
 class WebGLErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode; fallback: ReactNode }) {
@@ -19,18 +18,92 @@ class WebGLErrorBoundary extends Component<{ children: ReactNode; fallback: Reac
   }
 }
 
-function QuantumField() {
-  const ref = useRef<Group>(null);
+function SpiralGalaxy() {
+  const ref = useRef<THREE.Points>(null);
+
+  const { positions, colors } = useMemo(() => {
+    const COUNT = 15000;
+    const ARMS = 4;
+    const MAX_RADIUS = 4.5;
+
+    const positions = new Float32Array(COUNT * 3);
+    const colors = new Float32Array(COUNT * 3);
+
+    // Color stops: hot core → mid purple → cold cyan tips
+    const coreColor  = new THREE.Color('#ff8800'); // warm amber-orange
+    const innerColor = new THREE.Color('#ff3300'); // hot red
+    const midColor   = new THREE.Color('#6020cc'); // deep purple
+    const outerColor = new THREE.Color('#00aaff'); // cold blue
+    const tipColor   = new THREE.Color('#00ffee'); // icy cyan
+
+    for (let i = 0; i < COUNT; i++) {
+      const arm = i % ARMS;
+      const armOffset = (arm / ARMS) * Math.PI * 2;
+
+      // Bias toward inner distribution so the core is dense
+      const raw = Math.random();
+      const t = raw * raw * 0.55 + raw * 0.45; // slight inner density bias
+
+      const radius = t * MAX_RADIUS;
+
+      // Spiral: outer particles rotate more (tighter arms toward outside)
+      const spinAngle = radius * 1.8;
+      const angle = armOffset + spinAngle;
+
+      // Random dust scatter — more scatter at edge, thin disk height
+      const scatter = Math.pow(Math.random(), 1.5) * 0.55 * (1 + t);
+      const scatterAngle = Math.random() * Math.PI * 2;
+      const diskHeight   = (Math.random() - 0.5) * 0.25 * (1 - t * 0.6);
+
+      positions[i * 3]     = Math.cos(angle) * radius + Math.cos(scatterAngle) * scatter;
+      positions[i * 3 + 1] = diskHeight;
+      positions[i * 3 + 2] = Math.sin(angle) * radius + Math.sin(scatterAngle) * scatter;
+
+      // Smooth multi-stop color gradient by normalised radius
+      const n = radius / MAX_RADIUS; // 0 = core, 1 = tip
+      const color = new THREE.Color();
+
+      if (n < 0.1) {
+        color.lerpColors(coreColor, innerColor, n / 0.1);
+      } else if (n < 0.35) {
+        color.lerpColors(innerColor, midColor, (n - 0.1) / 0.25);
+      } else if (n < 0.7) {
+        color.lerpColors(midColor, outerColor, (n - 0.35) / 0.35);
+      } else {
+        color.lerpColors(outerColor, tipColor, (n - 0.7) / 0.3);
+      }
+
+      colors[i * 3]     = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+
+    return { positions, colors };
+  }, []);
+
   useFrame(() => {
     if (ref.current) {
-      ref.current.rotation.x -= 0.0003;
-      ref.current.rotation.y -= 0.0005;
+      ref.current.rotation.y += 0.0006;
+      ref.current.rotation.z += 0.00015;
     }
   });
+
   return (
-    <group ref={ref}>
-      <Stars radius={50} depth={50} count={8000} factor={9} saturation={0} fade speed={2} />
-    </group>
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color"    args={[colors,    3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.028}
+        vertexColors
+        transparent
+        opacity={0.9}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        sizeAttenuation
+      />
+    </points>
   );
 }
 
@@ -39,32 +112,32 @@ export default function MasterpieceHome() {
 
   return (
     <main className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center">
-      
+
       <div className="absolute inset-0 z-0">
         <WebGLErrorBoundary fallback={<div className="w-full h-full bg-black" />}>
-          <Canvas camera={{ position: [0, 0, 1] }}>
+          <Canvas camera={{ position: [0, 2.5, 7], fov: 60 }}>
             <color attach="background" args={['#000000']} />
-            <QuantumField />
+            <SpiralGalaxy />
           </Canvas>
         </WebGLErrorBoundary>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] pointer-events-none" />
       </div>
 
-      <motion.div 
+      <motion.div
         className="z-10 flex flex-col items-center w-full px-6"
-        animate={{ y: isFocused ? -60 : 0 }} 
+        animate={{ y: isFocused ? -60 : 0 }}
         transition={{ type: "spring", stiffness: 80, damping: 20 }}
       >
-        <motion.div 
+        <motion.div
           className="w-full max-w-[300px] relative group"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} 
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
         >
           <div className="absolute inset-0 bg-white/5 rounded-full blur-md transition-all duration-500 group-hover:bg-white/10" />
-          <input 
-            type="text" 
-            placeholder="Search the cosmos..." 
+          <input
+            type="text"
+            placeholder="Search the cosmos..."
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             className="relative w-full py-2.5 px-5 text-xs tracking-wider rounded-full bg-white/5 border border-white/10 backdrop-blur-xl text-white placeholder-white/30 outline-none focus:bg-white/10 focus:border-white/30 transition-all duration-500 shadow-2xl"
@@ -74,17 +147,17 @@ export default function MasterpieceHome() {
           </div>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           className="flex flex-wrap justify-center gap-2 mt-4 max-w-[300px]"
-          animate={{ 
-            opacity: isFocused ? 0 : 1, 
-            y: isFocused ? 10 : 0, 
-            filter: isFocused ? "blur(4px)" : "blur(0px)" 
+          animate={{
+            opacity: isFocused ? 0 : 1,
+            y: isFocused ? 10 : 0,
+            filter: isFocused ? "blur(4px)" : "blur(0px)"
           }}
           transition={{ duration: 0.4 }}
         >
           {['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics'].map((tag, index) => (
-            <motion.span 
+            <motion.span
               key={index}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
