@@ -20,7 +20,7 @@ class WebGLErrorBoundary extends Component<
   }
 }
 
-// ─── Shaders ─────────────────────────────────────────────────────────────────
+// ─── Soft round glow point – vertex + fragment ────────────────────────────────
 const VERT = /* glsl */`
   attribute vec3  aColor;
   attribute float aSize;
@@ -28,132 +28,106 @@ const VERT = /* glsl */`
 
   void main() {
     vColor = aColor;
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * (320.0 / -mvPosition.z);
-    gl_Position  = projectionMatrix * mvPosition;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = aSize * (300.0 / -mv.z);
+    gl_Position  = projectionMatrix * mv;
   }
 `;
 
 const FRAG = /* glsl */`
   varying vec3 vColor;
-
   void main() {
-    float d        = distance(gl_PointCoord, vec2(0.5));
-    float strength = clamp(1.0 - d * 2.0, 0.0, 1.0);
-    strength       = pow(strength, 8.0);
-    if (strength < 0.001) discard;
-    gl_FragColor   = vec4(vColor * strength, strength);
+    float d  = distance(gl_PointCoord, vec2(0.5)) * 2.0;
+    float a  = pow(clamp(1.0 - d, 0.0, 1.0), 6.0);
+    if (a < 0.003) discard;
+    gl_FragColor = vec4(vColor, a);
   }
 `;
 
-// ─── Colour palette — warm core, dusty purple wings ──────────────────────────
-const C = {
-  coreHot  : new THREE.Color(0.98, 0.92, 0.78), // pale warm cream
-  coreGold : new THREE.Color(0.90, 0.66, 0.28), // amber-gold
-  coreAmber: new THREE.Color(0.72, 0.40, 0.16), // deep amber
-  midDust  : new THREE.Color(0.34, 0.22, 0.50), // dusty purple
-  outerGas : new THREE.Color(0.18, 0.12, 0.32), // dark violet gas
-  edgeFade : new THREE.Color(0.07, 0.05, 0.13), // near-black edge
-};
+// ─── Color ramp: warm golden core → deep indigo void ─────────────────────────
+const RAMP = [
+  { t: 0.00, c: new THREE.Color(0.95, 0.86, 0.52) }, // pale gold
+  { t: 0.15, c: new THREE.Color(0.88, 0.62, 0.22) }, // warm amber
+  { t: 0.35, c: new THREE.Color(0.55, 0.28, 0.18) }, // deep orange-rust
+  { t: 0.55, c: new THREE.Color(0.22, 0.12, 0.38) }, // dusty indigo
+  { t: 0.75, c: new THREE.Color(0.08, 0.05, 0.22) }, // dark blue-violet
+  { t: 1.00, c: new THREE.Color(0.02, 0.01, 0.08) }, // near-void
+];
 
-function palette(n: number): THREE.Color {
-  // n = 0 (core) … 1 (outer edge)
-  const t = new THREE.Color();
-  if      (n < 0.10) t.lerpColors(C.coreHot,   C.coreGold,  n / 0.10);
-  else if (n < 0.26) t.lerpColors(C.coreGold,  C.coreAmber, (n - 0.10) / 0.16);
-  else if (n < 0.50) t.lerpColors(C.coreAmber, C.midDust,   (n - 0.26) / 0.24);
-  else if (n < 0.76) t.lerpColors(C.midDust,   C.outerGas,  (n - 0.50) / 0.26);
-  else               t.lerpColors(C.outerGas,  C.edgeFade,  (n - 0.76) / 0.24);
-  return t;
+function rampColor(n: number): THREE.Color {
+  const v = Math.max(0, Math.min(1, n));
+  for (let i = 1; i < RAMP.length; i++) {
+    if (v <= RAMP[i].t) {
+      const lo = RAMP[i - 1];
+      const hi = RAMP[i];
+      const u  = (v - lo.t) / (hi.t - lo.t);
+      return new THREE.Color().lerpColors(lo.c, hi.c, u);
+    }
+  }
+  return RAMP[RAMP.length - 1].c.clone();
 }
 
-// Gaussian sample: sum of two uniforms → bell curve centred at 0
-function gauss(): number { return (Math.random() + Math.random() - 1.0); }
-
-// ─── Build geometry ───────────────────────────────────────────────────────────
+// ─── Particle generation – no arms, pure organic scatter ─────────────────────
 function buildGeo(): THREE.BufferGeometry {
-  const MAX_R        = 5.2;
-  const CORE_COUNT   = 3_200;   // dense nucleus blob
-  const DUST_COUNT   = 14_000;  // inter-arm haze scattered across the disk
-  const ARM_COUNT    = 24_800;  // loose spiral arms with massive dispersion
-  const TOTAL        = CORE_COUNT + DUST_COUNT + ARM_COUNT;
-  const ARMS         = 3;
+  const TOTAL = 50_000;
+  const MAX_R = 5.2;
 
   const pos   = new Float32Array(TOTAL * 3);
   const col   = new Float32Array(TOTAL * 3);
   const sizes = new Float32Array(TOTAL);
 
-  let i = 0;
+  for (let i = 0; i < TOTAL; i++) {
+    // ── Radius via exponential distribution ──
+    // -ln(U) gives an exponential; scale and clamp so most land 0–3 with a
+    // long tail reaching MAX_R.  This makes the centre genuinely dense without
+    // a hard blob cutoff.
+    const raw    = -Math.log(1.0 - Math.random() * 0.9999) * 1.6;
+    const radius = Math.min(raw, MAX_R);
 
-  // — Nucleus: warm wide blob ————————————————————————————————————
-  while (i < CORE_COUNT) {
-    const r   = Math.pow(Math.random(), 1.6) * 0.8;
-    const th  = Math.random() * Math.PI * 2;
-    const ht  = gauss() * 0.18 * (1 - r / 0.8);
+    // ── Angle: fully random base + gentle differential-rotation swirl ──
+    // No arm index, no branching.  The swirl factor (0.55) gives a smooth
+    // galaxy-wide twist without creating discrete blades.
+    const baseAngle  = Math.random() * Math.PI * 2;
+    const swirl      = radius * 0.55;
+    const angle      = baseAngle + swirl;
 
-    pos[i*3]   = Math.cos(th) * r;
-    pos[i*3+1] = ht;
-    pos[i*3+2] = Math.sin(th) * r;
+    // ── Heavy organic scatter on X and Z ──
+    // Two independent exponential nudges in random directions so particles
+    // spread into a broad, irregular cloud rather than a thin ring.
+    const s1  = Math.pow(Math.random(), 0.45) * radius * 0.62;
+    const s2  = Math.pow(Math.random(), 0.45) * radius * 0.38;
+    const a1  = Math.random() * Math.PI * 2;
+    const a2  = Math.random() * Math.PI * 2;
 
-    const c = palette(r / 0.8 * 0.22);
-    col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
-    sizes[i] = 1.0 + Math.random() * 2.4;
-    i++;
-  }
+    const x = Math.cos(angle) * radius + Math.cos(a1) * s1 + Math.cos(a2) * s2;
+    const z = Math.sin(angle) * radius + Math.sin(a1) * s1 + Math.sin(a2) * s2;
 
-  // — Ambient disk dust: fills the whole plane, no arms ————————————
-  while (i < CORE_COUNT + DUST_COUNT) {
-    // Random point inside an ellipse — creates a flat galactic disk background
-    const r   = Math.sqrt(Math.random()) * MAX_R;       // uniform area distribution
-    const th  = Math.random() * Math.PI * 2;
-    const ht  = gauss() * 0.20 * (1 - (r / MAX_R) * 0.6);
-
-    pos[i*3]   = Math.cos(th) * r;
-    pos[i*3+1] = ht;
-    pos[i*3+2] = Math.sin(th) * r;
-
-    const n = r / MAX_R;
-    const c = palette(Math.min(1, n * 1.05));
-    col[i*3] = c.r * 0.55; col[i*3+1] = c.g * 0.55; col[i*3+2] = c.b * 0.55;
-    sizes[i] = 0.35 + Math.random() * 0.65;
-    i++;
-  }
-
-  // — Spiral arms: wide, fluffy, dispersed ——————————————————————————
-  while (i < TOTAL) {
-    const arm = (i - CORE_COUNT - DUST_COUNT) % ARMS;
-
-    // Concave mapping: more particles cluster near the inner region
-    const u      = Math.random();
-    const t      = 1 - Math.sqrt(1 - u * 0.97);
-    const radius = 0.8 + t * (MAX_R - 0.8);
-
-    const armBase  = (arm / ARMS) * Math.PI * 2;
-    const spinAngle = radius * 0.9;          // loose, open arms (was 1.85 — caused snake)
-    const baseAngle = armBase + spinAngle;
-
-    // ── MASSIVE dispersion: scatter proportional to radius ──
-    // Perpendicular (tangential) scatter — gives arms width
-    const tangScatter = gauss() * radius * 0.52;
-    const tangAngle   = baseAngle + Math.PI / 2;
-    // Radial scatter — blurs arm boundaries inward/outward
-    const radScatter  = gauss() * radius * 0.38;
-
-    const x = Math.cos(baseAngle) * (radius + radScatter) + Math.cos(tangAngle) * tangScatter;
-    const z = Math.sin(baseAngle) * (radius + radScatter) + Math.sin(tangAngle) * tangScatter;
-    // Disk height: thin but not a razor; wider near centre
-    const ht = gauss() * 0.45 * Math.pow(Math.max(0, 1 - t), 1.2);
+    // ── Disk height: thin but thicker near centre ──
+    // Two uniform samples summed → bell-shaped distribution (no harsh cutoff).
+    const halfH = 0.07 + 0.55 * Math.pow(Math.max(0, 1 - radius / MAX_R), 1.6);
+    const y = (Math.random() + Math.random() - 1.0) * halfH;
 
     pos[i*3]   = x;
-    pos[i*3+1] = ht;
+    pos[i*3+1] = y;
     pos[i*3+2] = z;
 
-    const actualR = Math.sqrt(x*x + z*z);
-    const n = Math.min(1, actualR / MAX_R);
-    const c = palette(n);
-    col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
-    sizes[i] = 0.50 + Math.random() * (1.1 - t * 0.55);
-    i++;
+    // ── Color: based on actual final distance from origin ──
+    const finalR = Math.sqrt(x*x + z*z);
+    const n      = Math.min(1, finalR / MAX_R);
+
+    // Slight per-particle brightness variation so the cloud looks textured
+    const brightness = 0.65 + Math.random() * 0.45;
+    const c = rampColor(n);
+    col[i*3]   = c.r * brightness;
+    col[i*3+1] = c.g * brightness;
+    col[i*3+2] = c.b * brightness;
+
+    // ── Size: larger near core, tiny at edges ──
+    // Core particles are intentionally small-to-medium so they stay
+    // semi-transparent and sum to a soft glow via additive blending,
+    // rather than painting a solid white blob.
+    const coreBoost = Math.max(0, 1 - radius / 1.2);
+    sizes[i] = 0.30 + Math.random() * 0.55 + coreBoost * 1.2;
   }
 
   const geo = new THREE.BufferGeometry();
@@ -170,7 +144,7 @@ function GalaxyDisk() {
 
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += 0.00042;
+      groupRef.current.rotation.y += 0.00038;
     }
   });
 
