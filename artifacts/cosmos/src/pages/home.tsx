@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, Component } from "react";
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 // ─── Error boundary ───────────────────────────────────────────────────────────
@@ -28,7 +29,6 @@ const VERT = /* glsl */`
   void main() {
     vColor = aColor;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    // perspective-correct point size
     gl_PointSize = aSize * (320.0 / -mvPosition.z);
     gl_Position  = projectionMatrix * mvPosition;
   }
@@ -38,142 +38,139 @@ const FRAG = /* glsl */`
   varying vec3 vColor;
 
   void main() {
-    // Soft smoky gas puff — radial exponential falloff
     float d        = distance(gl_PointCoord, vec2(0.5));
-    float strength = 1.0 - d * 2.0;          // 0 at edge, 1 at centre
-    strength = clamp(strength, 0.0, 1.0);
-    strength = pow(strength, 8.0);            // ultra-soft gaussian-like
-
+    float strength = clamp(1.0 - d * 2.0, 0.0, 1.0);
+    strength       = pow(strength, 8.0);
     if (strength < 0.001) discard;
-    gl_FragColor = vec4(vColor * strength, strength);
+    gl_FragColor   = vec4(vColor * strength, strength);
   }
 `;
 
-// ─── Realistic colour helpers ─────────────────────────────────────────────────
-// All colours are desaturated, dark-space tones that bloom beautifully
-// under additive blending without looking neon or candy.
-const PALETTE = {
-  coreFlash  : new THREE.Color(0.97, 0.93, 0.82), // pale warm cream
-  coreGold   : new THREE.Color(0.88, 0.70, 0.36), // muted gold
-  coreAmber  : new THREE.Color(0.70, 0.44, 0.20), // amber dust
-  midIndigo  : new THREE.Color(0.28, 0.20, 0.48), // dusty indigo
-  deepViolet : new THREE.Color(0.15, 0.10, 0.28), // deep space violet
-  edgeDust   : new THREE.Color(0.08, 0.06, 0.14), // near-black charcoal
+// ─── Colour palette — warm core, dusty purple wings ──────────────────────────
+const C = {
+  coreHot  : new THREE.Color(0.98, 0.92, 0.78), // pale warm cream
+  coreGold : new THREE.Color(0.90, 0.66, 0.28), // amber-gold
+  coreAmber: new THREE.Color(0.72, 0.40, 0.16), // deep amber
+  midDust  : new THREE.Color(0.34, 0.22, 0.50), // dusty purple
+  outerGas : new THREE.Color(0.18, 0.12, 0.32), // dark violet gas
+  edgeFade : new THREE.Color(0.07, 0.05, 0.13), // near-black edge
 };
 
-function lerpPalette(n: number): THREE.Color {
-  // n = 0 (core) → 1 (outer edge)
-  const tmp = new THREE.Color();
-  if      (n < 0.08) tmp.lerpColors(PALETTE.coreFlash,  PALETTE.coreGold,   n / 0.08);
-  else if (n < 0.22) tmp.lerpColors(PALETTE.coreGold,   PALETTE.coreAmber,  (n - 0.08) / 0.14);
-  else if (n < 0.45) tmp.lerpColors(PALETTE.coreAmber,  PALETTE.midIndigo,  (n - 0.22) / 0.23);
-  else if (n < 0.72) tmp.lerpColors(PALETTE.midIndigo,  PALETTE.deepViolet, (n - 0.45) / 0.27);
-  else               tmp.lerpColors(PALETTE.deepViolet,  PALETTE.edgeDust,  (n - 0.72) / 0.28);
-  return tmp;
+function palette(n: number): THREE.Color {
+  // n = 0 (core) … 1 (outer edge)
+  const t = new THREE.Color();
+  if      (n < 0.10) t.lerpColors(C.coreHot,   C.coreGold,  n / 0.10);
+  else if (n < 0.26) t.lerpColors(C.coreGold,  C.coreAmber, (n - 0.10) / 0.16);
+  else if (n < 0.50) t.lerpColors(C.coreAmber, C.midDust,   (n - 0.26) / 0.24);
+  else if (n < 0.76) t.lerpColors(C.midDust,   C.outerGas,  (n - 0.50) / 0.26);
+  else               t.lerpColors(C.outerGas,  C.edgeFade,  (n - 0.76) / 0.24);
+  return t;
 }
 
-// Cheap pseudo-noise: sum of offset sinusoids
-function fbm(x: number, y: number): number {
-  return (
-    Math.sin(x * 1.7 + y * 2.3) * 0.50 +
-    Math.sin(x * 3.1 - y * 1.9) * 0.25 +
-    Math.sin(x * 5.7 + y * 4.1) * 0.13 +
-    Math.sin(x * 9.3 - y * 7.5) * 0.06
-  );
-}
+// Gaussian sample: sum of two uniforms → bell curve centred at 0
+function gauss(): number { return (Math.random() + Math.random() - 1.0); }
 
-// ─── Galaxy geometry ──────────────────────────────────────────────────────────
-function buildGalaxyGeo() {
-  const TOTAL      = 42_000;
-  const ARMS       = 3;          // odd arm count looks more organic
-  const MAX_R      = 5.0;
-  const CORE_COUNT = 2_500;      // nucleus particles embedded in the same mesh
-  const ARM_COUNT  = TOTAL - CORE_COUNT;
+// ─── Build geometry ───────────────────────────────────────────────────────────
+function buildGeo(): THREE.BufferGeometry {
+  const MAX_R        = 5.2;
+  const CORE_COUNT   = 3_200;   // dense nucleus blob
+  const DUST_COUNT   = 14_000;  // inter-arm haze scattered across the disk
+  const ARM_COUNT    = 24_800;  // loose spiral arms with massive dispersion
+  const TOTAL        = CORE_COUNT + DUST_COUNT + ARM_COUNT;
+  const ARMS         = 3;
 
-  const positions  = new Float32Array(TOTAL * 3);
-  const aColor     = new Float32Array(TOTAL * 3);
-  const aSize      = new Float32Array(TOTAL);
+  const pos   = new Float32Array(TOTAL * 3);
+  const col   = new Float32Array(TOTAL * 3);
+  const sizes = new Float32Array(TOTAL);
 
-  // — nucleus —
-  for (let i = 0; i < CORE_COUNT; i++) {
-    const r      = Math.pow(Math.random(), 2.2) * 0.55;   // gaussian-ish cluster
-    const theta  = Math.random() * Math.PI * 2;
-    const diskH  = (Math.random() - 0.5) * 0.12 * (1 - r / 0.55);
+  let i = 0;
 
-    positions[i * 3]     = Math.cos(theta) * r;
-    positions[i * 3 + 1] = diskH;
-    positions[i * 3 + 2] = Math.sin(theta) * r;
+  // — Nucleus: warm wide blob ————————————————————————————————————
+  while (i < CORE_COUNT) {
+    const r   = Math.pow(Math.random(), 1.6) * 0.8;
+    const th  = Math.random() * Math.PI * 2;
+    const ht  = gauss() * 0.18 * (1 - r / 0.8);
 
-    const n   = r / 0.55;
-    const col = lerpPalette(n * 0.18); // keep inside warm zone
-    aColor[i * 3]     = col.r;
-    aColor[i * 3 + 1] = col.g;
-    aColor[i * 3 + 2] = col.b;
+    pos[i*3]   = Math.cos(th) * r;
+    pos[i*3+1] = ht;
+    pos[i*3+2] = Math.sin(th) * r;
 
-    // Core particles: softly varied sizes — some bigger for bloomed nucleus look
-    aSize[i] = 0.9 + Math.random() * 2.2;
+    const c = palette(r / 0.8 * 0.22);
+    col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    sizes[i] = 1.0 + Math.random() * 2.4;
+    i++;
   }
 
-  // — spiral arms with organic turbulence —
-  for (let i = 0; i < ARM_COUNT; i++) {
-    const idx = i + CORE_COUNT;
-    const arm = i % ARMS;
+  // — Ambient disk dust: fills the whole plane, no arms ————————————
+  while (i < CORE_COUNT + DUST_COUNT) {
+    // Random point inside an ellipse — creates a flat galactic disk background
+    const r   = Math.sqrt(Math.random()) * MAX_R;       // uniform area distribution
+    const th  = Math.random() * Math.PI * 2;
+    const ht  = gauss() * 0.20 * (1 - (r / MAX_R) * 0.6);
 
-    // Concave radial mapping → denser inner population
+    pos[i*3]   = Math.cos(th) * r;
+    pos[i*3+1] = ht;
+    pos[i*3+2] = Math.sin(th) * r;
+
+    const n = r / MAX_R;
+    const c = palette(Math.min(1, n * 1.05));
+    col[i*3] = c.r * 0.55; col[i*3+1] = c.g * 0.55; col[i*3+2] = c.b * 0.55;
+    sizes[i] = 0.35 + Math.random() * 0.65;
+    i++;
+  }
+
+  // — Spiral arms: wide, fluffy, dispersed ——————————————————————————
+  while (i < TOTAL) {
+    const arm = (i - CORE_COUNT - DUST_COUNT) % ARMS;
+
+    // Concave mapping: more particles cluster near the inner region
     const u      = Math.random();
-    const t      = 1 - Math.sqrt(1 - u * 0.96);
-    const radius = 0.55 + t * (MAX_R - 0.55); // start just outside nucleus
+    const t      = 1 - Math.sqrt(1 - u * 0.97);
+    const radius = 0.8 + t * (MAX_R - 0.8);
 
     const armBase  = (arm / ARMS) * Math.PI * 2;
-    const spinBase = radius * 1.85;             // tightness of spiral
+    const spinAngle = radius * 0.9;          // loose, open arms (was 1.85 — caused snake)
+    const baseAngle = armBase + spinAngle;
 
-    // Organic turbulence: angular noise + radial displacement
-    const px         = Math.cos(armBase + spinBase) * radius;
-    const pz         = Math.sin(armBase + spinBase) * radius;
-    const turbAngle  = fbm(px * 0.35, pz * 0.35) * 0.55;  // messy arm edges
-    const turbRadius = fbm(pz * 0.28, px * 0.28) * 0.40 * radius;
+    // ── MASSIVE dispersion: scatter proportional to radius ──
+    // Perpendicular (tangential) scatter — gives arms width
+    const tangScatter = gauss() * radius * 0.52;
+    const tangAngle   = baseAngle + Math.PI / 2;
+    // Radial scatter — blurs arm boundaries inward/outward
+    const radScatter  = gauss() * radius * 0.38;
 
-    const angle  = armBase + spinBase + turbAngle;
-    const r      = radius + turbRadius;
+    const x = Math.cos(baseAngle) * (radius + radScatter) + Math.cos(tangAngle) * tangScatter;
+    const z = Math.sin(baseAngle) * (radius + radScatter) + Math.sin(tangAngle) * tangScatter;
+    // Disk height: thin but not a razor; wider near centre
+    const ht = gauss() * 0.45 * Math.pow(Math.max(0, 1 - t), 1.2);
 
-    // Gaussian scatter perpendicular to arm, widening toward edge
-    const scatter      = Math.abs((Math.random() + Math.random() - 1) * 0.45 * (0.15 + t));
-    const scatterAngle = Math.random() * Math.PI * 2;
+    pos[i*3]   = x;
+    pos[i*3+1] = ht;
+    pos[i*3+2] = z;
 
-    // Disk: sharp vertical falloff
-    const diskH = (Math.random() - 0.5) * 0.35 * Math.pow(Math.max(0, 1 - t), 1.8);
-
-    positions[idx * 3]     = Math.cos(angle) * r + Math.cos(scatterAngle) * scatter;
-    positions[idx * 3 + 1] = diskH;
-    positions[idx * 3 + 2] = Math.sin(angle) * r + Math.sin(scatterAngle) * scatter;
-
-    // Colour by radius, with slight arm-specific hue shift for organic variety
-    const n      = (r - 0.55) / (MAX_R - 0.55);
-    const hShift = (arm / ARMS) * 0.05;           // tiny per-arm hue variation
-    const col    = lerpPalette(Math.min(1, n + hShift));
-    aColor[idx * 3]     = col.r;
-    aColor[idx * 3 + 1] = col.g;
-    aColor[idx * 3 + 2] = col.b;
-
-    // Size: inner region slightly larger (brighter accretion), outer whispy
-    aSize[idx] = 0.55 + Math.random() * (1.1 - t * 0.7);
+    const actualR = Math.sqrt(x*x + z*z);
+    const n = Math.min(1, actualR / MAX_R);
+    const c = palette(n);
+    col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    sizes[i] = 0.50 + Math.random() * (1.1 - t * 0.55);
+    i++;
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute("aColor",   new THREE.BufferAttribute(aColor,    3));
-  geo.setAttribute("aSize",    new THREE.BufferAttribute(aSize,     1));
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,   3));
+  geo.setAttribute("aColor",   new THREE.BufferAttribute(col,   3));
+  geo.setAttribute("aSize",    new THREE.BufferAttribute(sizes, 1));
   return geo;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-function VolumetricNebula() {
+// ─── Three component ──────────────────────────────────────────────────────────
+function GalaxyDisk() {
   const groupRef = useRef<THREE.Group>(null);
-  const geo      = useMemo(() => buildGalaxyGeo(), []);
+  const geo      = useMemo(() => buildGeo(), []);
 
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += 0.00045; // slow, majestic spin
+      groupRef.current.rotation.y += 0.00042;
     }
   });
 
@@ -199,24 +196,29 @@ export default function MasterpieceHome() {
   return (
     <main className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center">
 
-      {/* Galaxy — pure WebGL, no overlay */}
+      {/* Galaxy canvas */}
       <div className="absolute inset-0 z-0">
         <WebGLErrorBoundary fallback={<div className="w-full h-full bg-black" />}>
           <Canvas camera={{ position: [0, 3, 5], fov: 60 }}>
             <color attach="background" args={["#000000"]} />
-            <VolumetricNebula />
+            <GalaxyDisk />
+            <OrbitControls
+              enableZoom={false}
+              enablePan={false}
+              rotateSpeed={0.6}
+            />
           </Canvas>
         </WebGLErrorBoundary>
       </div>
 
       {/* UI layer */}
       <motion.div
-        className="z-10 flex flex-col items-center w-full px-6"
+        className="z-10 flex flex-col items-center w-full px-6 pointer-events-none"
         animate={{ y: isFocused ? -60 : 0 }}
         transition={{ type: "spring", stiffness: 80, damping: 20 }}
       >
         <motion.div
-          className="w-full max-w-[300px] relative group"
+          className="w-full max-w-[300px] relative group pointer-events-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
@@ -235,7 +237,7 @@ export default function MasterpieceHome() {
         </motion.div>
 
         <motion.div
-          className="flex flex-wrap justify-center gap-2 mt-4 max-w-[300px]"
+          className="flex flex-wrap justify-center gap-2 mt-4 max-w-[300px] pointer-events-auto"
           animate={{
             opacity: isFocused ? 0 : 1,
             y:       isFocused ? 10 : 0,
@@ -244,12 +246,12 @@ export default function MasterpieceHome() {
           transition={{ duration: 0.4 }}
         >
           {["Quantum Mechanics", "General Relativity", "String Theory", "Astrophysics"].map(
-            (tag, i) => (
+            (tag, idx) => (
               <motion.span
-                key={i}
+                key={idx}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 + i * 0.1, duration: 0.8 }}
+                transition={{ delay: 0.5 + idx * 0.1, duration: 0.8 }}
                 whileHover={{
                   scale: 1.05,
                   backgroundColor: "rgba(255,255,255,0.12)",
