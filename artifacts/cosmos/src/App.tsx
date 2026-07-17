@@ -78,8 +78,10 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error,     setError]     = useState('');
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef  = useRef<HTMLInputElement>(null);
+  const bottomRef  = useRef<HTMLDivElement>(null);
+  const inputRef   = useRef<HTMLInputElement>(null);
+  // Ref-based guard: prevents any concurrent or loop-triggered API call
+  const callingRef = useRef(false);
 
   // Auto-scroll to bottom on every new message or loading change
   useEffect(() => {
@@ -93,7 +95,10 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || isLoading) return;
+    // Double-guard: state flag (isLoading) + ref flag (callingRef) so
+    // no re-render timing or accidental double-invoke can trigger a second call.
+    if (!text || isLoading || callingRef.current) return;
+    callingRef.current = true;
 
     setInput('');
     setError('');
@@ -112,7 +117,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
 
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash-latest',
+        model: 'gemini-2.0-flash',
         systemInstruction: systemInstruction(avatar.name, language),
       });
 
@@ -131,6 +136,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
       setError((error as Error)?.message || String(error));
     } finally {
       setIsLoading(false);
+      callingRef.current = false;
     }
   };
 
@@ -216,7 +222,6 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
               onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }}
               onFocus={onInputFocus}
               onBlur={onInputBlur}
-              onClick={onInputFocus}
               disabled={isLoading}
               placeholder={isLoading ? 'Thinking…' : `Ask ${avatar.name.split(' ')[0]} anything…`}
               className="flex-1 bg-white/5 border border-white/20 rounded-full px-5 py-2.5 text-white text-[13px] placeholder-white/30 outline-none focus:border-white/35 focus:bg-white/8 disabled:opacity-40 transition-all duration-200 tracking-wide"
