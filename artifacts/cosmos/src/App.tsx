@@ -287,12 +287,27 @@ export default function App() {
   const [activeChat,  setActiveChat] = useState<ChatTarget | null>(null);
   const [sceneIdx,    setSceneIdx]   = useState(() => Math.floor(Math.random() * cosmicScenes.length));
   const overlayControls = useAnimation();
+  const bgIframeRef = useRef<HTMLIFrameElement>(null);
 
-  // ── Performance: pause background crossfade while chat is open ──────────────
-  // Clearing the interval removes the 300s timer entirely; it restarts when
-  // activeChat goes back to null, so no scene transitions fire during chat.
+  // ── Derived: is any UI interaction happening? ──────────────────────────────
+  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null;
+
+  // ── Pause/resume Sketchfab via postMessage when interaction state changes ──
   useEffect(() => {
-    if (activeChat) return; // paused — no interval while modal is open
+    const iframe = bgIframeRef.current;
+    if (!iframe) return;
+    const method = isAnimationPaused ? 'pause' : 'play';
+    // Sketchfab's viewer API accepts postMessage commands after it initialises.
+    // We send both to '*' and the sketchfab.com origin for compatibility.
+    try {
+      iframe.contentWindow?.postMessage(JSON.stringify({ method }), '*');
+      iframe.contentWindow?.postMessage(JSON.stringify({ method }), 'https://sketchfab.com');
+    } catch { /* cross-origin silently ignored */ }
+  }, [isAnimationPaused]);
+
+  // ── Scene rotation timer — paused whenever any UI interaction is active ────
+  useEffect(() => {
+    if (isAnimationPaused) return;
 
     const interval = setInterval(async () => {
       await overlayControls.start({ opacity: 1, transition: { duration: 1.5, ease: 'easeInOut' } });
@@ -300,7 +315,7 @@ export default function App() {
       await overlayControls.start({ opacity: 0, transition: { duration: 1.5, ease: 'easeInOut' } });
     }, 300_000);
     return () => clearInterval(interval);
-  }, [overlayControls, activeChat]);
+  }, [overlayControls, isAnimationPaused]);
 
   // ── Stable chat-open callbacks (useCallback = same reference across renders) ─
   const closeChat = useCallback(() => setActiveChat(null), []);
@@ -317,6 +332,7 @@ export default function App() {
       <div className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center">
         <iframe
           key={sceneIdx}
+          ref={bgIframeRef}
           title="Cosmic Background"
           src={cosmicScenes[sceneIdx]}
           className="absolute w-[110vw] h-[120vh] border-none pointer-events-auto"
@@ -334,6 +350,15 @@ export default function App() {
         className="absolute inset-0 z-10 bg-black pointer-events-none"
         initial={{ opacity: 0 }}
         animate={overlayControls}
+      />
+
+      {/* ── z-11  Dramatic freeze overlay — appears when any UI is active ── */}
+      <motion.div
+        className="absolute inset-0 z-11 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isAnimationPaused ? 1 : 0 }}
+        transition={{ duration: 0.6, ease: 'easeInOut' }}
+        style={{ backdropFilter: isAnimationPaused ? 'blur(2px)' : 'blur(0px)', background: 'rgba(0,0,0,0.45)' }}
       />
 
       {/* ── z-20  Main cinematic UI ── */}
