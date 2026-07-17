@@ -148,14 +148,8 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
     } catch (err: unknown) {
       const raw = (err as Error)?.message ?? String(err);
       // Surface quota/rate-limit errors as a friendly message.
-      // Google's 429 response includes a "retryDelay" or seconds in the message.
       if (/429|quota|rate.?limit|resource.?exhausted/i.test(raw)) {
-        const seconds = raw.match(/(\d+)\s*s(?:econds?)?/i)?.[1];
-        setError(
-          seconds
-            ? `Free-tier quota reached — please wait ${seconds} s before sending again.`
-            : 'Free-tier quota reached — please wait a moment before sending again.'
-        );
+        setError('Free-tier temporary limit hit. Please try again in 1 minute.');
       } else {
         setError(raw);
       }
