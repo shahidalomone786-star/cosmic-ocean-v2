@@ -63,6 +63,8 @@ router.post("/chat", async (req, res) => {
       return;
     } catch (err: unknown) {
       lastError = err;
+      const errMsg = (err as Error)?.message ?? String(err);
+      console.log('FAILED KEY:', GEMINI_KEYS[keyIndex].substring(0, 10) + '...', 'ERROR:', errMsg);
       if (isQuotaError(err)) {
         // Rotate to next key and try again
         currentKeyIndex = (currentKeyIndex + 1) % GEMINI_KEYS.length;
