@@ -92,7 +92,11 @@ function ChatModal({ avatar, language, onClose }: {
     setIsLoading(true);
 
     try {
-      const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY as string);
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error("API Key is missing! Check Replit Secrets.");
+      }
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
         systemInstruction: systemInstruction(avatar.name, language),
