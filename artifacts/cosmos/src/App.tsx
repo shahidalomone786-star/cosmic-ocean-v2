@@ -24,7 +24,11 @@ function randomIndexExcluding(current: number, length: number): number {
 }
 
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
-function AvatarCard({ name, subtitle, gradient, image }: { name: string; subtitle: string; gradient: string; image?: string }) {
+type ChatTarget = { name: string; role: string; image: string };
+
+function AvatarCard({ name, subtitle, gradient, image, onChat }: {
+  name: string; subtitle: string; gradient: string; image?: string; onChat?: () => void;
+}) {
   return (
     <motion.div
       whileHover={{ scale: 1.03, y: -4 }}
@@ -54,9 +58,12 @@ function AvatarCard({ name, subtitle, gradient, image }: { name: string; subtitl
         <p className="text-white text-sm font-medium tracking-wide truncate">{name}</p>
         <p className="text-white/40 text-[10px] tracking-wider uppercase mt-0.5 truncate">{subtitle}</p>
         <div className="mt-2.5 flex gap-1.5">
-          <span className="text-[9px] uppercase tracking-wider text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+          <button
+            onClick={onChat}
+            className="text-[9px] uppercase tracking-wider text-white/70 bg-white/8 border border-white/20 px-2 py-0.5 rounded-full hover:bg-white/15 hover:text-white transition-colors duration-200"
+          >
             Chat
-          </span>
+          </button>
           <span className="text-[9px] uppercase tracking-wider text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
             Explore
           </span>
@@ -77,6 +84,8 @@ export default function App() {
   const [langOpen,    setLangOpen]    = useState(false);
   const [activeTab,   setActiveTab]   = useState('All');
   const [portalQuery, setPortalQuery] = useState('');
+  const [activeChat,  setActiveChat]  = useState<ChatTarget | null>(null);
+  const [chatInput,   setChatInput]   = useState('');
   const [sceneIdx,    setSceneIdx]    = useState(() =>
     Math.floor(Math.random() * cosmicScenes.length)
   );
@@ -277,24 +286,28 @@ export default function App() {
                     subtitle="Theoretical Physicist"
                     gradient=""
                     image="https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg"
+                    onChat={() => setActiveChat({ name: 'Albert Einstein', role: 'Theoretical Physicist', image: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg' })}
                   />
                   <AvatarCard
                     name="Richard Feynman"
                     subtitle="Quantum Pioneer"
                     gradient=""
                     image="https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg"
+                    onChat={() => setActiveChat({ name: 'Richard Feynman', role: 'Quantum Pioneer', image: 'https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg' })}
                   />
                   <AvatarCard
                     name="Carl Sagan"
                     subtitle="Cosmos Explorer"
                     gradient=""
                     image="/carl-sagan.jpg"
+                    onChat={() => setActiveChat({ name: 'Carl Sagan', role: 'Cosmos Explorer', image: '/carl-sagan.jpg' })}
                   />
                   <AvatarCard
                     name="Nikola Tesla"
                     subtitle="Electrical Visionary"
                     gradient=""
                     image="https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg"
+                    onChat={() => setActiveChat({ name: 'Nikola Tesla', role: 'Electrical Visionary', image: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg' })}
                   />
                 </div>
               </div>
@@ -321,6 +334,92 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[100]  Chat Modal ── */}
+      <AnimatePresence>
+        {activeChat && (
+          <motion.div
+            key="chat-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center px-4"
+            onClick={() => setActiveChat(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="w-[90%] max-w-2xl h-[80vh] bg-black/40 border border-white/20 rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={activeChat.image}
+                    alt={activeChat.name}
+                    className="w-9 h-9 rounded-full object-cover border border-white/20"
+                  />
+                  <div>
+                    <p className="text-white text-[13px] font-medium tracking-wide leading-tight">
+                      {activeChat.name}
+                    </p>
+                    <p className="text-white/40 text-[10px] uppercase tracking-wider">{activeChat.role}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveChat(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-colors duration-200 text-lg leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Message area */}
+              <div className="flex-1 overflow-y-auto p-5 scrollbar-hide space-y-4">
+                {/* AI greeting bubble */}
+                <div className="flex items-start gap-3">
+                  <img
+                    src={activeChat.image}
+                    alt={activeChat.name}
+                    className="w-7 h-7 rounded-full object-cover border border-white/15 flex-shrink-0 mt-0.5"
+                  />
+                  <div className="bg-white/8 border border-white/10 backdrop-blur-xl rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%]">
+                    <p className="text-white/85 text-[13px] leading-relaxed tracking-wide">
+                      Greetings! I am {activeChat.name}. What mysteries of the universe shall we explore today?
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input area */}
+              <div className="flex-shrink-0 px-4 py-4 border-t border-white/10">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') setChatInput(''); }}
+                    placeholder={`Ask ${activeChat.name.split(' ')[0]} anything…`}
+                    className="flex-1 bg-white/5 border border-white/20 rounded-full px-5 py-2.5 text-white text-[13px] placeholder-white/30 outline-none focus:border-white/35 focus:bg-white/8 transition-colors duration-200 tracking-wide"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.06 }}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => setChatInput('')}
+                    className="flex-shrink-0 w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition-colors duration-200"
+                  >
+                    <span className="text-base leading-none">↑</span>
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
