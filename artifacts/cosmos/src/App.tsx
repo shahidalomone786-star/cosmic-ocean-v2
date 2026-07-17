@@ -152,12 +152,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
       setMessages(prev => [...prev, { role: 'model', text: reply }]);
     } catch (err: unknown) {
       const raw = (err as Error)?.message ?? String(err);
-      // Surface quota/rate-limit errors as a friendly message.
-      if (/429|quota|rate.?limit|resource.?exhausted/i.test(raw)) {
-        setError('Free-tier temporary limit hit. Please try again in 1 minute.');
-      } else {
-        setError(raw);
-      }
+      setError(raw);
     } finally {
       setIsLoading(false);
       callingRef.current = false;
