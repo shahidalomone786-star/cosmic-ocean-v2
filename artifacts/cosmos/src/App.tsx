@@ -24,19 +24,29 @@ function randomIndexExcluding(current: number, length: number): number {
 }
 
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
-function AvatarCard({ name, subtitle, gradient }: { name: string; subtitle: string; gradient: string }) {
+function AvatarCard({ name, subtitle, gradient, image }: { name: string; subtitle: string; gradient: string; image?: string }) {
   return (
     <motion.div
       whileHover={{ scale: 1.03, y: -4 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
       className="relative flex-shrink-0 w-44 rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl cursor-pointer group"
     >
-      {/* Abstract gradient avatar */}
-      <div className={`w-full h-36 ${gradient} flex items-center justify-center relative overflow-hidden`}>
-        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent" />
-        <span className="text-4xl font-thin text-white/80 select-none z-10">
-          {name.split(' ').map(w => w[0]).join('')}
-        </span>
+      {/* Photo or abstract gradient avatar */}
+      <div className="w-full h-36 relative overflow-hidden">
+        {image ? (
+          <img
+            src={image}
+            alt={name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div className={`w-full h-full ${gradient} flex items-center justify-center relative`}>
+            <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent" />
+            <span className="text-4xl font-thin text-white/80 select-none z-10">
+              {name.split(' ').map((w: string) => w[0]).join('')}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Card body */}
@@ -265,12 +275,14 @@ export default function App() {
                   <AvatarCard
                     name="Albert Einstein"
                     subtitle="Theoretical Physicist"
-                    gradient="bg-gradient-to-br from-amber-900/80 via-orange-800/60 to-yellow-900/40"
+                    gradient=""
+                    image="https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg"
                   />
                   <AvatarCard
                     name="Richard Feynman"
                     subtitle="Quantum Pioneer"
-                    gradient="bg-gradient-to-br from-blue-900/80 via-indigo-800/60 to-violet-900/40"
+                    gradient=""
+                    image="https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg"
                   />
                   <AvatarCard
                     name="Carl Sagan"
