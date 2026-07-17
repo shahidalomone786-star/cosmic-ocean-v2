@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -85,20 +84,6 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
   const callingRef  = useRef(false);
   const lastSentRef = useRef(0);
 
-  // Build the model once per avatar+language combination, not on every send.
-  // getGenerativeModel() makes zero network requests — it only configures a handle.
-  const geminiModelRef = useRef<ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']> | null>(null);
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) return;
-    const genAI = new GoogleGenerativeAI(apiKey);
-    geminiModelRef.current = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: systemInstruction(avatar.name, language),
-    });
-  // Re-create only when avatar or language changes — still no network call.
-  }, [avatar.name, language]);
-
   // Auto-scroll to bottom on every new message or loading change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -124,12 +109,6 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
     // Guard 3 — client-side 3-second cooldown between API calls
     const now = Date.now();
     if (now - lastSentRef.current < 3_000) return;
-    // Guard 4 — model must be initialised (API key present)
-    if (!geminiModelRef.current) {
-      setError('API Key missing in Replit Secrets');
-      return;
-    }
-
     callingRef.current  = true;
     lastSentRef.current = now;
 
@@ -145,14 +124,26 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
         parts: [{ text: m.text }],
       }));
 
-      const chat   = geminiModelRef.current.startChat({ history });
-      const result = await chat.sendMessage(text);
-      const reply  = result.response.text();
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history,
+          avatarName: avatar.name,
+          language,
+        }),
+      });
 
-      setMessages(prev => [...prev, { role: 'model', text: reply }]);
+      const data = await res.json() as { reply?: string; error?: string };
+
+      if (!res.ok || data.error) {
+        setError(data.error ?? `Server error ${res.status}`);
+      } else {
+        setMessages(prev => [...prev, { role: 'model', text: data.reply! }]);
+      }
     } catch (err: unknown) {
-      const raw = (err as Error)?.message ?? String(err);
-      setError(raw);
+      setError((err as Error)?.message ?? String(err));
     } finally {
       setIsLoading(false);
       callingRef.current = false;
