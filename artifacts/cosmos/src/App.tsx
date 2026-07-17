@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import NasaSearch from './components/NasaSearch';
+import NasaSearch, { type NasaItem, type NasaStatus } from './components/NasaSearch';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -298,7 +298,6 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [appMode,     setAppMode]    = useState<'chat' | 'nasa'>('chat');
   const [focused,     setFocused]    = useState(false);
   const [showPortal,  setShowPortal] = useState(false);
   const [language,    setLanguage]   = useState('English');
@@ -311,8 +310,41 @@ export default function App() {
   const overlayControls = useAnimation();
   const bgIframeRef = useRef<HTMLIFrameElement>(null);
 
+  // ── NASA image search state ────────────────────────────────────────────────
+  const [nasaQuery,   setNasaQuery]   = useState('');
+  const [nasaResults, setNasaResults] = useState<NasaItem[]>([]);
+  const [nasaStatus,  setNasaStatus]  = useState<NasaStatus>('idle');
+  const [nasaError,   setNasaError]   = useState('');
+
+  const hasSearchResults = nasaStatus !== 'idle';
+
+  const searchNasa = useCallback(async (q: string) => {
+    const term = q.trim();
+    if (!term) return;
+    setNasaStatus('loading');
+    setNasaResults([]);
+    setNasaError('');
+    try {
+      const res  = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(term)}&media_type=image`);
+      if (!res.ok) throw new Error(`NASA API error ${res.status}`);
+      const json = await res.json() as { collection: { items: NasaItem[] } };
+      setNasaResults(json.collection.items ?? []);
+      setNasaStatus('done');
+    } catch (err: unknown) {
+      setNasaError((err as Error)?.message ?? String(err));
+      setNasaStatus('error');
+    }
+  }, []);
+
+  const clearNasa = useCallback(() => {
+    setNasaQuery('');
+    setNasaResults([]);
+    setNasaStatus('idle');
+    setNasaError('');
+  }, []);
+
   // ── Derived: is any UI interaction happening? ──────────────────────────────
-  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused;
+  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused || hasSearchResults;
 
   // ── Pause/resume Sketchfab via postMessage when interaction state changes ──
   useEffect(() => {
@@ -351,7 +383,10 @@ export default function App() {
     <div className="relative w-full h-screen bg-black overflow-hidden">
 
       {/* ── z-0  Full-screen Sketchfab background ── */}
-      <div className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center">
+      <div
+        className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center transition-all duration-1000"
+        style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
+      >
         <iframe
           key={sceneIdx}
           ref={bgIframeRef}
@@ -383,70 +418,77 @@ export default function App() {
         style={{ backdropFilter: isAnimationPaused ? 'blur(2px)' : 'blur(0px)', background: 'rgba(0,0,0,0.45)' }}
       />
 
-      {/* ── z-50  Tab switcher — always above everything, never conditional ── */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 backdrop-blur-xl bg-white/10 border border-white/20 rounded-full p-1 shadow-2xl">
-        {(['chat', 'nasa'] as const).map(mode => (
-          <button
-            key={mode}
-            onClick={() => setAppMode(mode)}
-            className={`px-5 py-1.5 rounded-full text-[11px] uppercase tracking-[0.2em] font-medium transition-all duration-300 ${
-              appMode === mode
-                ? 'bg-white/20 text-white shadow-inner'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-          >
-            {mode === 'chat' ? '✦ Cosmic Chat' : '🛸 NASA Archive'}
-          </button>
-        ))}
-      </div>
-
-      {/* ── z-40  NASA Search panel — rendered only in nasa mode ── */}
-      {appMode === 'nasa' && <NasaSearch />}
-
       {/* ── z-20  Main cinematic UI ── */}
       <AnimatePresence>
-        {appMode === 'chat' && !showPortal && (
+        {!showPortal && (
           <motion.div key="main-ui"
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+            className={`absolute inset-0 z-20 flex flex-col items-center pointer-events-none ${
+              hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
+            }`}
           >
+            {/* Search bar + tags + "Everything" button */}
             <motion.div
-              animate={{ y: focused ? -120 : 0 }}
+              animate={{ y: hasSearchResults ? 0 : focused ? -120 : 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-              className="flex flex-col items-center gap-5 pointer-events-auto px-6 w-full max-w-md"
+              className={`flex flex-col items-center gap-5 pointer-events-auto px-6 w-full ${
+                hasSearchResults ? 'max-w-2xl' : 'max-w-md'
+              }`}
             >
               <div className="w-full backdrop-blur-xl bg-white/10 border border-white/20 rounded-full px-5 py-3.5 shadow-2xl">
-                <input type="text" placeholder="Search the cosmos..."
-                  onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                  className="w-full bg-transparent outline-none text-white placeholder-white/50 text-[15px] tracking-wide" />
+                <input
+                  type="text"
+                  value={nasaQuery}
+                  placeholder="Search the cosmos..."
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearNasa(); }}
+                  onKeyDown={e => { if (e.key === 'Enter') searchNasa(nasaQuery); }}
+                  className="w-full bg-transparent outline-none text-white placeholder-white/50 text-[15px] tracking-wide"
+                />
               </div>
 
               <div className="flex flex-wrap justify-center gap-2">
                 {TAGS.map(tag => (
-                  <span key={tag}
-                    className="text-[11px] uppercase tracking-wider text-white/70 backdrop-blur-md bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                  <button key={tag}
+                    onClick={() => { setNasaQuery(tag); searchNasa(tag); }}
+                    className="text-[11px] uppercase tracking-wider text-white/70 backdrop-blur-md bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:bg-white/10 hover:text-white/90 hover:border-white/20 transition-all duration-200 cursor-pointer">
                     {tag}
-                  </span>
+                  </button>
                 ))}
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.10)' }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setShowPortal(true)}
-                className="mt-1 px-7 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-xl text-white/80 text-[12px] uppercase tracking-[0.25em] font-medium shadow-lg transition-colors duration-300"
-              >
-                Everything ✦
-              </motion.button>
+              {!hasSearchResults && (
+                <motion.button
+                  whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.10)' }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowPortal(true)}
+                  className="mt-1 px-7 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-xl text-white/80 text-[12px] uppercase tracking-[0.25em] font-medium shadow-lg transition-colors duration-300"
+                >
+                  Everything ✦
+                </motion.button>
+              )}
             </motion.div>
+
+            {/* NASA results — scroll in below the search bar */}
+            {hasSearchResults && (
+              <div className="w-full max-w-2xl px-6 mt-8 pointer-events-auto">
+                <NasaSearch
+                  results={nasaResults}
+                  status={nasaStatus}
+                  errMsg={nasaError}
+                  onClear={clearNasa}
+                />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── z-30  Everything Portal ── */}
       <AnimatePresence>
-        {appMode === 'chat' && showPortal && (
+        {showPortal && (
           <motion.div key="portal"
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
@@ -561,7 +603,7 @@ export default function App() {
 
       {/* ── z-[100]  Chat Modal — only mounts when activeChat is truly set ── */}
       <AnimatePresence>
-        {appMode === 'chat' && activeChat && (
+        {activeChat && (
           <ChatModal
             avatar={activeChat}
             language={language}
