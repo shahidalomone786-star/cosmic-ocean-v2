@@ -78,10 +78,26 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error,     setError]     = useState('');
-  const bottomRef  = useRef<HTMLDivElement>(null);
-  const inputRef   = useRef<HTMLInputElement>(null);
-  // Ref-based guard: prevents any concurrent or loop-triggered API call
-  const callingRef = useRef(false);
+  const bottomRef   = useRef<HTMLDivElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  // callingRef:   prevents concurrent or double-invoke calls (ref, not state, so it's synchronous)
+  // lastSentRef:  timestamp of last successful dispatch — enforces a client-side 3 s cooldown
+  const callingRef  = useRef(false);
+  const lastSentRef = useRef(0);
+
+  // Build the model once per avatar+language combination, not on every send.
+  // getGenerativeModel() makes zero network requests — it only configures a handle.
+  const geminiModelRef = useRef<ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']> | null>(null);
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) return;
+    const genAI = new GoogleGenerativeAI(apiKey);
+    geminiModelRef.current = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: systemInstruction(avatar.name, language),
+    });
+  // Re-create only when avatar or language changes — still no network call.
+  }, [avatar.name, language]);
 
   // Auto-scroll to bottom on every new message or loading change
   useEffect(() => {
@@ -95,45 +111,54 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
 
   const sendMessage = async () => {
     const text = input.trim();
-    // Double-guard: state flag (isLoading) + ref flag (callingRef) so
-    // no re-render timing or accidental double-invoke can trigger a second call.
-    if (!text || isLoading || callingRef.current) return;
-    callingRef.current = true;
+
+    // Guard 1 — must have text and not already be loading
+    if (!text || isLoading) return;
+    // Guard 2 — synchronous in-flight lock (immune to render-timing races)
+    if (callingRef.current) return;
+    // Guard 3 — client-side 3-second cooldown between API calls
+    const now = Date.now();
+    if (now - lastSentRef.current < 3_000) return;
+    // Guard 4 — model must be initialised (API key present)
+    if (!geminiModelRef.current) {
+      setError('API Key missing in Replit Secrets');
+      return;
+    }
+
+    callingRef.current  = true;
+    lastSentRef.current = now;
 
     setInput('');
     setError('');
-
-    // Optimistically append user message
-    const userMsg: Message = { role: 'user', text };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { role: 'user', text }]);
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        setError("API Key missing in Replit Secrets");
-        return;
-      }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
-        systemInstruction: systemInstruction(avatar.name, language),
-      });
-
-      // Build Gemini history from all messages except the greeting and the new user message
+      // Build history from all messages except the opening greeting and the new user turn
       const history = messages.slice(1).map(m => ({
         role: m.role,
         parts: [{ text: m.text }],
       }));
 
-      const chat   = model.startChat({ history });
+      const chat   = geminiModelRef.current.startChat({ history });
       const result = await chat.sendMessage(text);
       const reply  = result.response.text();
 
       setMessages(prev => [...prev, { role: 'model', text: reply }]);
-    } catch (error: unknown) {
-      setError((error as Error)?.message || String(error));
+    } catch (err: unknown) {
+      const raw = (err as Error)?.message ?? String(err);
+      // Surface quota/rate-limit errors as a friendly message.
+      // Google's 429 response includes a "retryDelay" or seconds in the message.
+      if (/429|quota|rate.?limit|resource.?exhausted/i.test(raw)) {
+        const seconds = raw.match(/(\d+)\s*s(?:econds?)?/i)?.[1];
+        setError(
+          seconds
+            ? `Free-tier quota reached — please wait ${seconds} s before sending again.`
+            : 'Free-tier quota reached — please wait a moment before sending again.'
+        );
+      } else {
+        setError(raw);
+      }
     } finally {
       setIsLoading(false);
       callingRef.current = false;
