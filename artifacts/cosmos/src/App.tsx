@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
+import NasaSearch from './components/NasaSearch';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -297,6 +298,7 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [appMode,     setAppMode]    = useState<'chat' | 'nasa'>('chat');
   const [focused,     setFocused]    = useState(false);
   const [showPortal,  setShowPortal] = useState(false);
   const [language,    setLanguage]   = useState('English');
@@ -381,9 +383,29 @@ export default function App() {
         style={{ backdropFilter: isAnimationPaused ? 'blur(2px)' : 'blur(0px)', background: 'rgba(0,0,0,0.45)' }}
       />
 
+      {/* ── z-50  Tab switcher — always above everything, never conditional ── */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 backdrop-blur-xl bg-white/10 border border-white/20 rounded-full p-1 shadow-2xl">
+        {(['chat', 'nasa'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setAppMode(mode)}
+            className={`px-5 py-1.5 rounded-full text-[11px] uppercase tracking-[0.2em] font-medium transition-all duration-300 ${
+              appMode === mode
+                ? 'bg-white/20 text-white shadow-inner'
+                : 'text-white/50 hover:text-white/80'
+            }`}
+          >
+            {mode === 'chat' ? '✦ Cosmic Chat' : '🛸 NASA Archive'}
+          </button>
+        ))}
+      </div>
+
+      {/* ── z-40  NASA Search panel — rendered only in nasa mode ── */}
+      {appMode === 'nasa' && <NasaSearch />}
+
       {/* ── z-20  Main cinematic UI ── */}
       <AnimatePresence>
-        {!showPortal && (
+        {appMode === 'chat' && !showPortal && (
           <motion.div key="main-ui"
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.4, ease: 'easeInOut' }}
@@ -424,7 +446,7 @@ export default function App() {
 
       {/* ── z-30  Everything Portal ── */}
       <AnimatePresence>
-        {showPortal && (
+        {appMode === 'chat' && showPortal && (
           <motion.div key="portal"
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
@@ -539,7 +561,7 @@ export default function App() {
 
       {/* ── z-[100]  Chat Modal — only mounts when activeChat is truly set ── */}
       <AnimatePresence>
-        {activeChat && (
+        {appMode === 'chat' && activeChat && (
           <ChatModal
             avatar={activeChat}
             language={language}
