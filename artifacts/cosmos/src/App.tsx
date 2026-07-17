@@ -288,7 +288,7 @@ export default function App() {
                     name="Carl Sagan"
                     subtitle="Cosmos Explorer"
                     gradient=""
-                    image="https://upload.wikimedia.org/wikipedia/commons/b/be/Carl_Sagan_Planetary_Society.ROM.jpg"
+                    image="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Carl_Sagan_in_1980_%28cropped%29.jpg/400px-Carl_Sagan_in_1980_%28cropped%29.jpg"
                   />
                   <AvatarCard
                     name="Nikola Tesla"
