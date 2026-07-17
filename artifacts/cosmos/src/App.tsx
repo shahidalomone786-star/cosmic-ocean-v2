@@ -287,12 +287,14 @@ export default function App() {
                   <AvatarCard
                     name="Carl Sagan"
                     subtitle="Cosmos Explorer"
-                    gradient="bg-gradient-to-br from-slate-900/80 via-blue-900/60 to-cyan-900/40"
+                    gradient=""
+                    image="https://upload.wikimedia.org/wikipedia/commons/b/be/Carl_Sagan_Planetary_Society.ROM.jpg"
                   />
                   <AvatarCard
                     name="Nikola Tesla"
                     subtitle="Electrical Visionary"
-                    gradient="bg-gradient-to-br from-violet-900/80 via-purple-800/60 to-fuchsia-900/40"
+                    gradient=""
+                    image="https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg"
                   />
                 </div>
               </div>
