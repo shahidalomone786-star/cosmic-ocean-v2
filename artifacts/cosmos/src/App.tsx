@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// ─── 6 Cosmic Scenes (untouched) ─────────────────────────────────────────────
+// ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
   "https://sketchfab.com/models/e410da98b1e5445eae2acafaaa53587d/embed?autospin=1&autostart=1&preload=1&ui_infos=0",
   "https://sketchfab.com/models/d6521362b37b48e3a82bce4911409303/embed?autostart=1&preload=1&ui_infos=0",
@@ -17,6 +17,17 @@ const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory',
 const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','Equations',
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 const LANGUAGES   = ['English','Hindi','Hinglish','Japanese','Spanish','French','German','Arabic'];
+
+// ─── Avatar data (stable constant — prevents object recreation on re-render) ──
+const AVATARS = [
+  { name: 'Albert Einstein', role: 'Theoretical Physicist',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg' },
+  { name: 'Richard Feynman', role: 'Quantum Pioneer',
+    image: 'https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg' },
+  { name: 'Carl Sagan',      role: 'Cosmos Explorer',      image: '/carl-sagan.jpg' },
+  { name: 'Nikola Tesla',    role: 'Electrical Visionary',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg' },
+] as const;
 
 function randomIndexExcluding(current: number, length: number): number {
   let next = current;
@@ -92,10 +103,21 @@ function ChatModal({ avatar, language, onClose }: {
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      // ── API Key debug (issue #1) ──────────────────────────────────────────
+      console.log(
+        'API Key Debug:',
+        import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined)
+      );
+
+      // Primary: Vite env; fallback: Node process.env (e.g. SSR or test contexts)
+      const apiKey: string =
+        import.meta.env.VITE_GEMINI_API_KEY ??
+        (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
+
       if (!apiKey) {
-        console.error("API Key is missing! Check Replit Secrets.");
+        console.error('API Key is missing! Check Replit Secrets.');
       }
+
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
@@ -158,14 +180,12 @@ function ChatModal({ avatar, language, onClose }: {
         <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-3">
           {messages.map((msg, idx) =>
             msg.role === 'user' ? (
-              // User bubble — right-aligned, glass tint
               <div key={idx} className="flex justify-end">
                 <div className="bg-white/10 border border-white/15 backdrop-blur-xl rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[78%]">
                   <p className="text-white text-[13px] leading-relaxed tracking-wide">{msg.text}</p>
                 </div>
               </div>
             ) : (
-              // AI bubble — left-aligned, avatar thumbnail
               <div key={idx} className="flex items-start gap-2.5">
                 <img src={avatar.image} alt={avatar.name}
                   className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
@@ -176,7 +196,6 @@ function ChatModal({ avatar, language, onClose }: {
             )
           )}
 
-          {/* Thinking indicator */}
           {isLoading && (
             <div className="flex items-start gap-2.5">
               <img src={avatar.image} alt={avatar.name}
@@ -187,12 +206,10 @@ function ChatModal({ avatar, language, onClose }: {
             </div>
           )}
 
-          {/* Error toast */}
           {error && (
             <p className="text-center text-red-400/80 text-[11px] tracking-wide py-1">{error}</p>
           )}
 
-          {/* Scroll anchor */}
           <div ref={bottomRef} />
         </div>
 
@@ -225,9 +242,9 @@ function ChatModal({ avatar, language, onClose }: {
   );
 }
 
-// ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
-function AvatarCard({ name, subtitle, gradient, image, onChat }: {
-  name: string; subtitle: string; gradient: string; image?: string; onChat?: () => void;
+// ─── Glassmorphism Avatar Card (memo = skip re-render when App state changes) ─
+const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
+  name: string; subtitle: string; image?: string; onChat: () => void;
 }) {
   return (
     <motion.div
@@ -240,7 +257,7 @@ function AvatarCard({ name, subtitle, gradient, image, onChat }: {
           <img src={image} alt={name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
-          <div className={`w-full h-full ${gradient} flex items-center justify-center relative`}>
+          <div className="w-full h-full bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center relative">
             <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent" />
             <span className="text-4xl font-thin text-white/80 select-none z-10">
               {name.split(' ').map((w: string) => w[0]).join('')}
@@ -266,7 +283,7 @@ function AvatarCard({ name, subtitle, gradient, image, onChat }: {
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
     </motion.div>
   );
-}
+});
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -280,15 +297,27 @@ export default function App() {
   const [sceneIdx,    setSceneIdx]   = useState(() => Math.floor(Math.random() * cosmicScenes.length));
   const overlayControls = useAnimation();
 
-  // 5-minute cinematic crossfade swap (untouched)
+  // ── Performance: pause background crossfade while chat is open ──────────────
+  // Clearing the interval removes the 300s timer entirely; it restarts when
+  // activeChat goes back to null, so no scene transitions fire during chat.
   useEffect(() => {
+    if (activeChat) return; // paused — no interval while modal is open
+
     const interval = setInterval(async () => {
       await overlayControls.start({ opacity: 1, transition: { duration: 1.5, ease: 'easeInOut' } });
       setSceneIdx(prev => randomIndexExcluding(prev, cosmicScenes.length));
       await overlayControls.start({ opacity: 0, transition: { duration: 1.5, ease: 'easeInOut' } });
     }, 300_000);
     return () => clearInterval(interval);
-  }, [overlayControls]);
+  }, [overlayControls, activeChat]);
+
+  // ── Stable chat-open callbacks (useCallback = same reference across renders) ─
+  const closeChat = useCallback(() => setActiveChat(null), []);
+
+  // One stable handler; each AvatarCard passes its own avatar object from the
+  // AVATARS constant (never recreated), so the inline arrow below is the only
+  // new allocation — and memo on AvatarCard skips the child re-render anyway.
+  const openChat = useCallback((avatar: ChatTarget) => setActiveChat(avatar), []);
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
@@ -309,7 +338,7 @@ export default function App() {
         />
       </div>
 
-      {/* ── z-10  Cinematic crossfade overlay (untouched) ── */}
+      {/* ── z-10  Cinematic crossfade overlay ── */}
       <motion.div
         className="absolute inset-0 z-10 bg-black pointer-events-none"
         initial={{ opacity: 0 }}
@@ -428,25 +457,22 @@ export default function App() {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-5 pb-8 scrollbar-hide">
 
-              {/* Cosmic Pix */}
+              {/* Cosmic Pix — lazy-stable avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
                   <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Cosmic Pix</h2>
                   <span className="text-white/30 text-[11px] uppercase tracking-wider">AI Avatars</span>
                 </div>
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  <AvatarCard name="Albert Einstein" subtitle="Theoretical Physicist" gradient=""
-                    image="https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg"
-                    onChat={() => setActiveChat({ name: 'Albert Einstein', role: 'Theoretical Physicist', image: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg' })} />
-                  <AvatarCard name="Richard Feynman" subtitle="Quantum Pioneer" gradient=""
-                    image="https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg"
-                    onChat={() => setActiveChat({ name: 'Richard Feynman', role: 'Quantum Pioneer', image: 'https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg' })} />
-                  <AvatarCard name="Carl Sagan" subtitle="Cosmos Explorer" gradient=""
-                    image="/carl-sagan.jpg"
-                    onChat={() => setActiveChat({ name: 'Carl Sagan', role: 'Cosmos Explorer', image: '/carl-sagan.jpg' })} />
-                  <AvatarCard name="Nikola Tesla" subtitle="Electrical Visionary" gradient=""
-                    image="https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg"
-                    onChat={() => setActiveChat({ name: 'Nikola Tesla', role: 'Electrical Visionary', image: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg' })} />
+                  {AVATARS.map(av => (
+                    <AvatarCard
+                      key={av.name}
+                      name={av.name}
+                      subtitle={av.role}
+                      image={av.image}
+                      onChat={() => openChat(av)}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -475,13 +501,13 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── z-[100]  Chat Modal ── */}
+      {/* ── z-[100]  Chat Modal — only mounts when activeChat is truly set ── */}
       <AnimatePresence>
         {activeChat && (
           <ChatModal
             avatar={activeChat}
             language={language}
-            onClose={() => setActiveChat(null)}
+            onClose={closeChat}
           />
         )}
       </AnimatePresence>
