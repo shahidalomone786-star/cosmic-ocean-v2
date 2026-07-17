@@ -109,6 +109,11 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
     if (!isLoading) inputRef.current?.focus();
   }, [isLoading]);
 
+  // Clear any stale error whenever the active avatar changes
+  useEffect(() => {
+    setError('');
+  }, [avatar.name]);
+
   const sendMessage = async () => {
     const text = input.trim();
 
@@ -237,7 +242,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
               ref={inputRef}
               type="text"
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { setInput(e.target.value); if (error) setError(''); }}
               onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }}
               onFocus={onInputFocus}
               onBlur={onInputBlur}
