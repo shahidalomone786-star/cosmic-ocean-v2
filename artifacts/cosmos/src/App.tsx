@@ -103,19 +103,10 @@ function ChatModal({ avatar, language, onClose }: {
     setIsLoading(true);
 
     try {
-      // ── API Key debug (issue #1) ──────────────────────────────────────────
-      console.log(
-        'API Key Debug:',
-        import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined)
-      );
-
-      // Primary: Vite env; fallback: Node process.env (e.g. SSR or test contexts)
-      const apiKey: string =
-        import.meta.env.VITE_GEMINI_API_KEY ??
-        (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
-
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        console.error('API Key is missing! Check Replit Secrets.');
+        setError("ERROR: API_KEY_MISSING from Replit Secrets.");
+        return;
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
@@ -135,8 +126,8 @@ function ChatModal({ avatar, language, onClose }: {
       const reply  = result.response.text();
 
       setMessages(prev => [...prev, { role: 'model', text: reply }]);
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (error: unknown) {
+      setError((error as Error)?.message || String(error));
     } finally {
       setIsLoading(false);
     }
