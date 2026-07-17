@@ -85,18 +85,19 @@ export default function App() {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
 
-      {/* ── z-0  Full-screen Sketchfab background (untouched) ── */}
-      <div className="absolute inset-0 z-0">
+      {/* ── z-0  Full-screen Sketchfab background — 110vw×120vh pushes bottom controls off-screen ── */}
+      <div className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center">
         <iframe
           key={sceneIdx}
-          title={`cosmic-scene-${sceneIdx}`}
+          title="Cosmic Background"
           src={cosmicScenes[sceneIdx]}
-          className="w-full h-full border-0"
-          allowFullScreen
+          className="absolute w-[110vw] h-[120vh] border-none pointer-events-auto"
           allow="autoplay; fullscreen; xr-spatial-tracking"
-          // @ts-expect-error – non-standard Sketchfab attributes
-          mozallowfullscreen="true"
-          webkitallowfullscreen="true"
+          // @ts-expect-error – non-standard Sketchfab / iframe attributes
+          xr-spatial-tracking="true"
+          execution-while-out-of-viewport="true"
+          execution-while-not-rendered="true"
+          web-share="true"
         />
       </div>
 
