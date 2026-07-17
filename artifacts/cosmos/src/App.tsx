@@ -103,9 +103,9 @@ function ChatModal({ avatar, language, onClose }: {
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        setError("ERROR: API_KEY_MISSING from Replit Secrets.");
+        setError("API Key missing in Replit Secrets");
         return;
       }
 
