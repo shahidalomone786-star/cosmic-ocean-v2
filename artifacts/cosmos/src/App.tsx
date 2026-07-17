@@ -288,7 +288,7 @@ export default function App() {
                     name="Carl Sagan"
                     subtitle="Cosmos Explorer"
                     gradient=""
-                    image="https://cdn.britannica.com/15/116415-050-61A601A9/Carl-Sagan.jpg"
+                    image="/carl-sagan.jpg"
                   />
                   <AvatarCard
                     name="Nikola Tesla"
