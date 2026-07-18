@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import NasaSearch, { DetailModal, type UnifiedItem, type WikiItem, type NasaItem, type NasaStatus } from './components/NasaSearch';
-import BigBangIntro from './components/BigBangIntro';
+import WarpIntro from './components/WarpIntro';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -37,14 +37,16 @@ const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','E
 
 // Languages + their Google Translate codes
 const LANGUAGES: { label: string; gtCode: string }[] = [
-  { label: 'English',  gtCode: 'en' },
-  { label: 'Hindi',    gtCode: 'hi' },
-  { label: 'Hinglish', gtCode: 'hi' },
-  { label: 'Japanese', gtCode: 'ja' },
-  { label: 'Spanish',  gtCode: 'es' },
-  { label: 'French',   gtCode: 'fr' },
-  { label: 'German',   gtCode: 'de' },
-  { label: 'Arabic',   gtCode: 'ar' },
+  { label: 'English',    gtCode: 'en' },
+  { label: 'Hindi',      gtCode: 'hi' },
+  { label: 'Japanese',   gtCode: 'ja' },
+  { label: 'Spanish',    gtCode: 'es' },
+  { label: 'French',     gtCode: 'fr' },
+  { label: 'German',     gtCode: 'de' },
+  { label: 'Arabic',     gtCode: 'ar' },
+  { label: 'Portuguese', gtCode: 'pt' },
+  { label: 'Korean',     gtCode: 'ko' },
+  { label: 'Chinese',    gtCode: 'zh-CN' },
 ];
 
 // ─── Avatar data ──────────────────────────────────────────────────────────────
@@ -104,25 +106,40 @@ function injectGoogleTranslate() {
   document.head.appendChild(script);
 }
 
+function deleteGTranslateCookie() {
+  const past = 'expires=Thu, 01 Jan 1970 00:00:01 GMT';
+  document.cookie = `googtrans=; ${past}; path=/;`;
+  document.cookie = `googtrans=; ${past}; domain=${location.hostname}; path=/;`;
+  // Also clear sub-domain variant (e.g. www.)
+  document.cookie = `googtrans=; ${past}; domain=.${location.hostname}; path=/;`;
+}
+
 function applyGTranslate(targetCode: string) {
   if (targetCode === 'en') {
-    // Restore English by clearing the cookie and reloading
-    const cookieBase = 'googtrans=/en/en';
-    document.cookie = `${cookieBase};path=/;`;
-    document.cookie = `${cookieBase};domain=${location.hostname};path=/;`;
-    // Reload only if currently translated
-    const currentCookie = document.cookie;
-    if (currentCookie.includes('googtrans') && !currentCookie.includes('/en/en')) {
+    // Read the cookie state BEFORE touching anything
+    const wasTranslated = document.cookie
+      .split(';')
+      .some(c => {
+        const v = c.trim();
+        return v.startsWith('googtrans=') && !v.includes('/en/en') && v !== 'googtrans=';
+      });
+
+    // Nuke the cookie unconditionally so GT doesn't re-apply on reload
+    deleteGTranslateCookie();
+
+    if (wasTranslated) {
+      // Hard reload — the deleted cookie means GT will serve English
       window.location.reload();
     }
     return;
   }
-  // Set cookie then trigger the select element that Google Translate creates
-  const cookieVal = `/en/${targetCode}`;
-  document.cookie = `googtrans=${cookieVal};path=/;`;
-  document.cookie = `googtrans=${cookieVal};domain=${location.hostname};path=/;`;
 
-  // Try via the combo select (safest method)
+  // ── Non-English: set cookie then fire the GT combo-select ──────────────────
+  const cookieVal = `/en/${targetCode}`;
+  document.cookie = `googtrans=${cookieVal}; path=/;`;
+  document.cookie = `googtrans=${cookieVal}; domain=${location.hostname}; path=/;`;
+
+  // Primary: trigger the hidden GT select element (no reload needed)
   const sel = document.querySelector<HTMLSelectElement>('.goog-te-combo');
   if (sel) {
     sel.value = targetCode;
@@ -130,8 +147,8 @@ function applyGTranslate(targetCode: string) {
     return;
   }
 
-  // Fallback: reload — the cookie above will be read by Google Translate on load
-  setTimeout(() => window.location.reload(), 100);
+  // Fallback: cookie is set — reload and GT will pick it up automatically
+  setTimeout(() => window.location.reload(), 80);
 }
 
 // ─── Thinking indicator ───────────────────────────────────────────────────────
@@ -702,7 +719,7 @@ export default function App() {
 
       {/* ── Cinematic Big Bang Intro ── */}
       <AnimatePresence>
-        {showIntro && <BigBangIntro onDone={() => setShowIntro(false)} />}
+        {showIntro && <WarpIntro onDone={() => setShowIntro(false)} />}
       </AnimatePresence>
 
       {/* ── z-0  Full-screen Sketchfab background ── */}
