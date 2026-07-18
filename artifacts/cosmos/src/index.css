@@ -340,6 +340,43 @@
  * Even without handling focused or not, this is six possible combinations that
  * need to be distinguished from eachother visually.
  */
+/* ── Google Translate: hide the injected toolbar so it doesn't push our layout ── */
+.goog-te-banner-frame,
+.goog-te-menu-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+div#goog-gt-,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Prevent GT from shoving body down with a top offset */
+body {
+  top: 0 !important;
+}
+
+/* Hide the skiptranslate wrapper Google injects */
+.skiptranslate {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Re-show only the translate element we control (the hidden one we injected) */
+#google_translate_element {
+  display: none !important;
+}
+
+/* ── Scrollbar hide utility ── */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @layer utilities {
   /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type='search']::-webkit-search-cancel-button {

@@ -2,6 +2,12 @@ import { RefObject, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export interface SharedContext {
+  title: string;
+  description: string;
+  source: 'nasa' | 'wiki';
+}
+
 export interface NasaItem {
   data:  { title: string; description?: string; date_created?: string }[];
   links?: { href: string; rel: string }[];
@@ -34,7 +40,12 @@ function SourceBadge({ source }: { source: 'nasa' | 'wiki' }) {
 }
 
 // ─── Detail Modal ──────────────────────────────────────────────────────────────
-export function DetailModal({ item: unified, onClose }: { item: UnifiedItem; onClose: () => void }) {
+export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat }: {
+  item: UnifiedItem;
+  onClose: () => void;
+  chatAvatars?: { name: string; image?: string }[];
+  onShareToChat?: (avatarName: string) => void;
+}) {
   // Close on Escape
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -95,6 +106,39 @@ export function DetailModal({ item: unified, onClose }: { item: UnifiedItem; onC
           <h2 className="text-white text-[17px] font-medium leading-snug tracking-wide mb-3">{title}</h2>
           {desc && (
             <p className="text-white/55 text-[13px] leading-relaxed tracking-wide">{desc}</p>
+          )}
+
+          {/* ── Discuss with a Scientist ── */}
+          {chatAvatars && onShareToChat && (
+            <div className="mt-6 pt-5 border-t border-white/10">
+              <p className="text-white/35 text-[9px] uppercase tracking-[0.22em] mb-3">
+                💬 Discuss with a Scientist
+              </p>
+              <div className="flex gap-4">
+                {chatAvatars.map(av => (
+                  <button
+                    key={av.name}
+                    onClick={() => { onShareToChat(av.name); onClose(); }}
+                    className="flex flex-col items-center gap-1.5 group focus:outline-none"
+                    title={`Chat with ${av.name}`}
+                  >
+                    {av.image ? (
+                      <img
+                        src={av.image} alt={av.name}
+                        className="w-11 h-11 rounded-full object-cover border border-white/15 group-hover:border-white/50 group-hover:scale-105 transition-all duration-200 shadow-lg"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-white/10 border border-white/15 flex items-center justify-center text-sm text-white/60 group-hover:border-white/40 group-hover:scale-105 transition-all duration-200">
+                        {av.name.charAt(0)}
+                      </div>
+                    )}
+                    <span className="text-white/40 text-[9px] group-hover:text-white/70 transition-colors duration-200 w-12 text-center truncate leading-tight">
+                      {av.name.split(' ').slice(-1)[0]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </motion.div>
@@ -182,7 +226,7 @@ interface Props {
   errMsg:           string;
   onClear:          () => void;
   onCardClick:      (item: UnifiedItem) => void;
-  sentinelRef:      RefObject<HTMLDivElement>;
+  sentinelRef:      RefObject<HTMLDivElement | null>;
   isEverythingMode: boolean;
   isLoadingMore:    boolean;
 }

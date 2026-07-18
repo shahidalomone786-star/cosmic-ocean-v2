@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import NasaSearch, { DetailModal, type UnifiedItem, type WikiItem, type NasaItem, type NasaStatus } from './components/NasaSearch';
+import BigBangIntro from './components/BigBangIntro';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -15,14 +16,12 @@ const cosmicScenes = [
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
 
-// Cosmic terms cycled when "Everything" infinite-scroll mode is active
 const EVERYTHING_TERMS = [
   'nebula', 'galaxy', 'cosmos', 'supernova', 'aurora', 'jupiter', 'saturn',
   'milky way', 'black hole', 'star cluster', 'deep space', 'universe',
   'exoplanet', 'quasar', 'pulsar', 'comet', 'solar flare', 'hubble',
 ];
 
-// Interleave two arrays element-by-element: [a0, b0, a1, b1, …]
 function interleave(a: UnifiedItem[], b: UnifiedItem[]): UnifiedItem[] {
   const out: UnifiedItem[] = [];
   const max = Math.max(a.length, b.length);
@@ -32,11 +31,23 @@ function interleave(a: UnifiedItem[], b: UnifiedItem[]): UnifiedItem[] {
   }
   return out;
 }
+
 const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','Equations',
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
-const LANGUAGES   = ['English','Hindi','Hinglish','Japanese','Spanish','French','German','Arabic'];
 
-// ─── Avatar data (stable constant — prevents object recreation on re-render) ──
+// Languages + their Google Translate codes
+const LANGUAGES: { label: string; gtCode: string }[] = [
+  { label: 'English',  gtCode: 'en' },
+  { label: 'Hindi',    gtCode: 'hi' },
+  { label: 'Hinglish', gtCode: 'hi' },
+  { label: 'Japanese', gtCode: 'ja' },
+  { label: 'Spanish',  gtCode: 'es' },
+  { label: 'French',   gtCode: 'fr' },
+  { label: 'German',   gtCode: 'de' },
+  { label: 'Arabic',   gtCode: 'ar' },
+];
+
+// ─── Avatar data ──────────────────────────────────────────────────────────────
 const AVATARS = [
   { name: 'Albert Einstein', role: 'Theoretical Physicist',
     image: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg' },
@@ -54,19 +65,73 @@ function randomIndexExcluding(current: number, length: number): number {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type ChatTarget = { name: string; role: string; image: string };
-type Message    = { role: 'user' | 'model'; text: string };
+type ChatTarget    = { name: string; role: string; image: string };
+type Message       = { role: 'user' | 'model'; text: string };
+type SharedContext = { title: string; description: string; source: 'nasa' | 'wiki' };
 
-// ─── Per-avatar system instructions ──────────────────────────────────────────
-function systemInstruction(name: string, language: string): string {
-  const lang = `Always respond in ${language}.`;
-  const personas: Record<string, string> = {
-    'Albert Einstein':  `You are Albert Einstein. Be philosophical and use thought experiments to explain ideas. Reference your own discoveries naturally. ${lang}`,
-    'Richard Feynman':  `You are Richard Feynman. Be enthusiastic and playful. Hate jargon — always use simple, vivid analogies. ${lang}`,
-    'Carl Sagan':       `You are Carl Sagan. Be poetic and filled with cosmic wonder. Speak humbly about humanity's place in the universe. ${lang}`,
-    'Nikola Tesla':     `You are Nikola Tesla. Be visionary and intense, focused on electricity, energy, and future technology. ${lang}`,
+// ─── Google Translate helpers ─────────────────────────────────────────────────
+declare global {
+  interface Window {
+    googleTranslateElementInit?: () => void;
+    google?: {
+      translate?: {
+        TranslateElement: new (opts: object, id: string) => void;
+      };
+    };
+  }
+}
+
+function injectGoogleTranslate() {
+  if (document.getElementById('gt-script')) return; // already injected
+  const el = document.createElement('div');
+  el.id = 'google_translate_element';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+
+  window.googleTranslateElementInit = () => {
+    if (window.google?.translate?.TranslateElement) {
+      new window.google.translate.TranslateElement(
+        { pageLanguage: 'en', autoDisplay: false },
+        'google_translate_element'
+      );
+    }
   };
-  return personas[name] ?? `You are ${name}. ${lang}`;
+
+  const script = document.createElement('script');
+  script.id  = 'gt-script';
+  script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+function applyGTranslate(targetCode: string) {
+  if (targetCode === 'en') {
+    // Restore English by clearing the cookie and reloading
+    const cookieBase = 'googtrans=/en/en';
+    document.cookie = `${cookieBase};path=/;`;
+    document.cookie = `${cookieBase};domain=${location.hostname};path=/;`;
+    // Reload only if currently translated
+    const currentCookie = document.cookie;
+    if (currentCookie.includes('googtrans') && !currentCookie.includes('/en/en')) {
+      window.location.reload();
+    }
+    return;
+  }
+  // Set cookie then trigger the select element that Google Translate creates
+  const cookieVal = `/en/${targetCode}`;
+  document.cookie = `googtrans=${cookieVal};path=/;`;
+  document.cookie = `googtrans=${cookieVal};domain=${location.hostname};path=/;`;
+
+  // Try via the combo select (safest method)
+  const sel = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+  if (sel) {
+    sel.value = targetCode;
+    sel.dispatchEvent(new Event('change'));
+    return;
+  }
+
+  // Fallback: reload — the cookie above will be read by Google Translate on load
+  setTimeout(() => window.location.reload(), 100);
 }
 
 // ─── Thinking indicator ───────────────────────────────────────────────────────
@@ -85,47 +150,82 @@ function ThinkingDots() {
   );
 }
 
-// ─── Self-contained Chat Modal ────────────────────────────────────────────────
-function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
-  avatar: ChatTarget; language: string; onClose: () => void;
-  onInputFocus?: () => void; onInputBlur?: () => void;
+// ─── Chat Modal ───────────────────────────────────────────────────────────────
+function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onInputBlur }: {
+  avatar: ChatTarget;
+  language: string;
+  sharedContext?: SharedContext;
+  onClose: () => void;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (sharedContext) {
+      return []; // will be populated by auto-analyse
+    }
+    return [{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }];
+  });
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error,     setError]     = useState('');
   const bottomRef   = useRef<HTMLDivElement>(null);
   const inputRef    = useRef<HTMLInputElement>(null);
-  // callingRef:   prevents concurrent or double-invoke calls (ref, not state, so it's synchronous)
-  // lastSentRef:  timestamp of last successful dispatch — enforces a client-side 3 s cooldown
   const callingRef  = useRef(false);
   const lastSentRef = useRef(0);
+  const autoAnalysedRef = useRef(false);
 
-  // Auto-scroll to bottom on every new message or loading change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Re-focus input after AI responds
   useEffect(() => {
     if (!isLoading) inputRef.current?.focus();
   }, [isLoading]);
 
-  // Clear any stale error whenever the active avatar changes
   useEffect(() => {
     setError('');
   }, [avatar.name]);
 
+  // ── Auto-analyse shared content on mount ──────────────────────────────────
+  useEffect(() => {
+    if (!sharedContext || autoAnalysedRef.current) return;
+    autoAnalysedRef.current = true;
+    const analyse = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: '',
+            history: [],
+            avatarName: avatar.name,
+            language,
+            sharedContext,
+          }),
+        });
+        const data = await res.json() as { reply?: string; error?: string };
+        if (!res.ok || data.error) {
+          setError(data.error ?? `Server error ${res.status}`);
+          setMessages([{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }]);
+        } else {
+          setMessages([{ role: 'model', text: data.reply! }]);
+        }
+      } catch (err: unknown) {
+        setError((err as Error)?.message ?? String(err));
+        setMessages([{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    analyse();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sendMessage = async () => {
     const text = input.trim();
-
-    // Guard 1 — must have text and not already be loading
     if (!text || isLoading) return;
-    // Guard 2 — synchronous in-flight lock (immune to render-timing races)
     if (callingRef.current) return;
-    // Guard 3 — client-side 3-second cooldown between API calls
     const now = Date.now();
     if (now - lastSentRef.current < 3_000) return;
     callingRef.current  = true;
@@ -137,8 +237,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
     setIsLoading(true);
 
     try {
-      // Build history from all messages except the opening greeting and the new user turn
-      const history = messages.slice(1).map(m => ({
+      const history = messages.slice(sharedContext ? 0 : 1).map(m => ({
         role: m.role,
         parts: [{ text: m.text }],
       }));
@@ -197,14 +296,40 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
               <p className="text-white/40 text-[10px] uppercase tracking-wider">{avatar.role}</p>
             </div>
           </div>
+          {/* Shared context badge */}
+          {sharedContext && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/15 border border-violet-400/20 max-w-[180px]">
+              <span className="text-[9px] text-violet-300/80 uppercase tracking-wider flex-shrink-0">Analysing</span>
+              <span className="text-[9px] text-white/50 truncate">{sharedContext.title}</span>
+            </div>
+          )}
           <button onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-colors duration-200 text-lg leading-none">
             ×
           </button>
         </div>
 
+        {/* ── Shared context banner ── */}
+        {sharedContext && (
+          <div className="flex-shrink-0 px-5 py-2.5 bg-violet-900/15 border-b border-violet-400/10">
+            <p className="text-violet-300/60 text-[10px] uppercase tracking-wider mb-0.5">Context shared</p>
+            <p className="text-white/60 text-[12px] tracking-wide leading-snug line-clamp-1">{sharedContext.title}</p>
+          </div>
+        )}
+
         {/* ── Messages ── */}
         <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-3">
+          {/* Auto-analyse loading state */}
+          {isLoading && messages.length === 0 && (
+            <div className="flex items-start gap-2.5">
+              <img src={avatar.image} alt={avatar.name}
+                className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
+              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm">
+                <ThinkingDots />
+              </div>
+            </div>
+          )}
+
           {messages.map((msg, idx) =>
             msg.role === 'user' ? (
               <div key={idx} className="flex justify-end">
@@ -223,7 +348,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
             )
           )}
 
-          {isLoading && (
+          {isLoading && messages.length > 0 && (
             <div className="flex items-start gap-2.5">
               <img src={avatar.image} alt={avatar.name}
                 className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
@@ -271,7 +396,7 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
   );
 }
 
-// ─── Portal Wiki Card — horizontal scroll card for portal sections ────────────
+// ─── Portal Wiki Card ─────────────────────────────────────────────────────────
 function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => void }) {
   const imgSrc  = item.thumbnail?.source;
   const snippet = item.extract?.split('\n').find(l => l.trim()) ?? '';
@@ -307,7 +432,7 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
   );
 }
 
-// ─── Glassmorphism Avatar Card (memo = skip re-render when App state changes) ─
+// ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
 const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
   name: string; subtitle: string; image?: string; onChat: () => void;
 }) {
@@ -352,6 +477,7 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [showIntro,   setShowIntro]  = useState(true);
   const [focused,     setFocused]    = useState(false);
   const [showPortal,  setShowPortal] = useState(false);
   const [language,    setLanguage]   = useState('English');
@@ -359,12 +485,13 @@ export default function App() {
   const [activeTab,   setActiveTab]  = useState('All');
   const [portalQuery, setPortalQuery]= useState('');
   const [activeChat,       setActiveChat]       = useState<ChatTarget | null>(null);
+  const [chatSharedCtx,    setChatSharedCtx]    = useState<SharedContext | undefined>(undefined);
   const [chatInputFocused, setChatInputFocused] = useState(false);
   const [sceneIdx,         setSceneIdx]         = useState(() => Math.floor(Math.random() * cosmicScenes.length));
   const overlayControls = useAnimation();
-  const bgIframeRef = useRef<HTMLIFrameElement>(null);
+  const bgIframeRef     = useRef<HTMLIFrameElement>(null);
 
-  // ── Unified search state (NASA + Wikipedia) ───────────────────────────────
+  // ── Unified search state ──────────────────────────────────────────────────
   const [nasaQuery,        setNasaQuery]        = useState('');
   const [searchResults,    setSearchResults]    = useState<UnifiedItem[]>([]);
   const [searchStatus,     setSearchStatus]     = useState<NasaStatus>('idle');
@@ -381,7 +508,37 @@ export default function App() {
 
   const hasSearchResults = searchStatus !== 'idle';
 
-  // Fetch NASA images + Wikipedia articles in parallel, interleave into one feed
+  // ── Inject Google Translate once on mount ─────────────────────────────────
+  useEffect(() => {
+    injectGoogleTranslate();
+  }, []);
+
+  // ── Apply Google Translate whenever language changes ──────────────────────
+  useEffect(() => {
+    const lang = LANGUAGES.find(l => l.label === language);
+    if (!lang) return;
+    // Small delay to let GT widget load on first run
+    const timer = setTimeout(() => applyGTranslate(lang.gtCode), 800);
+    return () => clearTimeout(timer);
+  }, [language]);
+
+  // ── STRICT BACKGROUND FREEZE: hide iframe entirely to stop GPU rendering ──
+  // Using imperative DOM mutation — avoids re-mounting / key change on the iframe
+  useEffect(() => {
+    const iframe = bgIframeRef.current;
+    if (!iframe) return;
+    if (isAnimationPaused) {
+      iframe.style.display = 'none';
+    } else {
+      iframe.style.display = '';
+    }
+  });
+
+  const isAnimationPaused =
+    showIntro || focused || showPortal || langOpen ||
+    activeChat !== null || chatInputFocused ||
+    hasSearchResults || selectedCard !== null;
+
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
     if (!term) return;
@@ -418,7 +575,6 @@ export default function App() {
     }
   }, []);
 
-  // Infinite scroll — appends mixed NASA + Wikipedia results (Everything mode only)
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !isEverythingMode) return;
     setIsLoadingMore(true);
@@ -459,7 +615,7 @@ export default function App() {
     setIsLoadingMore(false);
   }, []);
 
-  // ── Portal fetch — runs once the first time the portal opens ─────────────
+  // ── Portal fetch ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!showPortal || portalFetched) return;
     setPortalFetched(true);
@@ -477,17 +633,11 @@ export default function App() {
       } catch { /* ignore */ }
     };
 
-    fetchWikiTitles(
-      ['Black hole', 'Supermassive black hole', 'Event horizon'],
-      setPortalBlackHoles,
-    );
-    fetchWikiTitles(
-      ['Theory of relativity', 'Schrödinger equation', 'Standard Model'],
-      setPortalEquations,
-    );
+    fetchWikiTitles(['Black hole', 'Supermassive black hole', 'Event horizon'], setPortalBlackHoles);
+    fetchWikiTitles(['Theory of relativity', 'Schrödinger equation', 'Standard Model'], setPortalEquations);
   }, [showPortal, portalFetched]);
 
-  // ── IntersectionObserver — infinite scroll (Everything mode only) ─────────
+  // ── IntersectionObserver — infinite scroll ────────────────────────────────
   useEffect(() => {
     if (!isEverythingMode || searchStatus !== 'done') return;
     const sentinel = sentinelRef.current;
@@ -500,23 +650,7 @@ export default function App() {
     return () => observer.disconnect();
   }, [isEverythingMode, searchStatus, loadMore]);
 
-  // ── Derived: is any UI interaction happening? ──────────────────────────────
-  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused || hasSearchResults || selectedCard !== null;
-
-  // ── Pause/resume Sketchfab via postMessage when interaction state changes ──
-  useEffect(() => {
-    const iframe = bgIframeRef.current;
-    if (!iframe) return;
-    const method = isAnimationPaused ? 'pause' : 'play';
-    // Sketchfab's viewer API accepts postMessage commands after it initialises.
-    // We send both to '*' and the sketchfab.com origin for compatibility.
-    try {
-      iframe.contentWindow?.postMessage(JSON.stringify({ method }), '*');
-      iframe.contentWindow?.postMessage(JSON.stringify({ method }), 'https://sketchfab.com');
-    } catch { /* cross-origin silently ignored */ }
-  }, [isAnimationPaused]);
-
-  // ── Scene rotation timer — paused whenever any UI interaction is active ────
+  // ── Scene rotation — paused when any UI interaction is active ─────────────
   useEffect(() => {
     if (isAnimationPaused) return;
 
@@ -528,22 +662,63 @@ export default function App() {
     return () => clearInterval(interval);
   }, [overlayControls, isAnimationPaused]);
 
-  // ── Stable chat-open callbacks (useCallback = same reference across renders) ─
-  const closeChat = useCallback(() => setActiveChat(null), []);
+  // ── Stable callbacks ──────────────────────────────────────────────────────
+  const closeChat = useCallback(() => {
+    setActiveChat(null);
+    setChatSharedCtx(undefined);
+  }, []);
 
-  // One stable handler; each AvatarCard passes its own avatar object from the
-  // AVATARS constant (never recreated), so the inline arrow below is the only
-  // new allocation — and memo on AvatarCard skips the child re-render anyway.
-  const openChat = useCallback((avatar: ChatTarget) => setActiveChat(avatar), []);
+  const openChat = useCallback((avatar: ChatTarget) => {
+    setChatSharedCtx(undefined);
+    setActiveChat(avatar);
+  }, []);
+
+  // Open chat WITH shared context (from "Discuss with a Scientist")
+  const openChatWithContext = useCallback((avatarName: string, ctx: SharedContext) => {
+    const av = AVATARS.find(a => a.name === avatarName);
+    if (!av) return;
+    setChatSharedCtx(ctx);
+    setActiveChat({ name: av.name, role: av.role, image: av.image });
+  }, []);
+
+  // Build shared context from a selected card for passing to DetailModal
+  const buildSharedContext = useCallback((card: UnifiedItem): SharedContext => {
+    if (card.source === 'nasa') {
+      return {
+        title:       card.item.data?.[0]?.title ?? 'NASA Image',
+        description: card.item.data?.[0]?.description ?? '',
+        source:      'nasa',
+      };
+    }
+    return {
+      title:       card.item.title ?? 'Wikipedia Article',
+      description: card.item.extract ?? '',
+      source:      'wiki',
+    };
+  }, []);
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
+
+      {/* ── Cinematic Big Bang Intro ── */}
+      <AnimatePresence>
+        {showIntro && <BigBangIntro onDone={() => setShowIntro(false)} />}
+      </AnimatePresence>
 
       {/* ── z-0  Full-screen Sketchfab background ── */}
       <div
         className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center transition-all duration-1000"
         style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
       >
+        {/* Static fallback gradient shown while iframe is hidden */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #050010 50%, #000 100%)',
+            opacity: isAnimationPaused ? 1 : 0,
+            transition: 'opacity 0.6s ease',
+          }}
+        />
         <iframe
           key={sceneIdx}
           ref={bgIframeRef}
@@ -551,7 +726,6 @@ export default function App() {
           src={cosmicScenes[sceneIdx]}
           className="absolute w-[110vw] h-[120vh] border-none pointer-events-auto"
           allow="autoplay; fullscreen; xr-spatial-tracking"
-          // @ts-expect-error – non-standard Sketchfab attributes
           xr-spatial-tracking="true"
           execution-while-out-of-viewport="true"
           execution-while-not-rendered="true"
@@ -566,9 +740,9 @@ export default function App() {
         animate={overlayControls}
       />
 
-      {/* ── z-11  Dramatic freeze overlay — appears when any UI is active ── */}
+      {/* ── z-11  Freeze overlay — covers iframe to visually freeze it ── */}
       <motion.div
-        className="absolute inset-0 z-11 pointer-events-none"
+        className="absolute inset-0 z-[11] pointer-events-none"
         initial={{ opacity: 0 }}
         animate={{ opacity: isAnimationPaused ? 1 : 0 }}
         transition={{ duration: 0.6, ease: 'easeInOut' }}
@@ -585,7 +759,35 @@ export default function App() {
               hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
             }`}
           >
-            {/* Search bar + tags + "Everything" button */}
+            {/* ── Language pill — top right ── */}
+            <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+              <div className="relative">
+                <button onClick={() => setLangOpen(o => !o)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-xl text-white/70 text-[11px] uppercase tracking-wider hover:bg-white/10 transition-colors duration-200">
+                  🌐 {language}
+                  <span className="text-white/40">{langOpen ? '▲' : '▼'}</span>
+                </button>
+                <AnimatePresence>
+                  {langOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.95 }} transition={{ duration: 0.18 }}
+                      className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-black/80 backdrop-blur-2xl overflow-hidden shadow-2xl z-50"
+                    >
+                      {LANGUAGES.map(lang => (
+                        <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
+                          className={`w-full text-left px-4 py-2.5 text-[12px] tracking-wide transition-colors duration-150
+                            ${lang.label === language ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+                          {lang.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Search bar + tags */}
             <motion.div
               animate={{ y: hasSearchResults ? 0 : focused ? -120 : 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 28 }}
@@ -644,7 +846,7 @@ export default function App() {
               )}
             </motion.div>
 
-            {/* NASA results — scroll in below the search bar */}
+            {/* Results feed */}
             {hasSearchResults && (
               <div className="w-full max-w-2xl px-6 mt-8 pointer-events-auto">
                 <NasaSearch
@@ -680,6 +882,7 @@ export default function App() {
                 <span>Back to Cosmos</span>
               </motion.button>
 
+              {/* Language selector inside portal */}
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
                   className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-xl text-white/70 text-[11px] uppercase tracking-wider hover:bg-white/10 transition-colors duration-200">
@@ -694,10 +897,10 @@ export default function App() {
                       className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-black/80 backdrop-blur-2xl overflow-hidden shadow-2xl z-50"
                     >
                       {LANGUAGES.map(lang => (
-                        <button key={lang} onClick={() => { setLanguage(lang); setLangOpen(false); }}
+                        <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
                           className={`w-full text-left px-4 py-2.5 text-[12px] tracking-wide transition-colors duration-150
-                            ${lang === language ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
-                          {lang}
+                            ${lang.label === language ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+                          {lang.label}
                         </button>
                       ))}
                     </motion.div>
@@ -722,19 +925,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* Scrollable tabs */}
+            {/* Tabs */}
             <div className="px-5 pb-5 flex-shrink-0">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {PORTAL_TABS.map(tab => (
                   <button key={tab} onClick={() => {
                     setActiveTab(tab);
-                    if (tab === 'All') {
-                      setShowPortal(false);
-                      clearSearch();
-                    } else {
-                      searchAll(tab, 'specific');
-                      setShowPortal(false);
-                    }
+                    if (tab === 'All') { setShowPortal(false); clearSearch(); }
+                    else { searchAll(tab, 'specific'); setShowPortal(false); }
                   }}
                     className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wider border transition-all duration-200
                       ${activeTab === tab
@@ -749,7 +947,7 @@ export default function App() {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-5 pb-8 scrollbar-hide">
 
-              {/* Cosmic Pix — lazy-stable avatar cards */}
+              {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
                   <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Cosmic Pix</h2>
@@ -777,11 +975,8 @@ export default function App() {
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalBlackHoles.length > 0
                     ? portalBlackHoles.map(item => (
-                        <PortalWikiCard
-                          key={item.pageid}
-                          item={item}
-                          onSelect={() => setSelectedCard({ source: 'wiki', item })}
-                        />
+                        <PortalWikiCard key={item.pageid} item={item}
+                          onSelect={() => setSelectedCard({ source: 'wiki', item })} />
                       ))
                     : [...Array(3)].map((_, i) => (
                         <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
@@ -798,11 +993,8 @@ export default function App() {
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalEquations.length > 0
                     ? portalEquations.map(item => (
-                        <PortalWikiCard
-                          key={item.pageid}
-                          item={item}
-                          onSelect={() => setSelectedCard({ source: 'wiki', item })}
-                        />
+                        <PortalWikiCard key={item.pageid} item={item}
+                          onSelect={() => setSelectedCard({ source: 'wiki', item })} />
                       ))
                     : [...Array(3)].map((_, i) => (
                         <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
@@ -814,12 +1006,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── z-[100]  Chat Modal — only mounts when activeChat is truly set ── */}
+      {/* ── z-[100]  Chat Modal ── */}
       <AnimatePresence>
         {activeChat && (
           <ChatModal
+            key={`${activeChat.name}-${chatSharedCtx?.title ?? 'plain'}`}
             avatar={activeChat}
             language={language}
+            sharedContext={chatSharedCtx}
             onClose={closeChat}
             onInputFocus={() => setChatInputFocused(true)}
             onInputBlur={() => setChatInputFocused(false)}
@@ -833,6 +1027,12 @@ export default function App() {
           <DetailModal
             item={selectedCard}
             onClose={() => setSelectedCard(null)}
+            chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+            onShareToChat={(avatarName) => {
+              const ctx = buildSharedContext(selectedCard);
+              setSelectedCard(null);
+              openChatWithContext(avatarName, ctx);
+            }}
           />
         )}
       </AnimatePresence>
