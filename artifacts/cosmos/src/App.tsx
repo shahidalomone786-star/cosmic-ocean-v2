@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus } from './components/NasaSearch';
+import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -915,10 +916,12 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [showIntro,   setShowIntro]  = useState(true);
-  const [focused,     setFocused]    = useState(false);
-  const [showPortal,  setShowPortal] = useState(false);
-  const [language,    setLanguage]   = useState('English');
+  const [showIntro,    setShowIntro]   = useState(true);
+  const [focused,      setFocused]     = useState(false);
+  const [showPortal,   setShowPortal]  = useState(false);
+  const [showLibrary,  setShowLibrary] = useState(false);
+  const [globalTheme,  setGlobalTheme] = useState<'black' | 'charcoal'>('black');
+  const [language,     setLanguage]    = useState('English');
   const [langOpen,    setLangOpen]   = useState(false);
   const [activeTab,   setActiveTab]  = useState('All');
   const [portalQuery, setPortalQuery]= useState('');
@@ -973,7 +976,7 @@ export default function App() {
   });
 
   const isAnimationPaused =
-    showIntro || focused || showPortal || langOpen ||
+    showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
     hasSearchResults || selectedCard !== null;
 
@@ -1145,6 +1148,12 @@ export default function App() {
     setActiveChat({ name: av.name, role: av.role, image: av.image });
   }, []);
 
+  // Library "Discuss" → close library + open chat with shared context
+  const handleLibraryDiscuss = useCallback((avatarName: string, ctx: LibrarySharedContext) => {
+    setShowLibrary(false);
+    openChatWithContext(avatarName, ctx);
+  }, [openChatWithContext]);
+
   // Build shared context from a selected card for passing to DetailModal
   const buildSharedContext = useCallback((card: UnifiedItem): SharedContext => {
     switch (card.source) {
@@ -1162,7 +1171,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden">
+    <div className={`relative w-full h-screen overflow-hidden transition-colors duration-700 ${globalTheme === 'black' ? 'bg-black' : 'bg-[#121212]'}`}>
 
       {/* ── Cinematic Big Bang Intro ── */}
       <AnimatePresence>
@@ -1223,6 +1232,27 @@ export default function App() {
               hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
             }`}
           >
+            {/* ── Top-left: Library + Theme toggle ── */}
+            <div className="absolute top-4 left-4 z-30 pointer-events-auto flex items-center gap-2">
+              {/* Library button */}
+              <button
+                onClick={() => setShowLibrary(true)}
+                title="Open Research Library"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/75 text-[11px] uppercase tracking-[0.13em] hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white transition-all duration-300"
+              >
+                <span className="text-[13px]">📚</span>
+                <span>Library</span>
+              </button>
+              {/* Global theme toggle */}
+              <button
+                onClick={() => setGlobalTheme(t => t === 'black' ? 'charcoal' : 'black')}
+                title={globalTheme === 'black' ? 'Switch to Charcoal' : 'Switch to Deep Black'}
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/60 text-[16px] hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white transition-all duration-300"
+              >
+                {globalTheme === 'black' ? '◑' : '◐'}
+              </button>
+            </div>
+
             {/* ── Language pill — top right ── */}
             <div className="absolute top-4 right-4 z-30 pointer-events-auto">
               <div className="relative">
@@ -1467,6 +1497,17 @@ export default function App() {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── z-30  Library ── */}
+      <AnimatePresence>
+        {showLibrary && (
+          <LibraryView
+            onClose={() => setShowLibrary(false)}
+            onDiscussWithAvatar={handleLibraryDiscuss}
+            avatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+          />
         )}
       </AnimatePresence>
 
