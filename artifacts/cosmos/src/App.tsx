@@ -222,6 +222,76 @@ function TtsControls({
   );
 }
 
+// ─── Quota Badge ──────────────────────────────────────────────────────────────
+function QuotaBadge({
+  tokens, voiceChars, ttsEngine, quotaExhausted,
+}: {
+  tokens: number;
+  voiceChars: number;
+  ttsEngine: 'premium' | 'standard';
+  quotaExhausted: boolean;
+}) {
+  const voiceLabel = quotaExhausted
+    ? '★ EXHAUSTED'
+    : ttsEngine === 'premium'
+      ? `★ ${voiceChars.toLocaleString()} ch`
+      : `◎ STD`;
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.09] backdrop-blur-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+      {/* AI tokens */}
+      <div className="flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-400/70 flex-shrink-0" />
+        <span className="text-[9px] text-white/45 uppercase tracking-[0.12em]">AI</span>
+        <span className="text-[9px] text-white/70 font-medium tabular-nums">{tokens.toLocaleString()}</span>
+      </div>
+      <span className="w-px h-3 bg-white/[0.12]" />
+      {/* Voice chars / status */}
+      <div className="flex items-center gap-1">
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${quotaExhausted ? 'bg-red-400/70' : ttsEngine === 'premium' ? 'bg-violet-400/70' : 'bg-white/30'}`} />
+        <span className={`text-[9px] uppercase tracking-[0.12em] font-medium ${quotaExhausted ? 'text-red-400/80' : ttsEngine === 'premium' ? 'text-violet-300/80' : 'text-white/45'}`}>
+          {voiceLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Typewriter Text ──────────────────────────────────────────────────────────
+function TypewriterText({ text, isTyping, onDone }: { text: string; isTyping: boolean; onDone?: () => void }) {
+  const [revealed, setRevealed] = useState(isTyping ? 0 : text.length);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    if (!isTyping) { setRevealed(text.length); return; }
+    setRevealed(0);
+    let count = 0;
+    const id = setInterval(() => {
+      count += 4; // reveal 4 chars per tick
+      if (count >= text.length) {
+        setRevealed(text.length);
+        clearInterval(id);
+        onDoneRef.current?.();
+      } else {
+        setRevealed(count);
+      }
+    }, 18);
+    return () => clearInterval(id);
+  }, [text, isTyping]);
+
+  const display = text.slice(0, revealed);
+  const showCursor = isTyping && revealed < text.length;
+  return (
+    <p className="text-white/90 text-[14.5px] leading-[1.75] tracking-[0.01em]">
+      {display}
+      {showCursor && (
+        <span className="inline-block w-[2px] h-[1.1em] ml-[2px] align-[-0.1em] bg-white/60 animate-pulse" />
+      )}
+    </p>
+  );
+}
+
 function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onInputBlur }: {
   avatar: ChatTarget;
   language: string;
@@ -255,6 +325,13 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const [activeEngine, setActiveEngine] = useState<'premium' | 'standard'>('premium');
   const [ttsToast,     setTtsToast]     = useState('');
 
+  // ── Quota / typewriter state ────────────────────────────────────────────────
+  const [sessionTokens,   setSessionTokens]   = useState(0);
+  const [sessionVoiceChars, setSessionVoiceChars] = useState(0);
+  const [quotaExhausted,  setQuotaExhausted]  = useState(false);
+  // Set of message indices currently in typewriter animation
+  const [typingSet, setTypingSet] = useState<Set<number>>(() => new Set());
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -266,6 +343,25 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   useEffect(() => {
     setError('');
   }, [avatar.name]);
+
+  // ── Token / voice tracking helpers ────────────────────────────────────────
+  const addTokens = useCallback((userText: string, replyText: string) => {
+    const est = Math.ceil((userText.length + replyText.length) / 4);
+    setSessionTokens(prev => prev + est);
+  }, []);
+
+  const addVoiceChars = useCallback((charCount: number) => {
+    setSessionVoiceChars(prev => prev + charCount);
+  }, []);
+
+  // ── Typewriter: mark new model message as typing ──────────────────────────
+  const startTyping = useCallback((idx: number) => {
+    setTypingSet(prev => { const next = new Set(prev); next.add(idx); return next; });
+  }, []);
+
+  const doneTyping = useCallback((idx: number) => {
+    setTypingSet(prev => { const next = new Set(prev); next.delete(idx); return next; });
+  }, []);
 
   // ── Auto-analyse shared content on mount ──────────────────────────────────
   useEffect(() => {
@@ -290,7 +386,10 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           setError(data.error ?? `Server error ${res.status}`);
           setMessages([{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }]);
         } else {
-          setMessages([{ role: 'model', text: data.reply! }]);
+          const reply = data.reply!;
+          setMessages([{ role: 'model', text: reply }]);
+          startTyping(0);
+          addTokens('', reply);
         }
       } catch (err: unknown) {
         setError((err as Error)?.message ?? String(err));
@@ -339,7 +438,14 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       if (!res.ok || data.error) {
         setError(data.error ?? `Server error ${res.status}`);
       } else {
-        setMessages(prev => [...prev, { role: 'model', text: data.reply! }]);
+        const reply = data.reply!;
+        setMessages(prev => {
+          const newIdx = prev.length; // index of the message we're about to add
+          // Start typewriter after state update — schedule micro-task
+          setTimeout(() => startTyping(newIdx), 0);
+          return [...prev, { role: 'model', text: reply }];
+        });
+        addTokens(text, reply);
       }
     } catch (err: unknown) {
       setError((err as Error)?.message ?? String(err));
@@ -384,14 +490,16 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       });
       if (!res.ok) {
         const data = await res.json() as { code?: string };
-        showToast(
-          data.code === 'TOTAL_QUOTA_EXHAUSTED'
-            ? 'Premium quota exhausted. Using Standard Voice.'
-            : 'Premium TTS unavailable. Using Standard Voice.',
-        );
+        if (data.code === 'TOTAL_QUOTA_EXHAUSTED') {
+          setQuotaExhausted(true);
+          showToast('Premium quota exhausted — switching to Standard Voice.');
+        } else {
+          showToast('Premium TTS unavailable. Using Standard Voice.');
+        }
         playStandard(text, idx);
         return;
       }
+      addVoiceChars(text.length);
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
@@ -408,7 +516,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       showToast('Premium TTS error. Using Standard Voice.');
       playStandard(text, idx);
     }
-  }, [avatar.name, showToast, playStandard]);
+  }, [avatar.name, showToast, playStandard, addVoiceChars]);
 
   const playTTS = useCallback(async (text: string, idx: number) => {
     // Toggle pause on the active message
@@ -428,9 +536,9 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
     // New message — stop everything and start fresh
     stopAll();
-    if (preferEngine === 'premium') { await playPremium(text, idx); }
+    if (preferEngine === 'premium' && !quotaExhausted) { await playPremium(text, idx); }
     else { playStandard(text, idx); }
-  }, [playingIdx, isPlaying, activeEngine, preferEngine, stopAll, playPremium, playStandard]);
+  }, [playingIdx, isPlaying, activeEngine, preferEngine, quotaExhausted, stopAll, playPremium, playStandard]);
 
   const skipTime = useCallback((delta: number) => {
     if (audioRef.current && activeEngine === 'premium' && playingIdx !== null) {
@@ -453,7 +561,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-[48px] flex items-end sm:items-center justify-center px-2 sm:px-4 pb-0 sm:pb-0"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[52px] flex items-end sm:items-center justify-center px-2 sm:px-4 pb-0 sm:pb-0"
       onClick={onClose}
     >
       <motion.div
@@ -461,7 +569,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 32 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full sm:w-[95vw] max-w-2xl h-[88vh] sm:h-[88vh] bg-[rgba(6,6,10,0.82)] backdrop-blur-[44px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.5),0_40px_80px_-16px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        className="relative w-[95vw] max-w-2xl h-[85vh] bg-[rgba(5,5,9,0.88)] backdrop-blur-[52px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.55),0_40px_80px_-16px_rgba(0,0,0,0.98),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Drag handle (mobile) ── */}
@@ -469,8 +577,18 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           <div className="w-10 h-[3px] rounded-full bg-white/20" />
         </div>
 
+        {/* ── Quota badge — top of modal ── */}
+        <div className="flex justify-center pt-2 pb-0 flex-shrink-0">
+          <QuotaBadge
+            tokens={sessionTokens}
+            voiceChars={sessionVoiceChars}
+            ttsEngine={activeEngine}
+            quotaExhausted={quotaExhausted}
+          />
+        </div>
+
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 sm:px-7 py-4 sm:py-5 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
+        <div className="flex items-center justify-between px-6 sm:px-7 py-3 sm:py-4 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
           <div className="flex items-center gap-4">
             <img src={avatar.image} alt={avatar.name}
               className="w-11 h-11 rounded-full object-cover border border-white/[0.18] shadow-[0_0_20px_rgba(0,0,0,0.7),0_0_0_2px_rgba(255,255,255,0.04)]" />
@@ -526,7 +644,11 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
                   <img src={avatar.image} alt={avatar.name}
                     className="w-8 h-8 rounded-full object-cover border border-white/[0.18] flex-shrink-0 mt-0.5 shadow-[0_0_16px_rgba(0,0,0,0.6)]" />
                   <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl rounded-tl-[5px] px-5 py-4 max-w-[85%] shadow-[0_2px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]">
-                    <p className="text-white/90 text-[14.5px] leading-[1.75] tracking-[0.01em]">{msg.text}</p>
+                    <TypewriterText
+                      text={msg.text}
+                      isTyping={typingSet.has(idx)}
+                      onDone={() => doneTyping(idx)}
+                    />
                   </div>
                 </div>
                 <TtsControls
@@ -577,8 +699,8 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         {/* Hidden audio element for premium TTS */}
         <audio ref={audioRef} preload="none" className="hidden" />
 
-        {/* ── Input ── */}
-        <div className="flex-shrink-0 px-5 sm:px-7 pt-4 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))] border-t border-white/[0.06] bg-gradient-to-b from-transparent via-white/[0.01] to-white/[0.02]">
+        {/* ── Input — with safe-area bottom padding ── */}
+        <div className="flex-shrink-0 px-5 sm:px-7 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,12px))] border-t border-white/[0.06] bg-gradient-to-b from-transparent via-white/[0.01] to-white/[0.02]">
           <div className="flex items-center gap-3">
             <input
               ref={inputRef}

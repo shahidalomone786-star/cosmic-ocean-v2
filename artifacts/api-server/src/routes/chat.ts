@@ -158,6 +158,13 @@ ${lang}`,
 
   let instruction = personas[name] ?? `You are ${name}, a brilliant scientist. Speak with authority and passion. ${lang}`;
 
+  // ── Strict global directives appended to every persona ───────────────────────
+  instruction += `
+
+━━ STRICT DIRECTIVES — ALWAYS FOLLOW, NO EXCEPTIONS ━━
+LANGUAGE OVERRIDE: You MUST communicate in 'Hinglish' (Hindi written in English alphabet) whenever the user initiates it or asks for it. Adapt your language seamlessly without breaking your persona. You are NEVER permitted to refuse or ignore a language request from the user.
+LENGTH CONSTRAINT: Keep all responses extremely concise, short, and to the point (1 to 3 sentences MAXIMUM). Only provide detailed answers if the user explicitly asks to 'explain in detail'. If that phrase is absent, be brief — no exceptions.`;
+
   // ── Shared context block — injected when user shares a NASA/Wiki card ────────
   if (sharedContext) {
     const sourceLabel = sharedContext.source === "nasa" ? "NASA archive" : "Wikipedia";
