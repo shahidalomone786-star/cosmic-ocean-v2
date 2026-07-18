@@ -994,15 +994,8 @@ export default function App() {
         fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=1`),
         fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
         fetch(`/api/search/arxiv?q=${encodeURIComponent(arxivTerm)}`),
-        fetch('https://api.spacexdata.com/v4/launches/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: everything ? {} : { name: { $regex: term, $options: 'i' } },
-            options: { limit: 4, sort: { date_utc: -1 }, select: ['name', 'details', 'date_utc', 'success', 'links'] },
-          }),
-        }),
-        fetch(`https://opendata.cern.ch/api/records/?q=${encodeURIComponent(term)}&size=4`).catch(() => null),
+        fetch(`/api/search/spacex?q=${encodeURIComponent(term)}&everything=${everything ? '1' : '0'}&limit=4`),
+        fetch(`/api/search/cern?q=${encodeURIComponent(term)}`),
       ]);
 
       const nasaItems: UnifiedItem[] = nasaRes.ok
@@ -1026,13 +1019,10 @@ export default function App() {
             .map(item => ({ source: 'spacex' as const, item }))
         : [];
 
-      const cernRaw = cernRes?.ok
-        ? (await cernRes.json() as { hits?: { hits?: Array<{ id: number; metadata?: { title?: string; abstract?: { description?: string } } }> } })
-        : { hits: { hits: [] } };
-      const cernItems: UnifiedItem[] = (cernRaw.hits?.hits ?? []).map(h => ({
-        source: 'cern' as const,
-        item: { id: h.id, title: h.metadata?.title ?? 'CERN Dataset', description: h.metadata?.abstract?.description ?? '' } as CernItem,
-      }));
+      const cernItems: UnifiedItem[] = cernRes.ok
+        ? ((await cernRes.json() as { items?: CernItem[] }).items ?? [])
+            .map(item => ({ source: 'cern' as const, item }))
+        : [];
 
       setSearchResults(interleaveAll(nasaItems, wikiItems, arxivItems, spacexItems, cernItems));
       setSearchStatus('done');
@@ -1050,17 +1040,11 @@ export default function App() {
       const wikiTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
       const page     = Math.floor(Math.random() * 8) + 1;
 
+      const spacexOffset = Math.floor(Math.random() * 30);
       const [nasaRes, wikiRes, spacexRes] = await Promise.all([
         fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=${page}`),
         fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
-        fetch('https://api.spacexdata.com/v4/launches/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: {},
-            options: { limit: 3, sort: { date_utc: -1 }, offset: Math.floor(Math.random() * 30), select: ['name', 'details', 'date_utc', 'success', 'links'] },
-          }),
-        }).catch(() => null),
+        fetch(`/api/search/spacex?q=&everything=1&limit=3&offset=${spacexOffset}`),
       ]);
 
       const nasaItems: UnifiedItem[] = nasaRes.ok
