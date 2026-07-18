@@ -949,6 +949,14 @@ export default function App() {
 
   const hasSearchResults = searchStatus !== 'idle';
 
+  // ── Apply global theme to document root ───────────────────────────────────
+  useEffect(() => {
+    document.documentElement.style.backgroundColor =
+      globalTheme === 'black' ? '#000000' : '#18181b';
+    document.body.style.backgroundColor =
+      globalTheme === 'black' ? '#000000' : '#18181b';
+  }, [globalTheme]);
+
   // ── Inject Google Translate once on mount ─────────────────────────────────
   useEffect(() => {
     injectGoogleTranslate();
@@ -1171,7 +1179,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`relative w-full h-screen overflow-hidden transition-colors duration-700 ${globalTheme === 'black' ? 'bg-black' : 'bg-[#121212]'}`}>
+    <div className={`relative w-full h-screen overflow-hidden transition-colors duration-700 ${globalTheme === 'black' ? 'bg-black' : 'bg-zinc-900'}`}>
 
       {/* ── Cinematic Big Bang Intro ── */}
       <AnimatePresence>
@@ -1180,7 +1188,7 @@ export default function App() {
 
       {/* ── z-0  Full-screen Sketchfab background ── */}
       <div
-        className="absolute inset-0 z-0 overflow-hidden bg-black pointer-events-auto flex items-center justify-center transition-all duration-1000"
+        className={`absolute inset-0 z-0 overflow-hidden pointer-events-auto flex items-center justify-center transition-all duration-1000 ${globalTheme === 'black' ? 'bg-black' : 'bg-zinc-900'}`}
         style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
       >
         {/* Static fallback gradient shown while iframe is hidden */}

@@ -21,6 +21,57 @@ interface LibraryViewProps {
 const DEFAULT_QUERY = 'astrophysics cosmology';
 const PAGE_SIZE     = 10;
 
+// ─── arXiv browser-side helpers ───────────────────────────────────────────────
+// arXiv's export API supports CORS (Access-Control-Allow-Origin: *), so we can
+// call it directly from the browser — no server proxy needed. This avoids the
+// server-side 8 s timeout that was silently returning empty results.
+
+function parseArxivTotal(xml: string): number {
+  const m = xml.match(/<opensearch:totalResults[^>]*>(\d+)<\/opensearch:totalResults>/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function xmlText(chunk: string, tag: string): string {
+  const m = chunk.match(new RegExp(`<${tag}[^>]*>\\s*([\\s\\S]*?)\\s*</${tag}>`));
+  return m ? m[1].replace(/\n+/g, ' ').trim() : '';
+}
+
+function parseArxivEntries(xml: string): ArxivItem[] {
+  const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
+  const items: ArxivItem[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = entryRe.exec(xml)) !== null) {
+    const e         = m[1];
+    const id        = xmlText(e, 'id');
+    const title     = xmlText(e, 'title');
+    const summary   = xmlText(e, 'summary').slice(0, 400);
+    const published = xmlText(e, 'published').slice(0, 10);
+    const authors   = [...e.matchAll(/<name>\s*(.*?)\s*<\/name>/g)].map(a => a[1]);
+    items.push({ id, title, summary, authors, published, link: id });
+  }
+  return items;
+}
+
+async function fetchArxiv(
+  q: string,
+  start: number,
+  maxResults: number,
+): Promise<{ items: ArxivItem[]; total: number }> {
+  const url =
+    `https://export.arxiv.org/api/query` +
+    `?search_query=all:${encodeURIComponent(q)}` +
+    `&max_results=${maxResults}` +
+    `&start=${start}` +
+    `&sortBy=relevance`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) return { items: [], total: 0 };
+  const xml   = await res.text();
+  const total = parseArxivTotal(xml);
+  const items = parseArxivEntries(xml);
+  return { items, total };
+}
+
 // ─── Paper Card ───────────────────────────────────────────────────────────────
 function PaperCard({
   paper, isDark, isDiscussOpen, onToggleDiscuss, avatars, onDiscuss,
@@ -167,36 +218,67 @@ function PaperCard({
 
 // ─── Library View ─────────────────────────────────────────────────────────────
 export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: LibraryViewProps) {
-  const [readerTheme,    setReaderTheme]    = useState<ReaderTheme>('dark');
-  const [query,          setQuery]          = useState('');
-  const [activeQuery,    setActiveQuery]    = useState(DEFAULT_QUERY);
-  const [papers,         setPapers]         = useState<ArxivItem[]>([]);
-  const [total,          setTotal]          = useState(0);
-  const [offset,         setOffset]         = useState(0);
-  const [loading,        setLoading]        = useState(false);
-  const [loadingMore,    setLoadingMore]    = useState(false);
-  const [activeDiscuss,  setActiveDiscuss]  = useState<string | null>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [readerTheme,   setReaderTheme]   = useState<ReaderTheme>('dark');
+  const [query,         setQuery]         = useState('');
+  const [activeQuery,   setActiveQuery]   = useState(DEFAULT_QUERY);
+  const [papers,        setPapers]        = useState<ArxivItem[]>([]);
+  const [total,         setTotal]         = useState(0);
+  const [offset,        setOffset]        = useState(0);
+  const [loading,       setLoading]       = useState(false);
+  const [loadingMore,   setLoadingMore]   = useState(false);
+  const [fetchError,    setFetchError]    = useState('');
+  const [activeDiscuss, setActiveDiscuss] = useState<string | null>(null);
+
+  // Refs — stable across renders, no effect teardown needed
+  const scrollRef     = useRef<HTMLDivElement>(null);
+  const activeQueryRef = useRef(activeQuery);
+  const offsetRef      = useRef(offset);
+  const totalRef       = useRef(total);
+  const papersLenRef   = useRef(papers.length);
+  const loadingRef     = useRef(false);
+  const loadingMoreRef = useRef(false);
+
+  // Keep refs in sync
+  activeQueryRef.current = activeQuery;
+  offsetRef.current      = offset;
+  totalRef.current       = total;
+  papersLenRef.current   = papers.length;
+  loadingRef.current     = loading;
+  loadingMoreRef.current = loadingMore;
 
   const isDark = readerTheme === 'dark';
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchPapers = useCallback(async (q: string, start: number, replace: boolean) => {
-    if (replace) { setLoading(true); setPapers([]); }
-    else           { setLoadingMore(true); }
+  // ── Core fetch (replace = initial/new search; !replace = load more) ────────
+  const fetchPapers = useCallback(async (
+    q: string,
+    start: number,
+    replace: boolean,
+  ) => {
+    // Guard: don't run two fetches in parallel
+    if (loadingRef.current || loadingMoreRef.current) return;
+
+    if (replace) {
+      setLoading(true);
+      setFetchError('');
+      setPapers([]);
+      setTotal(0);
+      setOffset(0);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      const res = await fetch(
-        `/api/search/arxiv?q=${encodeURIComponent(q)}&max_results=${PAGE_SIZE}&start=${start}`
-      );
-      if (!res.ok) return;
-      const data = await res.json() as { items?: ArxivItem[]; total?: number };
-      const newItems = data.items ?? [];
-      setPapers(prev => replace ? newItems : [...prev, ...newItems]);
-      setTotal(data.total ?? 0);
-      setOffset(start + newItems.length);
-    } catch { /* silently swallow */ }
-    finally { setLoading(false); setLoadingMore(false); }
-  }, []);
+      const { items, total: newTotal } = await fetchArxiv(q, start, PAGE_SIZE);
+      setPapers(prev => replace ? items : [...prev, ...items]);
+      setTotal(newTotal);
+      setOffset(start + items.length);
+    } catch (err) {
+      setFetchError((err as Error)?.message ?? 'Fetch failed');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []); // stable — all mutable values read via refs or params
 
   // Initial load
   useEffect(() => { fetchPapers(DEFAULT_QUERY, 0, true); }, [fetchPapers]);
@@ -209,29 +291,38 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
     fetchPapers(q, 0, true);
   }, [query, fetchPapers]);
 
-  // ── Load more ──────────────────────────────────────────────────────────────
-  const loadMore = useCallback(() => {
-    if (loadingMore || loading) return;
-    if (total > 0 && papers.length >= total) return;
-    fetchPapers(activeQuery, offset, false);
-  }, [loadingMore, loading, total, papers.length, fetchPapers, activeQuery, offset]);
+  // ── Load more (called from scroll handler — reads refs, never stale) ───────
+  const triggerLoadMore = useCallback(() => {
+    if (loadingRef.current || loadingMoreRef.current) return;
+    if (totalRef.current > 0 && papersLenRef.current >= totalRef.current) return;
+    if (papersLenRef.current === 0) return;
+    fetchPapers(activeQueryRef.current, offsetRef.current, false);
+  }, [fetchPapers]);
 
-  // ── Infinite scroll ────────────────────────────────────────────────────────
+  // ── Infinite scroll via scroll event on the container ─────────────────────
+  // Using a scroll listener (instead of IntersectionObserver) so the effect is
+  // stable — no teardown/reattach on every state change.
+  const triggerLoadMoreRef = useRef(triggerLoadMore);
+  triggerLoadMoreRef.current = triggerLoadMore;
+
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-    const obs = new IntersectionObserver(
-      entries => { if (entries[0]?.isIntersecting) loadMore(); },
-      { threshold: 0.1 }
-    );
-    obs.observe(sentinel);
-    return () => obs.disconnect();
-  }, [loadMore]);
+    const container = scrollRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Fire when within 300px of the bottom
+      if (scrollHeight - scrollTop - clientHeight < 300) {
+        triggerLoadMoreRef.current();
+      }
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []); // mount-once — triggerLoadMoreRef.current is always fresh
 
   // ─ Theme-aware class helpers ──────────────────────────────────────────────
-  const bg    = isDark ? 'bg-[#06060b]'    : 'bg-[#fafaf8]';
-  const text  = isDark ? 'text-white'       : 'text-[#0d0d0d]';
-  const muted = isDark ? 'text-white/35'    : 'text-black/40';
+  const bg    = isDark ? 'bg-[#06060b]'       : 'bg-[#fafaf8]';
+  const text  = isDark ? 'text-white'          : 'text-[#0d0d0d]';
+  const muted = isDark ? 'text-white/35'       : 'text-black/40';
   const div   = isDark ? 'border-white/[0.06]' : 'border-black/[0.07]';
 
   return (
@@ -316,7 +407,7 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
       </div>
 
       {/* ── Results ── */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
           // Loading skeleton
           <div className="flex justify-center gap-2 py-16">
@@ -328,6 +419,22 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
               />
             ))}
           </div>
+        ) : fetchError ? (
+          <div className={`flex flex-col items-center gap-3 py-16 ${muted}`}>
+            <p className="text-4xl">⚠️</p>
+            <p className="text-[12px] uppercase tracking-[0.25em]">Connection error</p>
+            <p className="text-[11px] opacity-60 max-w-xs text-center">{fetchError}</p>
+            <button
+              onClick={() => fetchPapers(activeQuery, 0, true)}
+              className={`mt-2 px-4 py-2 rounded-full border text-[10px] uppercase tracking-[0.14em] transition-all duration-200 ${
+                isDark
+                  ? 'border-white/[0.12] text-white/50 hover:text-white hover:border-white/[0.28]'
+                  : 'border-black/[0.12] text-black/50 hover:text-black hover:border-black/[0.28]'
+              }`}
+            >
+              Retry
+            </button>
+          </div>
         ) : papers.length === 0 ? (
           <div className={`flex flex-col items-center gap-3 py-16 ${muted}`}>
             <p className="text-4xl">📭</p>
@@ -338,7 +445,7 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
             {/* Result count */}
             {total > 0 && (
               <p className={`text-[10px] uppercase tracking-[0.2em] px-1 ${muted}`}>
-                {total.toLocaleString()} papers found
+                {total.toLocaleString()} papers · showing {papers.length.toLocaleString()}
               </p>
             )}
 
@@ -362,8 +469,8 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
               />
             ))}
 
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="w-full py-6 flex justify-center">
+            {/* Load-more indicator */}
+            <div className="w-full py-6 flex justify-center">
               {loadingMore ? (
                 <div className="flex gap-2">
                   {[0, 1, 2].map(i => (
@@ -376,13 +483,13 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
                 </div>
               ) : total > 0 && papers.length < total ? (
                 <span className={`text-[10px] uppercase tracking-[0.2em] ${isDark ? 'text-white/12' : 'text-black/12'}`}>
-                  Scroll to load more
+                  Scroll for more
                 </span>
-              ) : (
+              ) : papers.length > 0 ? (
                 <span className={`text-[10px] uppercase tracking-[0.2em] ${isDark ? 'text-white/12' : 'text-black/12'}`}>
-                  {papers.length > 0 ? `${papers.length.toLocaleString()} papers loaded` : ''}
+                  {papers.length.toLocaleString()} papers loaded
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         )}
