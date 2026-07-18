@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import NasaSearch, { DetailModal, type UnifiedItem, type WikiItem, type NasaItem, type NasaStatus } from './components/NasaSearch';
+import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus } from './components/NasaSearch';
 import WarpIntro from './components/WarpIntro';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -28,6 +28,17 @@ function interleave(a: UnifiedItem[], b: UnifiedItem[]): UnifiedItem[] {
   for (let i = 0; i < max; i++) {
     if (i < a.length) out.push(a[i]);
     if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
+function interleaveAll(...arrays: UnifiedItem[][]): UnifiedItem[] {
+  const out: UnifiedItem[] = [];
+  const max = Math.max(...arrays.map(a => a.length), 0);
+  for (let i = 0; i < max; i++) {
+    for (const arr of arrays) {
+      if (i < arr.length) out.push(arr[i]);
+    }
   }
   return out;
 }
@@ -69,7 +80,7 @@ function randomIndexExcluding(current: number, length: number): number {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ChatTarget    = { name: string; role: string; image: string };
 type Message       = { role: 'user' | 'model'; text: string };
-type SharedContext = { title: string; description: string; source: 'nasa' | 'wiki' };
+type SharedContext = { title: string; description: string; source: 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern' };
 
 // ─── Google Translate helpers ─────────────────────────────────────────────────
 declare global {
@@ -222,38 +233,117 @@ function TtsControls({
   );
 }
 
-// ─── Quota Badge ──────────────────────────────────────────────────────────────
-function QuotaBadge({
-  tokens, voiceChars, ttsEngine, quotaExhausted,
+// ─── Usage Dashboard Modal ─────────────────────────────────────────────────────
+function UsageDashboard({
+  tokens, voiceChars, quotaExhausted, ttsEngine, onClose,
 }: {
   tokens: number;
   voiceChars: number;
-  ttsEngine: 'premium' | 'standard';
   quotaExhausted: boolean;
+  ttsEngine: 'premium' | 'standard';
+  onClose: () => void;
 }) {
-  const voiceLabel = quotaExhausted
-    ? '★ EXHAUSTED'
-    : ttsEngine === 'premium'
-      ? `★ ${voiceChars.toLocaleString()} ch`
-      : `◎ STD`;
+  const VOICE_CAP = 10_000; // chars ≈ 10 min
+  const TOKEN_CAP = 30_000; // tokens ≈ 30 min
+
+  const voiceMinsUsed = (voiceChars / 1000).toFixed(1);
+  const voiceMinsLeft = Math.max(0, (VOICE_CAP - voiceChars) / 1000).toFixed(1);
+  const voicePct      = Math.min(100, (voiceChars / VOICE_CAP) * 100);
+
+  const tokenMinsUsed = (tokens / 1000).toFixed(1);
+  const tokenMinsLeft = Math.max(0, (TOKEN_CAP - tokens) / 1000).toFixed(1);
+  const tokenPct      = Math.min(100, (tokens / TOKEN_CAP) * 100);
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.09] backdrop-blur-[20px] shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
-      {/* AI tokens */}
-      <div className="flex items-center gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-sky-400/70 flex-shrink-0" />
-        <span className="text-[9px] text-white/45 uppercase tracking-[0.12em]">AI</span>
-        <span className="text-[9px] text-white/70 font-medium tabular-nums">{tokens.toLocaleString()}</span>
-      </div>
-      <span className="w-px h-3 bg-white/[0.12]" />
-      {/* Voice chars / status */}
-      <div className="flex items-center gap-1">
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${quotaExhausted ? 'bg-red-400/70' : ttsEngine === 'premium' ? 'bg-violet-400/70' : 'bg-white/30'}`} />
-        <span className={`text-[9px] uppercase tracking-[0.12em] font-medium ${quotaExhausted ? 'text-red-400/80' : ttsEngine === 'premium' ? 'text-violet-300/80' : 'text-white/45'}`}>
-          {voiceLabel}
-        </span>
-      </div>
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="absolute inset-0 z-[10] flex items-center justify-center p-6 bg-black/55 backdrop-blur-[18px] rounded-[2rem]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.91, y: 14 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.91, y: 14 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-[280px] rounded-[1.6rem] border border-white/[0.10] bg-[rgba(5,5,9,0.96)] backdrop-blur-[32px] p-6 shadow-[0_32px_64px_rgba(0,0,0,0.95)]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="text-[15px]">📊</span>
+            <h3 className="text-white text-[13px] font-semibold tracking-tight">Usage & Quota</h3>
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.05] text-white/40 hover:text-white text-[16px] leading-none transition-colors duration-150">
+            ×
+          </button>
+        </div>
+
+        {/* ── Voice section ── */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${quotaExhausted ? 'bg-red-400' : ttsEngine === 'premium' ? 'bg-violet-400' : 'bg-white/30'}`} />
+              <span className="text-white/70 text-[11.5px] font-medium">Voice · ElevenLabs</span>
+            </div>
+            <span className={`text-[8.5px] px-2 py-0.5 rounded-full border uppercase tracking-[0.12em] ${
+              quotaExhausted
+                ? 'bg-red-500/15 border-red-400/20 text-red-300/90'
+                : ttsEngine === 'premium'
+                  ? 'bg-violet-500/15 border-violet-400/20 text-violet-300/90'
+                  : 'bg-white/[0.05] border-white/[0.09] text-white/35'}`}>
+              {quotaExhausted ? '✗ Exhausted' : ttsEngine === 'premium' ? '★ Premium' : '◎ Std'}
+            </span>
+          </div>
+          <div className="flex justify-between text-[10.5px] text-white/35 mb-1.5">
+            <span>{voiceMinsUsed} min used</span>
+            <span>{voiceMinsLeft} min left</span>
+          </div>
+          <div className="w-full h-[5px] rounded-full bg-white/[0.07] overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${voicePct}%` }}
+              transition={{ duration: 0.85, ease: 'easeOut' }}
+              className={`h-full rounded-full ${quotaExhausted ? 'bg-red-400' : 'bg-violet-400'}`}
+            />
+          </div>
+          <div className="flex justify-between text-[9.5px] text-white/20 mt-1">
+            <span>{voiceChars.toLocaleString()} chars</span>
+            <span>≈{VOICE_CAP / 1000} min cap</span>
+          </div>
+        </div>
+
+        {/* ── AI Token section ── */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" />
+            <span className="text-white/70 text-[11.5px] font-medium">AI Chat · Groq</span>
+          </div>
+          <div className="flex justify-between text-[10.5px] text-white/35 mb-1.5">
+            <span>{tokenMinsUsed} min used</span>
+            <span>{tokenMinsLeft} min left</span>
+          </div>
+          <div className="w-full h-[5px] rounded-full bg-white/[0.07] overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${tokenPct}%` }}
+              transition={{ duration: 0.85, ease: 'easeOut', delay: 0.1 }}
+              className="h-full rounded-full bg-sky-400"
+            />
+          </div>
+          <div className="flex justify-between text-[9.5px] text-white/20 mt-1">
+            <span>~{tokens.toLocaleString()} tokens</span>
+            <span>≈{TOKEN_CAP / 1000} min cap</span>
+          </div>
+        </div>
+
+        <p className="text-white/18 text-[8.5px] text-center mt-5 tracking-widest uppercase">
+          Session stats · resets on page reload
+        </p>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -331,6 +421,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const [quotaExhausted,  setQuotaExhausted]  = useState(false);
   // Set of message indices currently in typewriter animation
   const [typingSet, setTypingSet] = useState<Set<number>>(() => new Set());
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -569,7 +660,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 32 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-[95vw] max-w-2xl h-[85vh] bg-[rgba(5,5,9,0.88)] backdrop-blur-[52px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.55),0_40px_80px_-16px_rgba(0,0,0,0.98),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        className="relative w-[95vw] h-[90vh] bg-[rgba(5,5,9,0.88)] backdrop-blur-[52px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.55),0_40px_80px_-16px_rgba(0,0,0,0.98),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Drag handle (mobile) ── */}
@@ -577,14 +668,16 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           <div className="w-10 h-[3px] rounded-full bg-white/20" />
         </div>
 
-        {/* ── Quota badge — top of modal ── */}
-        <div className="flex justify-center pt-2 pb-0 flex-shrink-0">
-          <QuotaBadge
-            tokens={sessionTokens}
-            voiceChars={sessionVoiceChars}
-            ttsEngine={activeEngine}
-            quotaExhausted={quotaExhausted}
-          />
+        {/* ── Usage dashboard trigger ── */}
+        <div className="flex justify-end px-4 pt-2 pb-0 flex-shrink-0">
+          <button
+            onClick={() => setShowDashboard(true)}
+            title="Usage & Quota Dashboard"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-white/35 hover:text-white/70 hover:bg-white/[0.08] hover:border-white/[0.14] transition-all duration-200"
+          >
+            <span className="text-[12px]">📊</span>
+            <span className="text-[9px] uppercase tracking-[0.14em]">Usage</span>
+          </button>
         </div>
 
         {/* ── Header ── */}
@@ -696,6 +789,19 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
             </motion.div>
           )}
         </AnimatePresence>
+        {/* ── Usage Dashboard overlay ── */}
+        <AnimatePresence>
+          {showDashboard && (
+            <UsageDashboard
+              tokens={sessionTokens}
+              voiceChars={sessionVoiceChars}
+              quotaExhausted={quotaExhausted}
+              ttsEngine={activeEngine}
+              onClose={() => setShowDashboard(false)}
+            />
+          )}
+        </AnimatePresence>
+
         {/* Hidden audio element for premium TTS */}
         <audio ref={audioRef} preload="none" className="hidden" />
 
@@ -753,9 +859,7 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
       )}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[8px] font-medium uppercase tracking-[0.18em] px-1.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-300/20 text-amber-200/80">
-            ◈ WIKI
-          </span>
+          <SourceBadge source="wiki" />
         </div>
         <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{item.title}</p>
         {snippet && (
@@ -882,12 +986,23 @@ export default function App() {
     setSearchResults([]);
     setSearchError('');
     try {
-      const nasaTerm = everything ? 'cosmos' : term;
-      const wikiTerm = everything ? 'cosmology astronomy' : term;
+      const nasaTerm  = everything ? 'cosmos' : term;
+      const wikiTerm  = everything ? 'cosmology astronomy' : term;
+      const arxivTerm = everything ? 'cosmology astrophysics' : term;
 
-      const [nasaRes, wikiRes] = await Promise.all([
+      const [nasaRes, wikiRes, arxivRes, spacexRes, cernRes] = await Promise.all([
         fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=1`),
         fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
+        fetch(`/api/search/arxiv?q=${encodeURIComponent(arxivTerm)}`),
+        fetch('https://api.spacexdata.com/v4/launches/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: everything ? {} : { name: { $regex: term, $options: 'i' } },
+            options: { limit: 4, sort: { date_utc: -1 }, select: ['name', 'details', 'date_utc', 'success', 'links'] },
+          }),
+        }),
+        fetch(`https://opendata.cern.ch/api/records/?q=${encodeURIComponent(term)}&size=4`).catch(() => null),
       ]);
 
       const nasaItems: UnifiedItem[] = nasaRes.ok
@@ -901,7 +1016,25 @@ export default function App() {
           ).map(item => ({ source: 'wiki' as const, item }))
         : [];
 
-      setSearchResults(interleave(nasaItems, wikiItems));
+      const arxivItems: UnifiedItem[] = arxivRes.ok
+        ? ((await arxivRes.json() as { items?: ArxivItem[] }).items ?? [])
+            .map(item => ({ source: 'arxiv' as const, item }))
+        : [];
+
+      const spacexItems: UnifiedItem[] = spacexRes.ok
+        ? ((await spacexRes.json() as { docs?: SpaceXItem[] }).docs ?? [])
+            .map(item => ({ source: 'spacex' as const, item }))
+        : [];
+
+      const cernRaw = cernRes?.ok
+        ? (await cernRes.json() as { hits?: { hits?: Array<{ id: number; metadata?: { title?: string; abstract?: { description?: string } } }> } })
+        : { hits: { hits: [] } };
+      const cernItems: UnifiedItem[] = (cernRaw.hits?.hits ?? []).map(h => ({
+        source: 'cern' as const,
+        item: { id: h.id, title: h.metadata?.title ?? 'CERN Dataset', description: h.metadata?.abstract?.description ?? '' } as CernItem,
+      }));
+
+      setSearchResults(interleaveAll(nasaItems, wikiItems, arxivItems, spacexItems, cernItems));
       setSearchStatus('done');
     } catch (err: unknown) {
       setSearchError((err as Error)?.message ?? String(err));
@@ -917,9 +1050,17 @@ export default function App() {
       const wikiTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
       const page     = Math.floor(Math.random() * 8) + 1;
 
-      const [nasaRes, wikiRes] = await Promise.all([
+      const [nasaRes, wikiRes, spacexRes] = await Promise.all([
         fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=${page}`),
         fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
+        fetch('https://api.spacexdata.com/v4/launches/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: {},
+            options: { limit: 3, sort: { date_utc: -1 }, offset: Math.floor(Math.random() * 30), select: ['name', 'details', 'date_utc', 'success', 'links'] },
+          }),
+        }).catch(() => null),
       ]);
 
       const nasaItems: UnifiedItem[] = nasaRes.ok
@@ -934,7 +1075,12 @@ export default function App() {
           ).map(item => ({ source: 'wiki' as const, item }))
         : [];
 
-      setSearchResults(prev => [...prev, ...interleave(nasaItems, wikiItems)]);
+      const spacexItems: UnifiedItem[] = spacexRes?.ok
+        ? ((await spacexRes.json() as { docs?: SpaceXItem[] }).docs ?? [])
+            .map(item => ({ source: 'spacex' as const, item }))
+        : [];
+
+      setSearchResults(prev => [...prev, ...interleaveAll(nasaItems, wikiItems, spacexItems)]);
     } catch { /* silently swallow */ }
     finally { setIsLoadingMore(false); }
   }, [isLoadingMore, isEverythingMode]);
@@ -1017,18 +1163,18 @@ export default function App() {
 
   // Build shared context from a selected card for passing to DetailModal
   const buildSharedContext = useCallback((card: UnifiedItem): SharedContext => {
-    if (card.source === 'nasa') {
-      return {
-        title:       card.item.data?.[0]?.title ?? 'NASA Image',
-        description: card.item.data?.[0]?.description ?? '',
-        source:      'nasa',
-      };
+    switch (card.source) {
+      case 'nasa':
+        return { title: card.item.data?.[0]?.title ?? 'NASA Image',       description: card.item.data?.[0]?.description ?? '', source: 'nasa'   };
+      case 'wiki':
+        return { title: card.item.title ?? 'Wikipedia Article',            description: card.item.extract ?? '',                source: 'wiki'   };
+      case 'arxiv':
+        return { title: card.item.title,                                   description: card.item.summary,                      source: 'arxiv'  };
+      case 'spacex':
+        return { title: card.item.name,                                    description: card.item.details ?? '',                source: 'spacex' };
+      case 'cern':
+        return { title: card.item.title,                                   description: card.item.description,                  source: 'cern'   };
     }
-    return {
-      title:       card.item.title ?? 'Wikipedia Article',
-      description: card.item.extract ?? '',
-      source:      'wiki',
-    };
   }, []);
 
   return (

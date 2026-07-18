@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export interface SharedContext {
   title: string;
   description: string;
-  source: 'nasa' | 'wiki';
+  source: 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern';
 }
 
 export interface NasaItem {
@@ -20,22 +20,109 @@ export interface WikiItem {
   thumbnail?: { source: string; width: number; height: number };
 }
 
+export interface ArxivItem {
+  id: string;
+  title: string;
+  summary: string;
+  authors: string[];
+  published: string;
+  link: string;
+}
+
+export interface SpaceXItem {
+  id: string;
+  name: string;
+  details: string | null;
+  date_utc: string;
+  success: boolean | null;
+  links?: { patch?: { small?: string } };
+}
+
+export interface CernItem {
+  id: number;
+  title: string;
+  description: string;
+}
+
 export type UnifiedItem =
-  | { source: 'nasa';  item: NasaItem }
-  | { source: 'wiki';  item: WikiItem  };
+  | { source: 'nasa';   item: NasaItem   }
+  | { source: 'wiki';   item: WikiItem   }
+  | { source: 'arxiv';  item: ArxivItem  }
+  | { source: 'spacex'; item: SpaceXItem }
+  | { source: 'cern';   item: CernItem   };
 
 export type NasaStatus = 'idle' | 'loading' | 'done' | 'error';
 
 // ─── Source badge ──────────────────────────────────────────────────────────────
-function SourceBadge({ source }: { source: 'nasa' | 'wiki' }) {
-  return source === 'nasa' ? (
-    <span className="inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/25 text-sky-300/90 backdrop-blur-md">
-      ✦ NASA
+const SOURCE_CONFIG: Record<UnifiedItem['source'], { emoji: string; label: string; cls: string }> = {
+  nasa:   { emoji: '🪐', label: 'NASA',      cls: 'bg-sky-500/20 border-sky-400/25 text-sky-300/90'       },
+  wiki:   { emoji: '🔍', label: 'Wikipedia', cls: 'bg-amber-400/15 border-amber-300/20 text-amber-200/90' },
+  arxiv:  { emoji: '📚', label: 'arXiv',    cls: 'bg-emerald-500/15 border-emerald-400/20 text-emerald-300/90' },
+  spacex: { emoji: '🚀', label: 'SpaceX',   cls: 'bg-slate-400/15 border-slate-300/20 text-slate-200/90'  },
+  cern:   { emoji: '⚛️', label: 'CERN',     cls: 'bg-purple-500/15 border-purple-400/20 text-purple-300/90' },
+};
+
+export function SourceBadge({ source }: { source: UnifiedItem['source'] }) {
+  const { emoji, label, cls } = SOURCE_CONFIG[source];
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border backdrop-blur-md ${cls}`}>
+      {emoji} {label}
     </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-300/20 text-amber-200/90 backdrop-blur-md">
-      ◈ WIKI
-    </span>
+  );
+}
+
+// ─── Extract display data from any source ─────────────────────────────────────
+function extractDisplay(unified: UnifiedItem): {
+  imgUrl?: string; title: string; desc: string; date: string;
+} {
+  switch (unified.source) {
+    case 'nasa': return {
+      imgUrl: unified.item.links?.find(l => l.rel === 'preview')?.href ?? unified.item.links?.[0]?.href,
+      title:  unified.item.data?.[0]?.title ?? 'Untitled',
+      desc:   unified.item.data?.[0]?.description ?? '',
+      date:   unified.item.data?.[0]?.date_created?.slice(0, 10) ?? '',
+    };
+    case 'wiki': return {
+      imgUrl: unified.item.thumbnail?.source,
+      title:  unified.item.title,
+      desc:   unified.item.extract ?? '',
+      date:   '',
+    };
+    case 'arxiv': return {
+      imgUrl: undefined,
+      title:  unified.item.title,
+      desc:   unified.item.summary,
+      date:   unified.item.published,
+    };
+    case 'spacex': return {
+      imgUrl: unified.item.links?.patch?.small,
+      title:  unified.item.name,
+      desc:   unified.item.details ?? '',
+      date:   unified.item.date_utc?.slice(0, 10) ?? '',
+    };
+    case 'cern': return {
+      imgUrl: undefined,
+      title:  unified.item.title,
+      desc:   unified.item.description,
+      date:   '',
+    };
+  }
+}
+
+// ─── Placeholder tile when no image available ─────────────────────────────────
+function NoImagePlaceholder({ source }: { source: UnifiedItem['source'] }) {
+  const glyphs: Record<UnifiedItem['source'], { glyph: string; style: string }> = {
+    nasa:   { glyph: '✦',  style: 'from-sky-900/30 via-black/40 to-transparent text-sky-200/20'     },
+    wiki:   { glyph: 'W',  style: 'from-amber-900/25 via-black/40 to-transparent text-amber-200/20' },
+    arxiv:  { glyph: 'Σ',  style: 'from-emerald-900/25 via-black/40 to-transparent text-emerald-200/20' },
+    spacex: { glyph: '🚀', style: 'from-slate-900/35 via-black/40 to-transparent text-slate-200/20' },
+    cern:   { glyph: '⚛', style: 'from-purple-900/25 via-black/40 to-transparent text-purple-200/20' },
+  };
+  const { glyph, style } = glyphs[source];
+  return (
+    <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${style}`}>
+      <span className="text-5xl font-thin select-none opacity-60">{glyph}</span>
+    </div>
   );
 }
 
@@ -46,21 +133,13 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
   chatAvatars?: { name: string; image?: string }[];
   onShareToChat?: (avatarName: string) => void;
 }) {
-  // Close on Escape
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
 
-  const imgUrl = unified.source === 'nasa'
-    ? (unified.item.links?.find(l => l.rel === 'preview')?.href ?? unified.item.links?.[0]?.href)
-    : unified.item.thumbnail?.source;
-
-  const title  = unified.source === 'nasa' ? (unified.item.data?.[0]?.title ?? 'Untitled') : unified.item.title;
-  const desc   = unified.source === 'nasa' ? (unified.item.data?.[0]?.description ?? '') : (unified.item.extract ?? '');
-  const date   = unified.source === 'nasa' ? (unified.item.data?.[0]?.date_created?.slice(0, 10) ?? '') : '';
-  const source = unified.source;
+  const { imgUrl, title, desc, date } = extractDisplay(unified);
 
   return (
     <motion.div
@@ -89,26 +168,51 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
         </button>
 
         {/* Image */}
-        {imgUrl && (
+        {imgUrl ? (
           <div className="w-full aspect-[16/9] flex-shrink-0 overflow-hidden bg-black/30">
             <img src={imgUrl} alt={title} className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-full aspect-[16/9] flex-shrink-0 overflow-hidden bg-black/30">
+            <NoImagePlaceholder source={unified.source} />
           </div>
         )}
 
         {/* Info — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide">
           <div className="flex items-center gap-2.5 mb-3">
-            <SourceBadge source={source} />
+            <SourceBadge source={unified.source} />
             {date && (
               <span className="text-[10px] text-white/35 uppercase tracking-[0.22em]">{date}</span>
             )}
           </div>
-          <h2 className="text-white text-[17px] font-semibold leading-snug tracking-[-0.01em] mb-3" style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</h2>
+          <h2 className="text-white text-[17px] font-semibold leading-snug tracking-[-0.01em] mb-3"
+            style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</h2>
           {desc && (
             <p className="text-white/55 text-[13px] leading-relaxed tracking-wide">{desc}</p>
           )}
 
-          {/* ── Discuss with a Scientist ── */}
+          {/* arXiv authors */}
+          {unified.source === 'arxiv' && unified.item.authors.length > 0 && (
+            <p className="mt-3 text-white/30 text-[11px] tracking-wide">
+              {unified.item.authors.slice(0, 3).join(', ')}{unified.item.authors.length > 3 ? ' et al.' : ''}
+            </p>
+          )}
+
+          {/* SpaceX status */}
+          {unified.source === 'spacex' && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className={`text-[9px] px-2 py-0.5 rounded-full border ${
+                unified.item.success === true  ? 'bg-emerald-500/15 border-emerald-400/20 text-emerald-300' :
+                unified.item.success === false ? 'bg-red-500/15 border-red-400/20 text-red-300' :
+                'bg-white/5 border-white/10 text-white/35'
+              }`}>
+                {unified.item.success === true ? '✓ SUCCESS' : unified.item.success === false ? '✗ FAILED' : '— UNKNOWN'}
+              </span>
+            </div>
+          )}
+
+          {/* Discuss with a Scientist */}
           {chatAvatars && onShareToChat && (
             <div className="mt-6 pt-5 border-t border-white/10">
               <p className="text-white/35 text-[9px] uppercase tracking-[0.22em] mb-3">
@@ -152,13 +256,7 @@ function ResultCard({ unified, idx, onClick }: {
   idx: number;
   onClick: () => void;
 }) {
-  const isNasa = unified.source === 'nasa';
-  const imgUrl = isNasa
-    ? (unified.item.links?.find(l => l.rel === 'preview')?.href ?? unified.item.links?.[0]?.href)
-    : unified.item.thumbnail?.source;
-  const title  = isNasa ? (unified.item.data?.[0]?.title ?? 'Untitled') : unified.item.title;
-  const desc   = isNasa ? (unified.item.data?.[0]?.description ?? '') : (unified.item.extract ?? '');
-  const date   = isNasa ? (unified.item.data?.[0]?.date_created?.slice(0, 10) ?? '') : '';
+  const { imgUrl, title, desc, date } = extractDisplay(unified);
 
   return (
     <motion.div
@@ -179,10 +277,7 @@ function ResultCard({ unified, idx, onClick }: {
             onError={e => { (e.currentTarget as HTMLImageElement).parentElement!.style.background = '#111'; }}
           />
         ) : (
-          /* Wikipedia placeholder when no thumbnail */
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-900/20 via-black/40 to-transparent">
-            <span className="text-5xl font-thin text-amber-200/20 select-none">W</span>
-          </div>
+          <NoImagePlaceholder source={unified.source} />
         )}
 
         {/* Gradient overlay */}
@@ -210,7 +305,8 @@ function ResultCard({ unified, idx, onClick }: {
 
       {/* Text */}
       <div className="px-5 py-5">
-        <p className="text-white text-[14px] font-medium leading-snug tracking-[0.01em] mb-2" style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</p>
+        <p className="text-white text-[14px] font-medium leading-snug tracking-[0.01em] mb-2"
+          style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</p>
         {desc && (
           <p className="text-white/50 text-[12.5px] leading-relaxed tracking-wide line-clamp-3">{desc}</p>
         )}
@@ -237,8 +333,13 @@ export default function NasaSearch({
 }: Props) {
   if (status === 'idle') return null;
 
-  const nasaCount = results.filter(r => r.source === 'nasa').length;
-  const wikiCount = results.filter(r => r.source === 'wiki').length;
+  const sourceCounts = results.reduce<Partial<Record<UnifiedItem['source'], number>>>((acc, r) => {
+    acc[r.source] = (acc[r.source] ?? 0) + 1;
+    return acc;
+  }, {});
+  const sourceLabel = (Object.entries(sourceCounts) as [UnifiedItem['source'], number][])
+    .map(([s, n]) => `${SOURCE_CONFIG[s].emoji} ${n} ${SOURCE_CONFIG[s].label}`)
+    .join(' · ');
 
   return (
     <AnimatePresence>
@@ -253,12 +354,12 @@ export default function NasaSearch({
         {/* Header */}
         <div className="flex items-center justify-between mb-4 px-1">
           <span className="text-white/40 text-[11px] uppercase tracking-[0.2em]">
-            {status === 'loading' ? 'Scanning NASA & Wikipedia…' :
+            {status === 'loading' ? 'Scanning NASA · Wikipedia · arXiv · SpaceX · CERN…' :
              status === 'error'   ? 'Transmission error' :
              results.length === 0 ? 'No signals found' :
              isEverythingMode
                ? `${results.length} results — scroll for more`
-               : `${nasaCount} NASA · ${wikiCount} Wikipedia`}
+               : sourceLabel}
           </span>
           <button onClick={onClear}
             className="text-white/30 hover:text-white/70 text-[11px] uppercase tracking-widest transition-colors duration-200">
@@ -293,16 +394,21 @@ export default function NasaSearch({
         {/* Cards */}
         {status === 'done' && results.length > 0 && (
           <div className="flex flex-col gap-5">
-            {results.map((unified, idx) => (
-              <ResultCard
-                key={unified.source === 'nasa'
-                  ? `nasa-${unified.item.data?.[0]?.title}-${idx}`
-                  : `wiki-${unified.item.pageid}-${idx}`}
-                unified={unified}
-                idx={idx}
-                onClick={() => onCardClick(unified)}
-              />
-            ))}
+            {results.map((unified, idx) => {
+              const key = unified.source === 'nasa'   ? `nasa-${unified.item.data?.[0]?.title}-${idx}` :
+                          unified.source === 'wiki'   ? `wiki-${unified.item.pageid}-${idx}` :
+                          unified.source === 'arxiv'  ? `arxiv-${unified.item.id}-${idx}` :
+                          unified.source === 'spacex' ? `spacex-${unified.item.id}-${idx}` :
+                          `cern-${unified.item.id}-${idx}`;
+              return (
+                <ResultCard
+                  key={key}
+                  unified={unified}
+                  idx={idx}
+                  onClick={() => onCardClick(unified)}
+                />
+              );
+            })}
 
             {/* Infinite scroll sentinel — Everything mode only */}
             {isEverythingMode && (
@@ -317,7 +423,7 @@ export default function NasaSearch({
                       ))}
                     </div>
                     <span className="text-white/25 text-[10px] uppercase tracking-[0.25em]">
-                      Loading more from NASA & Wikipedia…
+                      Loading more results…
                     </span>
                   </>
                 ) : (

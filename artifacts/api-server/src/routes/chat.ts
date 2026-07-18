@@ -167,7 +167,11 @@ LENGTH CONSTRAINT: Keep all responses extremely concise, short, and to the point
 
   // ── Shared context block — injected when user shares a NASA/Wiki card ────────
   if (sharedContext) {
-    const sourceLabel = sharedContext.source === "nasa" ? "NASA archive" : "Wikipedia";
+    const SOURCE_LABELS: Record<string, string> = {
+      nasa: "NASA archive", wiki: "Wikipedia",
+      arxiv: "arXiv preprint", spacex: "SpaceX mission database", cern: "CERN Open Data",
+    };
+    const sourceLabel = SOURCE_LABELS[sharedContext.source] ?? "external source";
     const preview = sharedContext.description.trim().slice(0, 900);
     instruction += `
 
