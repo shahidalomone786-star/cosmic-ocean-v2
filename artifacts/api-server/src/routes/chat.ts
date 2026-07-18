@@ -1,24 +1,21 @@
 import { Router } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = Router();
 
-// ── Key pool: 5 env-var slots, undefined entries filtered out ──────────────────
-const GEMINI_KEYS: string[] = [
-  process.env.GEMINI_KEY_111,
-  process.env.GEMINI_KEY_222,
-  process.env.GEMINI_KEY_333,
-  process.env.GEMINI_KEY_444,
-  process.env.GEMINI_KEY_555,
+// ── Key pool: 5 Groq keys, undefined entries filtered out ─────────────────────
+const GROQ_KEYS: string[] = [
+  process.env.GROQ_KEY_1,
+  process.env.GROQ_KEY_2,
+  process.env.GROQ_KEY_3,
+  process.env.GROQ_KEY_4,
+  process.env.GROQ_KEY_5,
 ].filter((k): k is string => typeof k === "string" && k.trim().length > 0);
 
 // Mutable pointer — advances on every 429, wraps around the pool
 let currentKeyIndex = 0;
 
-function isQuotaError(err: unknown): boolean {
-  const msg = (err as Error)?.message ?? String(err);
-  return /429|quota|rate.?limit|resource.?exhausted/i.test(msg);
-}
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL    = "llama-3.3-70b-versatile";
 
 // ── POST /api/chat ─────────────────────────────────────────────────────────────
 router.post("/chat", async (req, res) => {
@@ -34,42 +31,68 @@ router.post("/chat", async (req, res) => {
     return;
   }
 
-  if (GEMINI_KEYS.length === 0) {
-    res.status(500).json({ error: "No Gemini API keys configured on the server." });
+  if (GROQ_KEYS.length === 0) {
+    res.status(500).json({ error: "No Groq API keys configured on the server." });
     return;
   }
 
   const systemInstruction = buildSystemInstruction(avatarName, language);
 
-  // Try every key in the pool before giving up
+  // Convert Gemini-style history to OpenAI-style messages
+  const historyMessages: { role: "user" | "assistant"; content: string }[] =
+    (history ?? []).map((turn) => ({
+      role: turn.role === "model" ? "assistant" : "user",
+      content: turn.parts.map((p) => p.text).join(""),
+    }));
+
+  const messages = [
+    { role: "system" as const, content: systemInstruction },
+    ...historyMessages,
+    { role: "user" as const, content: message },
+  ];
+
+  // Try every key before giving up
   let lastError: unknown;
-  for (let attempt = 0; attempt < GEMINI_KEYS.length; attempt++) {
-    const keyIndex = (currentKeyIndex + attempt) % GEMINI_KEYS.length;
-    const apiKey   = GEMINI_KEYS[keyIndex];
+  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
+    const keyIndex = (currentKeyIndex + attempt) % GROQ_KEYS.length;
+    const apiKey   = GROQ_KEYS[keyIndex];
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-        systemInstruction,
+      const response = await fetch(GROQ_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model: GROQ_MODEL, messages }),
       });
 
-      const chat   = model.startChat({ history: history ?? [] });
-      const result = await chat.sendMessage(message);
-      const reply  = result.response.text();
+      if (response.status === 429) {
+        // Rate-limited — rotate and retry with next key
+        currentKeyIndex = (currentKeyIndex + 1) % GROQ_KEYS.length;
+        lastError = new Error(`429 rate limit on key index ${keyIndex}`);
+        continue;
+      }
 
-      // Advance the pointer only on quota errors; on success keep using this key
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Groq API error ${response.status}: ${body}`);
+      }
+
+      const json = await response.json() as {
+        choices: { message: { content: string } }[];
+      };
+      const reply = json.choices?.[0]?.message?.content ?? "";
       res.json({ reply });
       return;
+
     } catch (err: unknown) {
       lastError = err;
-      const errMsg = (err as Error)?.message ?? String(err);
-      console.log('FAILED KEY:', GEMINI_KEYS[keyIndex].substring(0, 10) + '...', 'ERROR:', errMsg);
-      if (isQuotaError(err)) {
-        // Rotate to next key and try again
-        currentKeyIndex = (currentKeyIndex + 1) % GEMINI_KEYS.length;
+      const msg = (err as Error)?.message ?? String(err);
+      // Only rotate on rate-limit signals; fail fast on auth / network errors
+      if (/429|rate.?limit/i.test(msg)) {
+        currentKeyIndex = (currentKeyIndex + 1) % GROQ_KEYS.length;
       } else {
-        // Non-quota error (auth, network, etc.) — fail fast, don't rotate
         break;
       }
     }
