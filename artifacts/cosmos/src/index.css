@@ -141,6 +141,7 @@
   --chart-5: red; /*replace with H S L */
 
   --app-font-sans: 'Inter', sans-serif;
+  --app-font-heading: 'Space Grotesk', 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.5rem; /* 8px */
@@ -310,13 +311,39 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
 }
 
+/* ── Global scrollbar suppression ────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari/WebKit */
+}
+
 @layer base {
   * {
     @apply border-border;
   }
 
+  html {
+    line-height: 1.65;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--app-font-heading);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
   }
 }
 
@@ -340,30 +367,38 @@
  * Even without handling focused or not, this is six possible combinations that
  * need to be distinguished from eachother visually.
  */
-/* ── Google Translate: hide the injected toolbar so it doesn't push our layout ── */
+/* ── Google Translate: nuke every injected element ───────────────────────────── */
 .goog-te-banner-frame,
 .goog-te-menu-frame,
-#goog-gt-tt,
 .goog-te-balloon-frame,
-div#goog-gt-,
+.goog-te-ftab-frame,
+#goog-gt-tt,
+#goog-gt-votingft,
 .goog-tooltip,
-.goog-tooltip:hover {
+.goog-tooltip:hover,
+.goog-te-spinner-pos,
+.goog-te-gadget-icon,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-l4eHX-hSRGPd {
   display: none !important;
   visibility: hidden !important;
+  pointer-events: none !important;
 }
 
-/* Prevent GT from shoving body down with a top offset */
+/* Prevent GT from shoving body down */
 body {
   top: 0 !important;
+  position: static !important;
 }
 
-/* Hide the skiptranslate wrapper Google injects */
+/* Hide the skiptranslate wrapper entirely */
 .skiptranslate {
   display: none !important;
   height: 0 !important;
+  overflow: hidden !important;
 }
 
-/* Re-show only the translate element we control (the hidden one we injected) */
+/* Our hidden GT mount point stays hidden */
 #google_translate_element {
   display: none !important;
 }

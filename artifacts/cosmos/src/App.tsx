@@ -292,7 +292,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center px-4"
+      className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-[32px] flex items-center justify-center px-4"
       onClick={onClose}
     >
       <motion.div
@@ -300,17 +300,17 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 24 }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="w-[90%] max-w-2xl h-[80vh] bg-black/40 border border-white/20 rounded-3xl flex flex-col overflow-hidden shadow-2xl"
+        className="w-[92%] max-w-2xl h-[82vh] bg-[rgba(7,7,12,0.88)] backdrop-blur-[28px] border border-white/[0.09] rounded-[2rem] flex flex-col overflow-hidden shadow-[0_40px_80px_-16px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0 bg-white/3 backdrop-blur-xl">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
+          <div className="flex items-center gap-3.5">
             <img src={avatar.image} alt={avatar.name}
-              className="w-9 h-9 rounded-full object-cover border border-white/20 shadow-lg" />
+              className="w-10 h-10 rounded-full object-cover border border-white/[0.18] shadow-[0_0_16px_rgba(0,0,0,0.6)]" />
             <div>
-              <p className="text-white text-[13px] font-medium tracking-wide leading-tight">{avatar.name}</p>
-              <p className="text-white/40 text-[10px] uppercase tracking-wider">{avatar.role}</p>
+              <p className="text-white text-[14px] font-medium tracking-wide leading-tight" style={{ fontFamily: 'var(--app-font-heading)' }}>{avatar.name}</p>
+              <p className="text-white/40 text-[10px] uppercase tracking-[0.18em] mt-0.5">{avatar.role}</p>
             </div>
           </div>
           {/* Shared context badge */}
@@ -321,27 +321,27 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
             </div>
           )}
           <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-colors duration-200 text-lg leading-none">
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.12] hover:border-white/[0.18] transition-all duration-200 text-lg leading-none">
             ×
           </button>
         </div>
 
         {/* ── Shared context banner ── */}
         {sharedContext && (
-          <div className="flex-shrink-0 px-5 py-2.5 bg-violet-900/15 border-b border-violet-400/10">
-            <p className="text-violet-300/60 text-[10px] uppercase tracking-wider mb-0.5">Context shared</p>
-            <p className="text-white/60 text-[12px] tracking-wide leading-snug line-clamp-1">{sharedContext.title}</p>
+          <div className="flex-shrink-0 px-6 py-3 bg-[rgba(124,58,237,0.08)] border-b border-violet-400/[0.12]">
+            <p className="text-violet-300/50 text-[9px] uppercase tracking-[0.2em] mb-0.5">Analysing context</p>
+            <p className="text-white/65 text-[12px] tracking-wide leading-snug line-clamp-1">{sharedContext.title}</p>
           </div>
         )}
 
         {/* ── Messages ── */}
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-hide space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide flex flex-col gap-4">
           {/* Auto-analyse loading state */}
           {isLoading && messages.length === 0 && (
-            <div className="flex items-start gap-2.5">
+            <div className="flex items-start gap-3">
               <img src={avatar.image} alt={avatar.name}
-                className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
-              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm">
+                className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
+              <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[4px]">
                 <ThinkingDots />
               </div>
             </div>
@@ -350,40 +350,42 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           {messages.map((msg, idx) =>
             msg.role === 'user' ? (
               <div key={idx} className="flex justify-end">
-                <div className="bg-white/10 border border-white/15 backdrop-blur-xl rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[78%]">
-                  <p className="text-white text-[13px] leading-relaxed tracking-wide">{msg.text}</p>
+                <div className="bg-white/[0.12] border border-white/[0.11] backdrop-blur-md rounded-2xl rounded-tr-[5px] px-5 py-3 max-w-[80%] shadow-[0_2px_20px_rgba(0,0,0,0.35)]">
+                  <p className="text-white text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
                 </div>
               </div>
             ) : (
-              <div key={idx} className="flex items-start gap-2.5">
+              <div key={idx} className="flex items-start gap-3">
                 <img src={avatar.image} alt={avatar.name}
-                  className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
-                <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[78%]">
-                  <p className="text-white/85 text-[13px] leading-relaxed tracking-wide">{msg.text}</p>
+                  className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
+                <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px] px-5 py-3 max-w-[82%]">
+                  <p className="text-white/88 text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
                 </div>
               </div>
             )
           )}
 
           {isLoading && messages.length > 0 && (
-            <div className="flex items-start gap-2.5">
+            <div className="flex items-start gap-3">
               <img src={avatar.image} alt={avatar.name}
-                className="w-6 h-6 rounded-full object-cover border border-white/15 flex-shrink-0 mt-1" />
-              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm">
+                className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
+              <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px]">
                 <ThinkingDots />
               </div>
             </div>
           )}
 
           {error && (
-            <p className="text-center text-red-400/80 text-[11px] tracking-wide py-1">{error}</p>
+            <div className="mx-auto px-4 py-2 rounded-full bg-red-500/10 border border-red-400/20">
+              <p className="text-center text-red-400/90 text-[11.5px] tracking-wide">{error}</p>
+            </div>
           )}
 
           <div ref={bottomRef} />
         </div>
 
         {/* ── Input ── */}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-white/10 bg-white/3">
+        <div className="flex-shrink-0 px-5 py-4 border-t border-white/[0.06] bg-gradient-to-r from-white/[0.02] to-transparent">
           <div className="flex items-center gap-3">
             <input
               ref={inputRef}
@@ -395,14 +397,14 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
               onBlur={onInputBlur}
               disabled={isLoading}
               placeholder={isLoading ? 'Thinking…' : `Ask ${avatar.name.split(' ')[0]} anything…`}
-              className="flex-1 bg-white/5 border border-white/20 rounded-full px-5 py-2.5 text-white text-[13px] placeholder-white/30 outline-none focus:border-white/35 focus:bg-white/8 disabled:opacity-40 transition-all duration-200 tracking-wide"
+              className="flex-1 bg-white/[0.06] border border-white/[0.11] rounded-full px-5 py-3 text-white text-[13.5px] placeholder-white/30 outline-none focus:border-white/[0.24] focus:bg-white/[0.09] disabled:opacity-40 transition-all duration-250 tracking-wide"
             />
             <motion.button
-              whileHover={{ scale: isLoading ? 1 : 1.07 }}
-              whileTap={{ scale: isLoading ? 1 : 0.93 }}
+              whileHover={{ scale: isLoading ? 1 : 1.08 }}
+              whileTap={{ scale: isLoading ? 1 : 0.92 }}
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-200"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/[0.14] flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.16] hover:border-white/[0.25] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
             >
               <span className="text-base leading-none">↑</span>
             </motion.button>
@@ -422,7 +424,7 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-md cursor-pointer hover:border-white/25 hover:bg-white/8 transition-all duration-300"
+      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out"
     >
       {imgSrc ? (
         <div className="w-full h-28 overflow-hidden bg-black/20">
@@ -457,7 +459,7 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
     <motion.div
       whileHover={{ scale: 1.03, y: -4 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-      className="relative flex-shrink-0 w-44 rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl cursor-pointer group"
+      className="relative flex-shrink-0 w-44 rounded-2xl overflow-hidden border border-white/[0.09] bg-white/[0.05] backdrop-blur-[18px] cursor-pointer group shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
     >
       <div className="w-full h-36 relative overflow-hidden">
         {image ? (
@@ -780,21 +782,21 @@ export default function App() {
             <div className="absolute top-4 right-4 z-30 pointer-events-auto">
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-xl text-white/70 text-[11px] uppercase tracking-wider hover:bg-white/10 transition-colors duration-200">
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/80 text-[11px] uppercase tracking-[0.15em] hover:bg-white/[0.11] hover:border-white/[0.2] transition-all duration-300">
                   🌐 {language}
-                  <span className="text-white/40">{langOpen ? '▲' : '▼'}</span>
+                  <span className="text-white/35 text-[9px]">{langOpen ? '▲' : '▼'}</span>
                 </button>
                 <AnimatePresence>
                   {langOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.95 }} transition={{ duration: 0.18 }}
-                      className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-black/80 backdrop-blur-2xl overflow-hidden shadow-2xl z-50"
+                      initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute right-0 mt-2 w-40 rounded-2xl border border-white/[0.09] bg-[rgba(8,8,14,0.92)] backdrop-blur-[28px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] z-50"
                     >
                       {LANGUAGES.map(lang => (
                         <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
-                          className={`w-full text-left px-4 py-2.5 text-[12px] tracking-wide transition-colors duration-150
-                            ${lang.label === language ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+                          className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150
+                            ${lang.label === language ? 'text-white bg-white/[0.10] border-l-2 border-white/40' : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-l-2 border-transparent'}`}>
                           {lang.label}
                         </button>
                       ))}
@@ -812,7 +814,7 @@ export default function App() {
                 hasSearchResults ? 'max-w-2xl' : 'max-w-md'
               }`}
             >
-              <div className="w-full backdrop-blur-xl bg-white/10 border border-white/20 rounded-full px-5 py-3.5 shadow-2xl">
+              <div className="w-full backdrop-blur-[22px] bg-white/[0.07] border border-white/[0.14] rounded-full px-6 py-4 shadow-[0_8px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-300 focus-within:border-white/[0.24] focus-within:bg-white/[0.10] focus-within:shadow-[0_8px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.10)]">
                 <input
                   type="text"
                   value={nasaQuery}
@@ -821,7 +823,7 @@ export default function App() {
                   onBlur={() => setFocused(false)}
                   onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
                   onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
-                  className="w-full bg-transparent outline-none text-white placeholder-white/50 text-[15px] tracking-wide"
+                  className="w-full bg-transparent outline-none text-white placeholder-white/40 text-[15px] tracking-wide font-light leading-relaxed"
                 />
               </div>
 
@@ -840,10 +842,10 @@ export default function App() {
                           setIsEverythingMode(false);
                         }
                       }}
-                      className={`text-[11px] uppercase tracking-wider backdrop-blur-md px-3 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                      className={`text-[11px] uppercase tracking-[0.14em] backdrop-blur-[14px] px-3.5 py-1.5 rounded-full transition-all duration-300 ease-out cursor-pointer hover:-translate-y-px ${
                         isEverything
-                          ? 'text-white/90 bg-white/10 border border-white/25 hover:bg-white/18 hover:text-white hover:border-white/40 font-medium'
-                          : 'text-white/70 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/90 hover:border-white/20'
+                          ? 'text-white/95 bg-white/[0.10] border border-white/[0.22] hover:bg-white/[0.16] hover:text-white hover:border-white/[0.35] hover:shadow-[0_4px_16px_rgba(255,255,255,0.06)] font-medium'
+                          : 'text-white/65 bg-white/[0.05] border border-white/[0.09] hover:bg-white/[0.09] hover:text-white/90 hover:border-white/[0.18]'
                       }`}>
                       {isEverything ? '✦ Everything' : tag}
                     </button>
@@ -856,7 +858,7 @@ export default function App() {
                   whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.10)' }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowPortal(true)}
-                  className="mt-1 px-7 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-xl text-white/80 text-[12px] uppercase tracking-[0.25em] font-medium shadow-lg transition-colors duration-300"
+                  className="mt-1 px-8 py-3 rounded-full border border-white/[0.14] bg-white/[0.06] backdrop-blur-[18px] text-white/80 text-[12px] uppercase tracking-[0.28em] font-medium shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300 hover:shadow-[0_4px_32px_rgba(255,255,255,0.07)]"
                 >
                   Explore Portal ✦
                 </motion.button>
@@ -902,21 +904,21 @@ export default function App() {
               {/* Language selector inside portal */}
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-xl text-white/70 text-[11px] uppercase tracking-wider hover:bg-white/10 transition-colors duration-200">
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/80 text-[11px] uppercase tracking-[0.15em] hover:bg-white/[0.11] hover:border-white/[0.2] transition-all duration-300">
                   🌐 {language}
-                  <span className="text-white/40">{langOpen ? '▲' : '▼'}</span>
+                  <span className="text-white/35 text-[9px]">{langOpen ? '▲' : '▼'}</span>
                 </button>
                 <AnimatePresence>
                   {langOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.95 }} transition={{ duration: 0.18 }}
-                      className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-black/80 backdrop-blur-2xl overflow-hidden shadow-2xl z-50"
+                      initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute right-0 mt-2 w-40 rounded-2xl border border-white/[0.09] bg-[rgba(8,8,14,0.92)] backdrop-blur-[28px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] z-50"
                     >
                       {LANGUAGES.map(lang => (
                         <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
-                          className={`w-full text-left px-4 py-2.5 text-[12px] tracking-wide transition-colors duration-150
-                            ${lang.label === language ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}>
+                          className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150
+                            ${lang.label === language ? 'text-white bg-white/[0.10] border-l-2 border-white/40' : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-l-2 border-transparent'}`}>
                           {lang.label}
                         </button>
                       ))}
@@ -928,7 +930,7 @@ export default function App() {
 
             {/* Portal search bar */}
             <div className="px-5 pb-4 flex-shrink-0">
-              <div className="w-full backdrop-blur-xl bg-white/8 border border-white/15 rounded-2xl px-5 py-3.5 shadow-xl">
+              <div className="w-full backdrop-blur-[20px] bg-white/[0.07] border border-white/[0.12] rounded-2xl px-6 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.4)] focus-within:border-white/[0.22] focus-within:bg-white/[0.10] transition-all duration-300">
                 <input type="text" value={portalQuery} onChange={e => setPortalQuery(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && portalQuery.trim()) {
@@ -937,7 +939,7 @@ export default function App() {
                     }
                   }}
                   placeholder="Search everything in the cosmos…"
-                  className="w-full bg-transparent outline-none text-white placeholder-white/40 text-[15px] tracking-wide"
+                  className="w-full bg-transparent outline-none text-white placeholder-white/35 text-[15px] tracking-wide font-light"
                   autoFocus />
               </div>
             </div>
@@ -951,10 +953,10 @@ export default function App() {
                     if (tab === 'All') { setShowPortal(false); clearSearch(); }
                     else { searchAll(tab, 'specific'); setShowPortal(false); }
                   }}
-                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wider border transition-all duration-200
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] uppercase tracking-[0.14em] border transition-all duration-300 hover:-translate-y-px
                       ${activeTab === tab
-                        ? 'border-white/40 bg-white/15 text-white'
-                        : 'border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:bg-white/8'}`}>
+                        ? 'border-white/[0.35] bg-white/[0.13] text-white shadow-[0_2px_12px_rgba(255,255,255,0.06)]'
+                        : 'border-white/[0.09] bg-white/[0.04] text-white/50 hover:text-white/80 hover:bg-white/[0.08] hover:border-white/[0.17]'}`}>
                     {tab}
                   </button>
                 ))}
@@ -967,8 +969,8 @@ export default function App() {
               {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Cosmic Pix</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-wider">AI Avatars</span>
+                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Cosmic Pix</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">AI Avatars</span>
                 </div>
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {AVATARS.map(av => (
@@ -986,8 +988,8 @@ export default function App() {
               {/* ── Black Holes ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Black Holes</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-wider">Singularities & Event Horizons</span>
+                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Black Holes</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Singularities & Event Horizons</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalBlackHoles.length > 0
@@ -1004,8 +1006,8 @@ export default function App() {
               {/* ── Equations ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Equations</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-wider">The Language of the Universe</span>
+                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Equations</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">The Language of the Universe</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalEquations.length > 0

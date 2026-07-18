@@ -77,7 +77,7 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
         animate={{ opacity: 1, scale: 1,    y: 0  }}
         exit={{ opacity: 0,    scale: 0.93, y: 28 }}
         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl overflow-hidden border border-white/15 bg-white/[0.06] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)]"
+        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-[2rem] overflow-hidden border border-white/[0.09] bg-[rgba(7,7,12,0.88)] backdrop-blur-[28px] shadow-[0_40px_80px_-16px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
         {/* Close */}
@@ -103,7 +103,7 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
               <span className="text-[10px] text-white/35 uppercase tracking-[0.22em]">{date}</span>
             )}
           </div>
-          <h2 className="text-white text-[17px] font-medium leading-snug tracking-wide mb-3">{title}</h2>
+          <h2 className="text-white text-[17px] font-semibold leading-snug tracking-[-0.01em] mb-3" style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</h2>
           {desc && (
             <p className="text-white/55 text-[13px] leading-relaxed tracking-wide">{desc}</p>
           )}
@@ -166,7 +166,7 @@ function ResultCard({ unified, idx, onClick }: {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.38, delay: Math.min((idx % 12) * 0.04, 0.6) }}
       onClick={onClick}
-      className="group relative w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl hover:border-white/28 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)] transition-all duration-400 cursor-pointer"
+      className="group relative w-full rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[18px] shadow-[0_4px_24px_rgba(0,0,0,0.5)] hover:border-white/[0.18] hover:-translate-y-[3px] hover:shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.04)] transition-all duration-300 ease-out cursor-pointer"
     >
       {/* Image area */}
       <div className="relative w-full aspect-[16/9] overflow-hidden bg-black/30">
@@ -209,10 +209,10 @@ function ResultCard({ unified, idx, onClick }: {
       </div>
 
       {/* Text */}
-      <div className="px-5 py-4">
-        <p className="text-white text-[14px] font-medium leading-snug tracking-wide mb-1.5">{title}</p>
+      <div className="px-5 py-5">
+        <p className="text-white text-[14px] font-medium leading-snug tracking-[0.01em] mb-2" style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</p>
         {desc && (
-          <p className="text-white/45 text-[12px] leading-relaxed tracking-wide line-clamp-3">{desc}</p>
+          <p className="text-white/50 text-[12.5px] leading-relaxed tracking-wide line-clamp-3">{desc}</p>
         )}
       </div>
     </motion.div>
