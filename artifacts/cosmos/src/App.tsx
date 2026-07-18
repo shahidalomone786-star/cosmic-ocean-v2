@@ -168,6 +168,60 @@ function ThinkingDots() {
 }
 
 // ─── Chat Modal ───────────────────────────────────────────────────────────────
+// ─── TTS Controls ────────────────────────────────────────────────────────────
+function TtsControls({
+  idx, playingIdx, isPlaying, activeEngine, preferEngine,
+  onPlay, onSkip, onEngineToggle,
+}: {
+  idx: number;
+  playingIdx: number | null;
+  isPlaying: boolean;
+  activeEngine: 'premium' | 'standard';
+  preferEngine: 'premium' | 'standard';
+  onPlay: () => void;
+  onSkip: (delta: number) => void;
+  onEngineToggle: () => void;
+}) {
+  const isActive = playingIdx === idx;
+  const showSkip = isActive && activeEngine === 'premium';
+  return (
+    <div className="ml-10 flex items-center gap-1.5 pt-1 opacity-70">
+      {/* Engine toggle */}
+      <button
+        onClick={onEngineToggle}
+        title={preferEngine === 'premium' ? 'Switch to Standard (browser TTS)' : 'Switch to Premium (ElevenLabs)'}
+        className={`px-2 py-[2px] rounded-full text-[8.5px] uppercase tracking-[0.14em] border transition-all duration-200
+          ${preferEngine === 'premium'
+            ? 'border-violet-400/30 bg-violet-500/10 text-violet-300/90 hover:border-violet-400/50'
+            : 'border-white/[0.12] bg-white/[0.05] text-white/45 hover:text-white/70'}`}
+      >
+        {preferEngine === 'premium' ? '★ PREM' : '◎ STD'}
+      </button>
+      {/* Rewind 5s — premium + active only */}
+      {showSkip && (
+        <button onClick={() => onSkip(-5)} title="Back 5s"
+          className="w-[18px] h-[18px] flex items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.04] text-white/45 hover:text-white/75 hover:bg-white/[0.09] transition-all duration-150 text-[8px]">
+          ⏪
+        </button>
+      )}
+      {/* Play / Pause */}
+      <button onClick={onPlay}
+        className="w-6 h-6 flex items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.07] text-white/65 hover:text-white hover:bg-white/[0.14] hover:border-white/[0.25] transition-all duration-150">
+        {isActive && isPlaying
+          ? <span className="text-[10px]">⏸</span>
+          : <span className="text-[9px] pl-px">▶</span>}
+      </button>
+      {/* Fast-forward 5s — premium + active only */}
+      {showSkip && (
+        <button onClick={() => onSkip(5)} title="Forward 5s"
+          className="w-[18px] h-[18px] flex items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.04] text-white/45 hover:text-white/75 hover:bg-white/[0.09] transition-all duration-150 text-[8px]">
+          ⏩
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onInputBlur }: {
   avatar: ChatTarget;
   language: string;
@@ -190,6 +244,16 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const callingRef  = useRef(false);
   const lastSentRef = useRef(0);
   const autoAnalysedRef = useRef(false);
+
+  // ── TTS state ──────────────────────────────────────────────────────────────
+  const audioRef      = useRef<HTMLAudioElement>(null);
+  const blobUrlRef    = useRef('');
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [preferEngine, setPreferEngine] = useState<'premium' | 'standard'>('premium');
+  const [playingIdx,   setPlayingIdx]   = useState<number | null>(null);
+  const [isPlaying,    setIsPlaying]    = useState(false);
+  const [activeEngine, setActiveEngine] = useState<'premium' | 'standard'>('premium');
+  const [ttsToast,     setTtsToast]     = useState('');
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -285,6 +349,103 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
   };
 
+  // ── TTS helpers ────────────────────────────────────────────────────────────
+  const showToast = useCallback((msg: string) => {
+    setTtsToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setTtsToast(''), 4500);
+  }, []);
+
+  const stopAll = useCallback(() => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    window.speechSynthesis?.cancel();
+    setIsPlaying(false);
+    setPlayingIdx(null);
+  }, []);
+
+  const playStandard = useCallback((text: string, idx: number) => {
+    window.speechSynthesis?.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate  = 0.92;
+    utt.onend   = () => { setIsPlaying(false); setPlayingIdx(null); };
+    utt.onerror = () => { setIsPlaying(false); setPlayingIdx(null); };
+    window.speechSynthesis.speak(utt);
+    setPlayingIdx(idx);
+    setIsPlaying(true);
+    setActiveEngine('standard');
+  }, []);
+
+  const playPremium = useCallback(async (text: string, idx: number) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, avatarName: avatar.name }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as { code?: string };
+        showToast(
+          data.code === 'TOTAL_QUOTA_EXHAUSTED'
+            ? 'Premium quota exhausted. Using Standard Voice.'
+            : 'Premium TTS unavailable. Using Standard Voice.',
+        );
+        playStandard(text, idx);
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = url;
+      const audio = audioRef.current!;
+      audio.src     = url;
+      audio.onended = () => { setIsPlaying(false); setPlayingIdx(null); };
+      audio.onerror = () => { setIsPlaying(false); setPlayingIdx(null); };
+      try { await audio.play(); } catch { /* interrupted */ }
+      setPlayingIdx(idx);
+      setIsPlaying(true);
+      setActiveEngine('premium');
+    } catch {
+      showToast('Premium TTS error. Using Standard Voice.');
+      playStandard(text, idx);
+    }
+  }, [avatar.name, showToast, playStandard]);
+
+  const playTTS = useCallback(async (text: string, idx: number) => {
+    // Toggle pause on the active message
+    if (playingIdx === idx && isPlaying) {
+      if (activeEngine === 'premium' && audioRef.current) { audioRef.current.pause(); }
+      else { window.speechSynthesis?.pause(); }
+      setIsPlaying(false);
+      return;
+    }
+    // Resume a paused message
+    if (playingIdx === idx && !isPlaying) {
+      if (activeEngine === 'premium' && audioRef.current) {
+        try { await audioRef.current.play(); } catch { /* ok */ }
+      } else { window.speechSynthesis?.resume(); }
+      setIsPlaying(true);
+      return;
+    }
+    // New message — stop everything and start fresh
+    stopAll();
+    if (preferEngine === 'premium') { await playPremium(text, idx); }
+    else { playStandard(text, idx); }
+  }, [playingIdx, isPlaying, activeEngine, preferEngine, stopAll, playPremium, playStandard]);
+
+  const skipTime = useCallback((delta: number) => {
+    if (audioRef.current && activeEngine === 'premium' && playingIdx !== null) {
+      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime + delta);
+    }
+  }, [activeEngine, playingIdx]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    window.speechSynthesis?.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
   return (
     <motion.div
       key="chat-modal"
@@ -355,12 +516,24 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
                 </div>
               </div>
             ) : (
-              <div key={idx} className="flex items-start gap-3">
-                <img src={avatar.image} alt={avatar.name}
-                  className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
-                <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px] px-5 py-3 max-w-[82%]">
-                  <p className="text-white/88 text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
+              <div key={idx} className="flex flex-col">
+                <div className="flex items-start gap-3">
+                  <img src={avatar.image} alt={avatar.name}
+                    className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
+                  <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px] px-5 py-3 max-w-[82%]">
+                    <p className="text-white/88 text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
+                  </div>
                 </div>
+                <TtsControls
+                  idx={idx}
+                  playingIdx={playingIdx}
+                  isPlaying={isPlaying}
+                  activeEngine={activeEngine}
+                  preferEngine={preferEngine}
+                  onPlay={() => { void playTTS(msg.text, idx); }}
+                  onSkip={skipTime}
+                  onEngineToggle={() => setPreferEngine(e => e === 'premium' ? 'standard' : 'premium')}
+                />
               </div>
             )
           )}
@@ -383,6 +556,21 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
 
           <div ref={bottomRef} />
         </div>
+
+        {/* ── TTS toast ── */}
+        <AnimatePresence>
+          {ttsToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.22 }}
+              className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/85 border border-white/[0.12] backdrop-blur-xl text-white/75 text-[11px] tracking-wide whitespace-nowrap z-20 pointer-events-none"
+            >
+              {ttsToast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Hidden audio element for premium TTS */}
+        <audio ref={audioRef} preload="none" className="hidden" />
 
         {/* ── Input ── */}
         <div className="flex-shrink-0 px-5 py-4 border-t border-white/[0.06] bg-gradient-to-r from-white/[0.02] to-transparent">
