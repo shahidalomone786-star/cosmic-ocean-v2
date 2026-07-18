@@ -452,37 +452,42 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-[32px] flex items-center justify-center px-4"
+      transition={{ duration: 0.3 }}
+      className="fixed inset-0 z-[100] bg-black/55 backdrop-blur-[48px] flex items-end sm:items-center justify-center px-2 sm:px-4 pb-0 sm:pb-0"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 24 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="w-[92%] max-w-2xl h-[82vh] bg-[rgba(7,7,12,0.88)] backdrop-blur-[28px] border border-white/[0.09] rounded-[2rem] flex flex-col overflow-hidden shadow-[0_40px_80px_-16px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 32 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full sm:w-[95vw] max-w-2xl h-[88vh] sm:h-[88vh] bg-[rgba(6,6,10,0.82)] backdrop-blur-[44px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.5),0_40px_80px_-16px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
+        {/* ── Drag handle (mobile) ── */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-[3px] rounded-full bg-white/20" />
+        </div>
+
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
-          <div className="flex items-center gap-3.5">
+        <div className="flex items-center justify-between px-6 sm:px-7 py-4 sm:py-5 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
+          <div className="flex items-center gap-4">
             <img src={avatar.image} alt={avatar.name}
-              className="w-10 h-10 rounded-full object-cover border border-white/[0.18] shadow-[0_0_16px_rgba(0,0,0,0.6)]" />
+              className="w-11 h-11 rounded-full object-cover border border-white/[0.18] shadow-[0_0_20px_rgba(0,0,0,0.7),0_0_0_2px_rgba(255,255,255,0.04)]" />
             <div>
-              <p className="text-white text-[14px] font-medium tracking-wide leading-tight" style={{ fontFamily: 'var(--app-font-heading)' }}>{avatar.name}</p>
+              <p className="text-white text-[15px] font-semibold tracking-[-0.01em] leading-tight" style={{ fontFamily: 'var(--app-font-heading)' }}>{avatar.name}</p>
               <p className="text-white/40 text-[10px] uppercase tracking-[0.18em] mt-0.5">{avatar.role}</p>
             </div>
           </div>
           {/* Shared context badge */}
           {sharedContext && (
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/15 border border-violet-400/20 max-w-[180px]">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-500/15 border border-violet-400/20 max-w-[200px]">
               <span className="text-[9px] text-violet-300/80 uppercase tracking-wider flex-shrink-0">Analysing</span>
               <span className="text-[9px] text-white/50 truncate">{sharedContext.title}</span>
             </div>
           )}
           <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.12] hover:border-white/[0.18] transition-all duration-200 text-lg leading-none">
+            className="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.12] hover:border-white/[0.18] transition-all duration-200 text-xl leading-none">
             ×
           </button>
         </div>
@@ -496,7 +501,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         )}
 
         {/* ── Messages ── */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-6 scrollbar-hide flex flex-col gap-5">
           {/* Auto-analyse loading state */}
           {isLoading && messages.length === 0 && (
             <div className="flex items-start gap-3">
@@ -511,17 +516,17 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           {messages.map((msg, idx) =>
             msg.role === 'user' ? (
               <div key={idx} className="flex justify-end">
-                <div className="bg-white/[0.12] border border-white/[0.11] backdrop-blur-md rounded-2xl rounded-tr-[5px] px-5 py-3 max-w-[80%] shadow-[0_2px_20px_rgba(0,0,0,0.35)]">
-                  <p className="text-white text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
+                <div className="bg-white/[0.13] border border-white/[0.12] backdrop-blur-xl rounded-2xl rounded-tr-[6px] px-5 py-4 max-w-[85%] shadow-[0_4px_24px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <p className="text-white text-[14.5px] leading-[1.72] tracking-[0.01em]">{msg.text}</p>
                 </div>
               </div>
             ) : (
-              <div key={idx} className="flex flex-col">
+              <div key={idx} className="flex flex-col gap-1.5">
                 <div className="flex items-start gap-3">
                   <img src={avatar.image} alt={avatar.name}
-                    className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
-                  <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px] px-5 py-3 max-w-[82%]">
-                    <p className="text-white/88 text-[13.5px] leading-relaxed tracking-wide">{msg.text}</p>
+                    className="w-8 h-8 rounded-full object-cover border border-white/[0.18] flex-shrink-0 mt-0.5 shadow-[0_0_16px_rgba(0,0,0,0.6)]" />
+                  <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl rounded-tl-[5px] px-5 py-4 max-w-[85%] shadow-[0_2px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <p className="text-white/90 text-[14.5px] leading-[1.75] tracking-[0.01em]">{msg.text}</p>
                   </div>
                 </div>
                 <TtsControls
@@ -573,7 +578,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         <audio ref={audioRef} preload="none" className="hidden" />
 
         {/* ── Input ── */}
-        <div className="flex-shrink-0 px-5 py-4 border-t border-white/[0.06] bg-gradient-to-r from-white/[0.02] to-transparent">
+        <div className="flex-shrink-0 px-5 sm:px-7 pt-4 pb-[calc(1.1rem+env(safe-area-inset-bottom,0px))] border-t border-white/[0.06] bg-gradient-to-b from-transparent via-white/[0.01] to-white/[0.02]">
           <div className="flex items-center gap-3">
             <input
               ref={inputRef}
@@ -585,16 +590,16 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
               onBlur={onInputBlur}
               disabled={isLoading}
               placeholder={isLoading ? 'Thinking…' : `Ask ${avatar.name.split(' ')[0]} anything…`}
-              className="flex-1 bg-white/[0.06] border border-white/[0.11] rounded-full px-5 py-3 text-white text-[13.5px] placeholder-white/30 outline-none focus:border-white/[0.24] focus:bg-white/[0.09] disabled:opacity-40 transition-all duration-250 tracking-wide"
+              className="flex-1 bg-white/[0.07] border border-white/[0.13] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] rounded-full px-6 py-3.5 text-white text-[14px] placeholder-white/30 outline-none focus:border-white/[0.26] focus:bg-white/[0.10] focus:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_3px_rgba(255,255,255,0.04)] disabled:opacity-40 transition-all duration-300 tracking-wide"
             />
             <motion.button
               whileHover={{ scale: isLoading ? 1 : 1.08 }}
               whileTap={{ scale: isLoading ? 1 : 0.92 }}
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/[0.14] flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.16] hover:border-white/[0.25] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex-shrink-0 w-11 h-11 rounded-full bg-white/[0.09] border border-white/[0.15] flex items-center justify-center text-white/70 hover:text-white hover:bg-white/[0.18] hover:border-white/[0.28] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
             >
-              <span className="text-base leading-none">↑</span>
+              <span className="text-[17px] leading-none">↑</span>
             </motion.button>
           </div>
         </div>
