@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import NasaSearch, { NasaDetailModal, type NasaItem, type NasaStatus } from './components/NasaSearch';
+import NasaSearch, { DetailModal, type UnifiedItem, type WikiItem, type NasaItem, type NasaStatus } from './components/NasaSearch';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -21,6 +21,17 @@ const EVERYTHING_TERMS = [
   'milky way', 'black hole', 'star cluster', 'deep space', 'universe',
   'exoplanet', 'quasar', 'pulsar', 'comet', 'solar flare', 'hubble',
 ];
+
+// Interleave two arrays element-by-element: [a0, b0, a1, b1, …]
+function interleave(a: UnifiedItem[], b: UnifiedItem[]): UnifiedItem[] {
+  const out: UnifiedItem[] = [];
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i++) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
 const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','Equations',
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 const LANGUAGES   = ['English','Hindi','Hinglish','Japanese','Spanish','French','German','Arabic'];
@@ -317,65 +328,91 @@ export default function App() {
   const overlayControls = useAnimation();
   const bgIframeRef = useRef<HTMLIFrameElement>(null);
 
-  // ── NASA image search state ────────────────────────────────────────────────
+  // ── Unified search state (NASA + Wikipedia) ───────────────────────────────
   const [nasaQuery,        setNasaQuery]        = useState('');
-  const [nasaResults,      setNasaResults]      = useState<NasaItem[]>([]);
-  const [nasaStatus,       setNasaStatus]       = useState<NasaStatus>('idle');
-  const [nasaError,        setNasaError]        = useState('');
+  const [searchResults,    setSearchResults]    = useState<UnifiedItem[]>([]);
+  const [searchStatus,     setSearchStatus]     = useState<NasaStatus>('idle');
+  const [searchError,      setSearchError]      = useState('');
   const [isEverythingMode, setIsEverythingMode] = useState(false);
   const [isLoadingMore,    setIsLoadingMore]    = useState(false);
-  const [selectedCard,     setSelectedCard]     = useState<NasaItem | null>(null);
+  const [selectedCard,     setSelectedCard]     = useState<UnifiedItem | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const hasSearchResults = nasaStatus !== 'idle';
+  const hasSearchResults = searchStatus !== 'idle';
 
-  // Specific keyword search — replaces results, no infinite scroll
-  const searchNasa = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
+  // Fetch NASA images + Wikipedia articles in parallel, interleave into one feed
+  const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
     if (!term) return;
     const everything = mode === 'everything';
     setIsEverythingMode(everything);
-    setNasaStatus('loading');
-    setNasaResults([]);
-    setNasaError('');
+    setSearchStatus('loading');
+    setSearchResults([]);
+    setSearchError('');
     try {
-      const searchTerm = everything ? 'cosmos' : term;
-      const res  = await fetch(
-        `https://images-api.nasa.gov/search?q=${encodeURIComponent(searchTerm)}&media_type=image&page=1`
-      );
-      if (!res.ok) throw new Error(`NASA API error ${res.status}`);
-      const json = await res.json() as { collection: { items: NasaItem[] } };
-      setNasaResults(json.collection.items ?? []);
-      setNasaStatus('done');
+      const nasaTerm = everything ? 'cosmos' : term;
+      const wikiTerm = everything ? 'cosmology astronomy' : term;
+
+      const [nasaRes, wikiRes] = await Promise.all([
+        fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=1`),
+        fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
+      ]);
+
+      const nasaItems: UnifiedItem[] = nasaRes.ok
+        ? ((await nasaRes.json() as { collection: { items: NasaItem[] } }).collection.items ?? [])
+            .map(item => ({ source: 'nasa' as const, item }))
+        : [];
+
+      const wikiItems: UnifiedItem[] = wikiRes.ok
+        ? Object.values(
+            ((await wikiRes.json() as { query?: { pages?: Record<string, WikiItem> } }).query?.pages) ?? {}
+          ).map(item => ({ source: 'wiki' as const, item }))
+        : [];
+
+      setSearchResults(interleave(nasaItems, wikiItems));
+      setSearchStatus('done');
     } catch (err: unknown) {
-      setNasaError((err as Error)?.message ?? String(err));
-      setNasaStatus('error');
+      setSearchError((err as Error)?.message ?? String(err));
+      setSearchStatus('error');
     }
   }, []);
 
-  // Infinite scroll — appends random cosmic results (Everything mode only)
-  const loadMoreNasa = useCallback(async () => {
+  // Infinite scroll — appends mixed NASA + Wikipedia results (Everything mode only)
+  const loadMore = useCallback(async () => {
     if (isLoadingMore || !isEverythingMode) return;
     setIsLoadingMore(true);
     try {
-      const term = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
-      const page = Math.floor(Math.random() * 8) + 1;
-      const res  = await fetch(
-        `https://images-api.nasa.gov/search?q=${encodeURIComponent(term)}&media_type=image&page=${page}`
-      );
-      if (!res.ok) throw new Error(`NASA API error ${res.status}`);
-      const json  = await res.json() as { collection: { items: NasaItem[] } };
-      const fresh = (json.collection.items ?? []).filter(item => item.links?.length);
-      setNasaResults(prev => [...prev, ...fresh]);
-    } catch { /* silently swallow load-more errors */ }
+      const nasaTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
+      const wikiTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
+      const page     = Math.floor(Math.random() * 8) + 1;
+
+      const [nasaRes, wikiRes] = await Promise.all([
+        fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=${page}`),
+        fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
+      ]);
+
+      const nasaItems: UnifiedItem[] = nasaRes.ok
+        ? ((await nasaRes.json() as { collection: { items: NasaItem[] } }).collection.items ?? [])
+            .filter(item => item.links?.length)
+            .map(item => ({ source: 'nasa' as const, item }))
+        : [];
+
+      const wikiItems: UnifiedItem[] = wikiRes.ok
+        ? Object.values(
+            ((await wikiRes.json() as { query?: { pages?: Record<string, WikiItem> } }).query?.pages) ?? {}
+          ).map(item => ({ source: 'wiki' as const, item }))
+        : [];
+
+      setSearchResults(prev => [...prev, ...interleave(nasaItems, wikiItems)]);
+    } catch { /* silently swallow */ }
     finally { setIsLoadingMore(false); }
   }, [isLoadingMore, isEverythingMode]);
 
-  const clearNasa = useCallback(() => {
+  const clearSearch = useCallback(() => {
     setNasaQuery('');
-    setNasaResults([]);
-    setNasaStatus('idle');
-    setNasaError('');
+    setSearchResults([]);
+    setSearchStatus('idle');
+    setSearchError('');
     setIsEverythingMode(false);
     setSelectedCard(null);
     setIsLoadingMore(false);
@@ -383,16 +420,16 @@ export default function App() {
 
   // ── IntersectionObserver — infinite scroll (Everything mode only) ─────────
   useEffect(() => {
-    if (!isEverythingMode || nasaStatus !== 'done') return;
+    if (!isEverythingMode || searchStatus !== 'done') return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
-      entries => { if (entries[0]?.isIntersecting) loadMoreNasa(); },
+      entries => { if (entries[0]?.isIntersecting) loadMore(); },
       { threshold: 0.1 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isEverythingMode, nasaStatus, loadMoreNasa]);
+  }, [isEverythingMode, searchStatus, loadMore]);
 
   // ── Derived: is any UI interaction happening? ──────────────────────────────
   const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused || hasSearchResults || selectedCard !== null;
@@ -494,8 +531,8 @@ export default function App() {
                   placeholder="Search the cosmos..."
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearNasa(); }}
-                  onKeyDown={e => { if (e.key === 'Enter') searchNasa(nasaQuery); }}
+                  onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
+                  onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
                   className="w-full bg-transparent outline-none text-white placeholder-white/50 text-[15px] tracking-wide"
                 />
               </div>
@@ -508,10 +545,10 @@ export default function App() {
                       onClick={() => {
                         if (isEverything) {
                           setNasaQuery('cosmos');
-                          searchNasa('cosmos', 'everything');
+                          searchAll('cosmos', 'everything');
                         } else {
                           setNasaQuery(tag);
-                          searchNasa(tag, 'specific');
+                          searchAll(tag, 'specific');
                           setIsEverythingMode(false);
                         }
                       }}
@@ -542,10 +579,10 @@ export default function App() {
             {hasSearchResults && (
               <div className="w-full max-w-2xl px-6 mt-8 pointer-events-auto">
                 <NasaSearch
-                  results={nasaResults}
-                  status={nasaStatus}
-                  errMsg={nasaError}
-                  onClear={clearNasa}
+                  results={searchResults}
+                  status={searchStatus}
+                  errMsg={searchError}
+                  onClear={clearSearch}
                   onCardClick={setSelectedCard}
                   sentinelRef={sentinelRef}
                   isEverythingMode={isEverythingMode}
@@ -688,7 +725,7 @@ export default function App() {
       {/* ── z-[200]  NASA Detail Modal ── */}
       <AnimatePresence>
         {selectedCard && (
-          <NasaDetailModal
+          <DetailModal
             item={selectedCard}
             onClose={() => setSelectedCard(null)}
           />
