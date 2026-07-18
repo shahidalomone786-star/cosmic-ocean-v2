@@ -271,6 +271,42 @@ function ChatModal({ avatar, language, onClose, onInputFocus, onInputBlur }: {
   );
 }
 
+// ─── Portal Wiki Card — horizontal scroll card for portal sections ────────────
+function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => void }) {
+  const imgSrc  = item.thumbnail?.source;
+  const snippet = item.extract?.split('\n').find(l => l.trim()) ?? '';
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onSelect}
+      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-md cursor-pointer hover:border-white/25 hover:bg-white/8 transition-all duration-300"
+    >
+      {imgSrc ? (
+        <div className="w-full h-28 overflow-hidden bg-black/20">
+          <img src={imgSrc} alt={item.title} loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        </div>
+      ) : (
+        <div className="w-full h-28 flex items-center justify-center bg-gradient-to-br from-amber-900/20 via-black/20 to-transparent">
+          <span className="text-4xl font-thin text-amber-200/15 select-none">W</span>
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-[8px] font-medium uppercase tracking-[0.18em] px-1.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-300/20 text-amber-200/80">
+            ◈ WIKI
+          </span>
+        </div>
+        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{item.title}</p>
+        {snippet && (
+          <p className="text-white/40 text-[11px] leading-relaxed line-clamp-2">{snippet}</p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Glassmorphism Avatar Card (memo = skip re-render when App state changes) ─
 const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
   name: string; subtitle: string; image?: string; onChat: () => void;
@@ -337,6 +373,11 @@ export default function App() {
   const [isLoadingMore,    setIsLoadingMore]    = useState(false);
   const [selectedCard,     setSelectedCard]     = useState<UnifiedItem | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // ── Portal prefetch state ──────────────────────────────────────────────────
+  const [portalFetched,    setPortalFetched]    = useState(false);
+  const [portalBlackHoles, setPortalBlackHoles] = useState<WikiItem[]>([]);
+  const [portalEquations,  setPortalEquations]  = useState<WikiItem[]>([]);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -417,6 +458,34 @@ export default function App() {
     setSelectedCard(null);
     setIsLoadingMore(false);
   }, []);
+
+  // ── Portal fetch — runs once the first time the portal opens ─────────────
+  useEffect(() => {
+    if (!showPortal || portalFetched) return;
+    setPortalFetched(true);
+
+    const fetchWikiTitles = async (titles: string[], setter: (items: WikiItem[]) => void) => {
+      try {
+        const joined = titles.map(encodeURIComponent).join('|');
+        const res = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&titles=${joined}&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=400&format=json&origin=*`
+        );
+        if (!res.ok) return;
+        const json = await res.json() as { query?: { pages?: Record<string, WikiItem> } };
+        const items = Object.values(json.query?.pages ?? {}).filter(p => !('missing' in p));
+        setter(items);
+      } catch { /* ignore */ }
+    };
+
+    fetchWikiTitles(
+      ['Black hole', 'Supermassive black hole', 'Event horizon'],
+      setPortalBlackHoles,
+    );
+    fetchWikiTitles(
+      ['Theory of relativity', 'Schrödinger equation', 'Standard Model'],
+      setPortalEquations,
+    );
+  }, [showPortal, portalFetched]);
 
   // ── IntersectionObserver — infinite scroll (Everything mode only) ─────────
   useEffect(() => {
@@ -641,7 +710,13 @@ export default function App() {
             <div className="px-5 pb-4 flex-shrink-0">
               <div className="w-full backdrop-blur-xl bg-white/8 border border-white/15 rounded-2xl px-5 py-3.5 shadow-xl">
                 <input type="text" value={portalQuery} onChange={e => setPortalQuery(e.target.value)}
-                  placeholder="Search everything in the cosmos..."
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && portalQuery.trim()) {
+                      searchAll(portalQuery, 'specific');
+                      setShowPortal(false);
+                    }
+                  }}
+                  placeholder="Search everything in the cosmos…"
                   className="w-full bg-transparent outline-none text-white placeholder-white/40 text-[15px] tracking-wide"
                   autoFocus />
               </div>
@@ -651,7 +726,16 @@ export default function App() {
             <div className="px-5 pb-5 flex-shrink-0">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {PORTAL_TABS.map(tab => (
-                  <button key={tab} onClick={() => setActiveTab(tab)}
+                  <button key={tab} onClick={() => {
+                    setActiveTab(tab);
+                    if (tab === 'All') {
+                      setShowPortal(false);
+                      clearSearch();
+                    } else {
+                      searchAll(tab, 'specific');
+                      setShowPortal(false);
+                    }
+                  }}
                     className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wider border transition-all duration-200
                       ${activeTab === tab
                         ? 'border-white/40 bg-white/15 text-white'
@@ -684,26 +768,47 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Placeholder rows */}
-              {[
-                { label: '✦ Black Holes', sub: 'Singularities & Event Horizons' },
-                { label: '✦ Equations',   sub: 'The Language of the Universe' },
-              ].map(({ label, sub }) => (
-                <div key={label} className="mb-6">
-                  <div className="flex items-baseline gap-3 mb-3">
-                    <h2 className="text-white text-[15px] font-medium tracking-wide">{label}</h2>
-                    <span className="text-white/30 text-[11px] uppercase tracking-wider">{sub}</span>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i}
-                        className="flex-shrink-0 w-40 h-24 rounded-xl border border-white/10 bg-white/5 backdrop-blur-md bg-gradient-to-br from-white/5 to-transparent flex items-end p-3">
-                        <div className="w-full h-1.5 rounded-full bg-white/10" />
-                      </div>
-                    ))}
-                  </div>
+              {/* ── Black Holes ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Black Holes</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-wider">Singularities & Event Horizons</span>
                 </div>
-              ))}
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {portalBlackHoles.length > 0
+                    ? portalBlackHoles.map(item => (
+                        <PortalWikiCard
+                          key={item.pageid}
+                          item={item}
+                          onSelect={() => setSelectedCard({ source: 'wiki', item })}
+                        />
+                      ))
+                    : [...Array(3)].map((_, i) => (
+                        <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
+                      ))}
+                </div>
+              </div>
+
+              {/* ── Equations ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className="text-white text-[15px] font-medium tracking-wide">✦ Equations</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-wider">The Language of the Universe</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {portalEquations.length > 0
+                    ? portalEquations.map(item => (
+                        <PortalWikiCard
+                          key={item.pageid}
+                          item={item}
+                          onSelect={() => setSelectedCard({ source: 'wiki', item })}
+                        />
+                      ))
+                    : [...Array(3)].map((_, i) => (
+                        <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
+                      ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
