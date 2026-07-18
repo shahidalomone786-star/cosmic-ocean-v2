@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import NasaSearch, { type NasaItem, type NasaStatus } from './components/NasaSearch';
+import NasaSearch, { NasaDetailModal, type NasaItem, type NasaStatus } from './components/NasaSearch';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -13,7 +13,14 @@ const cosmicScenes = [
 ];
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics'];
+const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
+
+// Cosmic terms cycled when "Everything" infinite-scroll mode is active
+const EVERYTHING_TERMS = [
+  'nebula', 'galaxy', 'cosmos', 'supernova', 'aurora', 'jupiter', 'saturn',
+  'milky way', 'black hole', 'star cluster', 'deep space', 'universe',
+  'exoplanet', 'quasar', 'pulsar', 'comet', 'solar flare', 'hubble',
+];
 const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','Equations',
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 const LANGUAGES   = ['English','Hindi','Hinglish','Japanese','Spanish','French','German','Arabic'];
@@ -311,21 +318,31 @@ export default function App() {
   const bgIframeRef = useRef<HTMLIFrameElement>(null);
 
   // ── NASA image search state ────────────────────────────────────────────────
-  const [nasaQuery,   setNasaQuery]   = useState('');
-  const [nasaResults, setNasaResults] = useState<NasaItem[]>([]);
-  const [nasaStatus,  setNasaStatus]  = useState<NasaStatus>('idle');
-  const [nasaError,   setNasaError]   = useState('');
+  const [nasaQuery,        setNasaQuery]        = useState('');
+  const [nasaResults,      setNasaResults]      = useState<NasaItem[]>([]);
+  const [nasaStatus,       setNasaStatus]       = useState<NasaStatus>('idle');
+  const [nasaError,        setNasaError]        = useState('');
+  const [isEverythingMode, setIsEverythingMode] = useState(false);
+  const [isLoadingMore,    setIsLoadingMore]    = useState(false);
+  const [selectedCard,     setSelectedCard]     = useState<NasaItem | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const hasSearchResults = nasaStatus !== 'idle';
 
-  const searchNasa = useCallback(async (q: string) => {
+  // Specific keyword search — replaces results, no infinite scroll
+  const searchNasa = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
     if (!term) return;
+    const everything = mode === 'everything';
+    setIsEverythingMode(everything);
     setNasaStatus('loading');
     setNasaResults([]);
     setNasaError('');
     try {
-      const res  = await fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(term)}&media_type=image`);
+      const searchTerm = everything ? 'cosmos' : term;
+      const res  = await fetch(
+        `https://images-api.nasa.gov/search?q=${encodeURIComponent(searchTerm)}&media_type=image&page=1`
+      );
       if (!res.ok) throw new Error(`NASA API error ${res.status}`);
       const json = await res.json() as { collection: { items: NasaItem[] } };
       setNasaResults(json.collection.items ?? []);
@@ -336,15 +353,49 @@ export default function App() {
     }
   }, []);
 
+  // Infinite scroll — appends random cosmic results (Everything mode only)
+  const loadMoreNasa = useCallback(async () => {
+    if (isLoadingMore || !isEverythingMode) return;
+    setIsLoadingMore(true);
+    try {
+      const term = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
+      const page = Math.floor(Math.random() * 8) + 1;
+      const res  = await fetch(
+        `https://images-api.nasa.gov/search?q=${encodeURIComponent(term)}&media_type=image&page=${page}`
+      );
+      if (!res.ok) throw new Error(`NASA API error ${res.status}`);
+      const json  = await res.json() as { collection: { items: NasaItem[] } };
+      const fresh = (json.collection.items ?? []).filter(item => item.links?.length);
+      setNasaResults(prev => [...prev, ...fresh]);
+    } catch { /* silently swallow load-more errors */ }
+    finally { setIsLoadingMore(false); }
+  }, [isLoadingMore, isEverythingMode]);
+
   const clearNasa = useCallback(() => {
     setNasaQuery('');
     setNasaResults([]);
     setNasaStatus('idle');
     setNasaError('');
+    setIsEverythingMode(false);
+    setSelectedCard(null);
+    setIsLoadingMore(false);
   }, []);
 
+  // ── IntersectionObserver — infinite scroll (Everything mode only) ─────────
+  useEffect(() => {
+    if (!isEverythingMode || nasaStatus !== 'done') return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) loadMoreNasa(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isEverythingMode, nasaStatus, loadMoreNasa]);
+
   // ── Derived: is any UI interaction happening? ──────────────────────────────
-  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused || hasSearchResults;
+  const isAnimationPaused = focused || showPortal || langOpen || activeChat !== null || chatInputFocused || hasSearchResults || selectedCard !== null;
 
   // ── Pause/resume Sketchfab via postMessage when interaction state changes ──
   useEffect(() => {
@@ -450,13 +501,29 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap justify-center gap-2">
-                {TAGS.map(tag => (
-                  <button key={tag}
-                    onClick={() => { setNasaQuery(tag); searchNasa(tag); }}
-                    className="text-[11px] uppercase tracking-wider text-white/70 backdrop-blur-md bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:bg-white/10 hover:text-white/90 hover:border-white/20 transition-all duration-200 cursor-pointer">
-                    {tag}
-                  </button>
-                ))}
+                {TAGS.map(tag => {
+                  const isEverything = tag === 'Everything';
+                  return (
+                    <button key={tag}
+                      onClick={() => {
+                        if (isEverything) {
+                          setNasaQuery('cosmos');
+                          searchNasa('cosmos', 'everything');
+                        } else {
+                          setNasaQuery(tag);
+                          searchNasa(tag, 'specific');
+                          setIsEverythingMode(false);
+                        }
+                      }}
+                      className={`text-[11px] uppercase tracking-wider backdrop-blur-md px-3 py-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                        isEverything
+                          ? 'text-white/90 bg-white/10 border border-white/25 hover:bg-white/18 hover:text-white hover:border-white/40 font-medium'
+                          : 'text-white/70 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/90 hover:border-white/20'
+                      }`}>
+                      {isEverything ? '✦ Everything' : tag}
+                    </button>
+                  );
+                })}
               </div>
 
               {!hasSearchResults && (
@@ -466,7 +533,7 @@ export default function App() {
                   onClick={() => setShowPortal(true)}
                   className="mt-1 px-7 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-xl text-white/80 text-[12px] uppercase tracking-[0.25em] font-medium shadow-lg transition-colors duration-300"
                 >
-                  Everything ✦
+                  Explore Portal ✦
                 </motion.button>
               )}
             </motion.div>
@@ -479,6 +546,10 @@ export default function App() {
                   status={nasaStatus}
                   errMsg={nasaError}
                   onClear={clearNasa}
+                  onCardClick={setSelectedCard}
+                  sentinelRef={sentinelRef}
+                  isEverythingMode={isEverythingMode}
+                  isLoadingMore={isLoadingMore}
                 />
               </div>
             )}
@@ -610,6 +681,16 @@ export default function App() {
             onClose={closeChat}
             onInputFocus={() => setChatInputFocused(true)}
             onInputBlur={() => setChatInputFocused(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[200]  NASA Detail Modal ── */}
+      <AnimatePresence>
+        {selectedCard && (
+          <NasaDetailModal
+            item={selectedCard}
+            onClose={() => setSelectedCard(null)}
           />
         )}
       </AnimatePresence>
