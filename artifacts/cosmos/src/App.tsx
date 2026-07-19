@@ -916,11 +916,13 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [showIntro,    setShowIntro]   = useState(true);
+  // show3D = false → clean charcoal background, no iframe, no WarpIntro (default)
+  // show3D = true  → WarpIntro + Sketchfab 3D animation active
+  const [show3D,       setShow3D]      = useState(false);
+  const [showIntro,    setShowIntro]   = useState(false);   // stays false until 3D is first enabled
   const [focused,      setFocused]     = useState(false);
   const [showPortal,   setShowPortal]  = useState(false);
   const [showLibrary,  setShowLibrary] = useState(false);
-  const [globalTheme,  setGlobalTheme] = useState<'black' | 'charcoal'>('black');
   const [language,     setLanguage]    = useState('English');
   const [langOpen,    setLangOpen]   = useState(false);
   const [activeTab,   setActiveTab]  = useState('All');
@@ -979,7 +981,7 @@ export default function App() {
   });
 
   const isAnimationPaused =
-    showIntro || focused || showPortal || showLibrary || langOpen ||
+    !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
     hasSearchResults || selectedCard !== null;
 
@@ -1174,58 +1176,62 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`relative w-full h-screen overflow-hidden transition-colors duration-700 ${globalTheme === 'black' ? 'bg-black' : 'bg-zinc-900'}`}>
+    <div className="relative w-full h-screen overflow-hidden bg-zinc-900">
 
-      {/* ── Cinematic Big Bang Intro ── */}
+      {/* ── Cinematic Big Bang Intro (only when 3D is enabled) ── */}
       <AnimatePresence>
-        {showIntro && <WarpIntro onDone={() => setShowIntro(false)} />}
+        {show3D && showIntro && <WarpIntro onDone={() => setShowIntro(false)} />}
       </AnimatePresence>
 
-      {/* ── z-0  Full-screen Sketchfab background ── */}
-      <div
-        className={`absolute inset-0 z-0 overflow-hidden pointer-events-auto flex items-center justify-center transition-all duration-1000 ${globalTheme === 'black' ? 'bg-black' : 'bg-zinc-900'}`}
-        style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
-      >
-        {/* Static fallback gradient shown while iframe is hidden — respects globalTheme */}
+      {/* ── z-0  Full-screen Sketchfab background (only when 3D is enabled) ── */}
+      {show3D && (
         <div
-          className="absolute inset-0"
-          style={{
-            background: globalTheme === 'black'
-              ? 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #050010 50%, #000000 100%)'
-              : 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #0e0e11 50%, #18181b 100%)',
-            opacity: isAnimationPaused ? 1 : 0,
-            transition: 'opacity 0.6s ease',
-          }}
-        />
-        <iframe
-          key={sceneIdx}
-          ref={bgIframeRef}
-          title="Cosmic Background"
-          src={cosmicScenes[sceneIdx]}
-          className="absolute w-[110vw] h-[120vh] border-none pointer-events-auto"
-          allow="autoplay; fullscreen; xr-spatial-tracking"
-          xr-spatial-tracking="true"
-          execution-while-out-of-viewport="true"
-          execution-while-not-rendered="true"
-          web-share="true"
-        />
-      </div>
+          className="absolute inset-0 z-0 overflow-hidden pointer-events-auto flex items-center justify-center bg-black"
+          style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
+        >
+          {/* Static fallback gradient shown while iframe is paused */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #050010 50%, #000000 100%)',
+              opacity: isAnimationPaused ? 1 : 0,
+              transition: 'opacity 0.6s ease',
+            }}
+          />
+          <iframe
+            key={sceneIdx}
+            ref={bgIframeRef}
+            title="Cosmic Background"
+            src={cosmicScenes[sceneIdx]}
+            className="absolute w-[110vw] h-[120vh] border-none pointer-events-auto"
+            allow="autoplay; fullscreen; xr-spatial-tracking"
+            xr-spatial-tracking="true"
+            execution-while-out-of-viewport="true"
+            execution-while-not-rendered="true"
+            web-share="true"
+          />
+        </div>
+      )}
 
-      {/* ── z-10  Cinematic crossfade overlay ── */}
-      <motion.div
-        className="absolute inset-0 z-10 bg-black pointer-events-none"
-        initial={{ opacity: 0 }}
-        animate={overlayControls}
-      />
+      {/* ── z-10  Cinematic crossfade overlay (only when 3D is enabled) ── */}
+      {show3D && (
+        <motion.div
+          className="absolute inset-0 z-10 bg-black pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={overlayControls}
+        />
+      )}
 
-      {/* ── z-11  Freeze overlay — covers iframe to visually freeze it ── */}
-      <motion.div
-        className="absolute inset-0 z-[11] pointer-events-none"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isAnimationPaused ? 1 : 0 }}
-        transition={{ duration: 0.6, ease: 'easeInOut' }}
-        style={{ backdropFilter: isAnimationPaused ? 'blur(2px)' : 'blur(0px)', background: 'rgba(0,0,0,0.45)' }}
-      />
+      {/* ── z-11  Freeze overlay (only when 3D is enabled) ── */}
+      {show3D && (
+        <motion.div
+          className="absolute inset-0 z-[11] pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isAnimationPaused ? 1 : 0 }}
+          transition={{ duration: 0.6, ease: 'easeInOut' }}
+          style={{ backdropFilter: isAnimationPaused ? 'blur(2px)' : 'blur(0px)', background: 'rgba(0,0,0,0.45)' }}
+        />
+      )}
 
       {/* ── z-20  Main cinematic UI ── */}
       <AnimatePresence>
@@ -1248,14 +1254,19 @@ export default function App() {
                 <span className="text-[13px]">📚</span>
                 <span>Library</span>
               </button>
-              {/* Global theme toggle — only visible on the Main/Home UI, not in Library */}
-              {!showLibrary && (
+              {/* 3D toggle — strictly on idle Home screen only */}
+              {!showLibrary && !hasSearchResults && activeChat === null && (
                 <button
-                  onClick={() => setGlobalTheme(t => t === 'black' ? 'charcoal' : 'black')}
-                  title={globalTheme === 'black' ? 'Switch to Charcoal' : 'Switch to Deep Black'}
+                  onClick={() => {
+                    setShow3D(prev => {
+                      if (!prev) setShowIntro(true); // trigger WarpIntro when enabling 3D
+                      return !prev;
+                    });
+                  }}
+                  title={show3D ? 'Disable 3D Background' : 'Enable 3D Background'}
                   className="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/60 text-[16px] hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white transition-all duration-300"
                 >
-                  {globalTheme === 'black' ? '◑' : '◐'}
+                  {show3D ? '◑' : '◐'}
                 </button>
               )}
             </div>
