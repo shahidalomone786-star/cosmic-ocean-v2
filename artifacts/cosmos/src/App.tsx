@@ -70,12 +70,21 @@ const AVATARS = [
   { name: 'Carl Sagan',      role: 'Cosmos Explorer',      image: '/carl-sagan.jpg' },
   { name: 'Nikola Tesla',    role: 'Electrical Visionary',
     image: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg' },
+  { name: 'Mahera Jannat',   role: 'Ultimate Supporter & Guide', image: '/mehera.jpg' },
 ] as const;
 
 function randomIndexExcluding(current: number, length: number): number {
   let next = current;
   while (next === current) next = Math.floor(Math.random() * length);
   return next;
+}
+
+// ─── Per-avatar opening greeting ─────────────────────────────────────────────
+function getInitialGreeting(name: string): string {
+  if (name === 'Mahera Jannat') {
+    return "Hello! Main Mahera Jannat hoon. Aaj main aapki kaise madad kar sakti hoon? 💛";
+  }
+  return `Greetings! I am ${name}. What mysteries of the universe shall we explore today?`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -395,7 +404,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     if (sharedContext) {
       return []; // will be populated by auto-analyse
     }
-    return [{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }];
+    return [{ role: 'model', text: getInitialGreeting(avatar.name) }];
   });
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -476,7 +485,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         const data = await res.json() as { reply?: string; error?: string };
         if (!res.ok || data.error) {
           setError(data.error ?? `Server error ${res.status}`);
-          setMessages([{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }]);
+          setMessages([{ role: 'model', text: getInitialGreeting(avatar.name) }]);
         } else {
           const reply = data.reply!;
           setMessages([{ role: 'model', text: reply }]);
@@ -485,7 +494,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         }
       } catch (err: unknown) {
         setError((err as Error)?.message ?? String(err));
-        setMessages([{ role: 'model', text: `Greetings! I am ${avatar.name}. What mysteries of the universe shall we explore today?` }]);
+        setMessages([{ role: 'model', text: getInitialGreeting(avatar.name) }]);
       } finally {
         setIsLoading(false);
       }

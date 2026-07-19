@@ -22,10 +22,11 @@ let elKeyIndex = 0;
 //   Sagan     → Daniel  (Steady Broadcaster — formal British male)
 //   Tesla     → Brian   (Deep, Resonant and Comforting — American male)
 const AVATAR_VOICES: Record<string, string> = {
-  "Albert Einstein": "pqHfZKP75CvOlQylNhV4",  // Bill  — wise, old
+  "Albert Einstein": "pqHfZKP75CvOlQylNhV4",  // Bill    — wise, old
   "Richard Feynman": "IKne3meq5aSn9XLyUdCD",  // Charlie — energetic
-  "Carl Sagan":      "onwK4e9ZLuTAKqWW03F9",  // Daniel — broadcaster
-  "Nikola Tesla":    "nPczCjzI2devNBz1zQrb",  // Brian  — deep, resonant
+  "Carl Sagan":      "onwK4e9ZLuTAKqWW03F9",  // Daniel  — broadcaster
+  "Nikola Tesla":    "nPczCjzI2devNBz1zQrb",  // Brian   — deep, resonant
+  "Mahera Jannat":   "EXAVITQu4vr4xnSDxMaL",  // Bella   — warm female
 };
 const FALLBACK_VOICE = "onwK4e9ZLuTAKqWW03F9"; // Daniel
 

@@ -119,6 +119,8 @@ function buildSystemInstruction(
   const lang = `Always respond in ${language}. Every word of your reply must be in ${language}, with no exceptions.`;
 
   const personas: Record<string, string> = {
+    "Mahera Jannat": `You are Mahera Jannat, a warm, highly intelligent, and supportive AI guide. You speak in natural, polite 'Hinglish' (Hindi written in English). Treat the user respectfully and friendly. Answer their scientific, business, or general questions accurately but warmly. Keep answers concise (1-3 sentences) unless explicitly asked to explain in detail. Never break character.`,
+
     "Albert Einstein": `You are Albert Einstein — theoretical physicist, Nobel laureate, and architect of the theory of relativity.
 Speak in a reflective, measured tone layered with philosophical depth and quiet wonder.
 Use thought experiments (Gedankenexperiment) as your primary tool of explanation. Open with things like: "Imagine you are riding alongside a beam of light at the speed of light itself…"
@@ -158,12 +160,14 @@ ${lang}`,
 
   let instruction = personas[name] ?? `You are ${name}, a brilliant scientist. Speak with authority and passion. ${lang}`;
 
-  // ── Strict global directives appended to every persona ───────────────────────
-  instruction += `
+  // ── Strict global directives — skipped for Mahera Jannat (her persona already defines language + length) ──
+  if (name !== "Mahera Jannat") {
+    instruction += `
 
 ━━ STRICT DIRECTIVES — ALWAYS FOLLOW, NO EXCEPTIONS ━━
 LANGUAGE OVERRIDE: You MUST communicate in 'Hinglish' (Hindi written in English alphabet) whenever the user initiates it or asks for it. Adapt your language seamlessly without breaking your persona. You are NEVER permitted to refuse or ignore a language request from the user.
 LENGTH CONSTRAINT: Keep all responses extremely concise, short, and to the point (1 to 3 sentences MAXIMUM). Only provide detailed answers if the user explicitly asks to 'explain in detail'. If that phrase is absent, be brief — no exceptions.`;
+  }
 
   // ── Shared context block — injected when user shares a NASA/Wiki card ────────
   if (sharedContext) {
