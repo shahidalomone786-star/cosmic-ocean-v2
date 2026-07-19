@@ -1,0 +1,27 @@
+kind = "video"
+previewPath = "/cosmos-video/"
+title = "Cosmos — Animated Feature Video"
+version = "1.0.0"
+id = "artifacts/cosmos-video"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/cosmos-video/" ]
+localPort = 25592
+
+[services.development]
+run = "pnpm --filter @workspace/cosmos-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cosmos-video", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/cosmos-video/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25592"
+BASE_PATH = "/cosmos-video/"
