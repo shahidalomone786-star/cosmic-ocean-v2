@@ -3,8 +3,9 @@ import { Router } from "express";
 const router = Router();
 
 // ── GET /api/search/arxiv?q=...&max_results=10&start=0 ───────────────────────
-// arXiv's Atom XML feed doesn't reliably support browser CORS, so we proxy it.
-// Returns { items: ArxivItem[], total: number }
+// arXiv's Atom XML feed has unreliable CORS headers on some networks/mobile,
+// so ALL arXiv requests are proxied here. Returns { items, total } on success
+// or { error, items: [], total: 0 } on timeout/failure.
 router.get("/search/arxiv", async (req, res) => {
   const q          = ((req.query.q as string) ?? "").trim();
   const maxResults = Math.min(Math.max(Number(req.query.max_results ?? 5), 1), 25);
@@ -16,15 +17,25 @@ router.get("/search/arxiv", async (req, res) => {
     const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&max_results=${maxResults}&start=${start}&sortBy=relevance`;
     const resp = await fetch(url, {
       headers: { Accept: "application/atom+xml" },
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(30_000), // 30 s — arXiv can be slow
     });
-    if (!resp.ok) { res.json({ items: [], total: 0 }); return; }
+    if (!resp.ok) {
+      res.status(502).json({ error: "arXiv upstream error", items: [], total: 0 });
+      return;
+    }
     const xml   = await resp.text();
     const total = parseTotalResults(xml);
     const items = parseArxivAtom(xml);
     res.json({ items, total });
-  } catch {
-    res.json({ items: [], total: 0 });
+  } catch (err) {
+    const isTimeout =
+      err instanceof Error &&
+      (err.name === "TimeoutError" || err.message.includes("timed out"));
+    if (isTimeout) {
+      res.status(504).json({ error: "Timeout", items: [], total: 0 });
+    } else {
+      res.status(502).json({ error: "arXiv fetch failed", items: [], total: 0 });
+    }
   }
 });
 

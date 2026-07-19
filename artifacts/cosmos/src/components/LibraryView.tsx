@@ -21,55 +21,35 @@ interface LibraryViewProps {
 const DEFAULT_QUERY = 'astrophysics cosmology';
 const PAGE_SIZE     = 10;
 
-// ─── arXiv browser-side helpers ───────────────────────────────────────────────
-// arXiv's export API supports CORS (Access-Control-Allow-Origin: *), so we can
-// call it directly from the browser — no server proxy needed. This avoids the
-// server-side 8 s timeout that was silently returning empty results.
+// ─── arXiv proxy helper ───────────────────────────────────────────────────────
+// All arXiv fetches MUST go through the backend proxy (/api/search/arxiv).
+// Direct browser fetches to export.arxiv.org fail on mobile and some networks
+// due to CORS / network blocking. The proxy now has a 30 s timeout and returns
+// clean JSON error payloads (502 / 504) instead of silently empty results.
 
-function parseArxivTotal(xml: string): number {
-  const m = xml.match(/<opensearch:totalResults[^>]*>(\d+)<\/opensearch:totalResults>/);
-  return m ? parseInt(m[1], 10) : 0;
-}
-
-function xmlText(chunk: string, tag: string): string {
-  const m = chunk.match(new RegExp(`<${tag}[^>]*>\\s*([\\s\\S]*?)\\s*</${tag}>`));
-  return m ? m[1].replace(/\n+/g, ' ').trim() : '';
-}
-
-function parseArxivEntries(xml: string): ArxivItem[] {
-  const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
-  const items: ArxivItem[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = entryRe.exec(xml)) !== null) {
-    const e         = m[1];
-    const id        = xmlText(e, 'id');
-    const title     = xmlText(e, 'title');
-    const summary   = xmlText(e, 'summary').slice(0, 400);
-    const published = xmlText(e, 'published').slice(0, 10);
-    const authors   = [...e.matchAll(/<name>\s*(.*?)\s*<\/name>/g)].map(a => a[1]);
-    items.push({ id, title, summary, authors, published, link: id });
-  }
-  return items;
-}
-
-async function fetchArxiv(
+async function fetchArxivProxy(
   q: string,
   start: number,
   maxResults: number,
-): Promise<{ items: ArxivItem[]; total: number }> {
+): Promise<{ items: ArxivItem[]; total: number; error?: string }> {
   const url =
-    `https://export.arxiv.org/api/query` +
-    `?search_query=all:${encodeURIComponent(q)}` +
+    `/api/search/arxiv` +
+    `?q=${encodeURIComponent(q)}` +
     `&max_results=${maxResults}` +
-    `&start=${start}` +
-    `&sortBy=relevance`;
+    `&start=${start}`;
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) return { items: [], total: 0 };
-  const xml   = await res.text();
-  const total = parseArxivTotal(xml);
-  const items = parseArxivEntries(xml);
-  return { items, total };
+  const res  = await fetch(url);
+  const data = await res.json() as { items?: ArxivItem[]; total?: number; error?: string };
+
+  if (!res.ok) {
+    // 504 = arXiv timed out on the server; 502 = upstream error
+    const msg = res.status === 504
+      ? 'Timeout'
+      : (data.error ?? `Server error ${res.status}`);
+    return { items: [], total: 0, error: msg };
+  }
+
+  return { items: data.items ?? [], total: data.total ?? 0 };
 }
 
 // ─── Paper Card ───────────────────────────────────────────────────────────────
@@ -268,10 +248,17 @@ export default function LibraryView({ onClose, onDiscussWithAvatar, avatars }: L
     }
 
     try {
-      const { items, total: newTotal } = await fetchArxiv(q, start, PAGE_SIZE);
-      setPapers(prev => replace ? items : [...prev, ...items]);
-      setTotal(newTotal);
-      setOffset(start + items.length);
+      const { items, total: newTotal, error } = await fetchArxivProxy(q, start, PAGE_SIZE);
+      if (error) {
+        const msg = error === 'Timeout'
+          ? 'arXiv server busy — please retry in a moment'
+          : `Could not load papers: ${error}`;
+        setFetchError(msg);
+      } else {
+        setPapers(prev => replace ? items : [...prev, ...items]);
+        setTotal(newTotal);
+        setOffset(start + items.length);
+      }
     } catch (err) {
       setFetchError((err as Error)?.message ?? 'Fetch failed');
     } finally {
