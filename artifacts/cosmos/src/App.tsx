@@ -47,6 +47,57 @@ function interleaveAll(...arrays: UnifiedItem[][]): UnifiedItem[] {
 const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','Equations',
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 
+// ─── PhET Interactive Simulations ────────────────────────────────────────────
+// Each entry follows PhET's stable CDN pattern:
+//   iframe  → https://phet.colorado.edu/sims/html/{slug}/latest/{slug}_all.html
+//   thumb   → https://phet.colorado.edu/sims/html/{slug}/latest/screenshot.png
+type SimItem = { slug: string; title: string; subject: string };
+
+const PHET_SIMULATIONS: SimItem[] = [
+  { slug: 'wave-on-a-string',             title: 'Wave on a String',              subject: 'Waves'          },
+  { slug: 'pendulum-lab',                 title: 'Pendulum Lab',                  subject: 'Motion'         },
+  { slug: 'projectile-motion',            title: 'Projectile Motion',             subject: 'Motion'         },
+  { slug: 'forces-and-motion-basics',     title: 'Forces and Motion',             subject: 'Forces'         },
+  { slug: 'gravity-and-orbits',           title: 'Gravity & Orbits',              subject: 'Gravity'        },
+  { slug: 'my-solar-system',              title: 'My Solar System',               subject: 'Gravity'        },
+  { slug: 'charges-and-fields',           title: 'Charges and Fields',            subject: 'Electricity'    },
+  { slug: 'electric-field-hockey',        title: 'Electric Field Hockey',         subject: 'Electricity'    },
+  { slug: 'faradays-law',                 title: "Faraday's Law",                 subject: 'Magnetism'      },
+  { slug: 'ohms-law',                     title: "Ohm's Law",                     subject: 'Electricity'    },
+  { slug: 'circuit-construction-kit-dc',  title: 'Circuit Construction Kit',      subject: 'Electricity'    },
+  { slug: 'capacitor-lab-basics',         title: 'Capacitor Lab',                 subject: 'Electricity'    },
+  { slug: 'bending-light',                title: 'Bending Light',                 subject: 'Optics'         },
+  { slug: 'color-vision',                 title: 'Color Vision',                  subject: 'Optics'         },
+  { slug: 'wave-interference',            title: 'Wave Interference',             subject: 'Waves'          },
+  { slug: 'fourier-making-waves',         title: 'Fourier: Making Waves',         subject: 'Waves'          },
+  { slug: 'density',                      title: 'Density',                       subject: 'Matter'         },
+  { slug: 'buoyancy',                     title: 'Buoyancy',                      subject: 'Fluids'         },
+  { slug: 'balancing-act',                title: 'Balancing Act',                 subject: 'Forces'         },
+  { slug: 'collision-lab',                title: 'Collision Lab',                 subject: 'Motion'         },
+  { slug: 'energy-forms-and-changes',     title: 'Energy Forms & Changes',        subject: 'Energy'         },
+  { slug: 'states-of-matter',             title: 'States of Matter',              subject: 'Thermodynamics' },
+  { slug: 'gas-properties',               title: 'Gas Properties',                subject: 'Thermodynamics' },
+  { slug: 'nuclear-fission',              title: 'Nuclear Fission',               subject: 'Nuclear'        },
+  { slug: 'alpha-decay',                  title: 'Alpha Decay',                   subject: 'Nuclear'        },
+  { slug: 'build-an-atom',                title: 'Build an Atom',                 subject: 'Atomic'         },
+  { slug: 'build-a-molecule',             title: 'Build a Molecule',              subject: 'Chemistry'      },
+  { slug: 'molecule-shapes',              title: 'Molecule Shapes',               subject: 'Chemistry'      },
+  { slug: 'natural-selection',            title: 'Natural Selection',             subject: 'Biology'        },
+  { slug: 'neuron',                       title: 'Neuron',                        subject: 'Biology'        },
+  { slug: 'gene-expression-essentials',   title: 'Gene Expression',               subject: 'Biology'        },
+  { slug: 'greenhouse-effect',            title: 'Greenhouse Effect',             subject: 'Earth Science'  },
+  { slug: 'plate-tectonics',              title: 'Plate Tectonics',               subject: 'Earth Science'  },
+  { slug: 'friction',                     title: 'Friction',                      subject: 'Forces'         },
+  { slug: 'vector-addition',              title: 'Vector Addition',               subject: 'Math/Physics'   },
+];
+
+function phetIframeUrl(slug: string) {
+  return `https://phet.colorado.edu/sims/html/${slug}/latest/${slug}_all.html`;
+}
+function phetThumb(slug: string) {
+  return `https://phet.colorado.edu/sims/html/${slug}/latest/screenshot.png`;
+}
+
 // Languages + their Google Translate codes
 const LANGUAGES: { label: string; gtCode: string }[] = [
   { label: 'English',    gtCode: 'en' },
@@ -880,6 +931,106 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
   );
 }
 
+// ─── PhET Simulation Card ────────────────────────────────────────────────────
+function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }) {
+  const [imgError, setImgError] = useState(false);
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onSelect}
+      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out group"
+    >
+      {/* Thumbnail */}
+      <div className="w-full h-28 overflow-hidden bg-black/20 relative">
+        {!imgError ? (
+          <img
+            src={phetThumb(sim.slug)}
+            alt={sim.title}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/30 via-indigo-900/20 to-transparent">
+            <span className="text-3xl select-none">🧪</span>
+          </div>
+        )}
+        {/* Play icon overlay */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
+          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+      {/* Info */}
+      <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border border-violet-400/30 text-violet-300/80 bg-violet-500/10">
+            🧪 Simulation
+          </span>
+        </div>
+        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{sim.title}</p>
+        <p className="text-white/40 text-[11px] leading-relaxed truncate">{sim.subject}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Simulation Full-Screen Modal ─────────────────────────────────────────────
+function SimulationModal({ sim, onClose }: { sim: SimItem; onClose: () => void }) {
+  const iframeUrl = phetIframeUrl(sim.slug);
+  return (
+    <motion.div
+      key="sim-modal"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-white/[0.08] bg-black/30">
+        <motion.button
+          whileHover={{ x: -3 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onClose}
+          className="flex items-center gap-2 text-white/60 hover:text-white text-[12px] uppercase tracking-widest transition-colors duration-200"
+        >
+          <span className="text-base leading-none">←</span>
+          <span>Back</span>
+        </motion.button>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-300/80 bg-violet-500/10">
+            🧪 PhET Simulation
+          </span>
+          <span className="text-white/70 text-[13px] font-medium tracking-wide">{sim.title}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+        >
+          ✕
+        </button>
+      </div>
+      {/* Iframe */}
+      <div className="flex-1 relative">
+        <iframe
+          src={iframeUrl}
+          title={sim.title}
+          allowFullScreen
+          allow="fullscreen"
+          className="absolute inset-0 w-full h-full border-0"
+          style={{ touchAction: 'manipulation' }}
+          loading="lazy"
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
 const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
   name: string; subtitle: string; image?: string; onChat: () => void;
@@ -960,6 +1111,7 @@ export default function App() {
   const [portalFetched,    setPortalFetched]    = useState(false);
   const [portalBlackHoles, setPortalBlackHoles] = useState<WikiItem[]>([]);
   const [portalEquations,  setPortalEquations]  = useState<WikiItem[]>([]);
+  const [simulationModal,  setSimulationModal]  = useState<SimItem | null>(null);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -995,7 +1147,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null;
+    hasSearchResults || selectedCard !== null || simulationModal !== null;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -1579,6 +1731,23 @@ export default function App() {
                       ))}
                 </div>
               </div>
+
+              {/* ── Quantum Lab ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✨ Quantum Lab</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Interactive Science Simulations</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {PHET_SIMULATIONS.map(sim => (
+                    <PortalSimCard
+                      key={sim.slug}
+                      sim={sim}
+                      onSelect={() => setSimulationModal(sim)}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1606,6 +1775,16 @@ export default function App() {
             onClose={closeChat}
             onInputFocus={() => setChatInputFocused(true)}
             onInputBlur={() => setChatInputFocused(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[250]  Simulation Modal ── */}
+      <AnimatePresence>
+        {simulationModal && (
+          <SimulationModal
+            sim={simulationModal}
+            onClose={() => setSimulationModal(null)}
           />
         )}
       </AnimatePresence>
