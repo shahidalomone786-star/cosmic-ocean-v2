@@ -75,6 +75,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1"
+    "@google/generative-ai": "^0.24.1",
+    "chess.js": "^1.4.0",
+    "react-chessboard": "^5.10.0"
   }
 }

@@ -3,6 +3,7 @@ import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
+import GrandmasterChessModal from './components/GrandmasterChess';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1511,6 +1512,7 @@ export default function App() {
   const [simulationModal,  setSimulationModal]  = useState<SimItem | null>(null);
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
+  const [showChess,        setShowChess]        = useState(false);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -1546,7 +1548,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null;
+    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -2193,6 +2195,58 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* ── Grandmaster Chess ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>♟️ Grandmaster Chess</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Challenge the Geniuses</span>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowChess(true)}
+                  className={`cursor-pointer w-full rounded-2xl overflow-hidden border transition-all duration-300 ${
+                    lm
+                      ? 'border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50 hover:border-violet-400 hover:shadow-[0_8px_28px_rgba(139,92,246,0.18)]'
+                      : 'border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-purple-500/8 to-indigo-500/10 hover:border-violet-400/50 hover:shadow-[0_12px_40px_rgba(139,92,246,0.3)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-5 px-5 py-5">
+                    {/* Chess piece cluster */}
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-4xl flex-shrink-0 ${
+                      lm ? 'bg-white shadow-sm border border-violet-100' : 'bg-white/[0.06] border border-white/[0.10]'
+                    }`}>
+                      ♛
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[15px] font-semibold tracking-[-0.01em] mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>
+                        Play Grandmaster Chess
+                      </p>
+                      <p className={`text-[12px] leading-relaxed ${lm ? 'text-slate-500' : 'text-white/40'}`}>
+                        Pass &amp; Play, challenge Einstein or Feynman, or watch two geniuses battle it out with Minimax AI.
+                      </p>
+                      {/* Avatar previews */}
+                      <div className="flex items-center gap-1.5 mt-2.5">
+                        {[
+                          { img: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg', name: 'Einstein' },
+                          { img: 'https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg', name: 'Feynman' },
+                          { img: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg', name: 'Tesla' },
+                          { img: '/mehera.jpg', name: 'Mahera' },
+                        ].map((av, i) => (
+                          <div key={av.name} className="w-6 h-6 rounded-full overflow-hidden border-2 border-violet-300/40 -ml-1 first:ml-0 shadow-sm">
+                            <img src={av.img} alt={av.name} className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                        ))}
+                        <span className={`ml-1 text-[10px] ${lm ? 'text-slate-400' : 'text-white/30'}`}>5 opponents</span>
+                      </div>
+                    </div>
+                    <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg ${
+                      lm ? 'bg-violet-100 text-violet-600' : 'bg-violet-500/20 text-violet-300'
+                    }`}>›</div>
+                  </div>
+                </motion.div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -2252,6 +2306,16 @@ export default function App() {
           <ArcadeModal
             game={arcadeModal}
             onClose={() => setArcadeModal(null)}
+            lm={lm}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[300]  Grandmaster Chess Modal ── */}
+      <AnimatePresence>
+        {showChess && (
+          <GrandmasterChessModal
+            onClose={() => setShowChess(false)}
             lm={lm}
           />
         )}
