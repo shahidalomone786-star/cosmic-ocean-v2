@@ -949,13 +949,8 @@ export default function App() {
 
   const hasSearchResults = searchStatus !== 'idle';
 
-  // ── Apply global theme to document root ───────────────────────────────────
-  useEffect(() => {
-    document.documentElement.style.backgroundColor =
-      globalTheme === 'black' ? '#000000' : '#18181b';
-    document.body.style.backgroundColor =
-      globalTheme === 'black' ? '#000000' : '#18181b';
-  }, [globalTheme]);
+  // Theme is applied directly to the outermost wrapper div via Tailwind class;
+  // no document.body manipulation needed.
 
   // ── Inject Google Translate once on mount ─────────────────────────────────
   useEffect(() => {
@@ -1191,11 +1186,13 @@ export default function App() {
         className={`absolute inset-0 z-0 overflow-hidden pointer-events-auto flex items-center justify-center transition-all duration-1000 ${globalTheme === 'black' ? 'bg-black' : 'bg-zinc-900'}`}
         style={{ filter: hasSearchResults ? 'blur(14px) brightness(0.55)' : 'none' }}
       >
-        {/* Static fallback gradient shown while iframe is hidden */}
+        {/* Static fallback gradient shown while iframe is hidden — respects globalTheme */}
         <div
           className="absolute inset-0"
           style={{
-            background: 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #050010 50%, #000 100%)',
+            background: globalTheme === 'black'
+              ? 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #050010 50%, #000000 100%)'
+              : 'radial-gradient(ellipse at 50% 40%, #1a0a3a 0%, #0e0e11 50%, #18181b 100%)',
             opacity: isAnimationPaused ? 1 : 0,
             transition: 'opacity 0.6s ease',
           }}
@@ -1251,14 +1248,16 @@ export default function App() {
                 <span className="text-[13px]">📚</span>
                 <span>Library</span>
               </button>
-              {/* Global theme toggle */}
-              <button
-                onClick={() => setGlobalTheme(t => t === 'black' ? 'charcoal' : 'black')}
-                title={globalTheme === 'black' ? 'Switch to Charcoal' : 'Switch to Deep Black'}
-                className="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/60 text-[16px] hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white transition-all duration-300"
-              >
-                {globalTheme === 'black' ? '◑' : '◐'}
-              </button>
+              {/* Global theme toggle — only visible on the Main/Home UI, not in Library */}
+              {!showLibrary && (
+                <button
+                  onClick={() => setGlobalTheme(t => t === 'black' ? 'charcoal' : 'black')}
+                  title={globalTheme === 'black' ? 'Switch to Charcoal' : 'Switch to Deep Black'}
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/60 text-[16px] hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white transition-all duration-300"
+                >
+                  {globalTheme === 'black' ? '◑' : '◐'}
+                </button>
+              )}
             </div>
 
             {/* ── Language pill — top right ── */}
