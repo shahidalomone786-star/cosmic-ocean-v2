@@ -938,7 +938,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
 }
 
 // ─── Portal Wiki Card ─────────────────────────────────────────────────────────
-function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => void }) {
+function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () => void; lm?: boolean }) {
   const imgSrc  = item.thumbnail?.source;
   const snippet = item.extract?.split('\n').find(l => l.trim()) ?? '';
   return (
@@ -946,25 +946,29 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out"
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out ${
+        lm
+          ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
+          : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+      }`}
     >
       {imgSrc ? (
-        <div className="w-full h-28 overflow-hidden bg-black/20">
+        <div className={`w-full h-28 overflow-hidden ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
           <img src={imgSrc} alt={item.title} loading="lazy"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         </div>
       ) : (
-        <div className="w-full h-28 flex items-center justify-center bg-gradient-to-br from-amber-900/20 via-black/20 to-transparent">
-          <span className="text-4xl font-thin text-amber-200/15 select-none">W</span>
+        <div className={`w-full h-28 flex items-center justify-center ${lm ? 'bg-slate-100' : 'bg-gradient-to-br from-amber-900/20 via-black/20 to-transparent'}`}>
+          <span className={`text-4xl font-thin select-none ${lm ? 'text-slate-300' : 'text-amber-200/15'}`}>W</span>
         </div>
       )}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
           <SourceBadge source="wiki" />
         </div>
-        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{item.title}</p>
+        <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{item.title}</p>
         {snippet && (
-          <p className="text-white/40 text-[11px] leading-relaxed line-clamp-2">{snippet}</p>
+          <p className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-slate-500' : 'text-white/40'}`}>{snippet}</p>
         )}
       </div>
     </motion.div>
@@ -972,7 +976,7 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
 }
 
 // ─── PhET Simulation Card ────────────────────────────────────────────────────
-function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }) {
+function PortalSimCard({ sim, onSelect, lm }: { sim: SimItem; onSelect: () => void; lm?: boolean }) {
   const imgUrl = useWikiThumbnail(sim.wikiQuery);
   const loaded = imgUrl !== '';
 
@@ -981,13 +985,17 @@ function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out group"
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out group ${
+        lm
+          ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
+          : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+      }`}
     >
       {/* Thumbnail */}
-      <div className="w-full h-28 overflow-hidden bg-black/20 relative">
+      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
         {/* Shimmer skeleton shown while fetch is in-flight */}
         {!loaded && (
-          <div className="absolute inset-0 bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04] animate-pulse" />
+          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
         )}
         {loaded && (
           <img
@@ -1009,19 +1017,21 @@ function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border border-violet-400/30 text-violet-300/80 bg-violet-500/10">
+          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+            lm ? 'border-violet-300/60 text-violet-700 bg-violet-50' : 'border-violet-400/30 text-violet-300/80 bg-violet-500/10'
+          }`}>
             ⚗️ Simulation
           </span>
         </div>
-        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{sim.title}</p>
-        <p className="text-white/40 text-[11px] leading-relaxed truncate">{sim.subject}</p>
+        <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{sim.title}</p>
+        <p className={`text-[11px] leading-relaxed truncate ${lm ? 'text-slate-500' : 'text-white/40'}`}>{sim.subject}</p>
       </div>
     </motion.div>
   );
 }
 
 // ─── Simulation Full-Screen Modal ─────────────────────────────────────────────
-function SimulationModal({ sim, onClose }: { sim: SimItem; onClose: () => void }) {
+function SimulationModal({ sim, onClose, lm }: { sim: SimItem; onClose: () => void; lm?: boolean }) {
   const iframeUrl = phetIframeUrl(sim.slug);
   return (
     <motion.div
@@ -1032,26 +1042,43 @@ function SimulationModal({ sim, onClose }: { sim: SimItem; onClose: () => void }
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-white/[0.08] bg-black/30">
+      {/* Sticky Header */}
+      <div className={`flex items-center gap-3 px-4 py-3 flex-shrink-0 border-b ${
+        lm
+          ? 'border-slate-200 bg-white/95 backdrop-blur-xl shadow-sm'
+          : 'border-white/[0.10] bg-[rgba(10,10,18,0.85)] backdrop-blur-xl'
+      }`}>
+        {/* Back button — large tappable area */}
         <motion.button
-          whileHover={{ x: -3 }}
+          whileHover={{ x: -2 }}
           whileTap={{ scale: 0.95 }}
           onClick={onClose}
-          className="flex items-center gap-2 text-white/60 hover:text-white text-[12px] uppercase tracking-widest transition-colors duration-200"
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 min-w-[80px] ${
+            lm
+              ? 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 hover:text-slate-900'
+              : 'bg-white/[0.10] text-white border border-white/[0.15] hover:bg-white/[0.18] hover:text-white'
+          }`}
         >
-          <span className="text-base leading-none">←</span>
+          <span className="text-[15px] leading-none">←</span>
           <span>Back</span>
         </motion.button>
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-300/80 bg-violet-500/10">
-            🧪 PhET Simulation
+        {/* Title area */}
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+            lm ? 'border-violet-300/60 text-violet-700 bg-violet-50' : 'border-violet-400/30 text-violet-300/80 bg-violet-500/10'
+          }`}>
+            🧪 PhET
           </span>
-          <span className="text-white/70 text-[13px] font-medium tracking-wide">{sim.title}</span>
+          <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{sim.title}</span>
         </div>
+        {/* Close X */}
         <button
           onClick={onClose}
-          className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+          className={`flex-shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-[14px] font-medium transition-all duration-200 ${
+            lm
+              ? 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              : 'border-white/[0.12] bg-white/[0.08] text-white/60 hover:bg-white/[0.15] hover:text-white'
+          }`}
         >
           ✕
         </button>
@@ -1138,7 +1165,7 @@ const ADVANCED_SIMS: AdvSimItem[] = [
 ];
 
 // ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
-function AdvSimCard({ sim, onSelect }: { sim: AdvSimItem; onSelect: () => void }) {
+function AdvSimCard({ sim, onSelect, lm }: { sim: AdvSimItem; onSelect: () => void; lm?: boolean }) {
   const imgUrl = useWikiThumbnail(sim.wikiQuery);
   const loaded = imgUrl !== '';
 
@@ -1147,12 +1174,16 @@ function AdvSimCard({ sim, onSelect }: { sim: AdvSimItem; onSelect: () => void }
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out group"
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out group ${
+        lm
+          ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
+          : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+      }`}
     >
       {/* Thumbnail */}
-      <div className="w-full h-28 overflow-hidden bg-black/20 relative">
+      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
         {!loaded && (
-          <div className="absolute inset-0 bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04] animate-pulse" />
+          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
         )}
         {loaded && (
           <img
@@ -1173,19 +1204,21 @@ function AdvSimCard({ sim, onSelect }: { sim: AdvSimItem; onSelect: () => void }
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10">
+          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+            lm ? 'border-cyan-300/60 text-cyan-700 bg-cyan-50' : 'border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10'
+          }`}>
             {sim.categoryTag}
           </span>
         </div>
-        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{sim.title}</p>
-        <p className="text-white/40 text-[11px] leading-relaxed line-clamp-2">{sim.description}</p>
+        <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{sim.title}</p>
+        <p className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-slate-500' : 'text-white/40'}`}>{sim.description}</p>
       </div>
     </motion.div>
   );
 }
 
 // ─── Advanced Sandbox Modal ────────────────────────────────────────────────────
-function AdvSandboxModal({ sim, onClose }: { sim: AdvSimItem; onClose: () => void }) {
+function AdvSandboxModal({ sim, onClose, lm }: { sim: AdvSimItem; onClose: () => void; lm?: boolean }) {
   return (
     <motion.div
       key="adv-modal"
@@ -1195,26 +1228,43 @@ function AdvSandboxModal({ sim, onClose }: { sim: AdvSimItem; onClose: () => voi
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-white/[0.08] bg-black/30">
+      {/* Sticky Header */}
+      <div className={`flex items-center gap-3 px-4 py-3 flex-shrink-0 border-b ${
+        lm
+          ? 'border-slate-200 bg-white/95 backdrop-blur-xl shadow-sm'
+          : 'border-white/[0.10] bg-[rgba(10,10,18,0.85)] backdrop-blur-xl'
+      }`}>
+        {/* Back button — large tappable area */}
         <motion.button
-          whileHover={{ x: -3 }}
+          whileHover={{ x: -2 }}
           whileTap={{ scale: 0.95 }}
           onClick={onClose}
-          className="flex items-center gap-2 text-white/60 hover:text-white text-[12px] uppercase tracking-widest transition-colors duration-200"
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 min-w-[80px] ${
+            lm
+              ? 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 hover:text-slate-900'
+              : 'bg-white/[0.10] text-white border border-white/[0.15] hover:bg-white/[0.18] hover:text-white'
+          }`}
         >
-          <span className="text-base leading-none">←</span>
+          <span className="text-[15px] leading-none">←</span>
           <span>Back</span>
         </motion.button>
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10">
+        {/* Title area */}
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+            lm ? 'border-cyan-300/60 text-cyan-700 bg-cyan-50' : 'border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10'
+          }`}>
             {sim.categoryTag}
           </span>
-          <span className="text-white/70 text-[13px] font-medium tracking-wide">{sim.title}</span>
+          <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{sim.title}</span>
         </div>
+        {/* Close X */}
         <button
           onClick={onClose}
-          className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+          className={`flex-shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-[14px] font-medium transition-all duration-200 ${
+            lm
+              ? 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              : 'border-white/[0.12] bg-white/[0.08] text-white/60 hover:bg-white/[0.15] hover:text-white'
+          }`}
         >
           ✕
         </button>
@@ -1236,23 +1286,27 @@ function AdvSandboxModal({ sim, onClose }: { sim: AdvSimItem; onClose: () => voi
 }
 
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
-const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
-  name: string; subtitle: string; image?: string; onChat: () => void;
+const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm }: {
+  name: string; subtitle: string; image?: string; onChat: () => void; lm?: boolean;
 }) {
   return (
     <motion.div
       whileHover={{ scale: 1.03, y: -4 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-      className="relative flex-shrink-0 w-44 rounded-2xl overflow-hidden border border-white/[0.09] bg-white/[0.05] backdrop-blur-[18px] cursor-pointer group shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+      className={`relative flex-shrink-0 w-44 rounded-2xl overflow-hidden cursor-pointer group ${
+        lm
+          ? 'border border-slate-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.10)]'
+          : 'border border-white/[0.09] bg-white/[0.05] backdrop-blur-[18px] shadow-[0_4px_20px_rgba(0,0,0,0.45)]'
+      }`}
     >
       <div className="w-full h-36 relative overflow-hidden">
         {image ? (
           <img src={image} alt={name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center relative">
+          <div className={`w-full h-full flex items-center justify-center relative ${lm ? 'bg-slate-100' : 'bg-gradient-to-br from-white/10 to-transparent'}`}>
             <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white/40 via-transparent to-transparent" />
-            <span className="text-4xl font-thin text-white/80 select-none z-10">
+            <span className={`text-4xl font-thin select-none z-10 ${lm ? 'text-slate-400' : 'text-white/80'}`}>
               {name.split(' ').map((w: string) => w[0]).join('')}
             </span>
           </div>
@@ -1260,14 +1314,20 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
       </div>
 
       <div className="p-3">
-        <p className="text-white text-sm font-medium tracking-wide truncate">{name}</p>
-        <p className="text-white/40 text-[10px] tracking-wider uppercase mt-0.5 truncate">{subtitle}</p>
+        <p className={`text-sm font-medium tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white'}`}>{name}</p>
+        <p className={`text-[10px] tracking-wider uppercase mt-0.5 truncate ${lm ? 'text-slate-500' : 'text-white/40'}`}>{subtitle}</p>
         <div className="mt-2.5 flex gap-1.5">
           <button onClick={onChat}
-            className="text-[9px] uppercase tracking-wider text-white/70 bg-white/8 border border-white/20 px-2 py-0.5 rounded-full hover:bg-white/15 hover:text-white transition-colors duration-200">
+            className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors duration-200 ${
+              lm
+                ? 'text-slate-700 bg-slate-100 border border-slate-300 hover:bg-slate-200 hover:text-slate-900'
+                : 'text-white/70 bg-white/8 border border-white/20 hover:bg-white/15 hover:text-white'
+            }`}>
             Chat
           </button>
-          <span className="text-[9px] uppercase tracking-wider text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+          <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
+            lm ? 'text-slate-500 bg-slate-50 border border-slate-200' : 'text-white/50 bg-white/5 border border-white/10'
+          }`}>
             Explore
           </span>
         </div>
@@ -1806,23 +1866,31 @@ export default function App() {
           <motion.div key="portal"
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 z-30 bg-black/60 backdrop-blur-2xl flex flex-col overflow-hidden"
+            className={`absolute inset-0 z-30 flex flex-col overflow-hidden ${lm ? 'bg-slate-50/96 backdrop-blur-2xl' : 'bg-black/60 backdrop-blur-2xl'}`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+            <div className={`flex items-center justify-between px-5 pt-4 pb-3 flex-shrink-0 border-b ${lm ? 'border-slate-200' : 'border-white/[0.06]'}`}>
               <motion.button whileHover={{ x: -3 }} whileTap={{ scale: 0.95 }}
                 onClick={() => setShowPortal(false)}
-                className="flex items-center gap-2 text-white/60 hover:text-white text-[12px] uppercase tracking-widest transition-colors duration-200">
-                <span className="text-base leading-none">←</span>
-                <span>Back to Cosmos</span>
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 ${
+                  lm
+                    ? 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 hover:text-slate-900'
+                    : 'bg-white/[0.08] text-white/70 border border-white/[0.12] hover:bg-white/[0.14] hover:text-white'
+                }`}>
+                <span className="text-[15px] leading-none">←</span>
+                <span>Back</span>
               </motion.button>
 
               {/* Language selector inside portal */}
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-[18px] text-white/80 text-[11px] uppercase tracking-[0.15em] hover:bg-white/[0.11] hover:border-white/[0.2] transition-all duration-300">
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
+                    lm
+                      ? 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
+                  }`}>
                   🌐 {language}
-                  <span className="text-white/35 text-[9px]">{langOpen ? '▲' : '▼'}</span>
+                  <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
                 </button>
                 <AnimatePresence>
                   {langOpen && (
@@ -1885,8 +1953,8 @@ export default function App() {
               {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Cosmic Pix</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">AI Avatars</span>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Cosmic Pix</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>AI Avatars</span>
                 </div>
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {AVATARS.map(av => (
@@ -1896,6 +1964,7 @@ export default function App() {
                       subtitle={av.role}
                       image={av.image}
                       onChat={() => openChat(av)}
+                      lm={lm}
                     />
                   ))}
                 </div>
@@ -1904,17 +1973,17 @@ export default function App() {
               {/* ── Black Holes ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Black Holes</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Singularities & Event Horizons</span>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Black Holes</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Singularities & Event Horizons</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalBlackHoles.length > 0
                     ? portalBlackHoles.map(item => (
-                        <PortalWikiCard key={item.pageid} item={item}
+                        <PortalWikiCard key={item.pageid} item={item} lm={lm}
                           onSelect={() => setSelectedCard({ source: 'wiki', item })} />
                       ))
                     : [...Array(3)].map((_, i) => (
-                        <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
+                        <div key={i} className={`flex-shrink-0 w-52 h-44 rounded-xl animate-pulse ${lm ? 'border border-slate-200 bg-slate-100' : 'border border-white/8 bg-white/4 backdrop-blur-md'}`} />
                       ))}
                 </div>
               </div>
@@ -1922,17 +1991,17 @@ export default function App() {
               {/* ── Equations ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Equations</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">The Language of the Universe</span>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Equations</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>The Language of the Universe</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {portalEquations.length > 0
                     ? portalEquations.map(item => (
-                        <PortalWikiCard key={item.pageid} item={item}
+                        <PortalWikiCard key={item.pageid} item={item} lm={lm}
                           onSelect={() => setSelectedCard({ source: 'wiki', item })} />
                       ))
                     : [...Array(3)].map((_, i) => (
-                        <div key={i} className="flex-shrink-0 w-52 h-44 rounded-xl border border-white/8 bg-white/4 backdrop-blur-md animate-pulse" />
+                        <div key={i} className={`flex-shrink-0 w-52 h-44 rounded-xl animate-pulse ${lm ? 'border border-slate-200 bg-slate-100' : 'border border-white/8 bg-white/4 backdrop-blur-md'}`} />
                       ))}
                 </div>
               </div>
@@ -1940,8 +2009,8 @@ export default function App() {
               {/* ── Quantum Lab ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>✨ Quantum Lab</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Interactive Science Simulations</span>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✨ Quantum Lab</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Interactive Science Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {PHET_SIMULATIONS.map(sim => (
@@ -1949,6 +2018,7 @@ export default function App() {
                       key={sim.slug}
                       sim={sim}
                       onSelect={() => setSimulationModal(sim)}
+                      lm={lm}
                     />
                   ))}
                 </div>
@@ -1957,8 +2027,8 @@ export default function App() {
               {/* ── Advanced Sandbox ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>⚙️ Advanced Sandbox</h2>
-                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Next-Gen STEM Simulations</span>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>⚙️ Advanced Sandbox</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Next-Gen STEM Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {ADVANCED_SIMS.map(sim => (
@@ -1966,6 +2036,7 @@ export default function App() {
                       key={sim.id}
                       sim={sim}
                       onSelect={() => setAdvModal(sim)}
+                      lm={lm}
                     />
                   ))}
                 </div>
@@ -2007,6 +2078,7 @@ export default function App() {
           <SimulationModal
             sim={simulationModal}
             onClose={() => setSimulationModal(null)}
+            lm={lm}
           />
         )}
       </AnimatePresence>
@@ -2017,6 +2089,7 @@ export default function App() {
           <AdvSandboxModal
             sim={advModal}
             onClose={() => setAdvModal(null)}
+            lm={lm}
           />
         )}
       </AnimatePresence>
