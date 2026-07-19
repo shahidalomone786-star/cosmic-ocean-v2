@@ -1072,6 +1072,169 @@ function SimulationModal({ sim, onClose }: { sim: SimItem; onClose: () => void }
   );
 }
 
+// ─── Advanced Sandbox Data ────────────────────────────────────────────────────
+type AdvSimItem = {
+  id: string;
+  title: string;
+  description: string;
+  categoryTag: string;
+  iframeUrl: string;
+  wikiQuery: string;
+};
+
+const ADVANCED_SIMS: AdvSimItem[] = [
+  // ── MyPhysicsLab ─────────────────────────────────────────────────────────
+  { id: 'mpl-double-pendulum',   title: 'Double Pendulum',        description: 'Chaotic motion of two linked pendulums.',        categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/pendulum/double-pendulum-en.html',        wikiQuery: 'Double pendulum' },
+  { id: 'mpl-pendulum',          title: 'Simple Pendulum',        description: 'Classic pendulum with adjustable parameters.',   categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/pendulum/pendulum1-en.html',            wikiQuery: 'Pendulum' },
+  { id: 'mpl-driven-pendulum',   title: 'Driven Pendulum',        description: 'Forced oscillation leading to resonance.',       categoryTag: '⚙️ Resonance',    iframeUrl: 'https://www.myphysicslab.com/pendulum/pendulum2-en.html',            wikiQuery: 'Resonance' },
+  { id: 'mpl-clock',             title: 'Pendulum Clock',         description: 'Escapement mechanism in a working clock.',       categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/pendulum/clock-en.html',                wikiQuery: 'Escapement' },
+  { id: 'mpl-chaotic-pendulum',  title: 'Chaotic Pendulum',       description: 'Sensitivity to initial conditions visualised.',  categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/pendulum/chaotic-pendulum-en.html',     wikiQuery: 'Chaos theory' },
+  { id: 'mpl-dangling-stick',    title: 'Dangling Stick',         description: 'Rigid rod pivoting freely in 2D space.',         categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/pendulum/dangling-stick-en.html',       wikiQuery: 'Rigid body dynamics' },
+  { id: 'mpl-single-spring',     title: 'Spring Oscillator',      description: 'Mass on a spring with damping controls.',        categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/springs/single-spring-en.html',         wikiQuery: 'Harmonic oscillator' },
+  { id: 'mpl-double-spring',     title: 'Double Spring',          description: 'Coupled spring system showing normal modes.',    categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/springs/double-spring-en.html',         wikiQuery: 'Coupled oscillation' },
+  { id: 'mpl-spring2d',          title: '2D Spring Motion',       description: 'Mass oscillating freely on a 2D spring.',       categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/springs/single-spring2d-en.html',       wikiQuery: 'Spring (device)' },
+  { id: 'mpl-spring-array',      title: 'Spring Array',           description: 'Wave propagation through a chain of springs.',  categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/springs/spring-array-en.html',          wikiQuery: 'Mechanical wave' },
+  { id: 'mpl-molecule3',         title: '3-Atom Lattice',         description: 'Three-body molecular spring simulation.',       categoryTag: '⚙️ Molecular',    iframeUrl: 'https://www.myphysicslab.com/springs/molecule3-en.html',             wikiQuery: 'Molecular dynamics' },
+  { id: 'mpl-molecule5',         title: '5-Atom Dynamics',        description: 'Five-atom spring-connected particle system.',   categoryTag: '⚙️ Molecular',    iframeUrl: 'https://www.myphysicslab.com/springs/molecule5-en.html',             wikiQuery: 'Molecular dynamics' },
+  { id: 'mpl-billiards',         title: 'Billiard Collisions',    description: 'Elastic collisions on a friction-free table.',  categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/billiards-en.html',            wikiQuery: 'Elastic collision' },
+  { id: 'mpl-collision',         title: '2D Rigid Collision',     description: 'Configurable two-body rigid collision.',        categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/collision-en.html',            wikiQuery: 'Collision' },
+  { id: 'mpl-rigid-body',        title: 'Rigid Body Stack',       description: 'Multi-body stacking with realistic friction.',  categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/engine2D/rigid-body-en.html',           wikiQuery: 'Rigid body' },
+  { id: 'mpl-newtons-cradle',    title: "Newton's Cradle",        description: 'Momentum transfer through suspended balls.',    categoryTag: '⚙️ Momentum',     iframeUrl: 'https://www.myphysicslab.com/engine2D/newtons-cradle-en.html',       wikiQuery: "Newton's cradle" },
+  { id: 'mpl-pile-driver',       title: 'Pile Driver',            description: 'Impact force and energy absorption demo.',      categoryTag: '⚙️ Impact',       iframeUrl: 'https://www.myphysicslab.com/engine2D/pile-driver-en.html',          wikiQuery: 'Impulse (physics)' },
+  { id: 'mpl-circular-motion',   title: 'Circular Motion',        description: 'Centripetal force and uniform circular path.',  categoryTag: '⚙️ Kinematics',   iframeUrl: 'https://www.myphysicslab.com/engine2D/circular-motion-en.html',      wikiQuery: 'Circular motion' },
+  { id: 'mpl-sumo',              title: 'Sumo Wrestlers',         description: 'Two-body rigid contact and wrestling dynamics.',categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/engine2D/sumo-en.html',                 wikiQuery: 'Rigid body dynamics' },
+  { id: 'mpl-spinning',          title: 'Spinning Body',          description: 'Angular momentum and torque visualised.',       categoryTag: '⚙️ Rotation',     iframeUrl: 'https://www.myphysicslab.com/engine2D/spinning-en.html',             wikiQuery: 'Angular momentum' },
+  { id: 'mpl-polygons',          title: 'Polygon Collisions',     description: 'Convex polygon rigid-body collision engine.',   categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/polygons-en.html',             wikiQuery: 'Rigid body' },
+  { id: 'mpl-roller-single',     title: 'Roller Coaster',         description: 'Energy conservation on a custom track.',        categoryTag: '⚙️ Energy',       iframeUrl: 'https://www.myphysicslab.com/roller/roller-single-en.html',          wikiQuery: 'Roller coaster physics' },
+  { id: 'mpl-roller-spring',     title: 'Spring Roller',          description: 'Roller coaster with spring propulsion.',        categoryTag: '⚙️ Energy',       iframeUrl: 'https://www.myphysicslab.com/roller/roller-spring-en.html',          wikiQuery: 'Elastic potential energy' },
+  { id: 'mpl-roller-flight',     title: 'Braking Roller',         description: 'Coaster leaving the track under friction.',     categoryTag: '⚙️ Friction',     iframeUrl: 'https://www.myphysicslab.com/roller/roller-flight-en.html',          wikiQuery: 'Friction' },
+  { id: 'mpl-wave1',             title: 'Wave Propagation',       description: 'Transverse wave on a string with boundaries.',  categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/wave/wave1-en.html',                    wikiQuery: 'Transverse wave' },
+  { id: 'mpl-wave2',             title: 'Standing Waves',         description: 'Nodes and antinodes in standing wave modes.',   categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/wave/wave2-en.html',                    wikiQuery: 'Standing wave' },
+  { id: 'mpl-lorenz',            title: 'Lorenz Attractor',       description: 'Strange attractor from chaotic equations.',     categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/chaos/lorenz-en.html',                  wikiQuery: 'Lorenz attractor' },
+  { id: 'mpl-dp-chaos',          title: 'Pendulum Chaos Map',     description: 'Phase-space diagram of a double pendulum.',     categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/chaos/double-pendulum-chaos-en.html',   wikiQuery: 'Phase space' },
+  { id: 'mpl-harmonic',          title: 'Harmonic Oscillator',    description: 'SHM with energy graphs in real time.',          categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/harmonic/harmonic-oscillator-en.html',  wikiQuery: 'Simple harmonic motion' },
+  { id: 'mpl-cart2',             title: '2D Cart Dynamics',       description: 'Wheeled cart on a slope with constraints.',     categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/engine2D/cart2-en.html',                wikiQuery: 'Inclined plane' },
+  // ── Extra PhET HTML5 ─────────────────────────────────────────────────────
+  { id: 'phet-qwi',              title: 'Quantum Wave Interference', description: 'Quantum particle double-slit experiment.',    categoryTag: '⚙️ Quantum',      iframeUrl: 'https://phet.colorado.edu/sims/html/quantum-wave-interference/latest/quantum-wave-interference_all.html',  wikiQuery: 'Double-slit experiment' },
+  { id: 'phet-photo',            title: 'Photoelectric Effect',   description: 'Photon energy ejecting electrons from metal.',  categoryTag: '⚙️ Quantum',      iframeUrl: 'https://phet.colorado.edu/sims/html/photoelectric-effect/latest/photoelectric-effect_all.html',          wikiQuery: 'Photoelectric effect' },
+  { id: 'phet-blackbody',        title: 'Blackbody Spectrum',     description: 'Thermal radiation curve vs. temperature.',      categoryTag: '⚙️ Thermodynamics',iframeUrl: 'https://phet.colorado.edu/sims/html/blackbody-spectrum/latest/blackbody-spectrum_all.html',              wikiQuery: 'Blackbody radiation' },
+  { id: 'phet-rutherford',       title: 'Rutherford Scattering',  description: 'Alpha particles deflected by a gold nucleus.',  categoryTag: '⚙️ Nuclear',      iframeUrl: 'https://phet.colorado.edu/sims/html/rutherford-scattering/latest/rutherford-scattering_all.html',        wikiQuery: 'Rutherford scattering' },
+  { id: 'phet-hydrogen',         title: 'Hydrogen Atom Models',   description: 'Bohr to quantum mechanical atomic models.',     categoryTag: '⚙️ Atomic',       iframeUrl: 'https://phet.colorado.edu/sims/html/models-of-the-hydrogen-atom/latest/models-of-the-hydrogen-atom_all.html', wikiQuery: 'Hydrogen atom' },
+  { id: 'phet-skatepark',        title: 'Energy Skate Park',      description: 'Kinetic vs. potential energy on a half-pipe.',  categoryTag: '⚙️ Energy',       iframeUrl: 'https://phet.colorado.edu/sims/html/energy-skate-park-basics/latest/energy-skate-park-basics_all.html',  wikiQuery: 'Mechanical energy' },
+  { id: 'phet-masses-springs',   title: 'Masses and Springs',     description: 'Hanging masses on springs with real-time graphs.',categoryTag: '⚙️ Vibration',   iframeUrl: 'https://phet.colorado.edu/sims/html/masses-and-springs/latest/masses-and-springs_all.html',            wikiQuery: 'Spring (device)' },
+  { id: 'phet-hookes-law',       title: "Hooke's Law",            description: 'Spring deformation vs. applied force.',         categoryTag: '⚙️ Elasticity',   iframeUrl: 'https://phet.colorado.edu/sims/html/hookes-law/latest/hookes-law_all.html',                            wikiQuery: "Hooke's law" },
+  { id: 'phet-under-pressure',   title: 'Under Pressure',         description: 'Fluid pressure at depth in different liquids.',  categoryTag: '⚙️ Fluids',      iframeUrl: 'https://phet.colorado.edu/sims/html/under-pressure/latest/under-pressure_all.html',                    wikiQuery: 'Fluid pressure' },
+  { id: 'phet-acid-base',        title: 'Acid-Base Solutions',    description: 'pH, conductivity and molecule concentrations.',  categoryTag: '⚙️ Chemistry',    iframeUrl: 'https://phet.colorado.edu/sims/html/acid-base-solutions/latest/acid-base-solutions_all.html',          wikiQuery: 'Acid–base reaction' },
+  { id: 'phet-ph-scale',         title: 'pH Scale',               description: 'Logarithmic hydrogen ion concentration scale.', categoryTag: '⚙️ Chemistry',    iframeUrl: 'https://phet.colorado.edu/sims/html/ph-scale/latest/ph-scale_all.html',                              wikiQuery: 'PH' },
+  { id: 'phet-isotopes',         title: 'Isotopes & Atomic Mass', description: 'Proton/neutron counts and isotope abundance.',  categoryTag: '⚙️ Nuclear',      iframeUrl: 'https://phet.colorado.edu/sims/html/isotopes-and-atomic-mass/latest/isotopes-and-atomic-mass_all.html',  wikiQuery: 'Isotope' },
+  { id: 'phet-atomic',           title: 'Atomic Interactions',    description: 'Lennard-Jones potential between two atoms.',    categoryTag: '⚙️ Molecular',    iframeUrl: 'https://phet.colorado.edu/sims/html/atomic-interactions/latest/atomic-interactions_all.html',          wikiQuery: 'Lennard-Jones potential' },
+  { id: 'phet-reactions',        title: 'Chemical Reactions',     description: 'Limiting reagents and reaction stoichiometry.', categoryTag: '⚙️ Chemistry',    iframeUrl: 'https://phet.colorado.edu/sims/html/reactants-products-and-leftovers/latest/reactants-products-and-leftovers_all.html', wikiQuery: 'Stoichiometry' },
+  { id: 'phet-circuit-ac',       title: 'AC Circuit Kit',         description: 'Build and analyse alternating current circuits.',categoryTag: '⚙️ Electricity',  iframeUrl: 'https://phet.colorado.edu/sims/html/circuit-construction-kit-ac/latest/circuit-construction-kit-ac_all.html',    wikiQuery: 'Alternating current' },
+  { id: 'phet-faraday-lab',      title: "Faraday's EM Lab",       description: 'Electromagnetic induction with a bar magnet.',  categoryTag: '⚙️ Magnetism',    iframeUrl: 'https://phet.colorado.edu/sims/html/faradays-electromagnetic-lab/latest/faradays-electromagnetic-lab_all.html', wikiQuery: 'Electromagnetic induction' },
+  { id: 'phet-molarity',         title: 'Molarity',               description: 'Moles per litre and solution concentration.',   categoryTag: '⚙️ Chemistry',    iframeUrl: 'https://phet.colorado.edu/sims/html/molarity/latest/molarity_all.html',                              wikiQuery: 'Molar concentration' },
+  { id: 'phet-beers-law',        title: "Beer's Law Lab",         description: "Light absorbance and Beer-Lambert law.",        categoryTag: '⚙️ Optics',       iframeUrl: 'https://phet.colorado.edu/sims/html/beers-law-lab/latest/beers-law-lab_all.html',                      wikiQuery: 'Beer–Lambert law' },
+  { id: 'phet-molecules-light',  title: 'Molecules and Light',    description: 'How IR/UV photons interact with gas molecules.', categoryTag: '⚙️ Chemistry',   iframeUrl: 'https://phet.colorado.edu/sims/html/molecules-and-light/latest/molecules-and-light_all.html',          wikiQuery: 'Molecular absorption spectroscopy' },
+  { id: 'phet-resistance',       title: 'Resistance in a Wire',   description: 'Resistivity, length and cross-section demo.',   categoryTag: '⚙️ Electricity',  iframeUrl: 'https://phet.colorado.edu/sims/html/resistance-in-a-wire/latest/resistance-in-a-wire_all.html',        wikiQuery: 'Electrical resistance' },
+];
+
+// ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
+function AdvSimCard({ sim, onSelect }: { sim: AdvSimItem; onSelect: () => void }) {
+  const imgUrl = useWikiThumbnail(sim.wikiQuery);
+  const loaded = imgUrl !== '';
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onSelect}
+      className="flex-shrink-0 w-52 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] cursor-pointer hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-all duration-300 ease-out group"
+    >
+      {/* Thumbnail */}
+      <div className="w-full h-28 overflow-hidden bg-black/20 relative">
+        {!loaded && (
+          <div className="absolute inset-0 bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04] animate-pulse" />
+        )}
+        {loaded && (
+          <img
+            src={imgUrl}
+            alt={sim.title}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
+          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+      {/* Info */}
+      <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10">
+            {sim.categoryTag}
+          </span>
+        </div>
+        <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{sim.title}</p>
+        <p className="text-white/40 text-[11px] leading-relaxed line-clamp-2">{sim.description}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Advanced Sandbox Modal ────────────────────────────────────────────────────
+function AdvSandboxModal({ sim, onClose }: { sim: AdvSimItem; onClose: () => void }) {
+  return (
+    <motion.div
+      key="adv-modal"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-white/[0.08] bg-black/30">
+        <motion.button
+          whileHover={{ x: -3 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onClose}
+          className="flex items-center gap-2 text-white/60 hover:text-white text-[12px] uppercase tracking-widest transition-colors duration-200"
+        >
+          <span className="text-base leading-none">←</span>
+          <span>Back</span>
+        </motion.button>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10">
+            {sim.categoryTag}
+          </span>
+          <span className="text-white/70 text-[13px] font-medium tracking-wide">{sim.title}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+        >
+          ✕
+        </button>
+      </div>
+      {/* Iframe */}
+      <div className="flex-1 relative">
+        <iframe
+          src={sim.iframeUrl}
+          title={sim.title}
+          allowFullScreen
+          allow="fullscreen"
+          className="absolute inset-0 w-full h-full border-0"
+          style={{ touchAction: 'manipulation' }}
+          loading="lazy"
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
 const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat }: {
   name: string; subtitle: string; image?: string; onChat: () => void;
@@ -1153,6 +1316,7 @@ export default function App() {
   const [portalBlackHoles, setPortalBlackHoles] = useState<WikiItem[]>([]);
   const [portalEquations,  setPortalEquations]  = useState<WikiItem[]>([]);
   const [simulationModal,  setSimulationModal]  = useState<SimItem | null>(null);
+  const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -1188,7 +1352,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null || simulationModal !== null;
+    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -1789,6 +1953,23 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* ── Advanced Sandbox ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className="text-white text-[15px] font-medium tracking-wide" style={{ fontFamily: 'var(--app-font-heading)' }}>⚙️ Advanced Sandbox</h2>
+                  <span className="text-white/30 text-[11px] uppercase tracking-[0.18em]">Next-Gen STEM Simulations</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {ADVANCED_SIMS.map(sim => (
+                    <AdvSimCard
+                      key={sim.id}
+                      sim={sim}
+                      onSelect={() => setAdvModal(sim)}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1820,12 +2001,22 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── z-[250]  Simulation Modal ── */}
+      {/* ── z-[250]  Simulation Modal (PhET / Quantum Lab) ── */}
       <AnimatePresence>
         {simulationModal && (
           <SimulationModal
             sim={simulationModal}
             onClose={() => setSimulationModal(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[250]  Advanced Sandbox Modal ── */}
+      <AnimatePresence>
+        {advModal && (
+          <AdvSandboxModal
+            sim={advModal}
+            onClose={() => setAdvModal(null)}
           />
         )}
       </AnimatePresence>
