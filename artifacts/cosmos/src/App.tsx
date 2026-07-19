@@ -1164,6 +1164,29 @@ const ADVANCED_SIMS: AdvSimItem[] = [
   { id: 'phet-resistance',       title: 'Resistance in a Wire',   description: 'Resistivity, length and cross-section demo.',   categoryTag: '⚙️ Electricity',  iframeUrl: 'https://phet.colorado.edu/sims/html/resistance-in-a-wire/latest/resistance-in-a-wire_all.html',        wikiQuery: 'Electrical resistance' },
 ];
 
+// ─── Arcade Zone ──────────────────────────────────────────────────────────────
+type FunGameItem = {
+  id: string;
+  title: string;
+  description: string;
+  categoryTag: string;
+  iframeUrl: string;
+  wikiQuery: string;
+};
+
+const FUN_GAMES: FunGameItem[] = [
+  { id: 'game-2048',        title: '2048',          description: 'Slide tiles to combine numbers — reach the 2048 tile!',              categoryTag: '🕹️ GAME', iframeUrl: 'https://gabrielecirulli.github.io/2048/',         wikiQuery: '2048 (video game)' },
+  { id: 'game-tetris',      title: 'Tetris',         description: 'Stack falling tetrominoes to clear lines in this timeless classic.',  categoryTag: '🕹️ GAME', iframeUrl: 'https://chvin.github.io/react-tetris/',           wikiQuery: 'Tetris' },
+  { id: 'game-flappy',      title: 'Flappy Bird',    description: 'Tap to fly through pipes — how far can you get?',                    categoryTag: '🕹️ GAME', iframeUrl: 'https://flappybird.io/',                          wikiQuery: 'Flappy Bird' },
+  { id: 'game-pacman',      title: 'Pac-Man',        description: 'Eat dots, avoid ghosts, and rule the maze.',                         categoryTag: '🕹️ GAME', iframeUrl: 'https://freepacman.org/',                         wikiQuery: 'Pac-Man' },
+  { id: 'game-breakout',    title: 'Breakout',       description: 'Bounce the ball to smash all the bricks — Atari classic!',           categoryTag: '🕹️ GAME', iframeUrl: 'https://elgoog.im/breakout/',                     wikiQuery: 'Breakout (video game)' },
+  { id: 'game-minesweeper', title: 'Minesweeper',    description: 'Uncover tiles without hitting a mine — pure logic!',                 categoryTag: '🕹️ GAME', iframeUrl: 'https://minesweeper.online/',                     wikiQuery: 'Microsoft Minesweeper' },
+  { id: 'game-mahjong',     title: 'Mahjong',        description: 'Match pairs of tiles to clear the ancient board.',                    categoryTag: '🕹️ GAME', iframeUrl: 'https://www.mahjong-game.com/',                   wikiQuery: 'Mahjong' },
+  { id: 'game-sudoku',      title: 'Sudoku',         description: 'Fill the 9×9 grid so every row, column and box holds 1–9.',         categoryTag: '🕹️ GAME', iframeUrl: 'https://www.websudoku.com/',                      wikiQuery: 'Sudoku' },
+  { id: 'game-asteroids',   title: 'Asteroids',      description: 'Pilot your ship and blast the asteroid field — retro action!',       categoryTag: '🕹️ GAME', iframeUrl: 'https://www.kevs3d.co.uk/dev/asteroids/',         wikiQuery: 'Asteroids (video game)' },
+  { id: 'game-hexgl',       title: 'HexGL Racing',   description: 'Futuristic anti-gravity racing at breathtaking speed.',              categoryTag: '🕹️ GAME', iframeUrl: 'https://hexgl.bkcore.com/play/',                  wikiQuery: 'WipEout (video game)' },
+];
+
 // ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
 function AdvSimCard({ sim, onSelect, lm }: { sim: AdvSimItem; onSelect: () => void; lm?: boolean }) {
   const imgUrl = useWikiThumbnail(sim.wikiQuery);
@@ -1285,6 +1308,116 @@ function AdvSandboxModal({ sim, onClose, lm }: { sim: AdvSimItem; onClose: () =>
   );
 }
 
+// ─── Arcade Zone Card ─────────────────────────────────────────────────────────
+function FunGameCard({ game, onSelect, lm }: { game: FunGameItem; onSelect: () => void; lm?: boolean }) {
+  const imgUrl = useWikiThumbnail(game.wikiQuery);
+  const loaded = imgUrl !== '';
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onSelect}
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out group ${
+        lm
+          ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
+          : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+      }`}
+    >
+      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
+        {!loaded && (
+          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
+        )}
+        {loaded && (
+          <img src={imgUrl} alt={game.title} loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        )}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
+          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+            lm ? 'border-amber-300/60 text-amber-700 bg-amber-50' : 'border-amber-400/30 text-amber-300/80 bg-amber-500/10'
+          }`}>
+            {game.categoryTag}
+          </span>
+        </div>
+        <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{game.title}</p>
+        <p className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-slate-500' : 'text-white/40'}`}>{game.description}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Arcade Zone Modal ─────────────────────────────────────────────────────────
+function ArcadeModal({ game, onClose, lm }: { game: FunGameItem; onClose: () => void; lm?: boolean }) {
+  return (
+    <motion.div
+      key="arcade-modal"
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-2xl flex flex-col overflow-hidden"
+    >
+      {/* Sticky Header */}
+      <div className={`flex items-center gap-3 px-4 py-3 flex-shrink-0 border-b ${
+        lm
+          ? 'border-slate-200 bg-white/95 backdrop-blur-xl shadow-sm'
+          : 'border-white/[0.10] bg-[rgba(10,10,18,0.85)] backdrop-blur-xl'
+      }`}>
+        <motion.button
+          whileHover={{ x: -2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onClose}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 min-w-[80px] ${
+            lm
+              ? 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 hover:text-slate-900'
+              : 'bg-white/[0.10] text-white border border-white/[0.15] hover:bg-white/[0.18] hover:text-white'
+          }`}
+        >
+          <span className="text-[15px] leading-none">←</span>
+          <span>Back</span>
+        </motion.button>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+            lm ? 'border-amber-300/60 text-amber-700 bg-amber-50' : 'border-amber-400/30 text-amber-300/80 bg-amber-500/10'
+          }`}>
+            🕹️ Arcade
+          </span>
+          <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{game.title}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className={`flex-shrink-0 w-9 h-9 rounded-full border flex items-center justify-center text-[14px] font-medium transition-all duration-200 ${
+            lm
+              ? 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              : 'border-white/[0.12] bg-white/[0.08] text-white/60 hover:bg-white/[0.15] hover:text-white'
+          }`}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex-1 relative">
+        <iframe
+          src={game.iframeUrl}
+          title={game.title}
+          allowFullScreen
+          allow="fullscreen"
+          className="absolute inset-0 w-full h-full border-0"
+          style={{ touchAction: 'manipulation' }}
+          loading="lazy"
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
 const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm }: {
   name: string; subtitle: string; image?: string; onChat: () => void; lm?: boolean;
@@ -1377,6 +1510,7 @@ export default function App() {
   const [portalEquations,  setPortalEquations]  = useState<WikiItem[]>([]);
   const [simulationModal,  setSimulationModal]  = useState<SimItem | null>(null);
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
+  const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -1412,7 +1546,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null;
+    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -2041,6 +2175,24 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* ── Arcade Zone ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>🎮 Arcade Zone</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Pure Fun & Games</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {FUN_GAMES.map(game => (
+                    <FunGameCard
+                      key={game.id}
+                      game={game}
+                      onSelect={() => setArcadeModal(game)}
+                      lm={lm}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -2089,6 +2241,17 @@ export default function App() {
           <AdvSandboxModal
             sim={advModal}
             onClose={() => setAdvModal(null)}
+            lm={lm}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[250]  Arcade Zone Modal ── */}
+      <AnimatePresence>
+        {arcadeModal && (
+          <ArcadeModal
+            game={arcadeModal}
+            onClose={() => setArcadeModal(null)}
             lm={lm}
           />
         )}
