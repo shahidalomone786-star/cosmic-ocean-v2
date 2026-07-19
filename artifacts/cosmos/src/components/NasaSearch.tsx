@@ -1,7 +1,10 @@
 import { RefObject, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { VideoItem } from './VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export type { VideoItem };
+
 export interface SharedContext {
   title: string;
   description: string;
@@ -250,7 +253,7 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
   );
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
+// ─── Article Card ──────────────────────────────────────────────────────────────
 function ResultCard({ unified, idx, onClick }: {
   unified: UnifiedItem;
   idx: number;
@@ -315,6 +318,86 @@ function ResultCard({ unified, idx, onClick }: {
   );
 }
 
+// ─── Video Card ────────────────────────────────────────────────────────────────
+function VideoCard({ video, idx, onClick }: {
+  video:   VideoItem;
+  idx:     number;
+  onClick: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1,  y: 0  }}
+      transition={{ duration: 0.38, delay: Math.min(idx * 0.06, 0.5) }}
+      onClick={onClick}
+      className="group relative w-full rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.04] backdrop-blur-[18px] shadow-[0_4px_24px_rgba(0,0,0,0.5)] hover:border-white/[0.22] hover:-translate-y-[3px] hover:shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)] transition-all duration-300 ease-out cursor-pointer"
+    >
+      {/* Thumbnail */}
+      <div className="relative w-full aspect-[16/9] overflow-hidden bg-black/40">
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          loading="lazy"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          onError={e => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
+
+        {/* Dark gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+        {/* ▶ Play button — always visible, scales on hover */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] group-hover:bg-white/35 group-hover:scale-110 group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.8)] transition-all duration-300">
+            {/* Solid triangle play icon */}
+            <svg viewBox="0 0 24 24" className="w-6 h-6 ml-0.5 fill-white drop-shadow">
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Video badge — top-left */}
+        <div className="absolute top-3 left-3">
+          <span className="inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border backdrop-blur-md bg-red-500/25 border-red-400/30 text-red-200/90">
+            ▶ Video
+          </span>
+        </div>
+
+        {/* Hover label */}
+        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <span className="text-[10px] text-white/70 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full tracking-widest uppercase font-medium">
+            Watch now
+          </span>
+        </div>
+      </div>
+
+      {/* Text */}
+      <div className="px-4 py-4">
+        <p className="text-white text-[13px] font-medium leading-snug tracking-[0.01em] mb-1.5 line-clamp-2"
+          style={{ fontFamily: 'var(--app-font-heading)' }}>{video.title}</p>
+        {video.channelTitle && (
+          <p className="text-white/40 text-[11px] tracking-wide">{video.channelTitle}</p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Section Divider ──────────────────────────────────────────────────────────
+function SectionHeader({ icon, label, sub }: { icon: string; label: string; sub: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-4 px-1">
+      <span className="text-[16px]">{icon}</span>
+      <div className="flex items-baseline gap-2.5">
+        <span className="text-white/80 text-[13px] font-semibold tracking-wide">{label}</span>
+        <span className="text-white/30 text-[10px] uppercase tracking-[0.2em]">{sub}</span>
+      </div>
+      <div className="flex-1 h-px bg-white/[0.07]" />
+    </div>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   results:          UnifiedItem[];
@@ -325,11 +408,16 @@ interface Props {
   sentinelRef:      RefObject<HTMLDivElement | null>;
   isEverythingMode: boolean;
   isLoadingMore:    boolean;
+  // Video Media Hub
+  videoResults?:    VideoItem[];
+  videoStatus?:     'idle' | 'loading' | 'done' | 'error';
+  onVideoClick?:    (video: VideoItem) => void;
 }
 
 // ─── SearchResults — pure display ─────────────────────────────────────────────
 export default function NasaSearch({
   results, status, errMsg, onClear, onCardClick, sentinelRef, isEverythingMode, isLoadingMore,
+  videoResults = [], videoStatus = 'idle', onVideoClick,
 }: Props) {
   if (status === 'idle') return null;
 
@@ -340,6 +428,8 @@ export default function NasaSearch({
   const sourceLabel = (Object.entries(sourceCounts) as [UnifiedItem['source'], number][])
     .map(([s, n]) => `${SOURCE_CONFIG[s].emoji} ${n} ${SOURCE_CONFIG[s].label}`)
     .join(' · ');
+
+  const showVideos = videoStatus !== 'idle' && (videoResults.length > 0 || videoStatus === 'loading');
 
   return (
     <AnimatePresence>
@@ -352,7 +442,7 @@ export default function NasaSearch({
         className="w-full max-w-2xl pointer-events-auto"
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4 px-1">
+        <div className="flex items-center justify-between mb-5 px-1">
           <span className="text-white/40 text-[11px] uppercase tracking-[0.2em]">
             {status === 'loading' ? 'Scanning NASA · Wikipedia · arXiv · SpaceX · CERN…' :
              status === 'error'   ? 'Transmission error' :
@@ -367,7 +457,7 @@ export default function NasaSearch({
           </button>
         </div>
 
-        {/* Loading */}
+        {/* Loading state */}
         {status === 'loading' && (
           <div className="flex justify-center gap-2 py-12">
             {[0, 1, 2].map(i => (
@@ -384,55 +474,109 @@ export default function NasaSearch({
         )}
 
         {/* Empty */}
-        {status === 'done' && results.length === 0 && (
+        {status === 'done' && results.length === 0 && videoResults.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-12 text-white/40">
             <p className="text-4xl">🔭</p>
             <p className="text-[12px] uppercase tracking-[0.25em]">No signals found in this region</p>
           </div>
         )}
 
-        {/* Cards */}
-        {status === 'done' && results.length > 0 && (
-          <div className="flex flex-col gap-5">
-            {results.map((unified, idx) => {
-              const key = unified.source === 'nasa'   ? `nasa-${unified.item.data?.[0]?.title}-${idx}` :
-                          unified.source === 'wiki'   ? `wiki-${unified.item.pageid}-${idx}` :
-                          unified.source === 'arxiv'  ? `arxiv-${unified.item.id}-${idx}` :
-                          unified.source === 'spacex' ? `spacex-${unified.item.id}-${idx}` :
-                          `cern-${unified.item.id}-${idx}`;
-              return (
-                <ResultCard
-                  key={key}
-                  unified={unified}
-                  idx={idx}
-                  onClick={() => onCardClick(unified)}
-                />
-              );
-            })}
+        {/* ══ COSMIC CINEMA — Video section ══════════════════════════════════ */}
+        {showVideos && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="mb-8"
+          >
+            <SectionHeader icon="🎬" label="Cosmic Cinema" sub="YouTube Videos" />
 
-            {/* Infinite scroll sentinel — Everything mode only */}
-            {isEverythingMode && (
-              <div ref={sentinelRef} className="w-full flex flex-col items-center py-6 gap-3">
-                {isLoadingMore ? (
-                  <>
-                    <div className="flex gap-2">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-white/40"
-                          animate={{ opacity: [0.2, 0.8, 0.2], scale: [1, 1.3, 1] }}
-                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />
-                      ))}
-                    </div>
-                    <span className="text-white/25 text-[10px] uppercase tracking-[0.25em]">
-                      Loading more results…
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-white/15 text-[10px] uppercase tracking-[0.2em]">
-                    Scroll to explore the universe
-                  </span>
-                )}
+            {/* Loading spinner for videos */}
+            {videoStatus === 'loading' && (
+              <div className="flex items-center gap-3 py-6 px-2">
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map(i => (
+                    <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-red-400/60"
+                      animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.3, 1] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />
+                  ))}
+                </div>
+                <span className="text-white/30 text-[11px] uppercase tracking-[0.2em]">
+                  Scanning for videos…
+                </span>
               </div>
             )}
+
+            {/* 2-column video grid */}
+            {videoStatus === 'done' && videoResults.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                {videoResults.slice(0, 8).map((v, i) => (
+                  <VideoCard
+                    key={v.videoId}
+                    video={v}
+                    idx={i}
+                    onClick={() => onVideoClick?.(v)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* No videos found */}
+            {videoStatus === 'done' && videoResults.length === 0 && (
+              <p className="text-white/25 text-[11px] tracking-wide px-1 pb-2">
+                No videos found — try a different search term.
+              </p>
+            )}
+          </motion.div>
+        )}
+
+        {/* ══ ARTICLES & DATA — original results ═════════════════════════════ */}
+        {status === 'done' && results.length > 0 && (
+          <div>
+            {showVideos && (
+              <SectionHeader icon="📝" label="Articles & Data" sub={sourceLabel} />
+            )}
+            <div className="flex flex-col gap-5">
+              {results.map((unified, idx) => {
+                const key = unified.source === 'nasa'   ? `nasa-${unified.item.data?.[0]?.title}-${idx}` :
+                            unified.source === 'wiki'   ? `wiki-${unified.item.pageid}-${idx}` :
+                            unified.source === 'arxiv'  ? `arxiv-${unified.item.id}-${idx}` :
+                            unified.source === 'spacex' ? `spacex-${unified.item.id}-${idx}` :
+                            `cern-${unified.item.id}-${idx}`;
+                return (
+                  <ResultCard
+                    key={key}
+                    unified={unified}
+                    idx={idx}
+                    onClick={() => onCardClick(unified)}
+                  />
+                );
+              })}
+
+              {/* Infinite scroll sentinel — Everything mode only */}
+              {isEverythingMode && (
+                <div ref={sentinelRef} className="w-full flex flex-col items-center py-6 gap-3">
+                  {isLoadingMore ? (
+                    <>
+                      <div className="flex gap-2">
+                        {[0, 1, 2].map(i => (
+                          <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-white/40"
+                            animate={{ opacity: [0.2, 0.8, 0.2], scale: [1, 1.3, 1] }}
+                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />
+                        ))}
+                      </div>
+                      <span className="text-white/25 text-[10px] uppercase tracking-[0.25em]">
+                        Loading more results…
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-white/15 text-[10px] uppercase tracking-[0.2em]">
+                      Scroll to explore the universe
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </motion.div>

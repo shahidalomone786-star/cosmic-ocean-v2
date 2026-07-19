@@ -142,4 +142,115 @@ function parseArxivAtom(xml: string) {
   return items;
 }
 
+// ── GET /api/search/videos?q=TERM&limit=8 ────────────────────────────────────
+// Uses YouTube's internal Web client API (same endpoint used by yt-dlp/youtube.com).
+// No API key required — uses YouTube's own public web client key.
+// Returns { videos: VideoItem[] }.
+router.get("/search/videos", async (req, res) => {
+  const q     = ((req.query.q as string) ?? "").trim();
+  const limit = Math.min(Number(req.query.limit ?? 8), 16);
+  if (!q) { res.json({ videos: [] }); return; }
+
+  type VideoItem = {
+    videoId:      string;
+    title:        string;
+    thumbnail:    string;
+    channelTitle: string;
+    description:  string;
+  };
+
+  // ── Primary: YouTube's internal youtubei/v1/search ───────────────────────
+  // This is the same endpoint the YouTube web app calls; the key is YouTube's
+  // own public web-client key that has been stable for years.
+  try {
+    const YT_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+    const resp = await fetch(
+      `https://www.youtube.com/youtubei/v1/search?key=${YT_KEY}&prettyPrint=false`,
+      {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent":   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "X-YouTube-Client-Name":    "1",
+          "X-YouTube-Client-Version": "2.20240101.00.00",
+          "Origin": "https://www.youtube.com",
+        },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName:    "WEB",
+              clientVersion: "2.20240101.00.00",
+              hl: "en",
+              gl: "US",
+            },
+          },
+          query: q,
+          params: "EgIQAQ%3D%3D", // filter: videos only
+        }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+
+    if (resp.ok) {
+      type YTRenderer = {
+        videoRenderer?: {
+          videoId?: string;
+          title?:   { runs?: { text: string }[] };
+          longBylineText?: { runs?: { text: string }[] };
+          descriptionSnippet?: { runs?: { text: string }[] };
+        };
+      };
+      type YTSection = {
+        itemSectionRenderer?: { contents?: YTRenderer[] };
+      };
+      type YTResponse = {
+        contents?: {
+          twoColumnSearchResultsRenderer?: {
+            primaryContents?: {
+              sectionListRenderer?: {
+                contents?: YTSection[];
+              };
+            };
+          };
+        };
+      };
+
+      const data = await resp.json() as YTResponse;
+      const sections =
+        data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+          ?.sectionListRenderer?.contents ?? [];
+
+      const renderers: YTRenderer[] = sections.flatMap(
+        s => s?.itemSectionRenderer?.contents ?? []
+      );
+
+      const videos: VideoItem[] = renderers
+        .filter(r => r.videoRenderer?.videoId)
+        .slice(0, limit)
+        .map(r => {
+          const vr = r.videoRenderer!;
+          const videoId    = vr.videoId ?? "";
+          const title      = vr.title?.runs?.map(r => r.text).join("") ?? "Untitled";
+          const channel    = vr.longBylineText?.runs?.map(r => r.text).join("") ?? "";
+          const description = vr.descriptionSnippet?.runs?.map(r => r.text).join("") ?? "";
+          return {
+            videoId,
+            title,
+            thumbnail:    `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+            channelTitle: channel,
+            description,
+          };
+        })
+        .filter(v => v.videoId.length > 0);
+
+      if (videos.length > 0) {
+        res.json({ videos });
+        return;
+      }
+    }
+  } catch { /* fall through to empty */ }
+
+  res.json({ videos: [] });
+});
+
 export default router;

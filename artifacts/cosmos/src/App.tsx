@@ -4,6 +4,7 @@ import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, 
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
+import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1513,6 +1514,10 @@ export default function App() {
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
+  // ── Video Media Hub ─────────────────────────────────────────────────────────
+  const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
+  const [videoStatus,      setVideoStatus]      = useState<'idle'|'loading'|'done'|'error'>('idle');
+  const [activeVideo,      setActiveVideo]      = useState<VideoItem | null>(null);
 
   const hasSearchResults = searchStatus !== 'idle';
 
@@ -1548,7 +1553,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess;
+    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess || activeVideo !== null;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -1599,6 +1604,16 @@ export default function App() {
 
       setSearchResults(interleaveAll(nasaItems, wikiItems, arxivItems, spacexItems, cernItems));
       setSearchStatus('done');
+
+      // ── Fire video search independently (doesn't block article results) ──
+      setVideoStatus('loading');
+      fetch(`/api/search/videos?q=${encodeURIComponent(term)}&limit=8`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then((data: { videos?: VideoItem[] }) => {
+          setVideoResults(data.videos ?? []);
+          setVideoStatus('done');
+        })
+        .catch(() => setVideoStatus('error'));
     } catch (err: unknown) {
       setSearchError((err as Error)?.message ?? String(err));
       setSearchStatus('error');
@@ -1650,6 +1665,8 @@ export default function App() {
     setIsEverythingMode(false);
     setSelectedCard(null);
     setIsLoadingMore(false);
+    setVideoResults([]);
+    setVideoStatus('idle');
   }, []);
 
   // ── Portal fetch ──────────────────────────────────────────────────────────
@@ -1989,6 +2006,9 @@ export default function App() {
                   sentinelRef={sentinelRef}
                   isEverythingMode={isEverythingMode}
                   isLoadingMore={isLoadingMore}
+                  videoResults={videoResults}
+                  videoStatus={videoStatus}
+                  onVideoClick={setActiveVideo}
                 />
               </div>
             )}
@@ -2316,6 +2336,17 @@ export default function App() {
         {showChess && (
           <GrandmasterChessModal
             onClose={() => setShowChess(false)}
+            lm={lm}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[350]  Video Player Modal ── */}
+      <AnimatePresence>
+        {activeVideo && (
+          <VideoPlayerModal
+            video={activeVideo}
+            onClose={() => setActiveVideo(null)}
             lm={lm}
           />
         )}
