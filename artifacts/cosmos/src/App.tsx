@@ -48,54 +48,120 @@ const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','E
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 
 // ─── PhET Interactive Simulations ────────────────────────────────────────────
-// Each entry follows PhET's stable CDN pattern:
-//   iframe  → https://phet.colorado.edu/sims/html/{slug}/latest/{slug}_all.html
-//   thumb   → https://phet.colorado.edu/sims/html/{slug}/latest/screenshot.png
-type SimItem = { slug: string; title: string; subject: string };
+// iframeUrl → https://phet.colorado.edu/sims/html/{slug}/latest/{slug}_all.html
+// thumbnails → Wikimedia Commons (reliable cross-origin img src, no hotlink block)
+type SimItem = { slug: string; title: string; subject: string; thumbnail: string };
 
 const PHET_SIMULATIONS: SimItem[] = [
-  { slug: 'wave-on-a-string',             title: 'Wave on a String',              subject: 'Waves'          },
-  { slug: 'pendulum-lab',                 title: 'Pendulum Lab',                  subject: 'Motion'         },
-  { slug: 'projectile-motion',            title: 'Projectile Motion',             subject: 'Motion'         },
-  { slug: 'forces-and-motion-basics',     title: 'Forces and Motion',             subject: 'Forces'         },
-  { slug: 'gravity-and-orbits',           title: 'Gravity & Orbits',              subject: 'Gravity'        },
-  { slug: 'my-solar-system',              title: 'My Solar System',               subject: 'Gravity'        },
-  { slug: 'charges-and-fields',           title: 'Charges and Fields',            subject: 'Electricity'    },
-  { slug: 'electric-field-hockey',        title: 'Electric Field Hockey',         subject: 'Electricity'    },
-  { slug: 'faradays-law',                 title: "Faraday's Law",                 subject: 'Magnetism'      },
-  { slug: 'ohms-law',                     title: "Ohm's Law",                     subject: 'Electricity'    },
-  { slug: 'circuit-construction-kit-dc',  title: 'Circuit Construction Kit',      subject: 'Electricity'    },
-  { slug: 'capacitor-lab-basics',         title: 'Capacitor Lab',                 subject: 'Electricity'    },
-  { slug: 'bending-light',                title: 'Bending Light',                 subject: 'Optics'         },
-  { slug: 'color-vision',                 title: 'Color Vision',                  subject: 'Optics'         },
-  { slug: 'wave-interference',            title: 'Wave Interference',             subject: 'Waves'          },
-  { slug: 'fourier-making-waves',         title: 'Fourier: Making Waves',         subject: 'Waves'          },
-  { slug: 'density',                      title: 'Density',                       subject: 'Matter'         },
-  { slug: 'buoyancy',                     title: 'Buoyancy',                      subject: 'Fluids'         },
-  { slug: 'balancing-act',                title: 'Balancing Act',                 subject: 'Forces'         },
-  { slug: 'collision-lab',                title: 'Collision Lab',                 subject: 'Motion'         },
-  { slug: 'energy-forms-and-changes',     title: 'Energy Forms & Changes',        subject: 'Energy'         },
-  { slug: 'states-of-matter',             title: 'States of Matter',              subject: 'Thermodynamics' },
-  { slug: 'gas-properties',               title: 'Gas Properties',                subject: 'Thermodynamics' },
-  { slug: 'nuclear-fission',              title: 'Nuclear Fission',               subject: 'Nuclear'        },
-  { slug: 'alpha-decay',                  title: 'Alpha Decay',                   subject: 'Nuclear'        },
-  { slug: 'build-an-atom',                title: 'Build an Atom',                 subject: 'Atomic'         },
-  { slug: 'build-a-molecule',             title: 'Build a Molecule',              subject: 'Chemistry'      },
-  { slug: 'molecule-shapes',              title: 'Molecule Shapes',               subject: 'Chemistry'      },
-  { slug: 'natural-selection',            title: 'Natural Selection',             subject: 'Biology'        },
-  { slug: 'neuron',                       title: 'Neuron',                        subject: 'Biology'        },
-  { slug: 'gene-expression-essentials',   title: 'Gene Expression',               subject: 'Biology'        },
-  { slug: 'greenhouse-effect',            title: 'Greenhouse Effect',             subject: 'Earth Science'  },
-  { slug: 'plate-tectonics',              title: 'Plate Tectonics',               subject: 'Earth Science'  },
-  { slug: 'friction',                     title: 'Friction',                      subject: 'Forces'         },
-  { slug: 'vector-addition',              title: 'Vector Addition',               subject: 'Math/Physics'   },
+  { slug: 'wave-on-a-string',
+    title: 'Wave on a String',   subject: 'Waves',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Wave_packet_%28dispersion%29.gif/320px-Wave_packet_%28dispersion%29.gif' },
+  { slug: 'pendulum-lab',
+    title: 'Pendulum Lab',       subject: 'Motion',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Simple_gravity_pendulum.svg/240px-Simple_gravity_pendulum.svg.png' },
+  { slug: 'projectile-motion',
+    title: 'Projectile Motion',  subject: 'Motion',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Inclinedthrow.gif/320px-Inclinedthrow.gif' },
+  { slug: 'forces-and-motion-basics',
+    title: 'Forces and Motion',  subject: 'Forces',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Newtons_cradle_animation_book.gif/200px-Newtons_cradle_animation_book.gif' },
+  { slug: 'gravity-and-orbits',
+    title: 'Gravity & Orbits',   subject: 'Gravity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Newton_Cannon.svg/320px-Newton_Cannon.svg.png' },
+  { slug: 'my-solar-system',
+    title: 'My Solar System',    subject: 'Gravity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Solar_sys8.jpg/320px-Solar_sys8.jpg' },
+  { slug: 'charges-and-fields',
+    title: 'Charges and Fields', subject: 'Electricity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/VFPt_charges_plus_minus.svg/320px-VFPt_charges_plus_minus.svg.png' },
+  { slug: 'electric-field-hockey',
+    title: 'Electric Field Hockey', subject: 'Electricity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Charged-ball.jpg/320px-Charged-ball.jpg' },
+  { slug: 'faradays-law',
+    title: "Faraday's Law",      subject: 'Magnetism',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Faraday_emf_experiment.svg/320px-Faraday_emf_experiment.svg.png' },
+  { slug: 'ohms-law',
+    title: "Ohm's Law",          subject: 'Electricity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Ohm%27s_Law_with_Voltage_source_TeX.svg/320px-Ohm%27s_Law_with_Voltage_source_TeX.svg.png' },
+  { slug: 'circuit-construction-kit-dc',
+    title: 'Circuit Construction Kit', subject: 'Electricity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Electronic-component-circuit.jpg/320px-Electronic-component-circuit.jpg' },
+  { slug: 'capacitor-lab-basics',
+    title: 'Capacitor Lab',      subject: 'Electricity',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Capacitor_schematic_with_dielectric.svg/320px-Capacitor_schematic_with_dielectric.svg.png' },
+  { slug: 'bending-light',
+    title: 'Bending Light',      subject: 'Optics',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Light_through_glass.jpg/320px-Light_through_glass.jpg' },
+  { slug: 'color-vision',
+    title: 'Color Vision',       subject: 'Optics',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Light_dispersion_of_a_mercury-vapor_lamp_with_a_flint_glass_prism_IPNr%C2%B00125.jpg/320px-Light_dispersion_of_a_mercury-vapor_lamp_with_a_flint_glass_prism_IPNr%C2%B00125.jpg' },
+  { slug: 'wave-interference',
+    title: 'Wave Interference',  subject: 'Waves',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Interference_of_two_waves.svg/320px-Interference_of_two_waves.svg.png' },
+  { slug: 'fourier-making-waves',
+    title: 'Fourier: Making Waves', subject: 'Waves',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Fourier2.jpg/320px-Fourier2.jpg' },
+  { slug: 'density',
+    title: 'Density',            subject: 'Matter',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Oil_water_mixture.jpg/320px-Oil_water_mixture.jpg' },
+  { slug: 'buoyancy',
+    title: 'Buoyancy',           subject: 'Fluids',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Buoyancy.svg/240px-Buoyancy.svg.png' },
+  { slug: 'balancing-act',
+    title: 'Balancing Act',      subject: 'Forces',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Simple_lever.svg/320px-Simple_lever.svg.png' },
+  { slug: 'collision-lab',
+    title: 'Collision Lab',      subject: 'Motion',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Billard%C3%B6lle_Sto%C3%9F.jpg/320px-Billard%C3%B6lle_Sto%C3%9F.jpg' },
+  { slug: 'energy-forms-and-changes',
+    title: 'Energy Forms & Changes', subject: 'Energy',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Lightning_over_Oradea_Romania_2.jpg/320px-Lightning_over_Oradea_Romania_2.jpg' },
+  { slug: 'states-of-matter',
+    title: 'States of Matter',   subject: 'Thermodynamics',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Water_molecule_3D_2.svg/240px-Water_molecule_3D_2.svg.png' },
+  { slug: 'gas-properties',
+    title: 'Gas Properties',     subject: 'Thermodynamics',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Translational_motion.gif/320px-Translational_motion.gif' },
+  { slug: 'nuclear-fission',
+    title: 'Nuclear Fission',    subject: 'Nuclear',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Nuclear_fission.svg/320px-Nuclear_fission.svg.png' },
+  { slug: 'alpha-decay',
+    title: 'Alpha Decay',        subject: 'Nuclear',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Alpha_decay.svg/320px-Alpha_decay.svg.png' },
+  { slug: 'build-an-atom',
+    title: 'Build an Atom',      subject: 'Atomic',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Stylised_atom_with_three_Bohr_model_orbits_and_stylised_nucleus.svg/240px-Stylised_atom_with_three_Bohr_model_orbits_and_stylised_nucleus.svg.png' },
+  { slug: 'build-a-molecule',
+    title: 'Build a Molecule',   subject: 'Chemistry',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Methane-CRC-MW-3D-balls.png/240px-Methane-CRC-MW-3D-balls.png' },
+  { slug: 'molecule-shapes',
+    title: 'Molecule Shapes',    subject: 'Chemistry',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Water_molecule_3D.svg/240px-Water_molecule_3D.svg.png' },
+  { slug: 'natural-selection',
+    title: 'Natural Selection',  subject: 'Biology',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Galapagos_Finches.jpg/320px-Galapagos_Finches.jpg' },
+  { slug: 'neuron',
+    title: 'Neuron',             subject: 'Biology',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Blausen_0657_MultipolarNeuron.png/320px-Blausen_0657_MultipolarNeuron.png' },
+  { slug: 'gene-expression-essentials',
+    title: 'Gene Expression',    subject: 'Biology',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/DNA_chemical_structure.svg/160px-DNA_chemical_structure.svg.png' },
+  { slug: 'greenhouse-effect',
+    title: 'Greenhouse Effect',  subject: 'Earth Science',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Greenhouse_effect.svg/320px-Greenhouse_effect.svg.png' },
+  { slug: 'plate-tectonics',
+    title: 'Plate Tectonics',    subject: 'Earth Science',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Tectonic_plates.png/320px-Tectonic_plates.png' },
+  { slug: 'friction',
+    title: 'Friction',           subject: 'Forces',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Friction_en.svg/320px-Friction_en.svg.png' },
+  { slug: 'vector-addition',
+    title: 'Vector Addition',    subject: 'Math/Physics',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Vector_add_scale.svg/320px-Vector_add_scale.svg.png' },
 ];
 
 function phetIframeUrl(slug: string) {
   return `https://phet.colorado.edu/sims/html/${slug}/latest/${slug}_all.html`;
-}
-function phetThumb(slug: string) {
-  return `https://phet.colorado.edu/sims/html/${slug}/latest/screenshot.png`;
 }
 
 // Languages + their Google Translate codes
@@ -933,7 +999,6 @@ function PortalWikiCard({ item, onSelect }: { item: WikiItem; onSelect: () => vo
 
 // ─── PhET Simulation Card ────────────────────────────────────────────────────
 function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }) {
-  const [imgError, setImgError] = useState(false);
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
@@ -943,19 +1008,12 @@ function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }
     >
       {/* Thumbnail */}
       <div className="w-full h-28 overflow-hidden bg-black/20 relative">
-        {!imgError ? (
-          <img
-            src={phetThumb(sim.slug)}
-            alt={sim.title}
-            loading="lazy"
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-900/30 via-indigo-900/20 to-transparent">
-            <span className="text-3xl select-none">🧪</span>
-          </div>
-        )}
+        <img
+          src={sim.thumbnail}
+          alt={sim.title}
+          loading="lazy"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
         {/* Play icon overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
           <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
@@ -969,7 +1027,7 @@ function PortalSimCard({ sim, onSelect }: { sim: SimItem; onSelect: () => void }
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
           <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border border-violet-400/30 text-violet-300/80 bg-violet-500/10">
-            🧪 Simulation
+            ⚗️ Simulation
           </span>
         </div>
         <p className="text-white text-[12px] font-medium leading-snug tracking-wide truncate mb-1">{sim.title}</p>
