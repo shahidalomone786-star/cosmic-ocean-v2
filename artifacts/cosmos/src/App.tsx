@@ -6,7 +6,7 @@ import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
-import CosmicProfile from './components/CosmicProfile';
+import ProfileModal from './components/ProfileModal';
 import { useAuthStore } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -1517,6 +1517,7 @@ export default function App() {
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
+  const [showProfile,      setShowProfile]      = useState(false);
   const { isAuthenticated, recordChessResult } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
@@ -1891,8 +1892,23 @@ export default function App() {
               )}
             </div>
 
-            {/* ── Language pill — top right ── */}
-            <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+            {/* ── Profile + Language pill — top right ── */}
+            <div className="absolute top-4 right-4 z-30 pointer-events-auto flex items-center gap-2">
+              {/* My Profile button */}
+              <motion.button
+                onClick={() => setShowProfile(true)}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                  lm
+                    ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
+                    : 'border-white/[0.12] bg-white/[0.06] text-white/75 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
+                }`}
+              >
+                <span className="text-[13px]">👤</span>
+                <span>My Profile</span>
+              </motion.button>
+
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
@@ -2277,8 +2293,6 @@ export default function App() {
                 </motion.div>
               </div>
 
-              {/* ── Cosmic Profile ── */}
-              <CosmicProfile lm={lm} />
             </div>
           </motion.div>
         )}
@@ -2341,6 +2355,11 @@ export default function App() {
             lm={lm}
           />
         )}
+      </AnimatePresence>
+
+      {/* ── z-[350]  Profile Modal ── */}
+      <AnimatePresence>
+        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       </AnimatePresence>
 
       {/* ── z-[300]  Grandmaster Chess Modal ── */}
