@@ -231,6 +231,9 @@ importers:
       react-chessboard:
         specifier: ^5.10.0
         version: 5.10.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      zustand:
+        specifier: ^5.0.14
+        version: 5.0.14(@types/react@19.2.17)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0))
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0

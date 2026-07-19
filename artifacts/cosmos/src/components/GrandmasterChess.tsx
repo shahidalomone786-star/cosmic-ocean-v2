@@ -141,10 +141,10 @@ function formatTime(secs: number): string {
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-interface Props { onClose: () => void; lm?: boolean; }
+interface Props { onClose: () => void; lm?: boolean; onGameEnd?: (result: 'win' | 'loss') => void; }
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
-export default function GrandmasterChessModal({ onClose, lm }: Props) {
+export default function GrandmasterChessModal({ onClose, lm, onGameEnd }: Props) {
   const [screen,          setScreen]          = useState<Screen>('mode-select');
   const [gameMode,        setGameMode]        = useState<GameMode>('pass-and-play');
   const [challengeAvatar, setChallengeAvatar] = useState<ChessAvatar | null>(null);
@@ -163,32 +163,34 @@ export default function GrandmasterChessModal({ onClose, lm }: Props) {
   const clashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerIntervalRef= useRef<ReturnType<typeof setInterval> | null>(null);
   const gameOverRef     = useRef(false);
+  // Always-current ref so the interval can read turn without restarting
+  const gameRef         = useRef<Chess>(game);
+  useEffect(() => { gameRef.current = game; }, [game]);
 
-  // ── Clock: tick the active player's timer ───────────────────────────────
+  // ── Clock: persistent tick — reads gameRef so both timers always count ──
+  // KEY FIX: depends only on [screen], NOT [fen].
+  // Previously the interval restarted on every fen change (each move), so the
+  // 1 000 ms tick never fired during the AI's 200 ms think window → black
+  // timer was stuck.  Now the interval runs continuously and reads the live
+  // turn from gameRef.current at each tick.
   useEffect(() => {
-    if (screen !== 'board' || gameOverRef.current) return;
+    if (screen !== 'board') return;
     timerIntervalRef.current = setInterval(() => {
-      setGame(g => {
-        if (g.isGameOver() || gameOverRef.current) {
-          clearInterval(timerIntervalRef.current!);
-          return g;
-        }
-        if (g.turn() === 'w') {
-          setWhiteTime(t => {
-            if (t <= 1) { gameOverRef.current = true; setStatus('White ran out of time. Black wins.'); return 0; }
-            return t - 1;
-          });
-        } else {
-          setBlackTime(t => {
-            if (t <= 1) { gameOverRef.current = true; setStatus('Black ran out of time. White wins.'); return 0; }
-            return t - 1;
-          });
-        }
-        return g;
-      });
+      if (gameRef.current.isGameOver() || gameOverRef.current) return;
+      if (gameRef.current.turn() === 'w') {
+        setWhiteTime(t => {
+          if (t <= 1) { gameOverRef.current = true; setStatus('White ran out of time. Black wins.'); return 0; }
+          return t - 1;
+        });
+      } else {
+        setBlackTime(t => {
+          if (t <= 1) { gameOverRef.current = true; setStatus('Black ran out of time. White wins.'); return 0; }
+          return t - 1;
+        });
+      }
     }, 1000);
     return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
-  }, [screen, fen]); // re-subscribe when fen changes (turn switches)
+  }, [screen]); // only restart when entering/leaving board, never on each move
 
   // ── Status helper ────────────────────────────────────────────────────────
   const computeStatus = useCallback((g: Chess, mode: GameMode, wAv?: ChessAvatar | null, bAv?: ChessAvatar | null): string => {
@@ -284,6 +286,15 @@ export default function GrandmasterChessModal({ onClose, lm }: Props) {
     }
     setStatus(computeStatus(game, gameMode));
   }, [screen, gameMode, game, computeStatus]);
+
+  // ── Report result to parent (challenge-avatar mode only) ─────────────────
+  useEffect(() => {
+    if (gameMode !== 'challenge-avatar' || !onGameEnd) return;
+    if (!game.isCheckmate()) return;
+    // After checkmate, game.turn() is the player who IS in checkmate.
+    // Black in checkmate → user (white) won; white in checkmate → user lost.
+    onGameEnd(game.turn() === 'b' ? 'win' : 'loss');
+  }, [game, gameMode, onGameEnd]);
 
   // ── Human move ───────────────────────────────────────────────────────────
   const onPieceDrop = useCallback(

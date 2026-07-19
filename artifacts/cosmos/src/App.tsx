@@ -5,6 +5,9 @@ import LibraryView, { type LibrarySharedContext } from './components/LibraryView
 import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
+import LoginScreen from './components/LoginScreen';
+import CosmicProfile from './components/CosmicProfile';
+import { useAuthStore } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1514,6 +1517,7 @@ export default function App() {
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
+  const { isAuthenticated, recordChessResult } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
   const [videoStatus,      setVideoStatus]      = useState<'idle'|'loading'|'done'|'error'>('idle');
@@ -1764,6 +1768,11 @@ export default function App() {
         ? 'radial-gradient(ellipse at 50% -20%, #f8fafc 0%, #ffffff 45%, #e2e8f0 100%)'
         : 'radial-gradient(ellipse at 50% -10%, #27272a 0%, #0a0a0b 45%, #000000 100%)' }}
     >
+
+      {/* ── Auth Gate ── */}
+      <AnimatePresence>
+        {!isAuthenticated && <LoginScreen />}
+      </AnimatePresence>
 
       {/* ── Cinematic Big Bang Intro (only when 3D is enabled) ── */}
       <AnimatePresence>
@@ -2219,7 +2228,7 @@ export default function App() {
               {/* ── Grandmaster Chess ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>♟️ Grandmaster Chess</h2>
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>Grandmaster Chess</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Challenge the Geniuses</span>
                 </div>
                 <motion.div
@@ -2267,6 +2276,9 @@ export default function App() {
                   </div>
                 </motion.div>
               </div>
+
+              {/* ── Cosmic Profile ── */}
+              <CosmicProfile lm={lm} />
             </div>
           </motion.div>
         )}
@@ -2337,6 +2349,7 @@ export default function App() {
           <GrandmasterChessModal
             onClose={() => setShowChess(false)}
             lm={lm}
+            onGameEnd={recordChessResult}
           />
         )}
       </AnimatePresence>
