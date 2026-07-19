@@ -7,7 +7,7 @@ import GrandmasterChessModal from './components/GrandmasterChess';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
-import { useAuthStore } from './store/authStore';
+import { useAuthStore, PRESET_AVATARS } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1518,7 +1518,7 @@ export default function App() {
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
   const [showProfile,      setShowProfile]      = useState(false);
-  const { isAuthenticated, recordChessResult } = useAuthStore();
+  const { isAuthenticated, recordChessResult, user } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
   const [videoStatus,      setVideoStatus]      = useState<'idle'|'loading'|'done'|'error'>('idle');
@@ -1894,21 +1894,6 @@ export default function App() {
 
             {/* ── Profile + Language pill — top right ── */}
             <div className="absolute top-4 right-4 z-30 pointer-events-auto flex items-center gap-2">
-              {/* My Profile button */}
-              <motion.button
-                onClick={() => setShowProfile(true)}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
-                  lm
-                    ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
-                    : 'border-white/[0.12] bg-white/[0.06] text-white/75 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
-                }`}
-              >
-                <span className="text-[13px]">👤</span>
-                <span>My Profile</span>
-              </motion.button>
-
               <div className="relative">
                 <button onClick={() => setLangOpen(o => !o)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
@@ -2242,7 +2227,7 @@ export default function App() {
               </div>
 
               {/* ── Grandmaster Chess ── */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex items-baseline gap-3 mb-3">
                   <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>Grandmaster Chess</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Challenge the Geniuses</span>
@@ -2288,6 +2273,76 @@ export default function App() {
                     </div>
                     <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg ${
                       lm ? 'bg-violet-100 text-violet-600' : 'bg-violet-500/20 text-violet-300'
+                    }`}>›</div>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* ── My Command Center ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>My Command Center</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Cosmic Profile</span>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.015, y: -2 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => setShowProfile(true)}
+                  className="cursor-pointer w-full rounded-2xl overflow-hidden transition-all duration-300"
+                  style={{
+                    background: lm
+                      ? 'rgba(248,246,255,0.95)'
+                      : 'rgba(12,10,26,0.82)',
+                    border: lm
+                      ? '1px solid rgba(139,92,246,0.18)'
+                      : '1px solid rgba(139,92,246,0.16)',
+                    boxShadow: lm
+                      ? '0 4px 24px rgba(139,92,246,0.07)'
+                      : '0 8px 32px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(20px)',
+                  }}
+                >
+                  <div className="flex items-center gap-4 px-5 py-4">
+                    {/* Avatar */}
+                    <div
+                      className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0"
+                      style={{
+                        border: '2px solid rgba(139,92,246,0.45)',
+                        boxShadow: '0 0 0 3px rgba(139,92,246,0.10), 0 0 20px rgba(139,92,246,0.18)',
+                      }}
+                    >
+                      <img
+                        src={user?.avatar ?? PRESET_AVATARS[0].url}
+                        alt={user?.username ?? 'Profile'}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {/* Identity */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[9px] uppercase tracking-[0.3em] font-mono mb-1 ${lm ? 'text-slate-400' : 'text-white/28'}`}>
+                        Command Center
+                      </p>
+                      <p className={`text-[15px] font-light tracking-tight truncate ${lm ? 'text-slate-900' : 'text-white'}`}>
+                        {user?.username ?? 'My Profile'}
+                      </p>
+                      <p className={`text-[11px] font-mono truncate mt-0.5 ${lm ? 'text-slate-400' : 'text-white/35'}`}>
+                        {user?.email ?? ''}
+                      </p>
+                    </div>
+                    {/* Stats inline preview */}
+                    {user && (
+                      <div className="flex-shrink-0 flex flex-col items-end gap-0.5 mr-1">
+                        <p className={`text-[10px] font-mono ${lm ? 'text-slate-400' : 'text-white/30'}`}>
+                          <span className="text-purple-400 font-medium">{user.chessWins}W</span>
+                          {' / '}
+                          <span className="text-white/40">{user.chessLosses}L</span>
+                        </p>
+                        <p className={`text-[9px] uppercase tracking-widest font-mono ${lm ? 'text-slate-300' : 'text-white/20'}`}>chess</p>
+                      </div>
+                    )}
+                    {/* Arrow */}
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[18px] ${
+                      lm ? 'bg-violet-100 text-violet-500' : 'bg-white/[0.05] text-white/30'
                     }`}>›</div>
                   </div>
                 </motion.div>
