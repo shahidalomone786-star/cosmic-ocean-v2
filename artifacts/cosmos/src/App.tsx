@@ -48,7 +48,7 @@ const PORTAL_TABS = ['All','Black Holes','Galaxies','String Theory','Avatars','E
                      'Nebulae','Dark Matter','Wormholes','Supernovae','Cosmology','Quantum Field'];
 
 // ─── PhET Interactive Simulations ────────────────────────────────────────────
-// iframeUrl → https://phet.colorado.edu/sims/html/{slug}/latest/{slug}_all.html
+// iframeUrl → https://phet.colorado.edu/sims/html/{slug}/latest/{slug}_en.html
 // thumbnails → fetched live from Wikipedia pageimages API (origin=* → no CORS)
 //              wikiQuery overrides the title when the sim name is too generic
 type SimItem = {
@@ -66,7 +66,7 @@ const PHET_SIMULATIONS: SimItem[] = [
   { slug: 'gravity-and-orbits',          title: 'Gravity & Orbits',         subject: 'Gravity',        wikiQuery: 'Gravity' },
   { slug: 'my-solar-system',             title: 'My Solar System',          subject: 'Gravity',        wikiQuery: 'Solar System' },
   { slug: 'charges-and-fields',          title: 'Charges and Fields',       subject: 'Electricity',    wikiQuery: 'Electric field' },
-  { slug: 'electric-field-hockey',       title: 'Electric Field Hockey',    subject: 'Electricity',    wikiQuery: 'Electric charge' },
+  { slug: 'john-travoltage',             title: 'John Travoltage',          subject: 'Electricity',    wikiQuery: 'Static electricity' },
   { slug: 'faradays-law',                title: "Faraday's Law",            subject: 'Magnetism',      wikiQuery: "Faraday's law of induction" },
   { slug: 'ohms-law',                    title: "Ohm's Law",                subject: 'Electricity',    wikiQuery: "Ohm's law" },
   { slug: 'circuit-construction-kit-dc', title: 'Circuit Construction Kit', subject: 'Electricity',    wikiQuery: 'Electrical circuit' },
@@ -82,8 +82,8 @@ const PHET_SIMULATIONS: SimItem[] = [
   { slug: 'energy-forms-and-changes',    title: 'Energy Forms & Changes',   subject: 'Energy',         wikiQuery: 'Conservation of energy' },
   { slug: 'states-of-matter',            title: 'States of Matter',         subject: 'Thermodynamics', wikiQuery: 'State of matter' },
   { slug: 'gas-properties',              title: 'Gas Properties',           subject: 'Thermodynamics', wikiQuery: 'Ideal gas' },
-  { slug: 'nuclear-fission',             title: 'Nuclear Fission',          subject: 'Nuclear',        wikiQuery: 'Nuclear fission' },
-  { slug: 'alpha-decay',                 title: 'Alpha Decay',              subject: 'Nuclear',        wikiQuery: 'Alpha decay' },
+  { slug: 'rutherford-scattering',       title: 'Rutherford Scattering',    subject: 'Nuclear',        wikiQuery: 'Rutherford scattering' },
+  { slug: 'models-of-the-hydrogen-atom', title: 'Hydrogen Atom Models',     subject: 'Atomic',         wikiQuery: 'Hydrogen atom' },
   { slug: 'build-an-atom',               title: 'Build an Atom',            subject: 'Atomic',         wikiQuery: 'Atom' },
   { slug: 'build-a-molecule',            title: 'Build a Molecule',         subject: 'Chemistry',      wikiQuery: 'Molecule' },
   { slug: 'molecule-shapes',             title: 'Molecule Shapes',          subject: 'Chemistry',      wikiQuery: 'Molecular geometry' },
@@ -91,7 +91,7 @@ const PHET_SIMULATIONS: SimItem[] = [
   { slug: 'neuron',                      title: 'Neuron',                   subject: 'Biology',        wikiQuery: 'Neuron' },
   { slug: 'gene-expression-essentials',  title: 'Gene Expression',          subject: 'Biology',        wikiQuery: 'Gene expression' },
   { slug: 'greenhouse-effect',           title: 'Greenhouse Effect',        subject: 'Earth Science',  wikiQuery: 'Greenhouse effect' },
-  { slug: 'plate-tectonics',             title: 'Plate Tectonics',          subject: 'Earth Science',  wikiQuery: 'Plate tectonics' },
+  { slug: 'gravity-force-lab',            title: 'Gravity Force Lab',        subject: 'Gravity',        wikiQuery: 'Gravity' },
   { slug: 'friction',                    title: 'Friction',                 subject: 'Forces',         wikiQuery: 'Friction' },
   { slug: 'vector-addition',             title: 'Vector Addition',          subject: 'Math/Physics',   wikiQuery: 'Euclidean vector' },
 ];
@@ -135,7 +135,7 @@ function useWikiThumbnail(wikiQuery: string): string {
 }
 
 function phetIframeUrl(slug: string) {
-  return `https://phet.colorado.edu/sims/html/${slug}/latest/${slug}_all.html`;
+  return `https://phet.colorado.edu/sims/html/${slug}/latest/${slug}_en.html`;
 }
 
 // Languages + their Google Translate codes
@@ -1085,38 +1085,38 @@ type AdvSimItem = {
 const ADVANCED_SIMS: AdvSimItem[] = [
   // ── MyPhysicsLab ─────────────────────────────────────────────────────────
   { id: 'mpl-double-pendulum',   title: 'Double Pendulum',        description: 'Chaotic motion of two linked pendulums.',        categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/pendulum/double-pendulum-en.html',        wikiQuery: 'Double pendulum' },
-  { id: 'mpl-pendulum',          title: 'Simple Pendulum',        description: 'Classic pendulum with adjustable parameters.',   categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/pendulum/pendulum1-en.html',            wikiQuery: 'Pendulum' },
-  { id: 'mpl-driven-pendulum',   title: 'Driven Pendulum',        description: 'Forced oscillation leading to resonance.',       categoryTag: '⚙️ Resonance',    iframeUrl: 'https://www.myphysicslab.com/pendulum/pendulum2-en.html',            wikiQuery: 'Resonance' },
-  { id: 'mpl-clock',             title: 'Pendulum Clock',         description: 'Escapement mechanism in a working clock.',       categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/pendulum/clock-en.html',                wikiQuery: 'Escapement' },
+  { id: 'mpl-pendulum',          title: 'Pendulum Lab',           description: 'Classic pendulum with adjustable length and gravity.',categoryTag: '⚙️ Mechanics',   iframeUrl: 'https://phet.colorado.edu/sims/html/pendulum-lab/latest/pendulum-lab_en.html',                       wikiQuery: 'Pendulum' },
+  { id: 'mpl-driven-pendulum',   title: 'Energy Forms & Changes', description: 'Conversion between kinetic, potential and thermal energy.',categoryTag: '⚙️ Energy',      iframeUrl: 'https://phet.colorado.edu/sims/html/energy-forms-and-changes/latest/energy-forms-and-changes_en.html',wikiQuery: 'Conservation of energy' },
+  { id: 'mpl-clock',             title: 'Balancing Act',          description: 'Torque and lever balance with adjustable masses.', categoryTag: '⚙️ Mechanics',   iframeUrl: 'https://phet.colorado.edu/sims/html/balancing-act/latest/balancing-act_en.html',                     wikiQuery: 'Lever' },
   { id: 'mpl-chaotic-pendulum',  title: 'Chaotic Pendulum',       description: 'Sensitivity to initial conditions visualised.',  categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/pendulum/chaotic-pendulum-en.html',     wikiQuery: 'Chaos theory' },
-  { id: 'mpl-dangling-stick',    title: 'Dangling Stick',         description: 'Rigid rod pivoting freely in 2D space.',         categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/pendulum/dangling-stick-en.html',       wikiQuery: 'Rigid body dynamics' },
+  { id: 'mpl-dangling-stick',    title: 'Projectile Motion',      description: 'Launch angle, speed and air resistance controls.', categoryTag: '⚙️ Kinematics',  iframeUrl: 'https://phet.colorado.edu/sims/html/projectile-motion/latest/projectile-motion_en.html',              wikiQuery: 'Projectile motion' },
   { id: 'mpl-single-spring',     title: 'Spring Oscillator',      description: 'Mass on a spring with damping controls.',        categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/springs/single-spring-en.html',         wikiQuery: 'Harmonic oscillator' },
   { id: 'mpl-double-spring',     title: 'Double Spring',          description: 'Coupled spring system showing normal modes.',    categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/springs/double-spring-en.html',         wikiQuery: 'Coupled oscillation' },
-  { id: 'mpl-spring2d',          title: '2D Spring Motion',       description: 'Mass oscillating freely on a 2D spring.',       categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/springs/single-spring2d-en.html',       wikiQuery: 'Spring (device)' },
-  { id: 'mpl-spring-array',      title: 'Spring Array',           description: 'Wave propagation through a chain of springs.',  categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/springs/spring-array-en.html',          wikiQuery: 'Mechanical wave' },
+  { id: 'mpl-spring2d',          title: 'Wave on a String',       description: 'Transverse wave with adjustable tension and damping.',categoryTag: '⚙️ Waves',       iframeUrl: 'https://phet.colorado.edu/sims/html/wave-on-a-string/latest/wave-on-a-string_en.html',               wikiQuery: 'Wave' },
+  { id: 'mpl-spring-array',      title: 'Wave Interference',      description: 'Constructive and destructive interference patterns.', categoryTag: '⚙️ Waves',       iframeUrl: 'https://phet.colorado.edu/sims/html/wave-interference/latest/wave-interference_en.html',              wikiQuery: 'Wave interference' },
   { id: 'mpl-molecule3',         title: '3-Atom Lattice',         description: 'Three-body molecular spring simulation.',       categoryTag: '⚙️ Molecular',    iframeUrl: 'https://www.myphysicslab.com/springs/molecule3-en.html',             wikiQuery: 'Molecular dynamics' },
   { id: 'mpl-molecule5',         title: '5-Atom Dynamics',        description: 'Five-atom spring-connected particle system.',   categoryTag: '⚙️ Molecular',    iframeUrl: 'https://www.myphysicslab.com/springs/molecule5-en.html',             wikiQuery: 'Molecular dynamics' },
   { id: 'mpl-billiards',         title: 'Billiard Collisions',    description: 'Elastic collisions on a friction-free table.',  categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/billiards-en.html',            wikiQuery: 'Elastic collision' },
   { id: 'mpl-collision',         title: '2D Rigid Collision',     description: 'Configurable two-body rigid collision.',        categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/collision-en.html',            wikiQuery: 'Collision' },
   { id: 'mpl-rigid-body',        title: 'Rigid Body Stack',       description: 'Multi-body stacking with realistic friction.',  categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/engine2D/rigid-body-en.html',           wikiQuery: 'Rigid body' },
   { id: 'mpl-newtons-cradle',    title: "Newton's Cradle",        description: 'Momentum transfer through suspended balls.',    categoryTag: '⚙️ Momentum',     iframeUrl: 'https://www.myphysicslab.com/engine2D/newtons-cradle-en.html',       wikiQuery: "Newton's cradle" },
-  { id: 'mpl-pile-driver',       title: 'Pile Driver',            description: 'Impact force and energy absorption demo.',      categoryTag: '⚙️ Impact',       iframeUrl: 'https://www.myphysicslab.com/engine2D/pile-driver-en.html',          wikiQuery: 'Impulse (physics)' },
-  { id: 'mpl-circular-motion',   title: 'Circular Motion',        description: 'Centripetal force and uniform circular path.',  categoryTag: '⚙️ Kinematics',   iframeUrl: 'https://www.myphysicslab.com/engine2D/circular-motion-en.html',      wikiQuery: 'Circular motion' },
-  { id: 'mpl-sumo',              title: 'Sumo Wrestlers',         description: 'Two-body rigid contact and wrestling dynamics.',categoryTag: '⚙️ Rigid Body',   iframeUrl: 'https://www.myphysicslab.com/engine2D/sumo-en.html',                 wikiQuery: 'Rigid body dynamics' },
-  { id: 'mpl-spinning',          title: 'Spinning Body',          description: 'Angular momentum and torque visualised.',       categoryTag: '⚙️ Rotation',     iframeUrl: 'https://www.myphysicslab.com/engine2D/spinning-en.html',             wikiQuery: 'Angular momentum' },
-  { id: 'mpl-polygons',          title: 'Polygon Collisions',     description: 'Convex polygon rigid-body collision engine.',   categoryTag: '⚙️ 2D Dynamics',  iframeUrl: 'https://www.myphysicslab.com/engine2D/polygons-en.html',             wikiQuery: 'Rigid body' },
+  { id: 'mpl-pile-driver',       title: 'Collision Lab',          description: 'Elastic and inelastic collisions with momentum graphs.', categoryTag: '⚙️ Momentum',    iframeUrl: 'https://phet.colorado.edu/sims/html/collision-lab/latest/collision-lab_en.html',                     wikiQuery: 'Elastic collision' },
+  { id: 'mpl-circular-motion',   title: 'Gravity Force Lab',      description: 'Gravitational attraction between masses in orbit.', categoryTag: '⚙️ Gravity',      iframeUrl: 'https://phet.colorado.edu/sims/html/gravity-force-lab/latest/gravity-force-lab_en.html',              wikiQuery: 'Gravity' },
+  { id: 'mpl-sumo',              title: 'Friction',               description: 'Static vs kinetic friction on slopes and surfaces.', categoryTag: '⚙️ Mechanics',   iframeUrl: 'https://phet.colorado.edu/sims/html/friction/latest/friction_en.html',                               wikiQuery: 'Friction' },
+  { id: 'mpl-spinning',          title: 'Vector Addition',        description: 'Graphical and component vector addition methods.',  categoryTag: '⚙️ Kinematics',  iframeUrl: 'https://phet.colorado.edu/sims/html/vector-addition/latest/vector-addition_en.html',                 wikiQuery: 'Euclidean vector' },
+  { id: 'mpl-polygons',          title: 'Build an Atom',          description: 'Protons, neutrons and electrons forming stable atoms.', categoryTag: '⚙️ Atomic',      iframeUrl: 'https://phet.colorado.edu/sims/html/build-an-atom/latest/build-an-atom_en.html',                     wikiQuery: 'Atom' },
   { id: 'mpl-roller-single',     title: 'Roller Coaster',         description: 'Energy conservation on a custom track.',        categoryTag: '⚙️ Energy',       iframeUrl: 'https://www.myphysicslab.com/roller/roller-single-en.html',          wikiQuery: 'Roller coaster physics' },
   { id: 'mpl-roller-spring',     title: 'Spring Roller',          description: 'Roller coaster with spring propulsion.',        categoryTag: '⚙️ Energy',       iframeUrl: 'https://www.myphysicslab.com/roller/roller-spring-en.html',          wikiQuery: 'Elastic potential energy' },
   { id: 'mpl-roller-flight',     title: 'Braking Roller',         description: 'Coaster leaving the track under friction.',     categoryTag: '⚙️ Friction',     iframeUrl: 'https://www.myphysicslab.com/roller/roller-flight-en.html',          wikiQuery: 'Friction' },
-  { id: 'mpl-wave1',             title: 'Wave Propagation',       description: 'Transverse wave on a string with boundaries.',  categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/wave/wave1-en.html',                    wikiQuery: 'Transverse wave' },
-  { id: 'mpl-wave2',             title: 'Standing Waves',         description: 'Nodes and antinodes in standing wave modes.',   categoryTag: '⚙️ Waves',        iframeUrl: 'https://www.myphysicslab.com/wave/wave2-en.html',                    wikiQuery: 'Standing wave' },
-  { id: 'mpl-lorenz',            title: 'Lorenz Attractor',       description: 'Strange attractor from chaotic equations.',     categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/chaos/lorenz-en.html',                  wikiQuery: 'Lorenz attractor' },
-  { id: 'mpl-dp-chaos',          title: 'Pendulum Chaos Map',     description: 'Phase-space diagram of a double pendulum.',     categoryTag: '⚙️ Chaos',        iframeUrl: 'https://www.myphysicslab.com/chaos/double-pendulum-chaos-en.html',   wikiQuery: 'Phase space' },
-  { id: 'mpl-harmonic',          title: 'Harmonic Oscillator',    description: 'SHM with energy graphs in real time.',          categoryTag: '⚙️ Vibration',    iframeUrl: 'https://www.myphysicslab.com/harmonic/harmonic-oscillator-en.html',  wikiQuery: 'Simple harmonic motion' },
-  { id: 'mpl-cart2',             title: '2D Cart Dynamics',       description: 'Wheeled cart on a slope with constraints.',     categoryTag: '⚙️ Mechanics',    iframeUrl: 'https://www.myphysicslab.com/engine2D/cart2-en.html',                wikiQuery: 'Inclined plane' },
+  { id: 'mpl-wave1',             title: 'Wave on a String',       description: 'Transverse wave with adjustable tension and damping.',categoryTag: '⚙️ Waves',       iframeUrl: 'https://phet.colorado.edu/sims/html/wave-on-a-string/latest/wave-on-a-string_en.html',               wikiQuery: 'Transverse wave' },
+  { id: 'mpl-wave2',             title: 'Wave Interference',      description: 'Constructive and destructive wave interference patterns.', categoryTag: '⚙️ Waves',       iframeUrl: 'https://phet.colorado.edu/sims/html/wave-interference/latest/wave-interference_en.html',              wikiQuery: 'Standing wave' },
+  { id: 'mpl-lorenz',            title: 'Gas Properties',         description: 'Kinetic theory — pressure, volume and temperature.',categoryTag: '⚙️ Thermodynamics',iframeUrl: 'https://phet.colorado.edu/sims/html/gas-properties/latest/gas-properties_en.html',                   wikiQuery: 'Ideal gas' },
+  { id: 'mpl-dp-chaos',          title: 'Energy Skate Park',      description: 'Conservation of energy on a custom skate track.',   categoryTag: '⚙️ Energy',       iframeUrl: 'https://phet.colorado.edu/sims/html/energy-skate-park/latest/energy-skate-park_en.html',              wikiQuery: 'Mechanical energy' },
+  { id: 'mpl-harmonic',          title: 'States of Matter',       description: 'Solid, liquid and gas phase transitions at the atomic scale.',categoryTag: '⚙️ Thermodynamics',iframeUrl: 'https://phet.colorado.edu/sims/html/states-of-matter/latest/states-of-matter_en.html',               wikiQuery: 'State of matter' },
+  { id: 'mpl-cart2',             title: 'Circuit Construction DC',description: 'Build and test DC circuits with real components.',  categoryTag: '⚙️ Electricity',  iframeUrl: 'https://phet.colorado.edu/sims/html/circuit-construction-kit-dc/latest/circuit-construction-kit-dc_en.html',wikiQuery: 'Electrical circuit' },
   // ── Extra PhET HTML5 ─────────────────────────────────────────────────────
-  { id: 'phet-qwi',              title: 'Quantum Wave Interference', description: 'Quantum particle double-slit experiment.',    categoryTag: '⚙️ Quantum',      iframeUrl: 'https://phet.colorado.edu/sims/html/quantum-wave-interference/latest/quantum-wave-interference_all.html',  wikiQuery: 'Double-slit experiment' },
-  { id: 'phet-photo',            title: 'Photoelectric Effect',   description: 'Photon energy ejecting electrons from metal.',  categoryTag: '⚙️ Quantum',      iframeUrl: 'https://phet.colorado.edu/sims/html/photoelectric-effect/latest/photoelectric-effect_all.html',          wikiQuery: 'Photoelectric effect' },
+  { id: 'phet-qwi',              title: 'Wave Interference',      description: 'Constructive and destructive interference — light, sound and water.',categoryTag: '⚙️ Quantum',     iframeUrl: 'https://phet.colorado.edu/sims/html/wave-interference/latest/wave-interference_en.html',              wikiQuery: 'Double-slit experiment' },
+  { id: 'phet-photo',            title: 'Build a Molecule',       description: 'Combine atoms to form real molecules and compounds.', categoryTag: '⚙️ Chemistry',   iframeUrl: 'https://phet.colorado.edu/sims/html/build-a-molecule/latest/build-a-molecule_en.html',                wikiQuery: 'Molecule' },
   { id: 'phet-blackbody',        title: 'Blackbody Spectrum',     description: 'Thermal radiation curve vs. temperature.',      categoryTag: '⚙️ Thermodynamics',iframeUrl: 'https://phet.colorado.edu/sims/html/blackbody-spectrum/latest/blackbody-spectrum_all.html',              wikiQuery: 'Blackbody radiation' },
   { id: 'phet-rutherford',       title: 'Rutherford Scattering',  description: 'Alpha particles deflected by a gold nucleus.',  categoryTag: '⚙️ Nuclear',      iframeUrl: 'https://phet.colorado.edu/sims/html/rutherford-scattering/latest/rutherford-scattering_all.html',        wikiQuery: 'Rutherford scattering' },
   { id: 'phet-hydrogen',         title: 'Hydrogen Atom Models',   description: 'Bohr to quantum mechanical atomic models.',     categoryTag: '⚙️ Atomic',       iframeUrl: 'https://phet.colorado.edu/sims/html/models-of-the-hydrogen-atom/latest/models-of-the-hydrogen-atom_all.html', wikiQuery: 'Hydrogen atom' },
