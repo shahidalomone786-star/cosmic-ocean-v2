@@ -1176,7 +1176,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-zinc-900">
+    <div className="relative w-full h-screen overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% -10%, #27272a 0%, #0a0a0b 45%, #000000 100%)' }}>
 
       {/* ── Cinematic Big Bang Intro (only when 3D is enabled) ── */}
       <AnimatePresence>
@@ -1307,7 +1307,7 @@ export default function App() {
                 hasSearchResults ? 'max-w-2xl' : 'max-w-md'
               }`}
             >
-              <div className="w-full backdrop-blur-[22px] bg-white/[0.07] border border-white/[0.14] rounded-full px-6 py-4 shadow-[0_8px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.07)] transition-all duration-300 focus-within:border-white/[0.24] focus-within:bg-white/[0.10] focus-within:shadow-[0_8px_40px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.10)]">
+              <div className="w-full backdrop-blur-[28px] bg-white/[0.05] border border-white/[0.10] rounded-full px-6 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_8px_48px_rgba(0,0,0,0.7),0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.09)] transition-all duration-300 focus-within:border-white/[0.20] focus-within:bg-white/[0.08] focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_8px_48px_rgba(0,0,0,0.8),0_2px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)]">
                 <input
                   type="text"
                   value={nasaQuery}
@@ -1335,10 +1335,10 @@ export default function App() {
                           setIsEverythingMode(false);
                         }
                       }}
-                      className={`text-[11px] uppercase tracking-[0.14em] backdrop-blur-[14px] px-3.5 py-1.5 rounded-full transition-all duration-300 ease-out cursor-pointer hover:-translate-y-px ${
+                      className={`text-[11px] uppercase tracking-[0.14em] backdrop-blur-[16px] px-3.5 py-1.5 rounded-full transition-all duration-300 ease-out cursor-pointer hover:-translate-y-px ${
                         isEverything
-                          ? 'text-white/95 bg-white/[0.10] border border-white/[0.22] hover:bg-white/[0.16] hover:text-white hover:border-white/[0.35] hover:shadow-[0_4px_16px_rgba(255,255,255,0.06)] font-medium'
-                          : 'text-white/65 bg-white/[0.05] border border-white/[0.09] hover:bg-white/[0.09] hover:text-white/90 hover:border-white/[0.18]'
+                          ? 'text-white/95 bg-white/[0.09] border border-white/[0.18] shadow-[0_2px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.10)] hover:bg-white/[0.13] hover:text-white hover:border-white/[0.28] hover:shadow-[0_4px_20px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.14)] font-medium'
+                          : 'text-white/55 bg-white/[0.04] border border-white/[0.08] shadow-[0_1px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-white/[0.08] hover:text-white/85 hover:border-white/[0.15] hover:shadow-[0_2px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]'
                       }`}>
                       {isEverything ? '✦ Everything' : tag}
                     </button>
