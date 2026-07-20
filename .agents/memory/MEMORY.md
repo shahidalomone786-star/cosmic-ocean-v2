@@ -1,0 +1,1 @@
+- [Cosmic Intelligence Engine](cosmic-intelligence-engine.md) — external_content UNION feed; source-dispatch cards; INSERT OR IGNORE dedup; SQLite FK off by default enables EC IDs in post_likes/bookmarks

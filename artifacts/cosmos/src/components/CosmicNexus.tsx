@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
+import { CosmicFeedCard } from './CosmicCards';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab     = 'shorts' | 'home' | 'search' | 'chat' | 'profile';
@@ -19,6 +20,11 @@ interface LivePost {
   comment_count:   number;
   user_liked:      boolean;
   user_bookmarked: boolean;
+  // Cosmic Intelligence Engine fields ('' for user posts)
+  source:          string;
+  external_link:   string;
+  extra_json:      string;
+  ec_title:        string;
 }
 
 interface CommentRow {
@@ -1071,9 +1077,11 @@ function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
           </div>
         )}
 
-        {/* Live posts */}
+        {/* Live posts — external content gets specialized cards, user posts get LiveFeedCard */}
         {!loading && posts.map(post => (
-          <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+          post.source
+            ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+            : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
         ))}
       </div>
     </div>
@@ -1095,7 +1103,12 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
 
   const filtered = posts.filter(p => {
     const matchKind = active === 'all' || p.type === active;
-    const matchQ    = !q.trim() || p.content.toLowerCase().includes(q.toLowerCase()) || p.author_username.toLowerCase().includes(q.toLowerCase());
+    const lower     = q.toLowerCase();
+    const matchQ    = !q.trim()
+      || p.content.toLowerCase().includes(lower)
+      || p.author_username.toLowerCase().includes(lower)
+      || (p.ec_title ?? '').toLowerCase().includes(lower)
+      || (p.source ?? '').toLowerCase().includes(lower);
     return matchKind && matchQ;
   });
 
@@ -1145,7 +1158,11 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
             <p className="text-[14px]">{q || active !== 'all' ? 'Nothing matched — try a different search or filter.' : 'No posts yet in the cosmos.'}</p>
           </div>
         ) : (
-          filtered.map(post => <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />)
+          filtered.map(post =>
+            post.source
+              ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+              : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+          )
         )}
       </div>
     </div>
