@@ -22,13 +22,14 @@ interface LivePost {
 }
 
 interface CommentRow {
-  id:              string;
-  post_id:         string;
-  user_id:         string;
-  content:         string;
-  created_at:      string;
-  author_username: string;
-  author_avatar:   string;
+  id:                string;
+  post_id:           string;
+  user_id:           string;
+  content:           string;
+  created_at:        string;
+  author_username:   string;
+  author_avatar:     string;
+  parent_comment_id: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,14 +153,15 @@ function LiveFeedCard({ post, lm, onComment, onRefresh }: {
   const [likeCount,  setLikeCount]  = useState(post.like_count);
   const [likeLoading,  setLikeLoading]  = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [shareToast,   setShareToast]   = useState(false);
 
   const meta   = KIND_META[post.type] ?? KIND_META['post'];
   const handle = '@' + post.author_username.toLowerCase().replace(/\s+/g, '');
   const timeStr = timeAgo(post.created_at);
 
-  // Detect media type
+  // Detect media type — support both URL extensions and base64 data URIs
   const isVideo = post.media_url
-    ? /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(post.media_url)
+    ? /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(post.media_url) || post.media_url.startsWith('data:video/')
     : false;
 
   const toggleLike = async () => {
@@ -337,11 +339,35 @@ function LiveFeedCard({ post, lm, onComment, onRefresh }: {
         </button>
 
         {/* Share */}
-        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}/api/posts/${post.id}`;
+            const shareData = { title: `Post by ${post.author_username}`, text: post.content, url };
+            if (navigator.share) {
+              try { await navigator.share(shareData); } catch { /* user cancelled */ }
+            } else {
+              try {
+                await navigator.clipboard.writeText(url);
+                setShareToast(true);
+                setTimeout(() => setShareToast(false), 2200);
+              } catch {
+                setShareToast(true);
+                setTimeout(() => setShareToast(false), 2200);
+              }
+            }
+          }}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all relative ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}
+        >
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
           </svg>
           Share
+          {shareToast && (
+            <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-medium px-2.5 py-1 rounded-lg whitespace-nowrap z-10"
+              style={{ background: 'rgba(30,30,50,0.95)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
+              Link copied!
+            </span>
+          )}
         </button>
 
         <div className="flex-1" />
@@ -384,6 +410,7 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
   const [text,       setText]       = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState('');
+  const [replyTo,    setReplyTo]    = useState<CommentRow | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef     = useRef<HTMLDivElement>(null);
 
@@ -406,6 +433,17 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
     }, 50);
   };
 
+  const startReply = (c: CommentRow) => {
+    setReplyTo(c);
+    setText(`@${c.author_username} `);
+    setTimeout(() => textareaRef.current?.focus(), 80);
+  };
+
+  const cancelReply = () => {
+    setReplyTo(null);
+    setText('');
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() || submitting) return;
@@ -417,12 +455,16 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
         method:      'POST',
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
-        body:        JSON.stringify({ content: text.trim() }),
+        body:        JSON.stringify({
+          content:         text.trim(),
+          parentCommentId: replyTo?.id ?? undefined,
+        }),
       });
       const data = await res.json() as { ok: boolean; comment?: CommentRow; error?: string };
       if (data.ok && data.comment) {
         setComments(prev => [...prev, data.comment!]);
         setText('');
+        setReplyTo(null);
         onRefresh(); // bump comment_count in parent
         scrollToBottom();
       } else {
@@ -434,6 +476,15 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
       setSubmitting(false);
     }
   };
+
+  // Organise into tree: top-level comments + replies grouped by parent
+  const topLevel = comments.filter(c => !c.parent_comment_id);
+  const repliesMap = new Map<string, CommentRow[]>();
+  comments.filter(c => c.parent_comment_id).forEach(c => {
+    const pid = c.parent_comment_id!;
+    if (!repliesMap.has(pid)) repliesMap.set(pid, []);
+    repliesMap.get(pid)!.push(c);
+  });
 
   return (
     <motion.div
@@ -507,51 +558,61 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
             </div>
           )}
 
-          {!loading && comments.map(c => (
-            <div key={c.id} className={`flex gap-3 p-3 rounded-xl ${lm ? 'bg-gray-50' : 'bg-white/[0.04]'}`}>
-              {/* Avatar */}
-              <div
-                className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}
-                style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}
-              >
-                <img
-                  src={c.author_avatar}
-                  alt={c.author_username}
-                  className="w-full h-full object-cover"
-                  onError={e => {
-                    const el = e.currentTarget;
-                    el.style.display = 'none';
-                    const p = el.parentElement;
-                    if (p) {
-                      p.style.display = 'flex';
-                      p.style.alignItems = 'center';
-                      p.style.justifyContent = 'center';
-                      p.style.fontSize = '12px';
-                      p.style.fontWeight = 'bold';
-                      p.style.color = 'white';
-                      if (!p.querySelector('span')) {
-                        const s = document.createElement('span');
-                        s.textContent = (c.author_username[0] ?? '?').toUpperCase();
-                        p.appendChild(s);
+          {!loading && topLevel.map(c => (
+            <div key={c.id} className="space-y-2">
+              {/* Parent comment */}
+              <div className={`flex gap-3 p-3 rounded-xl ${lm ? 'bg-gray-50' : 'bg-white/[0.04]'}`}>
+                <div className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                  <img src={c.author_avatar} alt={c.author_username} className="w-full h-full object-cover"
+                    onError={e => {
+                      const el = e.currentTarget; el.style.display = 'none';
+                      const p = el.parentElement;
+                      if (p && !p.querySelector('span')) {
+                        Object.assign(p.style, { display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'bold', color:'white' });
+                        const s = document.createElement('span'); s.textContent = (c.author_username[0]??'?').toUpperCase(); p.appendChild(s);
                       }
-                    }
-                  }}
-                />
+                    }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[12px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>{c.author_username}</span>
+                    <span className={`text-[10.5px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>{timeAgo(c.created_at)}</span>
+                  </div>
+                  <p className={`text-[12.5px] leading-relaxed ${lm ? 'text-gray-700' : 'text-white/65'}`}>{c.content}</p>
+                  <button
+                    onClick={() => startReply(c)}
+                    className={`mt-1.5 text-[10.5px] font-medium transition-colors ${lm ? 'text-purple-500 hover:text-purple-700' : 'text-violet-400/70 hover:text-violet-300'}`}
+                  >
+                    Reply
+                  </button>
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[12px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>
-                    {c.author_username}
-                  </span>
-                  <span className={`text-[10.5px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
-                    {timeAgo(c.created_at)}
-                  </span>
+              {/* Nested replies */}
+              {(repliesMap.get(c.id) ?? []).map(r => (
+                <div key={r.id} className={`flex gap-3 p-3 rounded-xl ml-8 border-l-2 ${lm ? 'bg-gray-50/60 border-purple-200' : 'bg-white/[0.03] border-violet-700/40'}`}>
+                  <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}
+                    style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                    <img src={r.author_avatar} alt={r.author_username} className="w-full h-full object-cover"
+                      onError={e => {
+                        const el = e.currentTarget; el.style.display = 'none';
+                        const p = el.parentElement;
+                        if (p && !p.querySelector('span')) {
+                          Object.assign(p.style, { display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold', color:'white' });
+                          const s = document.createElement('span'); s.textContent = (r.author_username[0]??'?').toUpperCase(); p.appendChild(s);
+                        }
+                      }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[11.5px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>{r.author_username}</span>
+                      <span className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>{timeAgo(r.created_at)}</span>
+                    </div>
+                    <p className={`text-[12px] leading-relaxed ${lm ? 'text-gray-700' : 'text-white/60'}`}>{r.content}</p>
+                  </div>
                 </div>
-                <p className={`text-[12.5px] leading-relaxed ${lm ? 'text-gray-700' : 'text-white/65'}`}>
-                  {c.content}
-                </p>
-              </div>
+              ))}
             </div>
           ))}
         </div>
@@ -569,6 +630,17 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Reply-to banner */}
+        {replyTo && (
+          <div className={`flex items-center justify-between px-4 py-2 border-t text-[11.5px] flex-shrink-0 ${lm ? 'border-gray-100 bg-purple-50 text-purple-600' : 'border-white/[0.06] text-violet-300'}`}
+            style={lm ? undefined : { background: 'rgba(109,40,217,0.09)' }}>
+            <span>Replying to <strong>{replyTo.author_username}</strong></span>
+            <button type="button" onClick={cancelReply} className={`text-[11px] underline ${lm ? 'text-gray-400 hover:text-gray-700' : 'text-white/35 hover:text-white/70'}`}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Input row */}
         <form
@@ -785,53 +857,61 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
             </div>
           </div>
 
-          {/* ── Media URL ── */}
+          {/* ── Media Upload ── */}
           <div>
             <label className={`block text-[10px] uppercase tracking-[0.2em] font-mono mb-2.5 ${lm ? 'text-gray-500' : 'text-white/35'}`}>
-              Image / Video URL <span className={`normal-case tracking-normal ${lm ? 'text-gray-400' : 'text-white/25'}`}>(optional)</span>
+              Photo / Video <span className={`normal-case tracking-normal ${lm ? 'text-gray-400' : 'text-white/25'}`}>(optional)</span>
             </label>
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-              lm
-                ? 'bg-white border-gray-200 focus-within:border-purple-400 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
-                : 'bg-white/[0.05] border-white/[0.09] focus-within:border-violet-500/60 focus-within:bg-white/[0.07]'
-            }`}>
-              {/* Media icon */}
-              <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2}>
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              <input
-                type="url"
-                value={mediaUrl}
-                onChange={e => setMediaUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                className={`flex-1 bg-transparent outline-none text-[13px] min-w-0 ${
+            {!mediaUrl ? (
+              <label
+                className={`flex items-center gap-3 px-4 py-4 rounded-xl border border-dashed cursor-pointer transition-all ${
                   lm
-                    ? 'text-gray-900 placeholder-gray-400'
-                    : 'text-white placeholder-white/25'
+                    ? 'border-gray-300 bg-gray-50 hover:border-purple-400 hover:bg-purple-50/40'
+                    : 'border-white/[0.12] bg-white/[0.03] hover:border-violet-500/50 hover:bg-white/[0.06]'
                 }`}
-              />
-              {mediaUrl && (
-                <button type="button" onClick={() => setMediaUrl('')}
-                  className={`text-[18px] leading-none flex-shrink-0 ${lm ? 'text-gray-400 hover:text-gray-600' : 'text-white/30 hover:text-white/60'}`}>
-                  ×
+              >
+                <svg viewBox="0 0 24 24" className={`w-5 h-5 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={1.75}>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                <div>
+                  <p className={`text-[13px] font-medium ${lm ? 'text-gray-700' : 'text-white/60'}`}>Choose from gallery</p>
+                  <p className={`text-[11px] mt-0.5 ${lm ? 'text-gray-400' : 'text-white/30'}`}>Images & videos supported</p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="sr-only"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      const result = ev.target?.result;
+                      if (typeof result === 'string') setMediaUrl(result);
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+            ) : (
+              <div className="relative">
+                <div className={`rounded-xl overflow-hidden border ${lm ? 'border-gray-100' : 'border-white/[0.07]'}`}>
+                  {mediaUrl.startsWith('data:video/') || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(mediaUrl) ? (
+                    <video src={mediaUrl} className="w-full max-h-40 object-cover bg-black" preload="metadata" />
+                  ) : (
+                    <img src={mediaUrl} alt="Preview" className="w-full max-h-40 object-cover" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMediaUrl('')}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white transition-all"
+                  style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+                >
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
                 </button>
-              )}
-            </div>
-            {/* Media preview thumbnail */}
-            {mediaUrl.trim() && (
-              <div className={`mt-2 rounded-xl overflow-hidden border ${lm ? 'border-gray-100' : 'border-white/[0.07]'}`}>
-                {/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(mediaUrl.trim()) ? (
-                  <video src={mediaUrl.trim()} className="w-full max-h-32 object-cover bg-black" preload="metadata" />
-                ) : (
-                  <img src={mediaUrl.trim()} alt="Preview" className="w-full max-h-32 object-cover"
-                    onError={e => {
-                      e.currentTarget.style.display = 'none';
-                      const wrap = e.currentTarget.parentElement;
-                      if (wrap) wrap.style.display = 'none';
-                    }} />
-                )}
               </div>
             )}
           </div>
@@ -1138,6 +1218,41 @@ function ProfileTab({ posts, loading, onCreatePost, lm, onComment, onRefresh }: 
 }) {
   const { user } = useAuthStore();
   const [activeSection, setActiveSection] = useState<'posts' | 'liked' | 'saved'>('posts');
+  const [likedPosts,    setLikedPosts]    = useState<LivePost[]>([]);
+  const [savedPosts,    setSavedPosts]    = useState<LivePost[]>([]);
+  const [likedLoading,  setLikedLoading]  = useState(false);
+  const [savedLoading,  setSavedLoading]  = useState(false);
+  const [likedFetched,  setLikedFetched]  = useState(false);
+  const [savedFetched,  setSavedFetched]  = useState(false);
+
+  const fetchLiked = useCallback(async () => {
+    setLikedLoading(true);
+    try {
+      const res  = await fetch('/api/users/me/likes', { credentials: 'include' });
+      const data = await res.json() as { ok: boolean; posts?: LivePost[] };
+      if (data.ok && data.posts) setLikedPosts(data.posts);
+    } catch { /* ignore */ } finally {
+      setLikedLoading(false);
+      setLikedFetched(true);
+    }
+  }, []);
+
+  const fetchSaved = useCallback(async () => {
+    setSavedLoading(true);
+    try {
+      const res  = await fetch('/api/users/me/bookmarks', { credentials: 'include' });
+      const data = await res.json() as { ok: boolean; posts?: LivePost[] };
+      if (data.ok && data.posts) setSavedPosts(data.posts);
+    } catch { /* ignore */ } finally {
+      setSavedLoading(false);
+      setSavedFetched(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'liked' && !likedFetched) void fetchLiked();
+    if (activeSection === 'saved' && !savedFetched) void fetchSaved();
+  }, [activeSection, likedFetched, savedFetched, fetchLiked, fetchSaved]);
 
   const myPosts = posts.filter(p => p.user_id === user?.id);
 
@@ -1262,11 +1377,37 @@ function ProfileTab({ posts, loading, onCreatePost, lm, onComment, onRefresh }: 
         </div>
       )}
 
-      {/* ── Liked / Saved (placeholder until backend support) ── */}
-      {activeSection !== 'posts' && (
-        <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
-          <p className="text-3xl mb-3">{activeSection === 'liked' ? '♥' : '🔖'}</p>
-          <p className="text-[14px]">{activeSection === 'liked' ? 'Liked posts will appear here.' : 'Saved posts will appear here.'}</p>
+      {/* ── Liked Tab ── */}
+      {activeSection === 'liked' && (
+        <div className="flex flex-col gap-3 p-4 pb-6">
+          {likedLoading && [1, 2].map(i => <PostSkeleton key={i} lm={lm} />)}
+          {!likedLoading && likedPosts.length === 0 && (
+            <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              <p className="text-3xl mb-3">♥</p>
+              <p className="text-[14px] font-medium mb-1">No liked posts yet</p>
+              <p className="text-[12px]">Posts you like will appear here.</p>
+            </div>
+          )}
+          {!likedLoading && likedPosts.map(post => (
+            <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={() => { void fetchLiked(); onRefresh(); }} />
+          ))}
+        </div>
+      )}
+
+      {/* ── Saved Tab ── */}
+      {activeSection === 'saved' && (
+        <div className="flex flex-col gap-3 p-4 pb-6">
+          {savedLoading && [1, 2].map(i => <PostSkeleton key={i} lm={lm} />)}
+          {!savedLoading && savedPosts.length === 0 && (
+            <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              <p className="text-3xl mb-3">🔖</p>
+              <p className="text-[14px] font-medium mb-1">No saved posts yet</p>
+              <p className="text-[12px]">Bookmark posts to find them here.</p>
+            </div>
+          )}
+          {!savedLoading && savedPosts.map(post => (
+            <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={() => { void fetchSaved(); onRefresh(); }} />
+          ))}
         </div>
       )}
     </div>

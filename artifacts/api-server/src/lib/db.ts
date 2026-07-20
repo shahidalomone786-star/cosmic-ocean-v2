@@ -66,6 +66,13 @@ try {
   // Column already present — ignore
 }
 
+// Add parent_comment_id to post_comments for nested replies
+try {
+  db.exec(`ALTER TABLE post_comments ADD COLUMN parent_comment_id TEXT REFERENCES post_comments(id) ON DELETE CASCADE`);
+} catch {
+  // Column already present — ignore
+}
+
 // ── Row types ─────────────────────────────────────────────────────────────────
 export interface UserRow {
   id: string;
@@ -102,6 +109,7 @@ export interface CommentRow {
   created_at: string;
   author_username: string;
   author_avatar: string;
+  parent_comment_id: string | null;
 }
 
 // ── Prepared statements ───────────────────────────────────────────────────────
@@ -190,9 +198,51 @@ export const stmts = {
     WHERE c.post_id = ?
     ORDER BY c.created_at ASC
   `),
-  insertComment: db.prepare<[string, string, string, string]>(
-    `INSERT INTO post_comments (id, post_id, user_id, content) VALUES (?, ?, ?, ?)`,
+  insertComment: db.prepare<[string, string, string, string, string | null]>(
+    `INSERT INTO post_comments (id, post_id, user_id, content, parent_comment_id) VALUES (?, ?, ?, ?, ?)`,
   ),
+
+  // ── liked posts (enriched) ──
+  getLikedPosts: db.prepare<[string], EnrichedPostRow>(`
+    SELECT
+      p.*,
+      u.username   AS author_username,
+      u.avatar_url AS author_avatar,
+      COALESCE(lc.cnt, 0) AS like_count,
+      COALESCE(cc.cnt, 0) AS comment_count
+    FROM post_likes pl
+    JOIN posts p ON p.id = pl.post_id
+    JOIN users u ON u.id = p.user_id
+    LEFT JOIN (
+      SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id
+    ) lc ON lc.post_id = p.id
+    LEFT JOIN (
+      SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id
+    ) cc ON cc.post_id = p.id
+    WHERE pl.user_id = ?
+    ORDER BY pl.created_at DESC
+  `),
+
+  // ── bookmarked posts (enriched) ──
+  getBookmarkedPosts: db.prepare<[string], EnrichedPostRow>(`
+    SELECT
+      p.*,
+      u.username   AS author_username,
+      u.avatar_url AS author_avatar,
+      COALESCE(lc.cnt, 0) AS like_count,
+      COALESCE(cc.cnt, 0) AS comment_count
+    FROM post_bookmarks pb
+    JOIN posts p ON p.id = pb.post_id
+    JOIN users u ON u.id = p.user_id
+    LEFT JOIN (
+      SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id
+    ) lc ON lc.post_id = p.id
+    LEFT JOIN (
+      SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id
+    ) cc ON cc.post_id = p.id
+    WHERE pb.user_id = ?
+    ORDER BY pb.created_at DESC
+  `),
 };
 
 export default db;

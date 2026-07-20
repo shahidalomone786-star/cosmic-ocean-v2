@@ -126,7 +126,7 @@ router.post("/posts/:id/comments", (req: Request, res: Response) => {
   if (!userId) return;
 
   const postId = String(req.params["id"]);
-  const { content } = req.body as { content?: string };
+  const { content, parentCommentId } = req.body as { content?: string; parentCommentId?: string };
 
   if (!content || content.trim().length === 0) {
     res.status(400).json({ ok: false, error: "Comment cannot be empty." });
@@ -138,12 +138,46 @@ router.post("/posts/:id/comments", (req: Request, res: Response) => {
   }
 
   const id = uid();
-  stmts.insertComment.run(id, postId, userId, content.trim());
+  stmts.insertComment.run(id, postId, userId, content.trim(), parentCommentId ?? null);
 
   // Return the full comment with author info
   const comment = stmts.getComments.all(postId).find(c => c.id === id);
   req.log.info({ commentId: id, postId, userId }, "Comment created");
   res.status(201).json({ ok: true, comment });
+});
+
+// ── GET /api/users/me/likes ────────────────────────────────────────────────────
+router.get("/users/me/likes", (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const posts = stmts.getLikedPosts.all(userId);
+  const likedSet = new Set(posts.map(p => p.id));
+
+  const enriched = posts.map(p => ({
+    ...p,
+    user_liked:      likedSet.has(p.id),
+    user_bookmarked: false,
+  }));
+
+  res.json({ ok: true, posts: enriched });
+});
+
+// ── GET /api/users/me/bookmarks ────────────────────────────────────────────────
+router.get("/users/me/bookmarks", (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const posts = stmts.getBookmarkedPosts.all(userId);
+  const savedSet = new Set(posts.map(p => p.id));
+
+  const enriched = posts.map(p => ({
+    ...p,
+    user_liked:      false,
+    user_bookmarked: savedSet.has(p.id),
+  }));
+
+  res.json({ ok: true, posts: enriched });
 });
 
 export default router;
