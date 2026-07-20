@@ -11,6 +11,21 @@ interface LivePost {
   user_id:         string;
   content:         string;
   type:            FeedKind;
+  media_url:       string;
+  created_at:      string;
+  author_username: string;
+  author_avatar:   string;
+  like_count:      number;
+  comment_count:   number;
+  user_liked:      boolean;
+  user_bookmarked: boolean;
+}
+
+interface CommentRow {
+  id:              string;
+  post_id:         string;
+  user_id:         string;
+  content:         string;
   created_at:      string;
   author_username: string;
   author_avatar:   string;
@@ -99,13 +114,97 @@ function PostSkeleton({ lm }: { lm?: boolean }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AVATAR helper — reusable inline avatar with initial fallback
+// ─────────────────────────────────────────────────────────────────────────────
+function Avatar({ src, name, size = 'md', ring, lm }: {
+  src:  string;
+  name: string;
+  size?: 'sm' | 'md' | 'lg';
+  ring?: boolean;
+  lm?:  boolean;
+}) {
+  const sizeClass = size === 'sm' ? 'w-8 h-8 text-[12px]' : size === 'lg' ? 'w-20 h-20 text-[28px]' : 'w-9 h-9 text-[14px]';
+  const ringClass = ring ? `ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}` : '';
+  return (
+    <div className={`${sizeClass} ${ringClass} rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white`}>
+      {src ? (
+        <img src={src} alt={name} className="w-full h-full object-cover"
+          onError={e => { e.currentTarget.style.display = 'none'; }} />
+      ) : null}
+      <span className="absolute" style={{ display: src ? 'none' : 'block' }}>
+        {(name[0] ?? '?').toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LIVE FEED CARD — renders a post from the database
 // ─────────────────────────────────────────────────────────────────────────────
-function LiveFeedCard({ post, lm }: { post: LivePost; lm?: boolean }) {
-  const [liked, setLiked] = useState(false);
+function LiveFeedCard({ post, lm, onComment, onRefresh }: {
+  post:       LivePost;
+  lm?:        boolean;
+  onComment:  (post: LivePost) => void;
+  onRefresh?: () => void;
+}) {
+  const [liked,      setLiked]      = useState(post.user_liked);
+  const [bookmarked, setBookmarked] = useState(post.user_bookmarked);
+  const [likeCount,  setLikeCount]  = useState(post.like_count);
+  const [likeLoading,  setLikeLoading]  = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+
   const meta   = KIND_META[post.type] ?? KIND_META['post'];
   const handle = '@' + post.author_username.toLowerCase().replace(/\s+/g, '');
   const timeStr = timeAgo(post.created_at);
+
+  // Detect media type
+  const isVideo = post.media_url
+    ? /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(post.media_url)
+    : false;
+
+  const toggleLike = async () => {
+    if (likeLoading) return;
+    const next = !liked;
+    setLiked(next);
+    setLikeCount(c => next ? c + 1 : Math.max(0, c - 1));
+    setLikeLoading(true);
+    try {
+      const res = await fetch(`/api/posts/${post.id}/like`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json() as { ok: boolean; liked?: boolean };
+      if (!data.ok) throw new Error('failed');
+      // Sync with server truth
+      setLiked(data.liked ?? next);
+    } catch {
+      // Revert on error
+      setLiked(!next);
+      setLikeCount(c => next ? Math.max(0, c - 1) : c + 1);
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    if (bookmarkLoading) return;
+    const next = !bookmarked;
+    setBookmarked(next);
+    setBookmarkLoading(true);
+    try {
+      const res = await fetch(`/api/posts/${post.id}/bookmark`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json() as { ok: boolean; bookmarked?: boolean };
+      if (!data.ok) throw new Error('failed');
+      setBookmarked(data.bookmarked ?? next);
+    } catch {
+      setBookmarked(!next);
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -114,33 +213,34 @@ function LiveFeedCard({ post, lm }: { post: LivePost; lm?: boolean }) {
       transition={{ duration: 0.22 }}
       className={`rounded-2xl overflow-hidden border transition-colors duration-300 ${lm ? 'bg-white border-gray-100 shadow-sm' : 'bg-white/[0.04] border-white/[0.08]'}`}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 pt-3.5 pb-2.5">
-        {/* Avatar */}
-        <div className={`w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}>
+        <div className={`w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}
+          style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
           <img
             src={post.author_avatar}
             alt={post.author_username}
             className="w-full h-full object-cover"
             onError={e => {
-              const el = e.currentTarget;
-              el.style.display = 'none';
-              const parent = el.parentElement;
-              if (parent) {
-                parent.style.background = 'linear-gradient(135deg,#7c3aed,#4f46e5)';
-                parent.style.display    = 'flex';
-                parent.style.alignItems = 'center';
-                parent.style.justifyContent = 'center';
-                parent.style.fontSize   = '14px';
-                parent.style.fontWeight = 'bold';
-                parent.style.color      = 'white';
-                parent.textContent      = (post.author_username[0] ?? '?').toUpperCase();
+              e.currentTarget.style.display = 'none';
+              const p = e.currentTarget.parentElement;
+              if (p) {
+                p.style.display    = 'flex';
+                p.style.alignItems = 'center';
+                p.style.justifyContent = 'center';
+                p.style.fontSize   = '14px';
+                p.style.fontWeight = 'bold';
+                p.style.color      = 'white';
+                if (!p.querySelector('span')) {
+                  const s = document.createElement('span');
+                  s.textContent = (post.author_username[0] ?? '?').toUpperCase();
+                  p.appendChild(s);
+                }
               }
             }}
           />
         </div>
 
-        {/* Meta */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-[13.5px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>
@@ -164,41 +264,364 @@ function LiveFeedCard({ post, lm }: { post: LivePost; lm?: boolean }) {
         </button>
       </div>
 
-      {/* Body */}
-      <p className={`px-4 pb-3.5 text-[13.5px] leading-relaxed whitespace-pre-wrap ${lm ? 'text-gray-700' : 'text-white/70'}`}>
+      {/* ── Content ── */}
+      <p className={`px-4 pb-3 text-[13.5px] leading-relaxed whitespace-pre-wrap ${lm ? 'text-gray-700' : 'text-white/70'}`}>
         {post.content}
       </p>
 
-      {/* Actions */}
+      {/* ── Media ── */}
+      {post.media_url && (
+        <div className="mx-4 mb-3.5 rounded-xl overflow-hidden border" style={lm ? { borderColor: '#f3f4f6' } : { borderColor: 'rgba(255,255,255,0.07)' }}>
+          {isVideo ? (
+            <video
+              src={post.media_url}
+              controls
+              className="w-full max-h-64 object-cover bg-black block"
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={post.media_url}
+              alt="Post media"
+              className="w-full max-h-64 object-cover block"
+              onError={e => {
+                // Show a broken-media placeholder instead of hiding
+                const el = e.currentTarget;
+                el.style.display = 'none';
+                const wrap = el.parentElement;
+                if (wrap && !wrap.querySelector('[data-broken]')) {
+                  const fb = document.createElement('div');
+                  fb.setAttribute('data-broken', '1');
+                  fb.style.cssText = 'display:flex;align-items:center;justify-content:center;height:80px;opacity:0.3;font-size:13px;';
+                  fb.textContent = '⚠️ Media unavailable';
+                  wrap.appendChild(fb);
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Actions ── */}
       <div className={`flex items-center gap-0.5 px-3 py-2 border-t ${lm ? 'border-gray-100' : 'border-white/[0.05]'}`}>
+        {/* Like */}
         <button
-          onClick={() => setLiked(l => !l)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all ${liked ? 'text-red-500' : lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}
+          onClick={toggleLike}
+          disabled={likeLoading}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all select-none ${
+            liked
+              ? 'text-red-500'
+              : lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'
+          }`}
         >
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
-            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-          </svg>
-          {liked ? 1 : 0}
+          <motion.div
+            animate={liked ? { scale: [1, 1.35, 1] } : { scale: 1 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+          </motion.div>
+          {likeCount > 0 ? fmt(likeCount) : '0'}
         </button>
-        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
+
+        {/* Comment */}
+        <button
+          onClick={() => onComment(post)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}
+        >
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
           </svg>
-          0
+          {post.comment_count > 0 ? fmt(post.comment_count) : '0'}
         </button>
+
+        {/* Share */}
         <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
           <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
           </svg>
           Share
         </button>
+
         <div className="flex-1" />
-        <button className={`p-2 rounded-xl transition-all ${lm ? 'text-gray-400 hover:bg-gray-100' : 'text-white/30 hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
-          </svg>
+
+        {/* Bookmark */}
+        <button
+          onClick={toggleBookmark}
+          disabled={bookmarkLoading}
+          className={`p-2 rounded-xl transition-all select-none ${
+            bookmarked
+              ? 'text-violet-500'
+              : lm ? 'text-gray-400 hover:bg-gray-100' : 'text-white/30 hover:bg-white/[0.06]'
+          }`}
+        >
+          <motion.div
+            animate={bookmarked ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill={bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+            </svg>
+          </motion.div>
         </button>
       </div>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMENT MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+function CommentModal({ post, lm, onClose, onRefresh }: {
+  post:      LivePost;
+  lm?:       boolean;
+  onClose:   () => void;
+  onRefresh: () => void;
+}) {
+  const [comments,   setComments]   = useState<CommentRow[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [text,       setText]       = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error,      setError]      = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const listRef     = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch(`/api/posts/${post.id}/comments`, { credentials: 'include' })
+      .then(r => r.json())
+      .then((d: { ok: boolean; comments?: CommentRow[] }) => {
+        if (d.ok && d.comments) setComments(d.comments);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    // Focus textarea after spring animation settles
+    const t = setTimeout(() => textareaRef.current?.focus(), 320);
+    return () => clearTimeout(t);
+  }, [post.id]);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    }, 50);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() || submitting) return;
+    if (text.length > 500) { setError('Comment must be under 500 characters.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/posts/${post.id}/comments`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ content: text.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; comment?: CommentRow; error?: string };
+      if (data.ok && data.comment) {
+        setComments(prev => [...prev, data.comment!]);
+        setText('');
+        onRefresh(); // bump comment_count in parent
+        scrollToBottom();
+      } else {
+        setError(data.error ?? 'Failed to post comment.');
+      }
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-[200] flex items-end justify-center"
+      style={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', background: 'rgba(0,0,0,0.65)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 60, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0,  scale: 1    }}
+        exit={{    opacity: 0, y: 60, scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+        className={`w-full max-w-lg rounded-t-3xl overflow-hidden flex flex-col ${lm ? 'bg-white shadow-2xl' : ''}`}
+        style={lm
+          ? { maxHeight: '82vh' }
+          : {
+              background:    'linear-gradient(160deg, rgba(18,18,32,0.99) 0%, rgba(9,9,18,0.99) 100%)',
+              border:        '1px solid rgba(139,92,246,0.22)',
+              borderBottom:  'none',
+              boxShadow:     '0 -24px 80px rgba(0,0,0,0.7), 0 0 80px rgba(109,40,217,0.07)',
+              maxHeight:     '82vh',
+            }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className={`w-10 h-1 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.12]'}`} />
+        </div>
+
+        {/* Header */}
+        <div className={`flex items-center justify-between px-6 pt-3 pb-4 border-b flex-shrink-0 ${lm ? 'border-gray-100' : 'border-white/[0.07]'}`}>
+          <div>
+            <h2 className={`text-[17px] font-bold tracking-tight ${lm ? 'text-gray-900' : 'text-white'}`}>Comments</h2>
+            <p className={`text-[12px] mt-0.5 ${lm ? 'text-gray-400' : 'text-white/35'}`}>
+              {loading ? '…' : `${comments.length} ${comments.length === 1 ? 'reply' : 'replies'}`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${lm ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-white/[0.08] text-white/40'}`}
+          >
+            <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Post preview */}
+        <div className={`px-6 py-3 border-b flex-shrink-0 ${lm ? 'border-gray-100 bg-gray-50' : 'border-white/[0.05] bg-white/[0.02]'}`}>
+          <p className={`text-[12px] font-semibold mb-0.5 ${lm ? 'text-gray-500' : 'text-white/35'}`}>
+            {post.author_username}
+          </p>
+          <p className={`text-[12.5px] leading-relaxed line-clamp-2 ${lm ? 'text-gray-600' : 'text-white/50'}`}>
+            {post.content}
+          </p>
+        </div>
+
+        {/* Comments list */}
+        <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0" style={{ scrollbarWidth: 'none' }}>
+          {loading && [1, 2].map(i => <PostSkeleton key={i} lm={lm} />)}
+
+          {!loading && comments.length === 0 && (
+            <div className={`py-12 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              <p className="text-3xl mb-3">💬</p>
+              <p className="text-[14px] font-medium mb-1">No comments yet</p>
+              <p className="text-[12px]">Be the first to reply!</p>
+            </div>
+          )}
+
+          {!loading && comments.map(c => (
+            <div key={c.id} className={`flex gap-3 p-3 rounded-xl ${lm ? 'bg-gray-50' : 'bg-white/[0.04]'}`}>
+              {/* Avatar */}
+              <div
+                className={`w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ${lm ? 'ring-gray-200' : 'ring-white/10'}`}
+                style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}
+              >
+                <img
+                  src={c.author_avatar}
+                  alt={c.author_username}
+                  className="w-full h-full object-cover"
+                  onError={e => {
+                    const el = e.currentTarget;
+                    el.style.display = 'none';
+                    const p = el.parentElement;
+                    if (p) {
+                      p.style.display = 'flex';
+                      p.style.alignItems = 'center';
+                      p.style.justifyContent = 'center';
+                      p.style.fontSize = '12px';
+                      p.style.fontWeight = 'bold';
+                      p.style.color = 'white';
+                      if (!p.querySelector('span')) {
+                        const s = document.createElement('span');
+                        s.textContent = (c.author_username[0] ?? '?').toUpperCase();
+                        p.appendChild(s);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[12px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>
+                    {c.author_username}
+                  </span>
+                  <span className={`text-[10.5px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                    {timeAgo(c.created_at)}
+                  </span>
+                </div>
+                <p className={`text-[12.5px] leading-relaxed ${lm ? 'text-gray-700' : 'text-white/65'}`}>
+                  {c.content}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{    opacity: 0, height: 0 }}
+              className={`mx-4 rounded-xl px-4 py-2 text-[12px] text-red-400 border flex-shrink-0 ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/[0.07] border-red-500/20'}`}
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Input row */}
+        <form
+          onSubmit={submit}
+          className={`flex gap-3 px-4 py-3 border-t flex-shrink-0 ${lm ? 'border-gray-100 bg-white' : 'border-white/[0.07]'}`}
+          style={lm ? undefined : { background: 'rgba(13,13,26,0.98)' }}
+        >
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={e => { setText(e.target.value); setError(''); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void submit(e as unknown as React.FormEvent);
+              }
+            }}
+            placeholder="Add a comment…"
+            rows={1}
+            style={{ resize: 'none' }}
+            className={`flex-1 px-3.5 py-2.5 rounded-xl border text-[13px] leading-relaxed outline-none transition-all ${
+              lm
+                ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
+                : 'bg-white/[0.05] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/60 focus:bg-white/[0.07]'
+            }`}
+          />
+          <motion.button
+            type="submit"
+            disabled={!text.trim() || submitting}
+            whileHover={text.trim() && !submitting ? { scale: 1.06 } : {}}
+            whileTap={text.trim()   && !submitting ? { scale: 0.94 } : {}}
+            className={`w-10 h-10 self-end rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
+              !text.trim() || submitting
+                ? lm ? 'bg-gray-100 text-gray-300' : 'bg-white/[0.04] text-white/20'
+                : lm ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'text-white'
+            }`}
+            style={text.trim() && !submitting && !lm
+              ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.85),rgba(91,33,182,0.9))', border: '1px solid rgba(139,92,246,0.45)', boxShadow: '0 4px 16px rgba(91,33,182,0.35)' }
+              : undefined}
+          >
+            {submitting ? (
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+            )}
+          </motion.button>
+        </form>
+      </motion.div>
     </motion.div>
   );
 }
@@ -212,6 +635,7 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
   lm?:       boolean;
 }) {
   const [content,    setContent]    = useState('');
+  const [mediaUrl,   setMediaUrl]   = useState('');
   const [postType,   setPostType]   = useState<FeedKind>('post');
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState('');
@@ -230,7 +654,11 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
         method:      'POST',
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
-        body:        JSON.stringify({ content: content.trim(), type: postType }),
+        body:        JSON.stringify({
+          content:  content.trim(),
+          type:     postType,
+          mediaUrl: mediaUrl.trim() || undefined,
+        }),
       });
       const data = await res.json() as { ok: boolean; error?: string };
       if (!data.ok) { setError(data.error ?? 'Failed to create post.'); setSubmitting(false); return; }
@@ -266,10 +694,10 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
         transition={{ type: 'spring', stiffness: 340, damping: 32 }}
         className={`w-full max-w-lg rounded-t-3xl overflow-hidden ${lm ? 'bg-white shadow-2xl' : ''}`}
         style={lm ? undefined : {
-          background:  'linear-gradient(160deg, rgba(18,18,32,0.99) 0%, rgba(9,9,18,0.99) 100%)',
-          border:      '1px solid rgba(139,92,246,0.22)',
+          background:   'linear-gradient(160deg, rgba(18,18,32,0.99) 0%, rgba(9,9,18,0.99) 100%)',
+          border:       '1px solid rgba(139,92,246,0.22)',
           borderBottom: 'none',
-          boxShadow:   '0 -24px 80px rgba(0,0,0,0.7), 0 0 80px rgba(109,40,217,0.07)',
+          boxShadow:    '0 -24px 80px rgba(0,0,0,0.7), 0 0 80px rgba(109,40,217,0.07)',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -355,6 +783,57 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
                 {content.length} / 1000
               </span>
             </div>
+          </div>
+
+          {/* ── Media URL ── */}
+          <div>
+            <label className={`block text-[10px] uppercase tracking-[0.2em] font-mono mb-2.5 ${lm ? 'text-gray-500' : 'text-white/35'}`}>
+              Image / Video URL <span className={`normal-case tracking-normal ${lm ? 'text-gray-400' : 'text-white/25'}`}>(optional)</span>
+            </label>
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+              lm
+                ? 'bg-white border-gray-200 focus-within:border-purple-400 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
+                : 'bg-white/[0.05] border-white/[0.09] focus-within:border-violet-500/60 focus-within:bg-white/[0.07]'
+            }`}>
+              {/* Media icon */}
+              <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <input
+                type="url"
+                value={mediaUrl}
+                onChange={e => setMediaUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className={`flex-1 bg-transparent outline-none text-[13px] min-w-0 ${
+                  lm
+                    ? 'text-gray-900 placeholder-gray-400'
+                    : 'text-white placeholder-white/25'
+                }`}
+              />
+              {mediaUrl && (
+                <button type="button" onClick={() => setMediaUrl('')}
+                  className={`text-[18px] leading-none flex-shrink-0 ${lm ? 'text-gray-400 hover:text-gray-600' : 'text-white/30 hover:text-white/60'}`}>
+                  ×
+                </button>
+              )}
+            </div>
+            {/* Media preview thumbnail */}
+            {mediaUrl.trim() && (
+              <div className={`mt-2 rounded-xl overflow-hidden border ${lm ? 'border-gray-100' : 'border-white/[0.07]'}`}>
+                {/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(mediaUrl.trim()) ? (
+                  <video src={mediaUrl.trim()} className="w-full max-h-32 object-cover bg-black" preload="metadata" />
+                ) : (
+                  <img src={mediaUrl.trim()} alt="Preview" className="w-full max-h-32 object-cover"
+                    onError={e => {
+                      e.currentTarget.style.display = 'none';
+                      const wrap = e.currentTarget.parentElement;
+                      if (wrap) wrap.style.display = 'none';
+                    }} />
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Error ── */}
@@ -481,11 +960,13 @@ function ShortsTab({ lm }: { lm?: boolean }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME TAB — live feed from API
 // ─────────────────────────────────────────────────────────────────────────────
-function HomeTab({ posts, loading, error, lm }: {
-  posts:   LivePost[];
-  loading: boolean;
-  error:   string;
-  lm?:     boolean;
+function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
+  posts:     LivePost[];
+  loading:   boolean;
+  error:     string;
+  lm?:       boolean;
+  onComment: (post: LivePost) => void;
+  onRefresh: () => void;
 }) {
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
@@ -512,7 +993,7 @@ function HomeTab({ posts, loading, error, lm }: {
 
         {/* Live posts */}
         {!loading && posts.map(post => (
-          <LiveFeedCard key={post.id} post={post} lm={lm} />
+          <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
         ))}
       </div>
     </div>
@@ -522,10 +1003,12 @@ function HomeTab({ posts, loading, error, lm }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // SEARCH TAB — filters live posts by type and query
 // ─────────────────────────────────────────────────────────────────────────────
-function SearchTab({ posts, loading, lm }: {
-  posts:   LivePost[];
-  loading: boolean;
-  lm?:     boolean;
+function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
+  posts:     LivePost[];
+  loading:   boolean;
+  lm?:       boolean;
+  onComment: (post: LivePost) => void;
+  onRefresh: () => void;
 }) {
   const [q,      setQ]      = useState('');
   const [active, setActive] = useState<FeedKind | 'all'>('all');
@@ -582,7 +1065,7 @@ function SearchTab({ posts, loading, lm }: {
             <p className="text-[14px]">{q || active !== 'all' ? 'Nothing matched — try a different search or filter.' : 'No posts yet in the cosmos.'}</p>
           </div>
         ) : (
-          filtered.map(post => <LiveFeedCard key={post.id} post={post} lm={lm} />)
+          filtered.map(post => <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />)
         )}
       </div>
     </div>
@@ -645,11 +1128,13 @@ function ChatTab({ lm }: { lm?: boolean }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE TAB — shows the current user's real posts
 // ─────────────────────────────────────────────────────────────────────────────
-function ProfileTab({ posts, loading, onCreatePost, lm }: {
+function ProfileTab({ posts, loading, onCreatePost, lm, onComment, onRefresh }: {
   posts:        LivePost[];
   loading:      boolean;
   onCreatePost: () => void;
   lm?:          boolean;
+  onComment:    (post: LivePost) => void;
+  onRefresh:    () => void;
 }) {
   const { user } = useAuthStore();
   const [activeSection, setActiveSection] = useState<'posts' | 'liked' | 'saved'>('posts');
@@ -772,12 +1257,12 @@ function ProfileTab({ posts, loading, onCreatePost, lm }: {
 
           {/* Real posts */}
           {!loading && myPosts.map(post => (
-            <LiveFeedCard key={post.id} post={post} lm={lm} />
+            <LiveFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
           ))}
         </div>
       )}
 
-      {/* ── Liked / Saved (cosmetic placeholder) ── */}
+      {/* ── Liked / Saved (placeholder until backend support) ── */}
       {activeSection !== 'posts' && (
         <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
           <p className="text-3xl mb-3">{activeSection === 'liked' ? '♥' : '🔖'}</p>
@@ -837,9 +1322,10 @@ function BottomNav({ active, onSelect, lm }: { active: Tab; onSelect: (t: Tab) =
 const TAB_ORDER: Tab[] = ['shorts', 'home', 'search', 'chat', 'profile'];
 
 export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?: boolean }) {
-  const [activeTab,    setActiveTab]    = useState<Tab>('home');
-  const [direction,    setDirection]    = useState(0);
-  const [showModal,    setShowModal]    = useState(false);
+  const [activeTab,      setActiveTab]      = useState<Tab>('home');
+  const [direction,      setDirection]      = useState(0);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [commentingPost, setCommentingPost] = useState<LivePost | null>(null);
 
   // ── Live posts state ──────────────────────────────────────────────────────
   const [posts,        setPosts]        = useState<LivePost[]>([]);
@@ -873,9 +1359,10 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
     setActiveTab(t);
   };
 
-  // ── Create Post modal handlers ────────────────────────────────────────────
-  const openCreatePost = () => setShowModal(true);
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const openCreatePost = () => setShowCreatePost(true);
   const handlePostSuccess = () => { fetchPosts(); };
+  const handleComment = (post: LivePost) => setCommentingPost(post);
 
   return (
     <>
@@ -909,7 +1396,7 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${lm ? 'text-purple-600 hover:bg-purple-50' : 'text-purple-400 hover:bg-purple-500/15'}`}
             title="Create post"
           >
-            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5}>
               <path d="M12 5v14M5 12h14"/>
             </svg>
           </motion.button>
@@ -929,10 +1416,10 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
               className="absolute inset-0 transform-gpu"
             >
               {activeTab === 'shorts'  && <ShortsTab  lm={lm} />}
-              {activeTab === 'home'    && <HomeTab    posts={posts} loading={postsLoading} error={postsError} lm={lm} />}
-              {activeTab === 'search'  && <SearchTab  posts={posts} loading={postsLoading} lm={lm} />}
+              {activeTab === 'home'    && <HomeTab    posts={posts} loading={postsLoading} error={postsError} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
+              {activeTab === 'search'  && <SearchTab  posts={posts} loading={postsLoading} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
               {activeTab === 'chat'    && <ChatTab    lm={lm} />}
-              {activeTab === 'profile' && <ProfileTab posts={posts} loading={postsLoading} onCreatePost={openCreatePost} lm={lm} />}
+              {activeTab === 'profile' && <ProfileTab posts={posts} loading={postsLoading} onCreatePost={openCreatePost} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -941,13 +1428,26 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
         <BottomNav active={activeTab} onSelect={handleSelect} lm={lm} />
       </motion.div>
 
-      {/* ── Create Post Modal ── */}
+      {/* ── Modals rendered at root to escape tab AnimatePresence/transform ── */}
       <AnimatePresence>
-        {showModal && (
+        {showCreatePost && (
           <CreatePostModal
-            onClose={() => setShowModal(false)}
+            key="create-post"
+            onClose={() => setShowCreatePost(false)}
             onSuccess={handlePostSuccess}
             lm={lm}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {commentingPost && (
+          <CommentModal
+            key={`comment-${commentingPost.id}`}
+            post={commentingPost}
+            lm={lm}
+            onClose={() => setCommentingPost(null)}
+            onRefresh={fetchPosts}
           />
         )}
       </AnimatePresence>
