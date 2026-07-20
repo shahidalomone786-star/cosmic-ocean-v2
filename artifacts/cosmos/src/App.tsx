@@ -1842,38 +1842,82 @@ export default function App() {
               hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
             }`}
           >
-            {/* ── Top-left: Library + toggles ── */}
-            <div className="absolute top-4 left-4 z-30 pointer-events-auto flex items-center gap-2">
-              {/* Library button */}
-              <button
-                onClick={() => setShowLibrary(true)}
-                title="Open Research Library"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
-                  lm
-                    ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
-                    : 'border-white/[0.12] bg-white/[0.06] text-white/75 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
-                }`}
-              >
-                <span className="text-[13px]">📚</span>
-                <span>Library</span>
-              </button>
+            {/* ── Two-row header: row 1 = nav pills + language, row 2 = utility icons ── */}
+            <div className="absolute top-4 left-4 right-4 z-30 pointer-events-auto flex flex-col gap-y-2.5">
 
-              {/* Cosmic Nexus button */}
-              <button
-                onClick={() => setShowNexus(true)}
-                title="Open Cosmic Nexus Social Hub"
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
-                  lm
-                    ? 'border-purple-300/60 bg-purple-50/80 text-purple-700 hover:bg-purple-100/90 hover:border-purple-400/70 hover:text-purple-900'
-                    : 'border-purple-500/30 bg-purple-500/10 text-purple-300/90 hover:bg-purple-500/18 hover:border-purple-400/50 hover:text-purple-200'
-                }`}
-              >
-                <span className="text-[13px]">🌐</span>
-                <span>Nexus</span>
-              </button>
+              {/* Row 1 — nav pills (left) + language dropdown (right) */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {/* Library button */}
+                  <button
+                    onClick={() => setShowLibrary(true)}
+                    title="Open Research Library"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                      lm
+                        ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
+                        : 'border-white/[0.12] bg-white/[0.06] text-white/75 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
+                    }`}
+                  >
+                    <span className="text-[13px]">📚</span>
+                    <span>Library</span>
+                  </button>
 
-              {/* 3D toggle — strictly on idle Home screen only */}
-              {!showLibrary && !hasSearchResults && activeChat === null && (
+                  {/* Cosmic Nexus button */}
+                  <button
+                    onClick={() => setShowNexus(true)}
+                    title="Open Cosmic Nexus Social Hub"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                      lm
+                        ? 'border-purple-300/60 bg-purple-50/80 text-purple-700 hover:bg-purple-100/90 hover:border-purple-400/70 hover:text-purple-900'
+                        : 'border-purple-500/30 bg-purple-500/10 text-purple-300/90 hover:bg-purple-500/18 hover:border-purple-400/50 hover:text-purple-200'
+                    }`}
+                  >
+                    <span className="text-[13px]">🌐</span>
+                    <span>Nexus</span>
+                  </button>
+                </div>
+
+                {/* Language dropdown */}
+                <div className="relative">
+                  <button onClick={() => setLangOpen(o => !o)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
+                      lm
+                        ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18]'
+                        : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
+                    }`}>
+                    🌐 {language}
+                    <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
+                  </button>
+                  <AnimatePresence>
+                    {langOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className={`absolute right-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
+                          lm
+                            ? 'border-black/[0.08] bg-white/[0.95] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
+                            : 'border-white/[0.09] bg-[rgba(8,8,14,0.92)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
+                        }`}
+                      >
+                        {LANGUAGES.map(lang => (
+                          <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
+                            className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
+                              lm
+                                ? lang.label === language ? 'text-slate-900 bg-black/[0.06] border-slate-400' : 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.04] border-transparent'
+                                : lang.label === language ? 'text-white bg-white/[0.10] border-white/40'     : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-transparent'
+                            }`}>
+                            {lang.label}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Row 2 — utility icon toggles, always visible */}
+              <div className="flex items-center justify-end gap-2">
+                {/* Background Animation (3D) toggle */}
                 <button
                   onClick={() => {
                     setShow3D(prev => {
@@ -1890,60 +1934,21 @@ export default function App() {
                 >
                   {show3D ? '◑' : '◐'}
                 </button>
-              )}
 
-              {/* Light mode toggle — only on idle Home screen with 3D off */}
-              {!show3D && !showLibrary && !hasSearchResults && activeChat === null && (
-                <button
-                  onClick={() => setIsLightMode(m => !m)}
-                  title={isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
-                  className={`w-9 h-9 flex items-center justify-center rounded-full border backdrop-blur-[18px] text-[15px] transition-all duration-300 ${
-                    lm
-                      ? 'border-black/[0.12] bg-black/[0.06] text-slate-600 hover:bg-black/[0.10] hover:border-black/[0.20] hover:text-slate-900'
-                      : 'border-white/[0.12] bg-white/[0.06] text-white/60 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
-                  }`}
-                >
-                  {isLightMode ? '🌙' : '☀️'}
-                </button>
-              )}
-            </div>
-
-            {/* ── Profile + Language pill — top right ── */}
-            <div className="absolute top-4 right-4 z-30 pointer-events-auto flex items-center gap-2">
-              <div className="relative">
-                <button onClick={() => setLangOpen(o => !o)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
-                    lm
-                      ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18]'
-                      : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
-                  }`}>
-                  🌐 {language}
-                  <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
-                </button>
-                <AnimatePresence>
-                  {langOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className={`absolute right-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
-                        lm
-                          ? 'border-black/[0.08] bg-white/[0.95] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
-                          : 'border-white/[0.09] bg-[rgba(8,8,14,0.92)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
-                      }`}
-                    >
-                      {LANGUAGES.map(lang => (
-                        <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
-                          className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
-                            lm
-                              ? lang.label === language ? 'text-slate-900 bg-black/[0.06] border-slate-400' : 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.04] border-transparent'
-                              : lang.label === language ? 'text-white bg-white/[0.10] border-white/40'     : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-transparent'
-                          }`}>
-                          {lang.label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Light / Dark mode toggle — only when 3D is off */}
+                {!show3D && (
+                  <button
+                    onClick={() => setIsLightMode(m => !m)}
+                    title={isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                    className={`w-9 h-9 flex items-center justify-center rounded-full border backdrop-blur-[18px] text-[15px] transition-all duration-300 ${
+                      lm
+                        ? 'border-black/[0.12] bg-black/[0.06] text-slate-600 hover:bg-black/[0.10] hover:border-black/[0.20] hover:text-slate-900'
+                        : 'border-white/[0.12] bg-white/[0.06] text-white/60 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
+                    }`}
+                  >
+                    {isLightMode ? '🌙' : '☀️'}
+                  </button>
+                )}
               </div>
             </div>
 
