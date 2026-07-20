@@ -106,6 +106,52 @@ const NASA_FALLBACK = [
     url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Eta_Carinae.jpg/800px-Eta_Carinae.jpg",
     hdurl: "https://upload.wikimedia.org/wikipedia/commons/b/b8/Eta_Carinae.jpg",
   },
+  // ── Extended NASA fallback (4 more) ──────────────────────────────────────
+  {
+    date: "2026-07-12",
+    title: "Orion Nebula — The Nearest Stellar Nursery",
+    explanation:
+      "The Orion Nebula (M42) is a diffuse nebula situated in the Milky Way, south of Orion's Belt. " +
+      "It is one of the brightest nebulae visible to the naked eye and contains a young open cluster of four massive stars " +
+      "called the Trapezium. At approximately 1,344 light-years away, it is the closest region of massive star formation " +
+      "to Earth, and has been extensively studied to understand how stars and planetary systems form from collapsing clouds.",
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Orion_Nebula_-_Hubble_2006_mosaic_18000.jpg/800px-Orion_Nebula_-_Hubble_2006_mosaic_18000.jpg",
+    hdurl: "https://upload.wikimedia.org/wikipedia/commons/f/f3/Orion_Nebula_-_Hubble_2006_mosaic_18000.jpg",
+  },
+  {
+    date: "2026-07-11",
+    title: "The Butterfly Nebula — Wings of Stellar Death",
+    explanation:
+      "The Butterfly Nebula (NGC 6302) is a bipolar planetary nebula with an estimated surface temperature of about " +
+      "250,000 degrees Celsius — one of the hottest known. The dying star at its center has ejected its outer layers " +
+      "to create two lobes of gas that stretch for nearly 3 light-years, sculpted by the star's magnetic field " +
+      "into one of the most visually striking objects in the Milky Way.",
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Ngc6302_hst.jpg/800px-Ngc6302_hst.jpg",
+    hdurl: "https://upload.wikimedia.org/wikipedia/commons/9/99/Ngc6302_hst.jpg",
+  },
+  {
+    date: "2026-07-10",
+    title: "Galaxy NGC 1300 — A Textbook Grand Design Spiral",
+    explanation:
+      "NGC 1300 is a barred spiral galaxy located about 61 million light-years away in the constellation Eridanus. " +
+      "This Hubble image shows the galaxy's extraordinary grand-design spiral structure, with a bright central bar " +
+      "and massive symmetric spiral arms laden with star-forming regions, young blue star clusters, and dark dust lanes. " +
+      "Within the central bar of NGC 1300, the nucleus itself shows a grand-design structure in miniature — a spiral within a spiral.",
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/NGC_1300.jpg/800px-NGC_1300.jpg",
+    hdurl: "https://upload.wikimedia.org/wikipedia/commons/6/6b/NGC_1300.jpg",
+  },
+  {
+    date: "2026-07-09",
+    title: "Hubble Ultra Deep Field — 13 Billion Years of History",
+    explanation:
+      "The Hubble Ultra Deep Field is an image of a small region of space in the constellation Fornax, " +
+      "composited from Hubble Space Telescope data accumulated over a period of 11.3 days. The image contains " +
+      "an estimated 10,000 galaxies stretching back almost to the time shortly after the Big Bang. " +
+      "In terms of solid angle, it covers 11.0 square arcminutes — equivalent to a 1 mm × 1 mm square " +
+      "held at 1 metre distance, or the apparent area of a grain of sand viewed from 10 feet away.",
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/NASA-HS201427a-HubbleUltraDeepField2014-20140603.jpg/800px-NASA-HS201427a-HubbleUltraDeepField2014-20140603.jpg",
+    hdurl: "https://upload.wikimedia.org/wikipedia/commons/6/69/NASA-HS201427a-HubbleUltraDeepField2014-20140603.jpg",
+  },
 ];
 
 async function fetchNasaApod(): Promise<SyncResult> {
@@ -266,6 +312,47 @@ const ARXIV_FALLBACK: ArxivEntry[] = [
     published: new Date(Date.now() - 52 * 3600000).toISOString(),
     category: "hep-th",
   },
+  // ── Extended arXiv fallback (5 more) ─────────────────────────────────────
+  {
+    arxiv_id: "2407.11234",
+    title: "Primordial Gravitational Waves from Cosmic Inflation: BICEP Array Constraints",
+    abstract: "We present the most stringent upper limits on the tensor-to-scalar ratio r from the BICEP Array and Keck Array experiments, achieving r < 0.032 at 95% confidence. These constraints exclude a significant class of large-field inflation models and rule out monomial inflation models with n ≥ 2, substantially constraining the landscape of viable inflationary theories.",
+    authors: ["BICEP/Keck Collaboration", "Ade, P.", "Ahmed, Z.", "Barkats, D."],
+    published: new Date(Date.now() - 58 * 3600000).toISOString(),
+    category: "astro-ph.CO",
+  },
+  {
+    arxiv_id: "2407.12345",
+    title: "Emergent Spacetime Geometry from Quantum Entanglement: A Holographic Perspective",
+    abstract: "We demonstrate that the metric of (d+1)-dimensional anti-de Sitter spacetime can be reconstructed from the entanglement structure of a d-dimensional conformal field theory, extending the Ryu-Takayanagi formula to dynamical spacetimes. Our construction implies that spacetime geometry is fundamentally quantum-informational in origin, providing a concrete realization of the ER=EPR conjecture.",
+    authors: ["Van Raamsdonk, M.", "Swingle, B.", "Headrick, M."],
+    published: new Date(Date.now() - 66 * 3600000).toISOString(),
+    category: "hep-th",
+  },
+  {
+    arxiv_id: "2407.13456",
+    title: "Room-Temperature Quantum Coherence in Biological Systems: Photosynthetic Energy Transfer",
+    abstract: "Using two-dimensional electronic spectroscopy with 10-femtosecond resolution, we observe long-lived quantum coherences in the FMO light-harvesting complex at 298K. Coherence lifetimes of 400 ± 50 fs significantly exceed thermal decoherence timescales predicted by the Redfield equation, suggesting quantum effects may enhance biological energy transfer efficiency.",
+    authors: ["Fleming, G.", "Engel, G.", "Calhoun, T.", "Read, E."],
+    published: new Date(Date.now() - 74 * 3600000).toISOString(),
+    category: "quant-ph",
+  },
+  {
+    arxiv_id: "2407.14567",
+    title: "Detection of Axion Dark Matter Using Quantum-Enhanced Nuclear Magnetic Resonance",
+    abstract: "We demonstrate a new technique for axion dark matter detection using nuclear magnetic resonance enhanced by quantum squeezing. The sensitivity of our apparatus surpasses the standard quantum limit by 8 dB, probing axion-photon couplings 10× below previous laboratory bounds in the mass range 50–200 μeV. No signal detected — placing the strongest constraints on QCD axions in this range.",
+    authors: ["Budker, D.", "Derevianko, A.", "Kimball, D.", "Pospelov, M."],
+    published: new Date(Date.now() - 82 * 3600000).toISOString(),
+    category: "hep-ph",
+  },
+  {
+    arxiv_id: "2407.15678",
+    title: "Traversable Wormholes Stabilised by Exotic Negative Energy: Quantum Field Theory Analysis",
+    abstract: "Morris-Thorne traversable wormholes require matter with negative energy density to remain open. We show that the Casimir effect between the wormhole's exotic geometry provides insufficient negative energy by 47 orders of magnitude. However, a new mechanism exploiting topological phase transitions in quantum field theory at Planck-scale temperatures may generate the required negative energy density transiently.",
+    authors: ["Morris, M.", "Visser, M.", "Barceló, C.", "Liberati, S."],
+    published: new Date(Date.now() - 90 * 3600000).toISOString(),
+    category: "gr-qc",
+  },
 ];
 
 async function fetchArxivPapers(): Promise<SyncResult> {
@@ -361,6 +448,35 @@ const WIKI_FALLBACK = [
     thumbnail: "",
     url: "https://en.wikipedia.org/wiki/Multiverse",
   },
+  // ── Extended Wikipedia fallback (4 more) ─────────────────────────────────
+  {
+    id: "wiki_uncertainty_principle",
+    title: "Heisenberg Uncertainty Principle",
+    extract: "The Heisenberg uncertainty principle is a fundamental limit in quantum mechanics stating it is impossible to simultaneously measure both the position and momentum of a particle with arbitrary precision. Δx · Δp ≥ ℏ/2. This is not measurement imprecision from limited instruments — it is an intrinsic indeterminacy in nature. The more precisely position is defined, the less precisely momentum can be known.",
+    thumbnail: "",
+    url: "https://en.wikipedia.org/wiki/Uncertainty_principle",
+  },
+  {
+    id: "wiki_general_relativity",
+    title: "General Relativity",
+    extract: "General relativity is Einstein's geometric theory of gravitation, published in 1915. It describes gravity as a geometric property of 4-dimensional spacetime — the curvature of spacetime is directly related to the energy and momentum of matter and radiation. GR predicts black holes, gravitational waves, gravitational lensing, and the expansion of the universe, all subsequently confirmed by observation.",
+    thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Spacetime_curvature.png/200px-Spacetime_curvature.png",
+    url: "https://en.wikipedia.org/wiki/General_relativity",
+  },
+  {
+    id: "wiki_crispr",
+    title: "CRISPR",
+    extract: "CRISPR (Clustered Regularly Interspaced Short Palindromic Repeats) refers to a family of DNA sequences in prokaryotic organisms. The CRISPR-Cas9 system has been adapted as a revolutionary gene-editing tool — the Cas9 protein acts as molecular scissors guided by a short RNA sequence to cut DNA at a precise location. This enables insertion, deletion, or replacement of DNA sequences with unprecedented accuracy.",
+    thumbnail: "",
+    url: "https://en.wikipedia.org/wiki/CRISPR",
+  },
+  {
+    id: "wiki_cosmic_inflation",
+    title: "Cosmic Inflation",
+    extract: "Cosmic inflation is a period of exponential expansion of space in the early universe, occurring approximately 10⁻³⁶ seconds after the Big Bang and lasting until about 10⁻³² seconds. During this time the universe expanded by a factor of at least 10²⁶. Inflation explains the flatness and horizon problems in cosmology, and generates the quantum fluctuations that seeded all large-scale structure in the cosmos.",
+    thumbnail: "",
+    url: "https://en.wikipedia.org/wiki/Inflation_(cosmology)",
+  },
 ];
 
 async function fetchWikipedia(): Promise<SyncResult> {
@@ -410,7 +526,7 @@ async function fetchWikipedia(): Promise<SyncResult> {
   return { source: "wikipedia", inserted };
 }
 
-// ── YouTube / Science Video Pool (18 videos) ─────────────────────────────────
+// ── YouTube / Science Video Pool (40 videos) ─────────────────────────────────
 
 const YOUTUBE_POOL = [
   {
@@ -557,6 +673,191 @@ const YOUTUBE_POOL = [
     type: "short-video" as const,
     views: "9.4M",
   },
+  // ── Extended Science Video Library (22 more) ─────────────────────────────
+  {
+    youtube_id: "sFogewR3JMk",
+    title: "Why No One Has Measured The Speed Of Light",
+    channel: "Veritasium",
+    description: "The speed of light has never truly been measured in a single direction — only round trips. This seemingly simple gap in measurement hides a deep philosophical problem about the one-way speed of light that may be impossible to ever resolve.",
+    type: "short-video" as const,
+    views: "23.1M",
+  },
+  {
+    youtube_id: "J1exWQKUi4k",
+    title: "Parallel Worlds Probably Exist. Here's Why",
+    channel: "Veritasium",
+    description: "The many-worlds interpretation of quantum mechanics is testable and makes predictions. Physicists like Sean Carroll argue it is the most parsimonious reading of quantum theory. Every quantum event creates a branching of reality — and most physicists secretly believe it.",
+    type: "short-video" as const,
+    views: "14.8M",
+  },
+  {
+    youtube_id: "y8yvnqHmFds",
+    title: "Quantum Computers Explained – Limits of Human Technology",
+    channel: "Kurzgesagt",
+    description: "Classical computers use bits that are 0 or 1. Quantum computers use qubits that exist in superposition — both at once. By exploiting quantum entanglement and interference, they can solve problems that would take classical computers longer than the age of the universe.",
+    type: "short-video" as const,
+    views: "21.4M",
+  },
+  {
+    youtube_id: "EHnl8vt-LRs",
+    title: "Black Holes Explained – From Birth to Death",
+    channel: "Kurzgesagt",
+    description: "Black holes are the universe's most extreme objects — born from dying stars, they warp spacetime to infinity. Everything that crosses the event horizon is lost forever. Or is it? Hawking radiation suggests black holes eventually evaporate, leaving nothing but a thermal glow.",
+    type: "short-video" as const,
+    views: "8.9M",
+  },
+  {
+    youtube_id: "uD4izuDMUQA",
+    title: "Genetic Engineering Will Change Everything Forever – CRISPR",
+    channel: "Kurzgesagt",
+    description: "CRISPR-Cas9 allows scientists to edit DNA with unprecedented precision — cutting and replacing genetic sequences like editing a text document. This molecular scissors technology is poised to eliminate hereditary diseases, create new crops, and fundamentally reshape biology.",
+    type: "short-video" as const,
+    views: "24.3M",
+  },
+  {
+    youtube_id: "yt6zFEMMR70",
+    title: "Are You Alone? (In The Universe)",
+    channel: "Kurzgesagt",
+    description: "Are we alone in the universe? The Drake equation gives us a framework but the numbers swing wildly. The Fermi Paradox tells us something is profoundly wrong with our assumptions. Either life is extraordinarily rare, or civilizations inevitably destroy themselves.",
+    type: "short-video" as const,
+    views: "11.2M",
+  },
+  {
+    youtube_id: "0NbBjNiw4tk",
+    title: "Do Wormholes Really Exist?",
+    channel: "Kurzgesagt",
+    description: "Einstein-Rosen bridges — wormholes — are mathematically valid solutions to general relativity. But can they exist physically? Would they be stable? Could they enable travel to other universes or faster-than-light journeys across our own? The science is stranger than the fiction.",
+    type: "short-video" as const,
+    views: "7.1M",
+  },
+  {
+    youtube_id: "pTn6Ewhb27k",
+    title: "The Most Efficient Way to Destroy the Universe – False Vacuum",
+    channel: "Kurzgesagt",
+    description: "Our universe might not be in its lowest energy state. If the Higgs field is in a false vacuum, a quantum fluctuation could trigger a phase transition that expands at the speed of light, destroying everything and converting our universe into a new, incompatible configuration.",
+    type: "short-video" as const,
+    views: "16.3M",
+  },
+  {
+    youtube_id: "QCFmBGMSmzI",
+    title: "The Science of Antimatter",
+    channel: "Kurzgesagt",
+    description: "Antimatter is the mirror image of matter — same mass, opposite charge. When matter meets antimatter, they annihilate in a burst of pure energy. The Big Bang should have created equal amounts of both. That it didn't is one of physics' greatest unsolved mysteries.",
+    type: "short-video" as const,
+    views: "8.4M",
+  },
+  {
+    youtube_id: "7vs3zJhYMDA",
+    title: "The True Science of Parallel Universes",
+    channel: "MinutePhysics",
+    description: "Are parallel universes science or science fiction? Three distinct theories — the many-worlds interpretation, eternal inflation, and quantum entanglement branches — each predict the existence of parallel realities, but for completely different physical reasons.",
+    type: "short-video" as const,
+    views: "13.7M",
+  },
+  {
+    youtube_id: "W9yWv5dqSKQ",
+    title: "TIMELAPSE OF THE FUTURE: A Journey to the End of Time",
+    channel: "melodysheep",
+    description: "Travel forward in time from our present day through stellar epochs, galaxy mergers, black hole evaporation, and the final quantum fluctuations at the heat death of the universe. 100 trillion years of cosmic history compressed into 30 stunning minutes.",
+    type: "long-video" as const,
+    views: "32.7M",
+  },
+  {
+    youtube_id: "rltpH6ckAkA",
+    title: "What is Dark Matter and Dark Energy?",
+    channel: "ScienceClic English",
+    description: "Dark matter and dark energy together constitute 95% of the universe's content yet we have never directly detected either. Their presence is inferred purely from gravitational effects. Understanding them is the defining challenge of 21st-century cosmology.",
+    type: "short-video" as const,
+    views: "4.8M",
+  },
+  {
+    youtube_id: "XM25J0u5EY4",
+    title: "Cosmic Inflation — The Universe's First Moments",
+    channel: "PBS Space Time",
+    description: "Cosmic inflation — an epoch of exponential expansion a fraction of a second after the Big Bang — solves the flatness problem and horizon problem that plagued earlier cosmological models. It also generates the quantum fluctuations that seeded all large-scale structure.",
+    type: "long-video" as const,
+    views: "2.3M",
+  },
+  {
+    youtube_id: "IJhgZBn-LHg",
+    title: "Dark Matter and the Fate of the Universe",
+    channel: "PBS Space Time",
+    description: "Dark matter shapes everything — from galaxy rotation curves to the cosmic web of filaments connecting galaxy clusters. Without it, no galaxy could form. Multiple independent lines of evidence confirm its existence, but its particle nature remains stubbornly unknown.",
+    type: "long-video" as const,
+    views: "2.1M",
+  },
+  {
+    youtube_id: "meTpeBrjBFo",
+    title: "Quantum Gravity and the Unification of Physics",
+    channel: "Sabine Hossenfelder",
+    description: "General relativity describes gravity at cosmic scales. Quantum mechanics describes physics at the subatomic level. The two theories are mutually incompatible — and reconciling them is arguably the greatest challenge in physics. What does quantum gravity actually predict?",
+    type: "long-video" as const,
+    views: "3.2M",
+  },
+  {
+    youtube_id: "lmTmGLzPVyM",
+    title: "Why the Speed of Light is Unreachable",
+    channel: "ScienceClic English",
+    description: "As an object approaches the speed of light, its relativistic mass increases toward infinity — requiring infinite energy to accelerate further. This isn't an engineering constraint but a fundamental feature of spacetime geometry, as Einstein showed in special relativity.",
+    type: "short-video" as const,
+    views: "6.7M",
+  },
+  {
+    youtube_id: "xAUJEf8_4TY",
+    title: "Time Dilation Explained Simply",
+    channel: "Kurzgesagt",
+    description: "Time passes more slowly for objects moving quickly or experiencing stronger gravity. GPS satellites must account for time dilation or their clocks would drift by 38 microseconds per day — enough to make your navigation 10 km off within 24 hours. Relativity is not abstract.",
+    type: "short-video" as const,
+    views: "5.9M",
+  },
+  {
+    youtube_id: "KnqnI9fPQ08",
+    title: "What is the Universe Made Of?",
+    channel: "PBS Space Time",
+    description: "The Standard Model of particle physics describes 17 fundamental particles — quarks, leptons, gauge bosons, and the Higgs boson. But these account for only 5% of the universe. The remaining 95% in dark matter and dark energy is utterly unknown.",
+    type: "short-video" as const,
+    views: "1.8M",
+  },
+  {
+    youtube_id: "SKxDEeHzBQI",
+    title: "How the Universe is Way Bigger Than You Think",
+    channel: "Vsauce",
+    description: "Numbers like 93 billion light-years or 2 trillion galaxies are meaningless until you walk through the scale of the universe step by step. From atoms to quarks, planets to galaxy superclusters, the scale of reality is so vast it becomes genuinely incomprehensible.",
+    type: "short-video" as const,
+    views: "27.4M",
+  },
+  {
+    youtube_id: "yHLiClz4rqo",
+    title: "The Big Bang — From Planck Time to the First Stars",
+    channel: "SpaceRip",
+    description: "The universe began 13.8 billion years ago in an event of incomprehensible energy density. From the quark-gluon plasma to the first nuclei, atoms, stars, and galaxies — this is the complete story of how everything came to be from almost nothing.",
+    type: "long-video" as const,
+    views: "4.1M",
+  },
+  {
+    youtube_id: "Pj-h6MEgE7I",
+    title: "The Science of Aging — Can We Live Forever?",
+    channel: "Kurzgesagt",
+    description: "Aging is driven by telomere shortening, cellular senescence, and accumulated DNA damage. Modern research into senolytics, mTOR inhibition, and epigenetic reprogramming suggests aging might be a disease we can treat. Is biological immortality achievable?",
+    type: "short-video" as const,
+    views: "12.8M",
+  },
+  {
+    youtube_id: "PvdHmylPzH4",
+    title: "Biggest Stars in the Universe Compared",
+    channel: "SpaceRip",
+    description: "UY Scuti, VY Canis Majoris, Stephenson 2-18 — these hypergiant stars are so enormous that if placed at the center of our solar system, they would swallow Jupiter. A photon of light takes 8 hours to travel from one side to the other.",
+    type: "short-video" as const,
+    views: "8.3M",
+  },
+  {
+    youtube_id: "b_djLsflA44",
+    title: "The Fine-Tuned Universe — Miracle or Multiverse?",
+    channel: "PBS Space Time",
+    description: "The fundamental constants of physics — the strength of gravity, the mass of the electron, the cosmological constant — appear fine-tuned for life's existence with extraordinary precision. Is this evidence for a multiverse, a designer, or just survivorship bias?",
+    type: "short-video" as const,
+    views: "3.7M",
+  },
 ];
 
 async function fetchYouTubePool(): Promise<SyncResult> {
@@ -566,7 +867,7 @@ async function fetchYouTubePool(): Promise<SyncResult> {
     const v = YOUTUBE_POOL[i];
     const id = `ec_yt_${v.youtube_id}`;
     const extra = JSON.stringify({ youtube_id: v.youtube_id, channel: v.channel, views: v.views });
-    const thumbnail = `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`;
+    const thumbnail = `https://img.youtube.com/vi/${v.youtube_id}/hqdefault.jpg`;
     const ts = hoursAgo(i * interval + 0.5);
     const r = stmts.upsertExternalContent.run(
       id, "youtube", v.title, v.description,
@@ -701,6 +1002,63 @@ const X_POOL = [
     likes: "94.7K",
     retweets: "26.4K",
   },
+  // ── Extended X Pool (7 more) ─────────────────────────────────────────────
+  {
+    handle: "Astro_Pettit",
+    verified: true,
+    followers: "718K",
+    content: "From the ISS, you can watch entire thunderstorm systems from above — sprites and elves dancing above the clouds at 70km altitude, lightning dancing below, the auroral oval glowing on the horizon. Earth from 400km up never stops being astonishing. Humanity's pale blue dot. 🌏",
+    likes: "43.2K",
+    retweets: "11.7K",
+  },
+  {
+    handle: "LHCphysics",
+    verified: false,
+    followers: "156K",
+    content: "Run 4 results: no new particles at 14.8 TeV yet — but the null result IS a result. The fact that supersymmetry hasn't appeared tells us either SUSY particles are heavier than expected, or SUSY is wrong. Either way, the Standard Model is remarkable. Physics beyond it, wherever it hides, must be subtle. ⚛️",
+    likes: "8.4K",
+    retweets: "2.3K",
+  },
+  {
+    handle: "cosmologytruth",
+    verified: false,
+    followers: "234K",
+    content: "The cosmic web: galaxies don't sit randomly in space — they trace filaments, walls, and voids in a structure spanning hundreds of millions of light-years. This cosmic architecture grew from quantum fluctuations that existed 380,000 years after the Big Bang, stretched across the sky by inflation. 🌐",
+    likes: "12.8K",
+    retweets: "3.4K",
+  },
+  {
+    handle: "FQXi",
+    verified: true,
+    followers: "287K",
+    content: "FQXi Small Grants 2026: Funded — 'Testing quantum gravity signatures with atomic interferometry at extreme altitudes'. The decoherence rate of quantum superpositions in varying gravitational fields may provide our first empirical window into Planck-scale physics. 🔬",
+    likes: "6.9K",
+    retweets: "1.8K",
+  },
+  {
+    handle: "kiraNovak_astro",
+    verified: false,
+    followers: "92K",
+    content: "Thread: why does anything exist instead of nothing? The Hartle-Hawking no-boundary proposal says the universe has no initial condition — it simply IS, without a beginning, like the surface of a sphere. The question 'what came before?' assumes time exists outside the universe. It doesn't. 🧵",
+    likes: "19.3K",
+    retweets: "5.7K",
+  },
+  {
+    handle: "Nobel_Physics",
+    verified: true,
+    followers: "2.1M",
+    content: "2026 Nobel Prize in Physics awarded to Alain Aspect, John Clauser, and Anton Zeilinger's labs for continued quantum entanglement experiments confirming Bell inequality violations at cosmological scales — spooky action at a distance is real, regardless of the distance. 🏅",
+    likes: "78.4K",
+    retweets: "19.2K",
+  },
+  {
+    handle: "quantumleap_ai",
+    verified: true,
+    followers: "445K",
+    content: "IBM Heron processor achieves 99.9% two-qubit gate fidelity at room temperature using new error mitigation protocols. We are now reliably in the fault-tolerant regime for small circuits. The era of quantum advantage for practical chemistry simulation has officially begun. 💻⚛️",
+    likes: "34.7K",
+    retweets: "9.1K",
+  },
 ];
 
 async function fetchXBulletins(): Promise<SyncResult> {
@@ -809,6 +1167,63 @@ const TELEGRAM_POOL = [
     content: "🪐 PROXIMA b ATMOSPHERE — VLT/ESPRESSO directly detects water vapour, methane, and CO₂ in the atmosphere of the super-Earth Proxima Centauri b. Atmospheric scale height implies surface conditions potentially compatible with liquid water. ELT follow-up approved for 2027 season. Our nearest neighbour may not be alone.",
     views: "35.2K",
     forwarded: 2618,
+  },
+  // ── Extended Telegram Pool (8 more) ──────────────────────────────────────
+  {
+    channel: "Event Horizon Monitor",
+    subscribers: "489K",
+    content: "🕳️ UPDATE — EHT 2026 campaign results: third image of M87* black hole shadow released. New VLBI baselines using space-based dish allow resolution of 15 microarcseconds — 3× sharper than previous images. First hints of relativistic jet launch zone structure. Preprint: arXiv 2407.28194",
+    views: "63.4K",
+    forwarded: 5218,
+  },
+  {
+    channel: "Gravitational Wave Alert",
+    subscribers: "312K",
+    content: "🌊 GW ALERT — O4 run event GW260719A: confident binary black hole merger detection. Primary mass: 87 M☉. Secondary: 43 M☉. Resulting black hole: ~127 M☉ — squarely in the 'mass gap' between stellar and intermediate-mass black holes. Sky localisation 180 deg². Optical follow-up underway.",
+    views: "28.7K",
+    forwarded: 2103,
+  },
+  {
+    channel: "Quantum Future Lab",
+    subscribers: "678K",
+    content: "🔐 MILESTONE — Microsoft achieves 1000 topological qubit operations with error rate below 10⁻⁷ using Majorana zero modes. If confirmed this would bypass the need for surface-code overhead entirely. The holy grail of quantum computing may be within reach this decade.",
+    views: "41.2K",
+    forwarded: 3467,
+  },
+  {
+    channel: "Cosmic Wire",
+    subscribers: "1.2M",
+    content: "🌠 NEW RECORD — Webb detects galaxy JADES-GS-z14-0 at z=14.32 — corresponding to just 290 million years after the Big Bang. The galaxy has 500 million solar masses of stars and active star formation. Galaxy formation is proceeding impossibly fast in the early universe. Our models are wrong.",
+    views: "97.1K",
+    forwarded: 8924,
+  },
+  {
+    channel: "Neutrino Observatory Net",
+    subscribers: "223K",
+    content: "⚡ ICE CUBE RESULTS — IceCube Neutrino Observatory confirms astrophysical neutrino source: the Seyfert galaxy NGC 1068. High-energy neutrinos detected above atmospheric background at 4.2σ. Neutrino astronomy is now a real field. The sky in neutrinos looks very different from photons.",
+    views: "19.4K",
+    forwarded: 1287,
+  },
+  {
+    channel: "Theoretical Physics Hub",
+    subscribers: "724K",
+    content: "🌌 EMERGENT GRAVITY — New paper in Physical Review Letters: gravity may not be fundamental but emergent from quantum entanglement entropy. The Ryu-Takayanagi formula connects spatial geometry to boundary entanglement. If correct, spacetime geometry IS entanglement. Maldacena's ER=EPR conjecture gains new support.",
+    views: "44.8K",
+    forwarded: 3728,
+  },
+  {
+    channel: "CERN Updates",
+    subscribers: "891K",
+    content: "⚛️ FCC APPROVAL — CERN Council approves next accelerator: the Future Circular Collider, 91km circumference, collision energies up to 100 TeV. Construction begins 2035, first collisions 2048. The FCC will probe energy scales 7× beyond the LHC — potentially discovering new forces, extra dimensions, or SUSY partners.",
+    views: "71.3K",
+    forwarded: 6142,
+  },
+  {
+    channel: "Space Medicine Institute",
+    subscribers: "167K",
+    content: "🧬 HEALTH ALERT — Deep-space radiation study: astronauts on a Mars mission would receive ~1 Sv of ionizing radiation — exceeding NASA's lifetime limit. New polyethylene hydrogen-rich shielding reduces dose by 38%. Still not sufficient for 3-year mission. Radiation remains the #1 unresolved obstacle for Mars.",
+    views: "22.1K",
+    forwarded: 1584,
   },
 ];
 
@@ -951,6 +1366,87 @@ const INSTAGRAM_POOL = [
     media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sahara_desert.jpg/600px-Sahara_desert.jpg",
     likes: "4.1M",
     hashtags: ["#Sahara", "#Climate", "#NatGeo", "#Earth"],
+    is_reel: false,
+  },
+  // ── Extended Instagram Pool (8 more posts) ───────────────────────────────
+  {
+    handle: "nasa_hubble",
+    verified: true,
+    followers: "8.3M",
+    content: "Pillars of Creation — Eagle Nebula in new light 🦅 These towering columns of cosmic gas and dust stretch 5 light-years tall, sculpted by radiation from nearby massive stars. Inside, gravity is collapsing pockets of gas into new solar systems right now.",
+    media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Pillars_of_creation_2014_HST_WFC3-UVIS_full-res_denoised.jpg/600px-Pillars_of_creation_2014_HST_WFC3-UVIS_full-res_denoised.jpg",
+    likes: "3.8M",
+    hashtags: ["#Hubble", "#EagleNebula", "#Cosmos", "#NASA"],
+    is_reel: false,
+  },
+  {
+    handle: "kurzgesagt",
+    verified: true,
+    followers: "5.2M",
+    content: "The universe will end in darkness 🌌 In 100 trillion years the last stars die. In 10^40 years all black holes evaporate. In 10^10^120 years a quantum fluctuation may spawn a new universe. What happens in between is a story of unimaginable desolation — and perhaps new beginnings.",
+    media_url: "",
+    likes: "287K",
+    hashtags: ["#Cosmology", "#HeatDeath", "#Universe", "#Science"],
+    is_reel: true,
+  },
+  {
+    handle: "thephysicsgirl",
+    verified: true,
+    followers: "1.7M",
+    content: "Quantum mechanics says particles have no definite position until measured 📐 But what does 'measurement' actually mean? This is the infamous measurement problem — and after 100 years, physicists still don't agree on the answer. We use quantum mechanics perfectly without understanding it.",
+    media_url: "",
+    likes: "94.1K",
+    hashtags: ["#QuantumMechanics", "#Physics", "#MeasurementProblem"],
+    is_reel: true,
+  },
+  {
+    handle: "astronomy_daily",
+    verified: false,
+    followers: "423K",
+    content: "Eta Carinae is 5 million times brighter than the Sun and could explode any day ☀️✨ When it goes hypernova, it will be visible in daylight from Earth. Astronomers watch it obsessively. It may already have exploded — we just haven't received the light yet.",
+    media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Eta_Carinae.jpg/600px-Eta_Carinae.jpg",
+    likes: "58.3K",
+    hashtags: ["#EtaCarinae", "#Hypernova", "#Astronomy"],
+    is_reel: false,
+  },
+  {
+    handle: "spacex",
+    verified: true,
+    followers: "14.2M",
+    content: "Raptor 3 engine fire test 🔥 Full-duration burn achieved. 280+ tons of thrust in a package smaller than a car engine. The most efficient methane rocket engine ever built. Multiple flights, full reuse. Making Mars multiplanetary — one refire at a time. 🚀",
+    media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/SpaceX-IFA-Merlin-Engines.jpg/600px-SpaceX-IFA-Merlin-Engines.jpg",
+    likes: "2.4M",
+    hashtags: ["#Raptor3", "#SpaceX", "#Mars", "#Reusable"],
+    is_reel: true,
+  },
+  {
+    handle: "quantumleap.science",
+    verified: false,
+    followers: "318K",
+    content: "Electron orbitals are not orbits 🧲 The 'electron cloud' represents probability densities — regions where an electron is likely to be found upon measurement. Before measurement, the electron is genuinely delocalized, spread across all possible positions simultaneously. This isn't metaphor. It's reality.",
+    media_url: "",
+    likes: "42.7K",
+    hashtags: ["#QuantumChemistry", "#Electrons", "#Physics", "#Science"],
+    is_reel: true,
+  },
+  {
+    handle: "astronomy.now",
+    verified: true,
+    followers: "612K",
+    content: "Crab Nebula pulsar rotating 30 times per second 💫 The neutron star at its heart — 20km wide, 1.4 solar masses — was born in a supernova witnessed by Chinese astronomers in 1054 AD. Its spinning magnetic field accelerates particles to near light speed, powering the entire nebula.",
+    media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Crab_Nebula.jpg/600px-Crab_Nebula.jpg",
+    likes: "137.4K",
+    hashtags: ["#CrabNebula", "#Pulsar", "#NeutronStar", "#Cosmos"],
+    is_reel: false,
+  },
+  {
+    handle: "deepskywatcher",
+    verified: false,
+    followers: "187K",
+    content: "Last night I captured M42 — the Orion Nebula — from my backyard 🔭 40 years of imaging and this never gets old. A stellar nursery 1,344 light-years away, visible to the naked eye on a dark night. The fuzzy patch in Orion's sword is thousands of newborn solar systems.",
+    media_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Orion_Nebula_-_Hubble_2006_mosaic_18000.jpg/600px-Orion_Nebula_-_Hubble_2006_mosaic_18000.jpg",
+    likes: "29.1K",
+    hashtags: ["#OrionNebula", "#M42", "#Astrophotography", "#Astronomy"],
     is_reel: false,
   },
 ];

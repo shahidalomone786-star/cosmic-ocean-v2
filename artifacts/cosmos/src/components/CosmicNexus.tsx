@@ -991,6 +991,20 @@ function ShortVideoSlide({ post, onComment }: {
   const [bookmarked, setBookmarked] = useState(post.user_bookmarked);
   const [playing,    setPlaying]    = useState(false);
   const [shareToast, setShareToast] = useState(false);
+  const [thumbErr,   setThumbErr]   = useState(false);
+  const slideRef = useRef<HTMLDivElement>(null);
+
+  // ── Stop audio/video when scrolled out of view ─────────────────────────────
+  useEffect(() => {
+    const el = slideRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry && !entry.isIntersecting) setPlaying(false); },
+      { threshold: 0.4 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const extra = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
   const youtubeId  = (extra['youtube_id'] as string) || '';
@@ -998,10 +1012,12 @@ function ShortVideoSlide({ post, onComment }: {
   const igLikes    = (extra['likes']      as string) || '';
   const channel    = (extra['channel']    as string) || '';
 
-  // Background image
+  // Background image — try hqdefault, fall back to sddefault
   let bgUrl = '';
   if (post.source === 'youtube' && youtubeId) {
-    bgUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    bgUrl = thumbErr
+      ? `https://img.youtube.com/vi/${youtubeId}/sddefault.jpg`
+      : `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
   } else if (post.media_url) {
     bgUrl = post.media_url;
   }
@@ -1047,12 +1063,14 @@ function ShortVideoSlide({ post, onComment }: {
   const authorName   = post.source === 'instagram' ? `@${igHandle || post.author_username}` : post.author_username;
 
   return (
-    <div className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden bg-black">
+    <div ref={slideRef} className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden bg-black">
 
       {/* ── Background ── */}
       {bgUrl && !playing && (
         <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
-          onError={e => { e.currentTarget.style.display = 'none'; }} />
+          onError={() => {
+            if (!thumbErr) setThumbErr(true);
+          }} />
       )}
       {!bgUrl && (
         <div className="absolute inset-0"

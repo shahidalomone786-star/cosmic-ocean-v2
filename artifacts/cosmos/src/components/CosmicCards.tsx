@@ -4,7 +4,7 @@
  * arXiv, NASA, YouTube, X, Telegram, Wikipedia
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Shared type (mirrors CosmicNexus LivePost) ────────────────────────────────
@@ -371,6 +371,21 @@ export function YouTubeCard({ post, lm, onComment, onRefresh }: {
 }) {
   const [playing,   setPlaying]   = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [thumbErr,  setThumbErr]  = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Pause when scrolled out of view — prevents audio overlap ─────────────
+  useEffect(() => {
+    if (!playing) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry && !entry.isIntersecting) setPlaying(false); },
+      { threshold: 0.1 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [playing]);
 
   const extra = parseExtra<{ youtube_id?: string; channel?: string; views?: string; duration?: string }>(post.extra_json, {});
   const youtubeId = extra.youtube_id ?? '';
@@ -379,6 +394,13 @@ export function YouTubeCard({ post, lm, onComment, onRefresh }: {
   const duration  = extra.duration  ?? '';
   const isShort   = post.type === 'short-video';
 
+  // Thumbnail with fallback chain: hqdefault → sddefault → mqdefault
+  const thumbUrl = youtubeId
+    ? thumbErr
+      ? `https://img.youtube.com/vi/${youtubeId}/sddefault.jpg`
+      : `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
+    : '';
+
   // Long-form videos use 16:9 frame; short-form uses portrait ratio
   const frameStyle: React.CSSProperties = isShort
     ? { aspectRatio: '9/16', maxHeight: '300px' }
@@ -386,6 +408,7 @@ export function YouTubeCard({ post, lm, onComment, onRefresh }: {
 
   return (
     <motion.div
+      ref={containerRef}
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
       className={`rounded-2xl overflow-hidden border transition-colors duration-300 ${
         lm ? 'bg-white border-gray-100 shadow-sm hover:shadow-md' : 'border-white/[0.07] hover:border-white/[0.12]'
@@ -402,9 +425,10 @@ export function YouTubeCard({ post, lm, onComment, onRefresh }: {
           {/* Thumbnail (shown before play) */}
           {!playing && (
             <img
-              src={`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`}
+              src={thumbUrl}
               alt={post.ec_title}
               onLoad={() => setImgLoaded(true)}
+              onError={() => { if (!thumbErr) setThumbErr(true); }}
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
             />
           )}
