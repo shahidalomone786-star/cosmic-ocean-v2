@@ -7,6 +7,7 @@ import GrandmasterChessModal from './components/GrandmasterChess';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
+import CosmicNexus from './components/CosmicNexus';
 import { useAuthStore, PRESET_AVATARS } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -1518,6 +1519,7 @@ export default function App() {
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
   const [showProfile,      setShowProfile]      = useState(false);
+  const [showNexus,        setShowNexus]        = useState(false);
   const { isAuthenticated, recordChessResult, user } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
@@ -1854,6 +1856,20 @@ export default function App() {
               >
                 <span className="text-[13px]">📚</span>
                 <span>Library</span>
+              </button>
+
+              {/* Cosmic Nexus button */}
+              <button
+                onClick={() => setShowNexus(true)}
+                title="Open Cosmic Nexus Social Hub"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                  lm
+                    ? 'border-purple-300/60 bg-purple-50/80 text-purple-700 hover:bg-purple-100/90 hover:border-purple-400/70 hover:text-purple-900'
+                    : 'border-purple-500/30 bg-purple-500/10 text-purple-300/90 hover:bg-purple-500/18 hover:border-purple-400/50 hover:text-purple-200'
+                }`}
+              >
+                <span className="text-[13px]">🌐</span>
+                <span>Nexus</span>
               </button>
 
               {/* 3D toggle — strictly on idle Home screen only */}
@@ -2416,6 +2432,11 @@ export default function App() {
       {/* ── z-[350]  Profile Modal ── */}
       <AnimatePresence>
         {showProfile && <ProfileModal onClose={() => setShowProfile(false)} lm={lm} />}
+      </AnimatePresence>
+
+      {/* ── z-[150]  Cosmic Nexus Social Hub ── */}
+      <AnimatePresence>
+        {showNexus && <CosmicNexus onClose={() => setShowNexus(false)} lm={lm} />}
       </AnimatePresence>
 
       {/* ── z-[300]  Grandmaster Chess Modal ── */}
