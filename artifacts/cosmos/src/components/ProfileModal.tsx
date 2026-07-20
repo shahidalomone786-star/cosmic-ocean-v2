@@ -28,33 +28,32 @@ function compressImage(file: File): Promise<string> {
 }
 
 // ─── Divider ──────────────────────────────────────────────────────────────────
-const HR = () => (
-  <div className="w-full h-[1px]" style={{ background: 'rgba(255,255,255,0.07)' }} />
+const HR = ({ lm }: { lm?: boolean }) => (
+  <div className="w-full h-[1px]" style={{ background: lm ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)' }} />
 );
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, accent }: { label: string; value: string | number; accent: string }) {
+function StatCard({ label, value, accent, lm }: { label: string; value: string | number; accent: string; lm?: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center py-6 rounded-2xl relative overflow-hidden"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className={`flex flex-col items-center justify-center py-6 rounded-2xl relative overflow-hidden transition-colors duration-300 ${lm ? 'bg-black/[0.03] border border-black/[0.08]' : ''}`}
+      style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
       <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: accent }} />
-      <span className="text-[40px] font-extralight text-white leading-none mb-2"
+      <span className={`text-[40px] font-extralight leading-none mb-2 ${lm ? 'text-gray-900' : 'text-white'}`}
         style={{ fontFamily: 'var(--app-font-heading, system-ui)' }}>{value}</span>
-      <span className="text-[9px] uppercase tracking-[0.3em] font-mono text-white/30">{label}</span>
+      <span className={`text-[9px] uppercase tracking-[0.3em] font-mono ${lm ? 'text-gray-400' : 'text-white/30'}`}>{label}</span>
     </div>
   );
 }
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
-function TopBar({
-  left, center, right,
-}: {
+function TopBar({ left, center, right, lm }: {
   left?: React.ReactNode;
   center?: React.ReactNode;
   right?: React.ReactNode;
+  lm?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 flex-shrink-0">
+    <div className={`flex items-center justify-between px-5 py-4 flex-shrink-0 transition-colors duration-300 ${lm ? 'bg-gray-50' : ''}`}>
       <div className="w-24 flex justify-start">{left}</div>
       <div className="flex-1 text-center">{center}</div>
       <div className="w-24 flex justify-end">{right}</div>
@@ -63,14 +62,14 @@ function TopBar({
 }
 
 // ─── Eyebrow label ────────────────────────────────────────────────────────────
-const Eyebrow = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-[9px] uppercase tracking-[0.38em] font-mono text-white/25">{children}</p>
+const Eyebrow = ({ children, lm }: { children: React.ReactNode; lm?: boolean }) => (
+  <p className={`text-[9px] uppercase tracking-[0.38em] font-mono ${lm ? 'text-gray-400' : 'text-white/25'}`}>{children}</p>
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HISTORY VIEW
 // ─────────────────────────────────────────────────────────────────────────────
-function HistoryView({ onBack }: { onBack: () => void }) {
+function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
   const { user } = useAuthStore();
   if (!user) return null;
 
@@ -80,23 +79,22 @@ function HistoryView({ onBack }: { onBack: () => void }) {
   return (
     <motion.div key="history"
       initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-0 w-full h-full z-[360] flex flex-col"
-      style={{ background: '#0a0a0a' }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      className={`fixed inset-0 w-full h-full z-[360] flex flex-col transform-gpu transition-colors duration-300 ${lm ? 'bg-gray-50' : 'bg-[#0a0a0a]'}`}
     >
-      <TopBar
+      <TopBar lm={lm}
         left={
           <button onClick={onBack}
-            className="flex items-center gap-1.5 text-white/40 hover:text-white transition-colors text-[11px] uppercase tracking-[0.2em] font-mono py-2">
+            className={`flex items-center gap-1.5 transition-colors text-[11px] uppercase tracking-[0.2em] font-mono py-2 ${lm ? 'text-gray-400 hover:text-gray-900' : 'text-white/40 hover:text-white'}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
               <polyline points="15 18 9 12 15 6"/>
             </svg>
             Back
           </button>
         }
-        center={<Eyebrow>Game History</Eyebrow>}
+        center={<Eyebrow lm={lm}>Game History</Eyebrow>}
       />
-      <HR />
+      <HR lm={lm} />
 
       <div className="flex-1 overflow-y-auto px-5 py-8">
         {/* identity strip */}
@@ -106,22 +104,22 @@ function HistoryView({ onBack }: { onBack: () => void }) {
             <img src={user.avatar} alt="" className="w-full h-full object-cover" />
           </div>
           <div>
-            <p className="text-[18px] font-light text-white tracking-tight">{user.username}</p>
-            <p className="text-[12px] font-mono text-white/30 mt-0.5">{user.email}</p>
+            <p className={`text-[18px] font-light tracking-tight ${lm ? 'text-gray-900' : 'text-white'}`}>{user.username}</p>
+            <p className={`text-[12px] font-mono mt-0.5 ${lm ? 'text-gray-400' : 'text-white/30'}`}>{user.email}</p>
           </div>
         </div>
 
-        <p className="text-[10px] uppercase tracking-[0.3em] font-mono text-white/25 mb-4">Grandmaster Chess</p>
+        <p className={`text-[10px] uppercase tracking-[0.3em] font-mono mb-4 ${lm ? 'text-gray-400' : 'text-white/25'}`}>Grandmaster Chess</p>
 
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Wins"         value={user.chessWins}   accent="linear-gradient(90deg, transparent, rgba(79,195,247,0.7), transparent)" />
-          <StatCard label="Losses"       value={user.chessLosses} accent="linear-gradient(90deg, transparent, rgba(239,68,68,0.55), transparent)" />
-          <StatCard label="Win Rate"     value={winRate}          accent="linear-gradient(90deg, transparent, rgba(139,92,246,0.7), transparent)" />
-          <StatCard label="Games Played" value={total}            accent="linear-gradient(90deg, transparent, rgba(201,168,76,0.55), transparent)" />
+          <StatCard lm={lm} label="Wins"         value={user.chessWins}   accent="linear-gradient(90deg, transparent, rgba(79,195,247,0.7), transparent)" />
+          <StatCard lm={lm} label="Losses"       value={user.chessLosses} accent="linear-gradient(90deg, transparent, rgba(239,68,68,0.55), transparent)" />
+          <StatCard lm={lm} label="Win Rate"     value={winRate}          accent="linear-gradient(90deg, transparent, rgba(139,92,246,0.7), transparent)" />
+          <StatCard lm={lm} label="Games Played" value={total}            accent="linear-gradient(90deg, transparent, rgba(201,168,76,0.55), transparent)" />
         </div>
 
         {total === 0 && (
-          <p className="text-center text-[12px] font-mono text-white/20 mt-8">
+          <p className={`text-center text-[12px] font-mono mt-8 ${lm ? 'text-gray-400' : 'text-white/20'}`}>
             No games recorded yet. Challenge a scientist to begin.
           </p>
         )}
@@ -133,7 +131,7 @@ function HistoryView({ onBack }: { onBack: () => void }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // EDIT VIEW
 // ─────────────────────────────────────────────────────────────────────────────
-function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+function EditView({ onCancel, onSaved, lm }: { onCancel: () => void; onSaved: () => void; lm?: boolean }) {
   const { user, updateProfile } = useAuthStore();
 
   const [nameDraft, setNameDraft]     = useState(user?.username ?? '');
@@ -156,7 +154,6 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
       // silently keep existing avatar
     } finally {
       setCompressing(false);
-      // reset so the same file can be re-picked
       e.target.value = '';
     }
   };
@@ -175,32 +172,31 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
   return (
     <motion.div key="edit"
       initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-0 w-full h-full z-[360] flex flex-col"
-      style={{ background: '#0a0a0a' }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      className={`fixed inset-0 w-full h-full z-[360] flex flex-col transform-gpu transition-colors duration-300 ${lm ? 'bg-gray-50' : 'bg-[#0a0a0a]'}`}
     >
       {/* hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
 
       {/* ── Top bar ── */}
-      <TopBar
+      <TopBar lm={lm}
         left={
           <button onClick={onCancel}
-            className="text-[11px] uppercase tracking-[0.2em] font-mono text-white/40 hover:text-white transition-colors py-2">
+            className={`text-[11px] uppercase tracking-[0.2em] font-mono transition-colors py-2 ${lm ? 'text-gray-400 hover:text-gray-900' : 'text-white/40 hover:text-white'}`}>
             Cancel
           </button>
         }
-        center={<Eyebrow>Edit Profile</Eyebrow>}
+        center={<Eyebrow lm={lm}>Edit Profile</Eyebrow>}
         right={
           <motion.button
             whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
             onClick={save}
-            className="text-[11px] uppercase tracking-[0.2em] font-mono text-purple-300 hover:text-purple-200 transition-colors py-2 font-medium">
+            className={`text-[11px] uppercase tracking-[0.2em] font-mono transition-colors py-2 font-medium ${lm ? 'text-purple-600 hover:text-purple-700' : 'text-purple-300 hover:text-purple-200'}`}>
             Save
           </motion.button>
         }
       />
-      <HR />
+      <HR lm={lm} />
 
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto px-5 py-10 flex flex-col gap-8 max-w-lg mx-auto w-full">
@@ -220,7 +216,7 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
                 boxShadow: '0 0 0 6px rgba(139,92,246,0.10), 0 0 40px rgba(139,92,246,0.22)',
               }}>
               {compressing ? (
-                <div className="w-full h-full bg-white/[0.05] flex items-center justify-center">
+                <div className={`w-full h-full flex items-center justify-center ${lm ? 'bg-gray-100' : 'bg-white/[0.05]'}`}>
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -247,8 +243,12 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={openPicker}
             disabled={compressing}
-            className="flex items-center gap-2.5 px-6 py-3 rounded-2xl text-[12px] font-mono uppercase tracking-[0.18em] text-purple-200 transition-all disabled:opacity-50"
-            style={{
+            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-[12px] font-mono uppercase tracking-[0.18em] transition-all disabled:opacity-50 ${
+              lm
+                ? 'bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100'
+                : 'text-purple-200'
+            }`}
+            style={lm ? undefined : {
               background: 'rgba(139,92,246,0.15)',
               border: '1px solid rgba(139,92,246,0.35)',
             }}
@@ -262,7 +262,9 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
           {/* Preset toggle */}
           <button
             onClick={() => setShowPresets(s => !s)}
-            className="text-[9px] uppercase tracking-[0.25em] font-mono text-white/25 hover:text-purple-400 transition-colors"
+            className={`text-[9px] uppercase tracking-[0.25em] font-mono transition-colors ${
+              lm ? 'text-gray-400 hover:text-purple-600' : 'text-white/25 hover:text-purple-400'
+            }`}
           >
             {showPresets ? '— Hide preset avatars' : '+ Choose a preset avatar'}
           </button>
@@ -284,7 +286,7 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
                       style={{
                         border: avatarDraft === av.url
                           ? '2.5px solid rgba(139,92,246,0.9)'
-                          : '2px solid rgba(255,255,255,0.08)',
+                          : lm ? '2px solid rgba(0,0,0,0.10)' : '2px solid rgba(255,255,255,0.08)',
                         boxShadow: avatarDraft === av.url ? '0 0 16px rgba(139,92,246,0.35)' : 'none',
                       }}
                     >
@@ -297,11 +299,11 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
           </AnimatePresence>
         </div>
 
-        <HR />
+        <HR lm={lm} />
 
         {/* ── Display name ── */}
         <div className="flex flex-col gap-2">
-          <label className="text-[9px] uppercase tracking-[0.3em] font-mono text-white/30 pl-1">
+          <label className={`text-[9px] uppercase tracking-[0.3em] font-mono pl-1 ${lm ? 'text-gray-400' : 'text-white/30'}`}>
             Display Name
           </label>
           <input
@@ -309,13 +311,17 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             placeholder={user.username}
-            className="w-full px-5 py-4 rounded-2xl text-[16px] font-light text-white bg-transparent outline-none transition-all"
-            style={{
+            className={`w-full px-5 py-4 rounded-2xl text-[16px] font-light outline-none transition-all ${
+              lm
+                ? 'bg-white border border-gray-200 text-gray-900 placeholder-gray-300 focus:border-purple-400'
+                : 'bg-transparent text-white'
+            }`}
+            style={lm ? undefined : {
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.10)',
             }}
-            onFocus={e  => (e.target.style.borderColor = 'rgba(139,92,246,0.6)')}
-            onBlur={e   => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
+            onFocus={e  => { if (!lm) e.target.style.borderColor = 'rgba(139,92,246,0.6)'; }}
+            onBlur={e   => { if (!lm) e.target.style.borderColor = 'rgba(255,255,255,0.10)'; }}
           />
         </div>
 
@@ -323,8 +329,12 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
         <motion.button
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
           onClick={save}
-          className="w-full py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.2em] text-white mt-2"
-          style={{
+          className={`w-full py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.2em] mt-2 transition-all ${
+            lm
+              ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200'
+              : 'text-white'
+          }`}
+          style={lm ? undefined : {
             background: 'linear-gradient(135deg, rgba(139,92,246,0.45) 0%, rgba(109,40,217,0.5) 100%)',
             border: '1px solid rgba(139,92,246,0.5)',
             boxShadow: '0 0 24px rgba(139,92,246,0.18)',
@@ -341,9 +351,9 @@ function EditView({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => 
 // PROFILE VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 function ProfileView({
-  onEdit, onViewHistory, onClose,
+  onEdit, onViewHistory, onClose, lm,
 }: {
-  onEdit: () => void; onViewHistory: () => void; onClose: () => void;
+  onEdit: () => void; onViewHistory: () => void; onClose: () => void; lm?: boolean;
 }) {
   const { user, logout } = useAuthStore();
   if (!user) return null;
@@ -351,22 +361,25 @@ function ProfileView({
   return (
     <motion.div key="profile"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
-      className="fixed inset-0 w-full h-full z-[360] flex flex-col"
-      style={{ background: '#0a0a0a' }}
+      transition={{ duration: 0.18 }}
+      className={`fixed inset-0 w-full h-full z-[360] flex flex-col transform-gpu transition-colors duration-300 ${lm ? 'bg-gray-50' : 'bg-[#0a0a0a]'}`}
     >
-      <TopBar
-        center={<Eyebrow>My Profile</Eyebrow>}
+      <TopBar lm={lm}
+        center={<Eyebrow lm={lm}>My Profile</Eyebrow>}
         right={
           <button onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full text-white/30 hover:text-white hover:bg-white/[0.07] transition-all">
+            className={`w-9 h-9 flex items-center justify-center rounded-full transition-all ${
+              lm
+                ? 'text-gray-400 hover:text-gray-900 hover:bg-black/[0.06]'
+                : 'text-white/30 hover:text-white hover:bg-white/[0.07]'
+            }`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         }
       />
-      <HR />
+      <HR lm={lm} />
 
       <div className="flex-1 overflow-y-auto flex flex-col items-center px-5 py-10 max-w-lg mx-auto w-full">
 
@@ -382,21 +395,25 @@ function ProfileView({
         </div>
 
         {/* Identity */}
-        <p className="text-[26px] font-light text-white tracking-tight mb-1">{user.username}</p>
-        <p className="text-[13px] font-mono text-white/35 mb-10">{user.email}</p>
+        <p className={`text-[26px] font-light tracking-tight mb-1 ${lm ? 'text-gray-900' : 'text-white'}`}>{user.username}</p>
+        <p className={`text-[13px] font-mono mb-10 ${lm ? 'text-gray-400' : 'text-white/35'}`}>{user.email}</p>
 
         <div className="w-full flex flex-col gap-3">
-          <HR />
+          <HR lm={lm} />
 
           {/* Edit Profile */}
           <button
             onClick={onEdit}
-            className="w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.15em] transition-all group"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+            className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.15em] transition-all group ${
+              lm
+                ? 'bg-black/[0.03] border border-black/[0.07] hover:bg-black/[0.06]'
+                : ''
+            }`}
+            style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
-            <span className="text-white/55 group-hover:text-white transition-colors">Edit Profile</span>
+            <span className={`transition-colors ${lm ? 'text-gray-600 group-hover:text-gray-900' : 'text-white/55 group-hover:text-white'}`}>Edit Profile</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-              className="text-white/20 group-hover:text-white/60 transition-colors">
+              className={`transition-colors ${lm ? 'text-gray-300 group-hover:text-gray-600' : 'text-white/20 group-hover:text-white/60'}`}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-1.414.586l-2.828.707.707-2.828a4 4 0 01.586-1.414z"/>
             </svg>
           </button>
@@ -404,23 +421,30 @@ function ProfileView({
           {/* View Game History */}
           <button
             onClick={onViewHistory}
-            className="w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.15em] transition-all group"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+            className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.15em] transition-all group ${
+              lm
+                ? 'bg-black/[0.03] border border-black/[0.07] hover:bg-black/[0.06]'
+                : ''
+            }`}
+            style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
-            <span className="text-white/55 group-hover:text-white transition-colors">View Game History</span>
+            <span className={`transition-colors ${lm ? 'text-gray-600 group-hover:text-gray-900' : 'text-white/55 group-hover:text-white'}`}>View Game History</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-              className="text-white/20 group-hover:text-white/60 transition-colors">
+              className={`transition-colors ${lm ? 'text-gray-300 group-hover:text-gray-600' : 'text-white/20 group-hover:text-white/60'}`}>
               <polyline points="9 18 15 12 9 6"/>
             </svg>
           </button>
 
-          <HR />
+          <HR lm={lm} />
 
           {/* Sign out */}
           <button
             onClick={() => { logout(); onClose(); }}
-            className="w-full py-3.5 rounded-2xl text-[12px] font-mono uppercase tracking-[0.15em] text-red-400/50 hover:text-red-400/80 transition-all"
-            style={{ border: '1px solid rgba(239,68,68,0.08)' }}
+            className={`w-full py-3.5 rounded-2xl text-[12px] font-mono uppercase tracking-[0.15em] transition-all ${
+              lm
+                ? 'text-red-500/70 hover:text-red-600 border border-red-200/60 hover:bg-red-50'
+                : 'text-red-400/50 hover:text-red-400/80 border border-red-500/[0.08]'
+            }`}
           >
             Sign Out
           </button>
@@ -435,7 +459,7 @@ function ProfileView({
 // ─────────────────────────────────────────────────────────────────────────────
 type View = 'profile' | 'edit' | 'history';
 
-export default function ProfileModal({ onClose }: { onClose: () => void }) {
+export default function ProfileModal({ onClose, lm }: { onClose: () => void; lm?: boolean }) {
   const [view, setView] = useState<View>('profile');
 
   return (
@@ -443,6 +467,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
       {view === 'profile' && (
         <ProfileView
           key="profile"
+          lm={lm}
           onEdit={() => setView('edit')}
           onViewHistory={() => setView('history')}
           onClose={onClose}
@@ -451,6 +476,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
       {view === 'edit' && (
         <EditView
           key="edit"
+          lm={lm}
           onCancel={() => setView('profile')}
           onSaved={() => setView('profile')}
         />
@@ -458,6 +484,7 @@ export default function ProfileModal({ onClose }: { onClose: () => void }) {
       {view === 'history' && (
         <HistoryView
           key="history"
+          lm={lm}
           onBack={() => setView('profile')}
         />
       )}

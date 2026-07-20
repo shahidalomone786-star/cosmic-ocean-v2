@@ -758,15 +758,15 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[52px] flex items-end sm:items-center justify-center px-2 sm:px-4 pb-0 sm:pb-0"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-2xl flex items-end sm:items-center justify-center px-2 sm:px-4 pb-0 sm:pb-0"
       onClick={onClose}
     >
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 32 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-[95vw] h-[90vh] bg-[rgba(5,5,9,0.88)] backdrop-blur-[52px] border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden shadow-[0_-8px_40px_rgba(0,0,0,0.55),0_40px_80px_-16px_rgba(0,0,0,0.98),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-[95vw] h-[90vh] bg-[rgba(5,5,9,0.92)] backdrop-blur-xl border border-white/[0.09] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col overflow-hidden transform-gpu will-change-transform shadow-[0_-8px_40px_rgba(0,0,0,0.55),0_40px_80px_-16px_rgba(0,0,0,0.98),inset_0_1px_0_rgba(255,255,255,0.08)]"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Drag handle (mobile) ── */}
@@ -2019,6 +2019,7 @@ export default function App() {
                   videoResults={videoResults}
                   videoStatus={videoStatus}
                   onVideoClick={setActiveVideo}
+                  lm={lm}
                 />
               </div>
             )}
@@ -2414,7 +2415,7 @@ export default function App() {
 
       {/* ── z-[350]  Profile Modal ── */}
       <AnimatePresence>
-        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} lm={lm} />}
       </AnimatePresence>
 
       {/* ── z-[300]  Grandmaster Chess Modal ── */}
@@ -2445,6 +2446,7 @@ export default function App() {
           <DetailModal
             item={selectedCard}
             onClose={() => setSelectedCard(null)}
+            lm={lm}
             chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
             onShareToChat={(avatarName) => {
               const ctx = buildSharedContext(selectedCard);
