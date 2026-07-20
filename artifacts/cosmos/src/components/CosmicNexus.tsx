@@ -54,15 +54,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-// ─── Cosmetic dummy data (Shorts & Chat only) ─────────────────────────────────
-const SHORTS = [
-  { id: 1, title: 'Quantum Entanglement Explained',       sub: 'Quantum Physics',    gradient: 'from-violet-900 via-indigo-900 to-blue-900',   emoji: '⚛️', views: '2.4M', likes: '182K' },
-  { id: 2, title: "Inside a Black Hole's Event Horizon",  sub: 'Astrophysics',       gradient: 'from-gray-900 via-black to-purple-900',         emoji: '🕳️', views: '5.1M', likes: '430K' },
-  { id: 3, title: 'How Dark Matter Shapes the Universe',  sub: 'Cosmology',          gradient: 'from-blue-900 via-cyan-900 to-teal-900',        emoji: '🌌', views: '3.8M', likes: '297K' },
-  { id: 4, title: 'CRISPR: Editing the Code of Life',     sub: 'Biology',            gradient: 'from-emerald-900 via-green-900 to-lime-900',    emoji: '🧬', views: '1.9M', likes: '154K' },
-  { id: 5, title: 'The Speed of Light Is Really Weird',   sub: 'Special Relativity', gradient: 'from-orange-900 via-red-900 to-pink-900',       emoji: '💫', views: '7.2M', likes: '612K' },
-  { id: 6, title: 'Neutron Stars: Ultra-Dense Matter',    sub: 'Stellar Physics',    gradient: 'from-slate-900 via-blue-900 to-indigo-900',     emoji: '✨', views: '2.1M', likes: '178K' },
-];
+// (SHORTS static array removed — Shorts tab now uses real data from the feed)
 
 interface ChatConvo { id: number; name: string; emoji: string; lastMsg: string; time: string; unread: number; online: boolean; isBot: boolean; }
 const CHATS: ChatConvo[] = [
@@ -988,63 +980,258 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHORTS TAB (cosmetic — unchanged)
+// SHORT VIDEO SLIDE — one full-screen card in the Shorts reel
 // ─────────────────────────────────────────────────────────────────────────────
-function ShortsTab({ lm }: { lm?: boolean }) {
-  const [liked, setLiked] = useState<Set<number>>(new Set());
-  const containerRef = useRef<HTMLDivElement>(null);
-  const toggle = (id: number) => setLiked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+function ShortVideoSlide({ post, onComment }: {
+  post:      LivePost;
+  onComment: (post: LivePost) => void;
+}) {
+  const [liked,      setLiked]      = useState(post.user_liked);
+  const [likeCount,  setLikeCount]  = useState(post.like_count);
+  const [bookmarked, setBookmarked] = useState(post.user_bookmarked);
+  const [playing,    setPlaying]    = useState(false);
+  const [shareToast, setShareToast] = useState(false);
+
+  const extra = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
+  const youtubeId  = (extra['youtube_id'] as string) || '';
+  const igHandle   = (extra['handle']     as string) || '';
+  const igLikes    = (extra['likes']      as string) || '';
+  const channel    = (extra['channel']    as string) || '';
+
+  // Background image
+  let bgUrl = '';
+  if (post.source === 'youtube' && youtubeId) {
+    bgUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+  } else if (post.media_url) {
+    bgUrl = post.media_url;
+  }
+
+  // Source badge config
+  const SOURCE_META: Record<string, { label: string; color: string }> = {
+    youtube:   { label: 'YouTube',   color: 'rgba(255,0,0,0.8)' },
+    instagram: { label: 'Instagram', color: 'rgba(131,58,180,0.9)' },
+    x:         { label: '𝕏',        color: 'rgba(0,0,0,0.85)' },
+    '':        { label: 'Cosmos',    color: 'rgba(109,40,217,0.85)' },
+  };
+  const srcMeta = SOURCE_META[post.source] ?? { label: post.source, color: 'rgba(30,30,50,0.85)' };
+
+  const toggleLike = async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikeCount(c => next ? c + 1 : Math.max(0, c - 1));
+    try {
+      const res  = await fetch(`/api/posts/${post.id}/like`, { method: 'POST', credentials: 'include' });
+      const data = await res.json() as { ok: boolean; liked?: boolean };
+      setLiked(data.liked ?? next);
+    } catch {
+      setLiked(!next);
+      setLikeCount(c => next ? Math.max(0, c - 1) : c + 1);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    const next = !bookmarked;
+    setBookmarked(next);
+    try {
+      await fetch(`/api/posts/${post.id}/bookmark`, { method: 'POST', credentials: 'include' });
+    } catch { setBookmarked(!next); }
+  };
+
+  const handleShare = async () => {
+    const url = post.external_link || `${window.location.origin}/api/posts/${post.id}`;
+    if (navigator.share) { try { await navigator.share({ title: post.ec_title || post.content.slice(0, 60), url }); } catch { /**/ } }
+    else { try { await navigator.clipboard.writeText(url); } catch { /**/ } setShareToast(true); setTimeout(() => setShareToast(false), 2000); }
+  };
+
+  const displayTitle = post.ec_title || post.content;
+  const authorName   = post.source === 'instagram' ? `@${igHandle || post.author_username}` : post.author_username;
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto snap-y snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-      {SHORTS.map(s => (
-        <div key={s.id} className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden">
-          <div className={`absolute inset-0 bg-gradient-to-br ${s.gradient}`} />
-          <div className="absolute inset-0 opacity-[0.06]"
-            style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-              className="text-[100px] drop-shadow-2xl select-none">{s.emoji}</motion.div>
-          </div>
-          <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
-            <button onClick={() => toggle(s.id)} className="flex flex-col items-center gap-1">
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center border transition-all duration-200 ${liked.has(s.id) ? 'bg-red-500/90 border-red-400 scale-110' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}>
-                <svg viewBox="0 0 24 24" className={`w-5 h-5 ${liked.has(s.id) ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={2}>
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-                </svg>
+    <div className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden bg-black">
+
+      {/* ── Background ── */}
+      {bgUrl && !playing && (
+        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
+          onError={e => { e.currentTarget.style.display = 'none'; }} />
+      )}
+      {!bgUrl && (
+        <div className="absolute inset-0"
+          style={{ background: 'linear-gradient(135deg,#0d001a 0%,#1a0033 35%,#000d1a 70%,#000510 100%)' }} />
+      )}
+
+      {/* YouTube embed */}
+      {playing && youtubeId && (
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+          className="absolute inset-0 w-full h-full border-none"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      )}
+
+      {/* Dark gradient layers */}
+      {!playing && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
+        </>
+      )}
+
+      {/* ── Source badge (top-left) ── */}
+      {!playing && (
+        <div className="absolute top-4 left-4 flex items-center gap-2">
+          <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-white px-2.5 py-1 rounded-full"
+            style={{ background: srcMeta.color, backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            {srcMeta.label}
+          </span>
+          {(channel || igHandle) && (
+            <span className="text-[10px] text-white/60 font-medium drop-shadow">
+              {channel || `@${igHandle}`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── YouTube play button (center) ── */}
+      {post.source === 'youtube' && youtubeId && !playing && (
+        <button onClick={() => setPlaying(true)}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[68px] h-[68px] rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          style={{ background: 'rgba(255,0,0,0.88)', boxShadow: '0 0 0 6px rgba(255,0,0,0.18), 0 8px 40px rgba(255,0,0,0.5)' }}>
+          <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white ml-1"><polygon points="5,3 19,12 5,21"/></svg>
+        </button>
+      )}
+
+      {/* ── Close player ── */}
+      {playing && (
+        <button onClick={() => setPlaying(false)}
+          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-white fill-none" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      )}
+
+      {/* ── Bottom-left: user info + content ── */}
+      {!playing && (
+        <div className="absolute bottom-0 left-0" style={{ right: '80px' }}>
+          <div className="px-5 pb-8 pt-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+            {/* Avatar + name */}
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0"
+                style={{ border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 12px rgba(0,0,0,0.5)', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                <img src={post.author_avatar} alt={authorName} className="w-full h-full object-cover"
+                  onError={e => { e.currentTarget.style.display = 'none'; }} />
               </div>
-              <span className="text-white text-[11px] font-medium drop-shadow">{s.likes}</span>
-            </button>
-            <button className="flex flex-col items-center gap-1">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center border border-white/20 bg-white/10 hover:bg-white/20 transition-all">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              <div>
+                <p className="text-white font-semibold text-[13.5px] leading-tight drop-shadow">{authorName}</p>
+                {igLikes && <p className="text-white/55 text-[10.5px]">{igLikes} likes</p>}
               </div>
-              <span className="text-white text-[11px] drop-shadow">128</span>
-            </button>
-            <button className="flex flex-col items-center gap-1">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center border border-white/20 bg-white/10 hover:bg-white/20 transition-all">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
-              </div>
-              <span className="text-white text-[11px] drop-shadow">Share</span>
-            </button>
-          </div>
-          <div className="absolute bottom-0 inset-x-0 px-5 pb-8 pt-16 bg-gradient-to-t from-black/70 to-transparent">
-            <span className="inline-block text-[9px] uppercase tracking-[0.22em] font-mono text-white/50 border border-white/20 bg-white/10 px-2.5 py-0.5 rounded-full mb-2">{s.sub}</span>
-            <h2 className="text-white text-[20px] font-semibold leading-tight mb-3 drop-shadow-lg max-w-[80%]">{s.title}</h2>
-            <div className="flex items-center gap-4">
-              <span className="text-white/50 text-[12px]">👁 {s.views} views</span>
-              <span className="text-white/50 text-[12px]">💜 {s.likes} likes</span>
             </div>
+            {/* Title / Content */}
+            <p className="text-white/90 text-[13px] leading-snug line-clamp-3 drop-shadow">
+              {displayTitle}
+            </p>
           </div>
         </div>
+      )}
+
+      {/* ── Bottom-right: glassmorphism action bar ── */}
+      {!playing && (
+        <div className="absolute bottom-8 right-4 flex flex-col items-center gap-5">
+          {/* Like */}
+          <motion.button onClick={toggleLike} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
+              style={{ background: liked ? 'rgba(239,68,68,0.85)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: `1px solid ${liked ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.22)'}`, boxShadow: liked ? '0 0 20px rgba(239,68,68,0.4)' : '0 4px 16px rgba(0,0,0,0.3)' }}>
+              <svg viewBox="0 0 24 24" className={`w-5 h-5 transition-all ${liked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={2}>
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+              </svg>
+            </div>
+            <span className="text-white text-[11px] font-medium drop-shadow">{likeCount > 0 ? fmt(likeCount) : '0'}</span>
+          </motion.button>
+
+          {/* Comment */}
+          <motion.button onClick={() => onComment(post)} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </div>
+            <span className="text-white text-[11px] drop-shadow">{post.comment_count > 0 ? fmt(post.comment_count) : '0'}</span>
+          </motion.button>
+
+          {/* Share */}
+          <motion.button onClick={handleShare} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5 relative">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
+            </div>
+            <span className="text-white text-[11px] drop-shadow">Share</span>
+            {shareToast && (
+              <span className="absolute -left-14 top-1/2 -translate-y-1/2 text-[10px] px-2.5 py-1 rounded-lg whitespace-nowrap"
+                style={{ background: 'rgba(20,20,40,0.95)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
+                Copied!
+              </span>
+            )}
+          </motion.button>
+
+          {/* Save */}
+          <motion.button onClick={toggleBookmark} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
+              style={{ background: bookmarked ? 'rgba(139,92,246,0.85)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: `1px solid ${bookmarked ? 'rgba(139,92,246,0.7)' : 'rgba(255,255,255,0.22)'}`, boxShadow: bookmarked ? '0 0 20px rgba(139,92,246,0.4)' : '0 4px 16px rgba(0,0,0,0.3)' }}>
+              <svg viewBox="0 0 24 24" className={`w-5 h-5 ${bookmarked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={2}>
+                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+              </svg>
+            </div>
+            <span className="text-white text-[11px] drop-shadow">Save</span>
+          </motion.button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHORTS TAB — full-screen vertical reel from real short-video posts
+// ─────────────────────────────────────────────────────────────────────────────
+function ShortsTab({ posts, loading, onComment }: {
+  posts:     LivePost[];
+  loading:   boolean;
+  onComment: (post: LivePost) => void;
+}) {
+  const shorts = posts.filter(p => p.type === 'short-video');
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-purple-500/40 border-t-purple-400 animate-spin" />
+          <p className="text-white/30 text-[13px]">Loading shorts…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (shorts.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-5xl mb-4">⚡</p>
+          <p className="text-white/50 text-[15px] font-medium mb-1">No shorts yet</p>
+          <p className="text-white/25 text-[12px]">Short videos will appear here.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto snap-y snap-mandatory" style={{ scrollbarWidth: 'none' }}>
+      {shorts.map(post => (
+        <ShortVideoSlide key={post.id} post={post} onComment={onComment} />
       ))}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOME TAB — live feed from API
+// HOME TAB — live feed from API with infinite scroll
 // ─────────────────────────────────────────────────────────────────────────────
 function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
   posts:     LivePost[];
@@ -1054,6 +1241,29 @@ function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
   onComment: (post: LivePost) => void;
   onRefresh: () => void;
 }) {
+  const [displayCount, setDisplayCount] = useState(20);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset display count when posts change
+  useEffect(() => { setDisplayCount(20); }, [posts.length]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) setDisplayCount(c => c + 20); },
+      { rootMargin: '300px' },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // Feed is all posts except short-videos (those live in Shorts tab)
+  const feedPosts = posts.filter(p => p.type !== 'short-video');
+  const visible   = feedPosts.slice(0, displayCount);
+  const hasMore   = displayCount < feedPosts.length;
+
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
       <div className="flex flex-col gap-3 p-4 pb-6">
@@ -1065,11 +1275,15 @@ function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
           <div className={`py-14 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
             <p className="text-3xl mb-3">⚠️</p>
             <p className="text-[13px]">{error}</p>
+            <button onClick={onRefresh} className="mt-3 px-4 py-2 rounded-xl border text-[12px] transition-all"
+              style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
+              Retry
+            </button>
           </div>
         )}
 
         {/* Empty */}
-        {!loading && !error && posts.length === 0 && (
+        {!loading && !error && feedPosts.length === 0 && (
           <div className={`py-14 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
             <p className="text-3xl mb-3">🌌</p>
             <p className="text-[14px] font-medium mb-1">No posts yet</p>
@@ -1078,18 +1292,32 @@ function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
         )}
 
         {/* Live posts — external content gets specialized cards, user posts get LiveFeedCard */}
-        {!loading && posts.map(post => (
+        {!loading && visible.map(post => (
           post.source
             ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
             : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
         ))}
+
+        {/* Infinite scroll sentinel */}
+        {!loading && hasMore && (
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            <div className={`w-6 h-6 rounded-full border-2 animate-spin ${lm ? 'border-gray-200 border-t-purple-400' : 'border-white/[0.08] border-t-purple-500/60'}`} />
+          </div>
+        )}
+
+        {/* End of feed */}
+        {!loading && !hasMore && feedPosts.length > 0 && (
+          <div className={`py-6 text-center text-[11px] font-mono tracking-widest uppercase ${lm ? 'text-gray-300' : 'text-white/15'}`}>
+            · · · end of feed · · ·
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH TAB — filters live posts by type and query
+// SEARCH TAB — filters live posts by type and query, with infinite scroll
 // ─────────────────────────────────────────────────────────────────────────────
 function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
   posts:     LivePost[];
@@ -1098,8 +1326,10 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
   onComment: (post: LivePost) => void;
   onRefresh: () => void;
 }) {
-  const [q,      setQ]      = useState('');
-  const [active, setActive] = useState<FeedKind | 'all'>('all');
+  const [q,            setQ]            = useState('');
+  const [active,       setActive]       = useState<FeedKind | 'all'>('all');
+  const [displayCount, setDisplayCount] = useState(20);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const filtered = posts.filter(p => {
     const matchKind = active === 'all' || p.type === active;
@@ -1111,6 +1341,24 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
       || (p.source ?? '').toLowerCase().includes(lower);
     return matchKind && matchQ;
   });
+
+  // Reset display count when filter/query changes
+  useEffect(() => { setDisplayCount(20); }, [q, active]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) setDisplayCount(c => c + 20); },
+      { rootMargin: '300px' },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const visible = filtered.slice(0, displayCount);
+  const hasMore = displayCount < filtered.length;
 
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
@@ -1129,7 +1377,7 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
         </div>
 
         {/* Filter chips */}
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex items-center gap-2 mt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {SEARCH_FILTERS.map(f => {
             const isOn = active === f.kind;
             return (
@@ -1158,11 +1406,25 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
             <p className="text-[14px]">{q || active !== 'all' ? 'Nothing matched — try a different search or filter.' : 'No posts yet in the cosmos.'}</p>
           </div>
         ) : (
-          filtered.map(post =>
+          visible.map(post =>
             post.source
               ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
               : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
           )
+        )}
+
+        {/* Infinite scroll sentinel */}
+        {!loading && hasMore && (
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            <div className={`w-6 h-6 rounded-full border-2 animate-spin ${lm ? 'border-gray-200 border-t-purple-400' : 'border-white/[0.08] border-t-purple-500/60'}`} />
+          </div>
+        )}
+
+        {/* End of results */}
+        {!loading && !hasMore && filtered.length > 5 && (
+          <div className={`py-6 text-center text-[11px] font-mono tracking-widest uppercase ${lm ? 'text-gray-300' : 'text-white/15'}`}>
+            · · · {filtered.length} results · · ·
+          </div>
         )}
       </div>
     </div>
@@ -1573,7 +1835,7 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
               transition={tabTransition}
               className="absolute inset-0 transform-gpu"
             >
-              {activeTab === 'shorts'  && <ShortsTab  lm={lm} />}
+              {activeTab === 'shorts'  && <ShortsTab  posts={posts} loading={postsLoading} onComment={handleComment} />}
               {activeTab === 'home'    && <HomeTab    posts={posts} loading={postsLoading} error={postsError} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
               {activeTab === 'search'  && <SearchTab  posts={posts} loading={postsLoading} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
               {activeTab === 'chat'    && <ChatTab    lm={lm} />}

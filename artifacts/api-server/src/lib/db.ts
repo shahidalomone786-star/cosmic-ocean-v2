@@ -216,7 +216,7 @@ export const stmts = {
     ) cc2 ON cc2.post_id = ec.id
 
     ORDER BY created_at DESC
-    LIMIT 80
+    LIMIT 200
   `),
 
   getPostsByUser: db.prepare<[string], PostRow>(

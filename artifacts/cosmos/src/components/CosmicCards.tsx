@@ -364,100 +364,157 @@ export function NasaCard({ post, lm, onComment, onRefresh }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// YOUTUBE CARD — thumbnail → inline iframe player
+// YOUTUBE CARD — cinematic preview frame with sleek overlay player
 // ─────────────────────────────────────────────────────────────────────────────
 export function YouTubeCard({ post, lm, onComment, onRefresh }: {
   post: CosmicPost; lm?: boolean; onComment: (p: CosmicPost) => void; onRefresh?: () => void;
 }) {
-  const [playing, setPlaying] = useState(false);
-  const extra = parseExtra<{ youtube_id?: string; channel?: string; views?: string }>(post.extra_json, {});
+  const [playing,   setPlaying]   = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const extra = parseExtra<{ youtube_id?: string; channel?: string; views?: string; duration?: string }>(post.extra_json, {});
   const youtubeId = extra.youtube_id ?? '';
-  const channel   = extra.channel ?? post.ec_title;
-  const views     = extra.views ?? '';
+  const channel   = extra.channel   ?? '';
+  const views     = extra.views     ?? '';
+  const duration  = extra.duration  ?? '';
   const isShort   = post.type === 'short-video';
+
+  // Long-form videos use 16:9 frame; short-form uses portrait ratio
+  const frameStyle: React.CSSProperties = isShort
+    ? { aspectRatio: '9/16', maxHeight: '300px' }
+    : { aspectRatio: '16/9', maxHeight: '210px' };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
       className={`rounded-2xl overflow-hidden border transition-colors duration-300 ${
-        lm ? 'bg-white border-gray-100 shadow-sm' : 'border-white/[0.08]'
+        lm ? 'bg-white border-gray-100 shadow-sm hover:shadow-md' : 'border-white/[0.07] hover:border-white/[0.12]'
       }`}
-      style={lm ? undefined : { background: 'rgba(8,8,16,0.97)' }}
+      style={lm ? undefined : {
+        background: 'linear-gradient(160deg, rgba(10,10,20,0.98) 0%, rgba(6,6,14,0.99) 100%)',
+        boxShadow: '0 4px 28px rgba(255,0,0,0.06)',
+        transition: 'border-color 0.2s, box-shadow 0.2s',
+      }}
     >
-      {/* Video area */}
+      {/* ── Cinematic video frame ── */}
       {youtubeId && (
-        <div className="relative" style={{ aspectRatio: isShort ? '9/14' : '16/9', maxHeight: isShort ? '320px' : '200px', overflow: 'hidden' }}>
-          {playing ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
-              title={post.ec_title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full"
-              style={{ border: 'none' }}
+        <div className="relative overflow-hidden" style={frameStyle}>
+          {/* Thumbnail (shown before play) */}
+          {!playing && (
+            <img
+              src={`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`}
+              alt={post.ec_title}
+              onLoad={() => setImgLoaded(true)}
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
             />
-          ) : (
-            <div className="relative w-full h-full cursor-pointer group" onClick={() => setPlaying(true)}>
-              <img
-                src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`}
-                alt={post.ec_title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-              {/* Dark overlay */}
-              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
-              {/* Play button */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                  className="w-14 h-14 rounded-full flex items-center justify-center"
-                  style={{ background: 'rgba(255,0,0,0.85)', boxShadow: '0 4px 24px rgba(255,0,0,0.5)' }}>
-                  <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white ml-0.5" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>
-                    <polygon points="5,3 19,12 5,21"/>
-                  </svg>
+          )}
+
+          {/* Skeleton while image loads */}
+          {!playing && !imgLoaded && (
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(20,20,40,0.9), rgba(10,10,25,0.95))' }}>
+              <div className="absolute inset-0 animate-pulse" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent)', backgroundSize: '200% 100%' }} />
+            </div>
+          )}
+
+          {/* Gradient for light mode contrast */}
+          {!playing && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
+          )}
+
+          {/* YouTube iframe player */}
+          {playing && (
+            <iframe
+              src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1&color=white`}
+              title={post.ec_title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-none"
+            />
+          )}
+
+          {/* ── Overlay controls (only before play) ── */}
+          {!playing && (
+            <>
+              {/* Clickable play zone */}
+              <button
+                onClick={() => setPlaying(true)}
+                aria-label="Play video"
+                className="absolute inset-0 w-full h-full flex items-center justify-center group"
+              >
+                {/* Center play button — sleek minimal ring style */}
+                <motion.div
+                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
+                  className="relative flex items-center justify-center"
+                >
+                  {/* Outer ring (animated on hover) */}
+                  <div className="absolute w-[64px] h-[64px] rounded-full border border-white/25 group-hover:border-white/50 group-hover:scale-110 transition-all duration-300" />
+                  {/* Inner fill */}
+                  <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
+                    style={{ background: 'rgba(255,0,0,0.90)', boxShadow: '0 0 0 3px rgba(255,255,255,0.15), 0 8px 32px rgba(255,0,0,0.55)' }}>
+                    <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] fill-white ml-0.5 drop-shadow">
+                      <polygon points="5,3 19,12 5,21"/>
+                    </svg>
+                  </div>
                 </motion.div>
+              </button>
+
+              {/* ── Top-left: YouTube + channel badge ── */}
+              <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full"
+                  style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 flex-shrink-0">
+                    <path fill="#FF0000" d="M23.5 6.2a3 3 0 00-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 00.5 6.2 31 31 0 000 12a31 31 0 00.5 5.8 3 3 0 002.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 002.1-2.1A31 31 0 0024 12a31 31 0 00-.5-5.8z"/>
+                    <polygon fill="white" points="9.75,15.02 15.5,12 9.75,8.98"/>
+                  </svg>
+                  <span className="text-[8.5px] font-bold text-white/90 tracking-wide">
+                    {isShort ? 'SHORTS' : 'YOUTUBE'}
+                  </span>
+                </div>
               </div>
-              {/* YouTube badge */}
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
-                <svg viewBox="0 0 24 24" className="w-3 h-3 fill-red-500"><path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 00.5 6.2 31 31 0 000 12a31 31 0 00.5 5.8 3 3 0 002.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 002.1-2.1A31 31 0 0024 12a31 31 0 00-.5-5.8z"/><polygon fill="white" points="9.75,15.02 15.5,12 9.75,8.98"/></svg>
-                <span className="text-[9px] font-bold text-white tracking-wide">YouTube</span>
-                {isShort && <span className="text-[8.5px] text-white/60">Shorts</span>}
-              </div>
-              {views && (
-                <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9.5px] text-white font-medium"
-                  style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
-                  👁 {views}
+
+              {/* ── Top-right: duration or views ── */}
+              {(duration || views) && (
+                <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-[9px] text-white/90 font-mono font-medium"
+                  style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                  {duration || `${views} views`}
                 </div>
               )}
-            </div>
+            </>
+          )}
+
+          {/* ── Close button (when playing) ── */}
+          {playing && (
+            <button onClick={() => setPlaying(false)}
+              className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-white fill-none" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
           )}
         </div>
       )}
 
-      {/* Info */}
+      {/* ── Info section ── */}
       <div className="px-4 pt-3 pb-2">
+        {/* Channel name */}
         {channel && (
-          <p className={`text-[10.5px] font-semibold uppercase tracking-[0.12em] mb-1 ${lm ? 'text-gray-400' : 'text-white/35'}`}>
-            {channel}
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              {channel}
+            </span>
+            {views && !duration && (
+              <span className={`text-[10px] ${lm ? 'text-gray-300' : 'text-white/20'}`}>· {views} views</span>
+            )}
+          </div>
+        )}
+        <h3 className={`text-[13.5px] font-semibold leading-snug line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/92'}`}>
+          {post.ec_title || post.content}
+        </h3>
+        {post.content && post.content !== post.ec_title && (
+          <p className={`text-[12px] leading-relaxed mt-1.5 line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/38'}`}>
+            {post.content}
           </p>
         )}
-        <h3 className={`text-[13.5px] font-semibold leading-snug ${lm ? 'text-gray-900' : 'text-white'}`}>
-          {post.ec_title}
-        </h3>
-        <p className={`text-[12px] leading-relaxed mt-1.5 line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/40'}`}>
-          {post.content}
-        </p>
       </div>
-
-      {!playing && youtubeId && (
-        <div className="px-4 pb-3">
-          <button onClick={() => setPlaying(true)}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl text-[12px] font-semibold transition-all text-white"
-            style={{ background: 'rgba(220,38,38,0.75)', border: '1px solid rgba(220,38,38,0.5)', boxShadow: '0 4px 14px rgba(220,38,38,0.25)' }}>
-            <svg viewBox="0 0 24 24" className="w-3 h-3 fill-white"><polygon points="5,3 19,12 5,21"/></svg>
-            Play Inline
-          </button>
-        </div>
-      )}
 
       <ActionBar post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
     </motion.div>
@@ -704,6 +761,131 @@ export function WikipediaCard({ post, lm, onComment, onRefresh }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INSTAGRAM CARD — premium gradient header, engagement stats, hashtags
+// ─────────────────────────────────────────────────────────────────────────────
+export function InstagramCard({ post, lm, onComment, onRefresh }: {
+  post: CosmicPost; lm?: boolean; onComment: (p: CosmicPost) => void; onRefresh?: () => void;
+}) {
+  const extra = parseExtra<{
+    handle?: string; verified?: boolean; followers?: string;
+    likes?: string; hashtags?: string[]; is_reel?: boolean;
+  }>(post.extra_json, {});
+
+  const handle    = extra.handle ?? post.ec_title?.replace(/^@/, '') ?? 'instagram';
+  const verified  = extra.verified ?? false;
+  const followers = extra.followers ?? '';
+  const likes     = extra.likes ?? '';
+  const hashtags  = extra.hashtags ?? [];
+  const isReel    = extra.is_reel ?? (post.type === 'short-video');
+  const thumbnail = post.media_url;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
+      className={`rounded-2xl overflow-hidden border transition-colors duration-300 ${
+        lm ? 'bg-white border-gray-100 shadow-sm' : 'border-white/[0.08]'
+      }`}
+      style={lm ? undefined : {
+        background: 'linear-gradient(145deg, rgba(10,6,24,0.97) 0%, rgba(6,4,18,0.99) 100%)',
+        boxShadow: '0 4px 20px rgba(131,58,180,0.07)',
+      }}
+    >
+      {/* Instagram header */}
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-2.5">
+        {/* Gradient ring avatar */}
+        <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center p-[2px]"
+          style={{ background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}>
+          <div className="w-full h-full rounded-full flex items-center justify-center text-[13px] font-bold text-white"
+            style={{ background: lm ? '#f9fafb' : 'rgba(10,6,24,0.97)' }}>
+            <span className={lm ? 'text-gray-800' : 'text-white'}>
+              {(handle[0] ?? 'I').toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-[13px] font-bold ${lm ? 'text-gray-900' : 'text-white'}`}>
+              @{handle}
+            </span>
+            {verified && (
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-shrink-0" fill="none">
+                <circle cx="12" cy="12" r="10" fill="#3897f0"/>
+                <path d="M8 12l3 3 5-6" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+            {isReel && (
+              <span className="text-[8.5px] px-1.5 py-0.5 rounded-full font-bold text-white flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #833ab4, #fd1d1d)' }}>
+                REEL
+              </span>
+            )}
+            {followers && (
+              <span className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                · {followers}
+              </span>
+            )}
+          </div>
+          <span className={`text-[10.5px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+            {timeAgo(post.created_at)}
+          </span>
+        </div>
+
+        <button className={`p-1.5 rounded-full transition-colors ${lm ? 'hover:bg-gray-100' : 'hover:bg-white/[0.06]'}`}>
+          <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 ${lm ? 'fill-gray-400' : 'fill-white/30'}`}>
+            <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Media */}
+      {thumbnail && (
+        <div className="relative">
+          <img src={thumbnail} alt={post.ec_title || post.content}
+            className="w-full object-cover block"
+            style={{ maxHeight: '260px', objectPosition: 'center' }}
+            onError={e => { (e.currentTarget.parentElement ?? e.currentTarget).style.display = 'none'; }}
+          />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/25 to-transparent" />
+          {isReel && (
+            <div className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(6px)' }}>
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white">
+                <path d="M21 2H3C1.9 2 1 2.9 1 4v16c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 16V8l8 4-8 4z"/>
+              </svg>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Caption + likes + hashtags */}
+      <div className="px-4 pt-3 pb-2">
+        {likes && (
+          <p className={`text-[12px] font-semibold mb-1.5 ${lm ? 'text-gray-800' : 'text-white'}`}>
+            {likes} likes
+          </p>
+        )}
+        {post.content && (
+          <p className={`text-[12.5px] leading-relaxed ${lm ? 'text-gray-700' : 'text-white/75'}`}>
+            <span className={`font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>@{handle}</span>{' '}
+            {post.content}
+          </p>
+        )}
+        {hashtags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {hashtags.map((tag, i) => (
+              <span key={i} className={`text-[11px] ${lm ? 'text-blue-500' : 'text-blue-400/80'}`}>{tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ActionBar post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COSMIC FEED CARD — dispatch to appropriate specialized card
 // ─────────────────────────────────────────────────────────────────────────────
 export function CosmicFeedCard({ post, lm, onComment, onRefresh }: {
@@ -718,6 +900,7 @@ export function CosmicFeedCard({ post, lm, onComment, onRefresh }: {
     case 'x':         return <XBulletinCard {...props} />;
     case 'telegram':  return <TelegramCard  {...props} />;
     case 'wikipedia': return <WikipediaCard {...props} />;
+    case 'instagram': return <InstagramCard {...props} />;
     default:          return null; // user posts handled by LiveFeedCard in CosmicNexus
   }
 }
