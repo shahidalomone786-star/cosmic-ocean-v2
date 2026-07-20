@@ -1531,6 +1531,11 @@ export default function App() {
   // Theme is applied directly to the outermost wrapper div via Tailwind class;
   // no document.body manipulation needed.
 
+  // ── Restore session from httpOnly cookie on mount ────────────────────────
+  useEffect(() => {
+    useAuthStore.getState().checkSession();
+  }, []);
+
   // ── Inject Google Translate once on mount ─────────────────────────────────
   useEffect(() => {
     injectGoogleTranslate();

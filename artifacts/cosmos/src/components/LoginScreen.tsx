@@ -78,13 +78,12 @@ export default function LoginScreen() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    await new Promise(r => setTimeout(r, 320)); // brief sim delay
 
     if (tab === 'login') {
-      const res = login(email, password);
+      const res = await login(email, password);
       if (!res.ok) setError(res.error ?? 'Login failed.');
     } else {
-      const res = signup(email, username, password);
+      const res = await signup(email, username, password);
       if (!res.ok) setError(res.error ?? 'Signup failed.');
     }
     setLoading(false);
@@ -258,8 +257,8 @@ export default function LoginScreen() {
           {/* Footer note */}
           <p className="text-center text-[10px] text-slate-600 font-mono pt-1">
             {tab === 'login'
-              ? 'Your session persists across all visits.'
-              : 'Your profile is saved locally — log in from this device anytime.'}
+              ? 'Your session persists securely across all visits.'
+              : 'Your account is saved to the server — access it from any device.'}
           </p>
         </form>
 
