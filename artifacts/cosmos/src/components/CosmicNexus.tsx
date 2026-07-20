@@ -22,58 +22,92 @@ const SHORTS = [
   { id: 6, title: 'Neutron Stars: Ultra-Dense Matter',     sub: 'Stellar Physics',   gradient: 'from-slate-900 via-blue-900 to-indigo-900',     emoji: '✨', views: '2.1M', likes: '178K' },
 ];
 
+type FeedKind = 'short-video' | 'post' | 'article' | 'long-video';
+
 interface FeedPost {
-  id: number; kind: 'nasa' | 'wiki' | 'user';
+  id: number; kind: FeedKind;
   author: string; handle: string; avatarEmoji: string; time: string;
   title?: string; body: string; imageUrl?: string;
   likes: number; comments: number; shares: number;
+  // video-only
+  duration?: string; gradient?: string; videoEmoji?: string; views?: string;
+  // article-only
+  readTime?: string;
 }
 
 const FEED: FeedPost[] = [
-  { id: 1, kind: 'nasa',  author: 'NASA Astronomy',   handle: '@nasa',         avatarEmoji: '🔭', time: '2h',
-    title: 'Webb Captures a Star-Forming Pillar',
-    body:  'The James Webb Space Telescope reveals unprecedented detail inside the Carina Nebula — star-forming pillars stretching light-years high.',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/NGC_6302_Butterfly_nebula.jpg/400px-NGC_6302_Butterfly_nebula.jpg',
-    likes: 14200, comments: 892, shares: 3401 },
-  { id: 2, kind: 'user',  author: 'Dr. Elena Vasquez',handle: '@evasquez',     avatarEmoji: '👩‍🔬', time: '4h',
-    body: 'Just finished peer-reviewing a groundbreaking paper on gravitational wave detection using quantum sensors. The future of observational astronomy is going to be absolutely wild. 🌊',
+  // ── Short Videos ──────────────────────────────────────────────────────────
+  { id:  1, kind: 'short-video', author: 'Cosmos Lab',       handle: '@cosmoslab',   avatarEmoji: '🔬', time: '1h',
+    title: 'Quantum Entanglement in 60 Seconds',
+    body:  'Two particles, one measurement — the universe refuses to behave.',
+    likes: 48200, comments: 2340, shares: 9100,
+    duration: '0:58', views: '2.4M',
+    gradient: 'from-violet-900 via-indigo-900 to-blue-900', videoEmoji: '⚛️' },
+  // ── Posts ──────────────────────────────────────────────────────────────────
+  { id:  2, kind: 'post',        author: 'Dr. Elena Vasquez',handle: '@evasquez',    avatarEmoji: '👩‍🔬', time: '2h',
+    body: 'Just finished peer-reviewing a paper on gravitational wave detection using quantum sensors. The future of observational astronomy is going to be absolutely wild. 🌊',
     likes: 2847, comments: 134, shares: 289 },
-  { id: 3, kind: 'wiki',  author: 'Wikipedia Science', handle: '@wikipedia',   avatarEmoji: '📖', time: '6h',
-    title: 'Quantum Chromodynamics',
-    body: 'QCD is the theory of the strong interaction between quarks mediated by gluons — a non-abelian gauge theory with the gauge group SU(3).',
-    likes: 5620, comments: 217, shares: 1834 },
-  { id: 4, kind: 'nasa',  author: 'Mars Perseverance', handle: '@nasapersev',  avatarEmoji: '🚀', time: '8h',
-    title: 'Organic Molecules Found in Jezero Crater',
-    body: "NASA's Perseverance rover confirms organic molecules in ancient lake sediments, strengthening the case for ancient microbial life on Mars.",
+  // ── Articles ──────────────────────────────────────────────────────────────
+  { id:  3, kind: 'article',     author: 'Nature Journal',   handle: '@naturenews',  avatarEmoji: '📰', time: '3h',
+    title: 'Dark Energy: What We Know (and Don\'t)',
+    body: 'An unknown force is tearing the universe apart at an accelerating pace. After 25 years of study, cosmologists are still asking: what is it?',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/NGC_6302_Butterfly_nebula.jpg/400px-NGC_6302_Butterfly_nebula.jpg',
+    likes: 7830, comments: 362, shares: 2140, readTime: '6 min read' },
+  // ── Long Videos ───────────────────────────────────────────────────────────
+  { id:  4, kind: 'long-video',  author: 'PBS Space Time',   handle: '@pbsspace',    avatarEmoji: '🎬', time: '5h',
+    title: 'How Fast Is the Universe Really Expanding?',
+    body:  'The Hubble Tension explained — why two methods of measuring cosmic expansion disagree, and what it might mean for physics.',
+    likes: 31400, comments: 1820, shares: 7650,
+    duration: '22:14', views: '3.4M',
+    gradient: 'from-blue-800 via-indigo-900 to-slate-900', videoEmoji: '🌌' },
+  // ── Short Videos ──────────────────────────────────────────────────────────
+  { id:  5, kind: 'short-video', author: 'SciShorts',        handle: '@scishorts',   avatarEmoji: '⚡', time: '6h',
+    title: 'Why Is the Speed of Light That Number?',
+    body:  'c = 299,792,458 m/s. But why? The answer is weirder than you think.',
+    likes: 71200, comments: 4120, shares: 18400,
+    duration: '0:47', views: '7.2M',
+    gradient: 'from-orange-900 via-red-900 to-pink-900', videoEmoji: '💫' },
+  // ── Posts ──────────────────────────────────────────────────────────────────
+  { id:  6, kind: 'post',        author: 'NASA Astronomy',   handle: '@nasa',        avatarEmoji: '🔭', time: '8h',
+    title: 'Webb Captures a Star-Forming Pillar',
+    body:  'Unprecedented detail inside the Carina Nebula — star-forming pillars stretching light-years high.',
     imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/OSIRIS_Mars_true_color.jpg/400px-OSIRIS_Mars_true_color.jpg',
     likes: 22100, comments: 1456, shares: 8790 },
-  { id: 5, kind: 'user',  author: 'Prof. Kenji Nakamura',handle: '@kenjinaka', avatarEmoji: '👨‍💻', time: '10h',
-    body: 'New preprint on quantum error correction using topological qubits. We achieved 99.7% gate fidelity over 1,000 operations. Link in bio. 🎯',
+  // ── Articles ──────────────────────────────────────────────────────────────
+  { id:  7, kind: 'article',     author: 'Scientific American', handle: '@sciam',    avatarEmoji: '🧪', time: '10h',
+    title: 'Topological Qubits Reach 99.7% Gate Fidelity',
+    body:  'Microsoft\'s quantum team reports a landmark result — topological qubits operating with error rates low enough for practical computation.',
+    likes: 9340, comments: 445, shares: 2100, readTime: '4 min read' },
+  // ── Long Videos ───────────────────────────────────────────────────────────
+  { id:  8, kind: 'long-video',  author: 'Kurzgesagt',        handle: '@kurzgesagt', avatarEmoji: '🐦', time: '12h',
+    title: 'The Fermi Paradox — Where Are All the Aliens?',
+    body:  'There are 200 billion trillion stars. Surely some orbit planets with life. So why is the universe so quiet?',
+    likes: 89300, comments: 6700, shares: 34000,
+    duration: '14:38', views: '22M',
+    gradient: 'from-emerald-800 via-teal-900 to-slate-900', videoEmoji: '🛸' },
+  // ── Short Videos ──────────────────────────────────────────────────────────
+  { id:  9, kind: 'short-video', author: 'NeutronStar',       handle: '@neutronstar', avatarEmoji: '✨', time: '14h',
+    title: 'Neutron Stars: 1 Teaspoon = 1 Billion Tons',
+    body:  'The densest stable objects in the universe — where physics meets the edge of the possible.',
+    likes: 38900, comments: 1740, shares: 8200,
+    duration: '1:02', views: '2.1M',
+    gradient: 'from-slate-800 via-blue-900 to-indigo-900', videoEmoji: '⭐' },
+  // ── Posts ──────────────────────────────────────────────────────────────────
+  { id: 10, kind: 'post',        author: 'Prof. Kenji Nakamura',handle: '@kenjinaka',avatarEmoji: '👨‍💻', time: '16h',
+    body: 'New preprint: quantum error correction using topological qubits. 99.7% gate fidelity over 1,000 operations. This changes everything. 🎯',
     likes: 9340, comments: 445, shares: 2100 },
-  { id: 6, kind: 'wiki',  author: 'Wikipedia Science', handle: '@wikipedia',   avatarEmoji: '📖', time: '12h',
-    title: 'Dark Energy',
-    body: 'Dark energy is an unknown form of energy that dominates the universe. First evidenced by Type Ia supernova measurements in 1998, it accounts for ~68% of total energy.',
-    likes: 7830, comments: 362, shares: 2140 },
-];
-
-const TOPICS = [
-  { label: 'Quantum Physics',  emoji: '⚛️', from: 'from-violet-500/20', border: 'border-violet-500/40' },
-  { label: 'Black Holes',      emoji: '🕳️', from: 'from-purple-900/30', border: 'border-purple-500/40' },
-  { label: 'Dark Matter',      emoji: '🌑', from: 'from-blue-900/30',   border: 'border-blue-500/40' },
-  { label: 'Exoplanets',       emoji: '🪐', from: 'from-orange-500/20', border: 'border-orange-400/40' },
-  { label: 'CRISPR',           emoji: '🧬', from: 'from-emerald-500/20',border: 'border-emerald-400/40' },
-  { label: 'Relativity',       emoji: '💡', from: 'from-yellow-500/20', border: 'border-yellow-400/40' },
-  { label: 'Neuroscience',     emoji: '🧠', from: 'from-pink-500/20',   border: 'border-pink-400/40' },
-  { label: 'String Theory',    emoji: '🔮', from: 'from-cyan-500/20',   border: 'border-cyan-400/40' },
-  { label: 'Astrobiology',     emoji: '🦠', from: 'from-lime-500/20',   border: 'border-lime-400/40' },
-  { label: 'Cosmology',        emoji: '🌌', from: 'from-indigo-500/20', border: 'border-indigo-400/40' },
-];
-
-const VIDEO_THUMBS = [
-  { id: 1, title: 'Hawking Radiation Explained',         channel: 'Cosmos Lab',  gradient: 'from-slate-800 to-purple-900',   views: '1.2M' },
-  { id: 2, title: 'How Fast Is the Universe Expanding?', channel: 'PBS Space Time',gradient:'from-blue-800 to-indigo-900',    views: '3.4M' },
-  { id: 3, title: 'What Is Spacetime Made Of?',          channel: 'PBS Nova',    gradient: 'from-emerald-800 to-teal-900',   views: '892K' },
-  { id: 4, title: 'The Fermi Paradox: Where Are Aliens?',channel: 'Kurzgesagt',  gradient: 'from-orange-800 to-red-900',     views: '22M'  },
+  // ── Articles ──────────────────────────────────────────────────────────────
+  { id: 11, kind: 'article',     author: 'Ars Technica',      handle: '@arstechnica', avatarEmoji: '🖥️', time: '18h',
+    title: 'Inside CRISPR\'s New Frontiers: Gene Drives and Extinction',
+    body:  'Scientists are debating whether gene drives — genetic changes that spread through wild populations — should ever be deployed outside a lab.',
+    likes: 5620, comments: 217, shares: 1834, readTime: '8 min read' },
+  // ── Long Videos ───────────────────────────────────────────────────────────
+  { id: 12, kind: 'long-video',  author: 'PBS Nova',          handle: '@pbsnova',    avatarEmoji: '🎥', time: '1d',
+    title: 'What Is Spacetime Made Of?',
+    body:  'From Einstein\'s rubber sheet to loop quantum gravity — physicists are still arguing about the fabric of the cosmos.',
+    likes: 14700, comments: 892, shares: 4300,
+    duration: '18:52', views: '892K',
+    gradient: 'from-purple-800 via-violet-900 to-slate-900', videoEmoji: '🕳️' },
 ];
 
 interface ChatConvo { id: number; name: string; emoji: string; lastMsg: string; time: string; unread: number; online: boolean; isBot: boolean; }
@@ -199,36 +233,79 @@ function ShortsTab({ lm }: { lm?: boolean }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOME TAB
+// FEED CARD — renders all 4 content types
 // ─────────────────────────────────────────────────────────────────────────────
+const KIND_META: Record<FeedKind, { label: string; color: string; icon: string }> = {
+  'short-video': { label: 'Short',   color: 'text-pink-500',    icon: '⚡' },
+  'post':        { label: 'Post',    color: 'text-purple-500',  icon: '✏️' },
+  'article':     { label: 'Article', color: 'text-blue-500',    icon: '📰' },
+  'long-video':  { label: 'Video',   color: 'text-emerald-500', icon: '🎬' },
+};
+
 function FeedCard({ post, lm }: { post: FeedPost; lm?: boolean }) {
   const [liked, setLiked] = useState(false);
-
-  const kindColor = post.kind === 'nasa' ? 'text-blue-500' : post.kind === 'wiki' ? 'text-emerald-600' : 'text-purple-500';
-  const kindLabel = post.kind === 'nasa' ? 'NASA' : post.kind === 'wiki' ? 'Wikipedia' : 'Scientist';
+  const meta = KIND_META[post.kind];
+  const isVideo = post.kind === 'short-video' || post.kind === 'long-video';
 
   return (
     <div className={`rounded-2xl overflow-hidden border transition-colors duration-300 ${lm ? 'bg-white border-gray-100 shadow-sm' : 'bg-white/[0.04] border-white/[0.08]'}`}>
+
+      {/* Video thumbnail for short-video and long-video */}
+      {isVideo && post.gradient && (
+        <div className={`relative w-full overflow-hidden ${post.kind === 'short-video' ? 'aspect-[9/14]' : 'aspect-video'}`}>
+          <div className={`absolute inset-0 bg-gradient-to-br ${post.gradient}`} />
+          {/* noise overlay */}
+          <div className="absolute inset-0 opacity-[0.05]"
+            style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          {/* center emoji */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className={`select-none drop-shadow-2xl ${post.kind === 'short-video' ? 'text-[72px]' : 'text-[54px]'}`}>{post.videoEmoji}</span>
+          </div>
+          {/* play button */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className={`rounded-full bg-black/30 border border-white/30 flex items-center justify-center backdrop-blur-sm ${post.kind === 'short-video' ? 'w-14 h-14' : 'w-12 h-12'}`}>
+              <svg viewBox="0 0 24 24" className={`fill-white ml-0.5 ${post.kind === 'short-video' ? 'w-6 h-6' : 'w-5 h-5'}`}><polygon points="5,3 19,12 5,21"/></svg>
+            </div>
+          </div>
+          {/* duration badge */}
+          {post.duration && (
+            <span className="absolute bottom-2.5 right-3 text-[11px] font-mono font-medium text-white bg-black/60 px-2 py-0.5 rounded-md">
+              {post.duration}
+            </span>
+          )}
+          {/* views badge */}
+          {post.views && (
+            <span className="absolute bottom-2.5 left-3 text-[11px] text-white/70">
+              👁 {post.views}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Post header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0 ${lm ? 'bg-gray-100' : 'bg-white/[0.08]'}`}>
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-2.5">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 ${lm ? 'bg-gray-100' : 'bg-white/[0.08]'}`}>
           {post.avatarEmoji}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[14px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>{post.author}</span>
-            <span className={`text-[10px] uppercase tracking-[0.15em] font-mono px-2 py-0.5 rounded-full ${lm ? 'bg-gray-100 text-gray-500' : 'bg-white/[0.08] text-white/40'} ${kindColor}`}>
-              {kindLabel}
+            <span className={`text-[13.5px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>{post.author}</span>
+            <span className={`text-[9.5px] uppercase tracking-[0.14em] font-mono px-1.5 py-0.5 rounded-full ${lm ? 'bg-gray-100' : 'bg-white/[0.07]'} ${meta.color}`}>
+              {meta.icon} {meta.label}
             </span>
+            {post.readTime && (
+              <span className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/35'}`}>{post.readTime}</span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`text-[11px] ${lm ? 'text-gray-400' : 'text-white/35'}`}>{post.handle}</span>
             <span className={`text-[10px] ${lm ? 'text-gray-300' : 'text-white/20'}`}>·</span>
             <span className={`text-[11px] ${lm ? 'text-gray-400' : 'text-white/35'}`}>{post.time}</span>
           </div>
         </div>
-        <button className={`text-[18px] p-1 rounded-full transition-colors ${lm ? 'hover:bg-gray-100' : 'hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className={`w-4 h-4 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2}>
+        <button className={`p-1.5 rounded-full transition-colors ${lm ? 'hover:bg-gray-100' : 'hover:bg-white/[0.06]'}`}>
+          <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2}>
             <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
           </svg>
         </button>
@@ -236,14 +313,14 @@ function FeedCard({ post, lm }: { post: FeedPost; lm?: boolean }) {
 
       {/* Title */}
       {post.title && (
-        <p className={`px-4 pb-2 text-[15px] font-semibold leading-snug ${lm ? 'text-gray-900' : 'text-white'}`}>{post.title}</p>
+        <p className={`px-4 pb-1.5 text-[14.5px] font-semibold leading-snug ${lm ? 'text-gray-900' : 'text-white'}`}>{post.title}</p>
       )}
 
       {/* Body */}
-      <p className={`px-4 pb-3 text-[13.5px] leading-relaxed ${lm ? 'text-gray-600' : 'text-white/60'}`}>{post.body}</p>
+      <p className={`px-4 pb-3 text-[13px] leading-relaxed ${lm ? 'text-gray-600' : 'text-white/55'}`}>{post.body}</p>
 
-      {/* Image */}
-      {post.imageUrl && (
+      {/* Image (post/article with imageUrl, not video) */}
+      {!isVideo && post.imageUrl && (
         <div className="mx-4 mb-3 rounded-xl overflow-hidden aspect-[16/9] bg-gray-800">
           <img src={post.imageUrl} alt={post.title} className="w-full h-full object-cover" loading="lazy"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -251,33 +328,29 @@ function FeedCard({ post, lm }: { post: FeedPost; lm?: boolean }) {
       )}
 
       {/* Actions */}
-      <div className={`flex items-center gap-1 px-3 py-2.5 border-t ${lm ? 'border-gray-100' : 'border-white/[0.05]'}`}>
-        {/* Like */}
+      <div className={`flex items-center gap-0.5 px-3 py-2 border-t ${lm ? 'border-gray-100' : 'border-white/[0.05]'}`}>
         <button onClick={() => setLiked(l => !l)}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all ${liked ? 'text-red-500' : lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
             <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
           </svg>
           {fmt(post.likes + (liked ? 1 : 0))}
         </button>
-        {/* Comment */}
         <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
           </svg>
           {fmt(post.comments)}
         </button>
-        {/* Share */}
         <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] transition-all ${lm ? 'text-gray-500 hover:bg-gray-100' : 'text-white/45 hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
           </svg>
           {fmt(post.shares)}
         </button>
         <div className="flex-1" />
-        {/* Bookmark */}
         <button className={`p-2 rounded-xl transition-all ${lm ? 'text-gray-400 hover:bg-gray-100' : 'text-white/30 hover:bg-white/[0.06]'}`}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
           </svg>
         </button>
@@ -286,25 +359,12 @@ function FeedCard({ post, lm }: { post: FeedPost; lm?: boolean }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME TAB — pure, uninterrupted mixed feed; no header controls
+// ─────────────────────────────────────────────────────────────────────────────
 function HomeTab({ lm }: { lm?: boolean }) {
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-      {/* Stories row */}
-      <div className={`sticky top-0 z-10 px-4 py-3 border-b flex gap-3 overflow-x-auto ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}
-        style={{ scrollbarWidth: 'none' }}>
-        {['You', 'NASA', 'SpaceX', 'CERN', 'ArXiv', 'ESA', 'Hubble', 'Webb'].map((name, i) => (
-          <button key={name} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl p-0.5 ${i === 0 ? 'bg-gradient-to-br from-violet-500 to-indigo-600' : 'bg-gradient-to-br from-purple-500/30 to-blue-500/30'} ${lm ? 'ring-2 ring-offset-2 ring-purple-300 ring-offset-gray-50' : 'ring-2 ring-offset-2 ring-purple-500/30 ring-offset-[#080810]'}`}>
-              <div className={`w-full h-full rounded-full flex items-center justify-center text-base ${lm ? 'bg-gray-100' : 'bg-[#080810]'}`}>
-                {['🧑‍🚀', '🔭', '🚀', '⚗️', '📄', '🛰️', '🌌', '🔬'][i]}
-              </div>
-            </div>
-            <span className={`text-[10px] truncate w-12 text-center ${lm ? 'text-gray-600' : 'text-white/50'}`}>{name}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Feed */}
       <div className="flex flex-col gap-3 p-4 pb-6">
         {FEED.map(post => <FeedCard key={post.id} post={post} lm={lm} />)}
       </div>
@@ -313,15 +373,30 @@ function HomeTab({ lm }: { lm?: boolean }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH TAB
+// SEARCH TAB — search bar + 4 filter chips + filtered feed
 // ─────────────────────────────────────────────────────────────────────────────
+const SEARCH_FILTERS: { kind: FeedKind | 'all'; label: string; icon: string }[] = [
+  { kind: 'short-video', label: 'Short Video', icon: '⚡' },
+  { kind: 'post',        label: 'Post',        icon: '✏️' },
+  { kind: 'article',     label: 'Article',     icon: '📰' },
+  { kind: 'long-video',  label: 'Long Video',  icon: '🎬' },
+];
+
 function SearchTab({ lm }: { lm?: boolean }) {
-  const [q, setQ] = useState('');
+  const [q,      setQ]      = useState('');
+  const [active, setActive] = useState<FeedKind | 'all'>('all');
+
+  const filtered = FEED.filter(p => {
+    const matchKind = active === 'all' || p.kind === active;
+    const matchQ    = !q.trim() || (p.title ?? p.body).toLowerCase().includes(q.toLowerCase());
+    return matchKind && matchQ;
+  });
 
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-      {/* Search bar */}
+      {/* Sticky search bar + filter chips */}
       <div className={`sticky top-0 z-10 px-4 pt-4 pb-3 border-b ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
+        {/* Search input */}
         <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${lm ? 'bg-white border-gray-200 shadow-sm focus-within:border-purple-300 focus-within:shadow-md' : 'bg-white/[0.06] border-white/[0.10] focus-within:border-white/[0.22] focus-within:bg-white/[0.09]'}`}>
           <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2.5}>
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -329,49 +404,47 @@ function SearchTab({ lm }: { lm?: boolean }) {
           <input
             value={q} onChange={e => setQ(e.target.value)}
             placeholder="Search the cosmos…"
-            className={`flex-1 bg-transparent outline-none text-[14px] placeholder:text-[14px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`}
+            className={`flex-1 bg-transparent outline-none text-[14px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`}
           />
           {q && (
             <button onClick={() => setQ('')} className={`text-[18px] leading-none ${lm ? 'text-gray-400 hover:text-gray-600' : 'text-white/30 hover:text-white/60'}`}>×</button>
           )}
         </div>
+
+        {/* 4 filter chips */}
+        <div className="flex items-center gap-2 mt-3">
+          {SEARCH_FILTERS.map(f => {
+            const isOn = active === f.kind;
+            return (
+              <motion.button key={f.kind} whileTap={{ scale: 0.94 }}
+                onClick={() => setActive(a => a === f.kind ? 'all' : f.kind)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11.5px] font-medium transition-all flex-shrink-0 ${
+                  isOn
+                    ? lm
+                      ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
+                      : 'bg-violet-600 border-violet-500 text-white'
+                    : lm
+                      ? 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      : 'bg-white/[0.05] border-white/[0.10] text-white/55 hover:bg-white/[0.09] hover:border-white/[0.18]'
+                }`}>
+                <span className="text-[12px]">{f.icon}</span>
+                <span>{f.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="px-4 py-5 flex flex-col gap-6">
-        {/* Trending topics */}
-        <div>
-          <p className={`text-[10px] uppercase tracking-[0.28em] font-mono mb-3 ${lm ? 'text-gray-400' : 'text-white/35'}`}>🔥 Trending Topics</p>
-          <div className="grid grid-cols-2 gap-2.5">
-            {TOPICS.map(t => (
-              <motion.button key={t.label} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left transition-all bg-gradient-to-r ${t.from} to-transparent ${t.border} ${lm ? 'hover:bg-gray-100/80' : 'hover:bg-white/[0.06]'}`}>
-                <span className="text-[18px]">{t.emoji}</span>
-                <span className={`text-[12px] font-medium ${lm ? 'text-gray-800' : 'text-white/80'}`}>{t.label}</span>
-              </motion.button>
-            ))}
+      {/* Filtered feed */}
+      <div className="flex flex-col gap-3 p-4 pb-6">
+        {filtered.length === 0 ? (
+          <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+            <p className="text-3xl mb-3">🔭</p>
+            <p className="text-[14px]">Nothing found — try a different search or filter.</p>
           </div>
-        </div>
-
-        {/* Video thumbnails */}
-        <div>
-          <p className={`text-[10px] uppercase tracking-[0.28em] font-mono mb-3 ${lm ? 'text-gray-400' : 'text-white/35'}`}>🎬 Recommended Videos</p>
-          <div className="grid grid-cols-2 gap-3">
-            {VIDEO_THUMBS.map(v => (
-              <motion.div key={v.id} whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.97 }}
-                className={`rounded-xl overflow-hidden border cursor-pointer ${lm ? 'border-gray-200 bg-gray-100' : 'border-white/[0.08]'}`}>
-                <div className={`aspect-video bg-gradient-to-br ${v.gradient} flex items-center justify-center`}>
-                  <div className="w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-4 h-4 ml-0.5 fill-white"><polygon points="5,3 19,12 5,21"/></svg>
-                  </div>
-                </div>
-                <div className={`px-2.5 py-2 ${lm ? 'bg-white' : 'bg-white/[0.03]'}`}>
-                  <p className={`text-[11px] font-medium leading-tight line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/80'}`}>{v.title}</p>
-                  <p className={`text-[10px] mt-0.5 ${lm ? 'text-gray-400' : 'text-white/30'}`}>{v.channel} · {v.views}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        ) : (
+          filtered.map(post => <FeedCard key={post.id} post={post} lm={lm} />)
+        )}
       </div>
     </div>
   );
