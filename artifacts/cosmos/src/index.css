@@ -467,3 +467,8 @@ body {
     inset: -1px;
   }
 }
+
+/* ── Cosmos video loading spinner ─────────────────────────────────────────── */
+@keyframes cosmos-spin {
+  to { transform: rotate(360deg); }
+}

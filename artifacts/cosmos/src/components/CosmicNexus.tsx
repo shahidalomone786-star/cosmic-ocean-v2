@@ -991,40 +991,68 @@ const SLIDE_GRADIENTS = [
   'linear-gradient(160deg,#050010 0%,#10002a 50%,#030010 100%)',
 ];
 
-function ShortVideoSlide({ post, onComment }: {
-  post:      LivePost;
-  onComment: (post: LivePost) => void;
+function ShortVideoSlide({ post, onComment, globalMuted, onToggleMute, srcActive, onBecameActive }: {
+  post:            LivePost;
+  onComment:       (post: LivePost) => void;
+  globalMuted:     boolean;
+  onToggleMute:    () => void; // toggles global mute — unmutes on first tap, mutes on second
+  srcActive:       boolean;   // true = this slide + next slide (load src)
+  onBecameActive:  () => void; // called when slide scrolls into view
 }) {
-  const [inView,     setInView]     = useState(false);
-  const [muted,      setMuted]      = useState(true);
   const [liked,      setLiked]      = useState(post.user_liked);
   const [likeCount,  setLikeCount]  = useState(post.like_count);
   const [bookmarked, setBookmarked] = useState(post.user_bookmarked);
   const [shareToast, setShareToast] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [isPlaying,  setIsPlaying]  = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const slideRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // ── Mount iframe when slide enters view; unmount (kill audio) when it leaves ─
+  // ── IntersectionObserver: play/pause, report active, DO NOT reset mute ───
   useEffect(() => {
     const el = slideRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => {
-        setInView(entry.isIntersecting);
-        if (!entry.isIntersecting) setMuted(true); // reset mute on every scroll-away
+        const vid = videoRef.current;
+        if (entry.isIntersecting) {
+          onBecameActive();
+          if (vid) {
+            vid.muted = globalMuted;
+            vid.play().catch(() => {/* autoplay blocked */});
+          }
+          setIsPlaying(true);
+        } else {
+          if (vid) vid.pause();
+          setIsPlaying(false);
+          setIsBuffering(false);
+        }
       },
-      { threshold: 0.72 },
+      { threshold: 0.6 },
     );
     obs.observe(el);
     return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const extra      = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
-  const youtubeId  = (extra['youtube_id'] as string) || '';
-  const igHandle   = (extra['handle']     as string) || '';
-  const igLikes    = (extra['likes']      as string) || '';
-  const channel    = (extra['channel']    as string) || '';
+  // ── Sync globalMuted → video element property ─────────────────────────────
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = globalMuted;
+  }, [globalMuted]);
 
-  // ── Wired interactivity ───────────────────────────────────────────────────
+  // ── When src becomes active, reset error so video can retry ──────────────
+  useEffect(() => {
+    if (srcActive) setVideoError(false);
+  }, [srcActive]);
+
+  const extra     = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
+  const videoUrl  = (extra['video_url']  as string) || '';
+  const igHandle  = (extra['handle']     as string) || '';
+  const igLikes   = (extra['likes']      as string) || '';
+  const channel   = (extra['channel']    as string) || '';
+
+  // ── Wired like / bookmark / share ────────────────────────────────────────
   const toggleLike = async () => {
     const next = !liked;
     setLiked(next);
@@ -1064,84 +1092,101 @@ function ShortVideoSlide({ post, onComment }: {
   const authorName   = post.source === 'instagram' ? `@${igHandle || post.author_username}` : (channel || post.author_username);
   const displayTitle = post.ec_title || post.content;
   const bg           = SLIDE_GRADIENTS[(post.id?.charCodeAt?.(2) ?? 0) % SLIDE_GRADIENTS.length];
-
-  // iframe src: key forces remount when muted changes → video restarts with new audio state
-  const iframeSrc = youtubeId
-    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=${muted ? 1 : 0}&controls=0&loop=1&playlist=${youtubeId}&rel=0&playsinline=1&modestbranding=1`
-    : '';
+  const hasVideo     = !!videoUrl && !videoError;
+  const hasFallback  = !!post.media_url;
 
   return (
-    <div ref={slideRef} className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden bg-black">
+    <div ref={slideRef} className="snap-start snap-always h-full w-full relative flex-shrink-0 overflow-hidden bg-black">
 
-      {/* ── Deep-space gradient (always present as base layer) ── */}
+      {/* ── Deep-space gradient — always present as base / fallback layer ── */}
       <div className="absolute inset-0" style={{ background: bg }} />
 
-      {/* ── Non-YouTube media (Instagram reels / user posts) ── */}
-      {post.source !== 'youtube' && post.media_url && (
-        <img src={post.media_url} alt="" className="absolute inset-0 w-full h-full object-cover"
-          onError={e => { e.currentTarget.style.display = 'none'; }} />
-      )}
-
-      {/* ── YouTube iframe — mounts on view-enter, unmounts on view-exit ── */}
-      {inView && youtubeId && (
-        <iframe
-          key={muted ? 'muted' : 'unmuted'}
-          src={iframeSrc}
-          className="absolute inset-0 w-full h-full border-none"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
+      {/* ── Native HTML5 video — lazy: src only attached when srcActive ── */}
+      {hasVideo && (
+        <video
+          ref={videoRef}
+          {...(srcActive ? { src: videoUrl } : {})}
+          poster={post.media_url || undefined}
+          autoPlay
+          loop
+          muted={globalMuted}
+          playsInline
+          onError={() => setVideoError(true)}
+          onPlay={() => { setIsPlaying(true); setIsBuffering(false); }}
+          onPause={() => setIsPlaying(false)}
+          onWaiting={() => setIsBuffering(true)}
+          onCanPlay={() => setIsBuffering(false)}
+          onPlaying={() => setIsBuffering(false)}
+          className="absolute inset-0 w-full h-full object-cover"
           style={{ zIndex: 1 }}
         />
       )}
 
-      {/* ── Gradient overlays — scrim for UI readability on top of iframe ── */}
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.32) 100%)' }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
-        background: 'linear-gradient(to right, rgba(0,0,0,0.28) 0%, transparent 55%)' }} />
+      {/* ── Image fallback for non-video posts (Instagram / user posts) ── */}
+      {!hasVideo && hasFallback && (
+        <img
+          src={post.media_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ zIndex: 1 }}
+          onError={e => { e.currentTarget.style.display = 'none'; }}
+        />
+      )}
 
-      {/* ── SOURCE BADGE — top-left ── */}
+      {/* ── Gradient scrims — readability over video without hiding content ── */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
+        background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.0) 42%, rgba(0,0,0,0.25) 100%)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
+        background: 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, transparent 52%)' }} />
+
+      {/* ── LOADING SPINNER — shows while buffering ── */}
+      <AnimatePresence>
+        {isBuffering && hasVideo && (
+          <motion.div
+            key="spinner"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: 8 }}
+          >
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%',
+              border: '3px solid rgba(255,255,255,0.15)',
+              borderTopColor: 'rgba(255,255,255,0.85)',
+              animation: 'cosmos-spin 0.75s linear infinite',
+            }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SOURCE / CHANNEL BADGE — top-left ── */}
       <div className="absolute top-4 left-4 flex items-center gap-2" style={{ zIndex: 10 }}>
-        {post.source === 'youtube' && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
-            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.14)' }}>
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-shrink-0">
-              <path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z"/>
-              <polygon fill="white" points="9.75,15.02 15.5,12 9.75,8.98"/>
-            </svg>
-            <span className="text-white text-[9.5px] font-bold tracking-wider">SHORTS</span>
-          </div>
-        )}
-        {post.source === 'instagram' && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
-            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.14)' }}>
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-shrink-0">
-              <defs><linearGradient id="igG" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#feda75"/><stop offset="30%" stopColor="#fa7e1e"/>
-                <stop offset="60%" stopColor="#d62976"/><stop offset="85%" stopColor="#962fbf"/>
-                <stop offset="100%" stopColor="#4f5bd5"/></linearGradient></defs>
-              <path fill="url(#igG)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-            </svg>
-            <span className="text-white text-[9.5px] font-bold tracking-wider">REELS</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
+          style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+          {/* Cosmos star badge */}
+          <svg viewBox="0 0 24 24" className="w-3 h-3 flex-shrink-0 fill-violet-400">
+            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+          </svg>
+          <span className="text-white text-[9px] font-bold tracking-widest uppercase">Cosmos</span>
+        </div>
         {(channel || igHandle) && (
-          <span className="text-white/65 text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>
+          <span className="text-white/70 text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>
             {channel || `@${igHandle}`}
           </span>
         )}
       </div>
 
-      {/* ── MUTE TOGGLE — top-right ── */}
-      {inView && (youtubeId || post.media_url) && (
+      {/* ── MUTE TOGGLE — top-right (only shown when video is active) ── */}
+      {(hasVideo || hasFallback) && (
         <motion.button
-          onClick={() => setMuted(m => !m)}
+          onClick={onToggleMute}
           whileTap={{ scale: 0.86 }}
           className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center"
           style={{ zIndex: 10, background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.18)' }}
-          aria-label={muted ? 'Unmute' : 'Mute'}
+          aria-label={globalMuted ? 'Unmute' : 'Mute'}
         >
-          {muted ? (
+          {globalMuted ? (
             <svg viewBox="0 0 24 24" className="w-[15px] h-[15px] fill-none stroke-white" strokeWidth={2}>
               <path d="M11 5L6 9H2v6h4l5 4V5z"/>
               <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
@@ -1155,30 +1200,31 @@ function ShortVideoSlide({ post, onComment }: {
         </motion.button>
       )}
 
-      {/* ── TAP-TO-UNMUTE cta — fades in after 1s, disappears when unmuted ── */}
+      {/* ── TAP-TO-UNMUTE pill — appears after 1.2s, disappears when unmuted ── */}
       <AnimatePresence>
-        {inView && muted && youtubeId && (
+        {isPlaying && globalMuted && hasVideo && (
           <motion.button
             key="unmute-cta"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: 1.1, duration: 0.35 } }}
-            exit={{ opacity: 0, y: -4, transition: { duration: 0.2 } }}
-            onClick={() => setMuted(false)}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1, transition: { delay: 1.2, duration: 0.3 } }}
+            exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.18 } }}
+            onClick={onToggleMute}
             className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-full"
-            style={{ zIndex: 10, bottom: '48%', background: 'rgba(0,0,0,0.58)', backdropFilter: 'blur(22px)', border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 8px 36px rgba(0,0,0,0.45)' }}
+            style={{ zIndex: 10, bottom: '50%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 36px rgba(0,0,0,0.5)' }}
           >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-white/80" strokeWidth={2}>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-white/85" strokeWidth={2}>
               <path d="M11 5L6 9H2v6h4l5 4V5z"/>
               <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
             </svg>
-            <span className="text-white/85 text-[11.5px] font-medium tracking-wide">Tap to unmute</span>
+            <span className="text-white/90 text-[11.5px] font-medium tracking-wide">Tap to unmute</span>
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* ── BOTTOM-LEFT: author avatar + name + title ── */}
+      {/* ── BOTTOM-LEFT: author + title ── */}
       <div className="absolute bottom-0 left-0" style={{ right: '86px', zIndex: 10 }}>
-        <div className="px-5 pb-8 pt-28">
+        <div className="px-5 pb-8 pt-28"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.0) 0%, transparent 100%)' }}>
           <div className="flex items-center gap-2.5 mb-2.5">
             <div className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden"
               style={{ border: '2px solid rgba(255,255,255,0.32)', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
@@ -1187,16 +1233,16 @@ function ShortVideoSlide({ post, onComment }: {
             </div>
             <div>
               <p className="text-white font-semibold text-[13.5px] leading-tight"
-                style={{ textShadow: '0 1px 8px rgba(0,0,0,1)' }}>{authorName}</p>
+                style={{ textShadow: '0 1px 10px rgba(0,0,0,1)' }}>{authorName}</p>
               {igLikes && <p className="text-white/50 text-[10.5px] mt-0.5">{igLikes} likes</p>}
             </div>
           </div>
-          <p className="text-white/88 text-[13px] leading-snug line-clamp-3"
-            style={{ textShadow: '0 1px 8px rgba(0,0,0,1)' }}>{displayTitle}</p>
+          <p className="text-white/85 text-[13px] leading-snug line-clamp-3"
+            style={{ textShadow: '0 1px 10px rgba(0,0,0,1)' }}>{displayTitle}</p>
         </div>
       </div>
 
-      {/* ── BOTTOM-RIGHT: action bar — ALWAYS visible, always wired ── */}
+      {/* ── BOTTOM-RIGHT: action bar ── */}
       <div className="absolute bottom-8 right-3.5 flex flex-col items-center gap-5" style={{ zIndex: 10 }}>
 
         {/* Like */}
@@ -1285,6 +1331,13 @@ function ShortsTab({ posts, loading, onComment }: {
 }) {
   const shorts = posts.filter(p => p.type === 'short-video');
 
+  // ── Global mute state — persists across slides once user unmutes ──────────
+  const [globalMuted,  setGlobalMuted]  = useState(true);
+  // ── Active index — tracks which slide is in view for lazy loading ─────────
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleToggleMute = useCallback(() => setGlobalMuted(m => !m), []);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1310,8 +1363,17 @@ function ShortsTab({ posts, loading, onComment }: {
 
   return (
     <div className="h-full overflow-y-auto snap-y snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-      {shorts.map(post => (
-        <ShortVideoSlide key={post.id} post={post} onComment={onComment} />
+      {shorts.map((post, idx) => (
+        <ShortVideoSlide
+          key={post.id}
+          post={post}
+          onComment={onComment}
+          globalMuted={globalMuted}
+          onToggleMute={handleToggleMute}
+          // Strict lazy loading: only active slide + immediate next get a src
+          srcActive={idx >= activeIndex && idx <= activeIndex + 1}
+          onBecameActive={() => setActiveIndex(idx)}
+        />
       ))}
     </div>
   );

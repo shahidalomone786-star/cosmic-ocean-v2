@@ -4,10 +4,17 @@ import path from "node:path";
 const DB_PATH =
   process.env["DB_PATH"] ?? path.join(process.cwd(), "cosmos.db");
 
+// IMPORTANT: The DB file at DB_PATH is the persistent store for all user
+// accounts, posts, likes, and bookmarks. NEVER drop, truncate, or DELETE FROM
+// the `users` table in any migration or sync path. All schema changes must use
+// ADD COLUMN or CREATE TABLE IF NOT EXISTS — never DROP TABLE or recreate.
 const db = new Database(DB_PATH);
 
 // WAL mode for better concurrent read performance
 db.pragma("journal_mode = WAL");
+// Foreign keys are OFF by default in SQLite — keep them off to allow
+// external_content IDs to be used in post_likes/post_bookmarks.
+db.pragma("foreign_keys = OFF");
 
 // ── Core schema ───────────────────────────────────────────────────────────────
 db.exec(`
