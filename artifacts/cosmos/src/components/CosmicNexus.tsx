@@ -982,55 +982,49 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // SHORT VIDEO SLIDE — one full-screen card in the Shorts reel
 // ─────────────────────────────────────────────────────────────────────────────
+// ── Space gradient palette — one per slide for visual variety ────────────────
+const SLIDE_GRADIENTS = [
+  'linear-gradient(160deg,#06000f 0%,#130025 50%,#000510 100%)',
+  'linear-gradient(160deg,#000a1a 0%,#001630 50%,#00081a 100%)',
+  'linear-gradient(160deg,#0a0002 0%,#1f0010 50%,#08000f 100%)',
+  'linear-gradient(160deg,#000f08 0%,#001a12 50%,#000c08 100%)',
+  'linear-gradient(160deg,#050010 0%,#10002a 50%,#030010 100%)',
+];
+
 function ShortVideoSlide({ post, onComment }: {
   post:      LivePost;
   onComment: (post: LivePost) => void;
 }) {
+  const [inView,     setInView]     = useState(false);
+  const [muted,      setMuted]      = useState(true);
   const [liked,      setLiked]      = useState(post.user_liked);
   const [likeCount,  setLikeCount]  = useState(post.like_count);
   const [bookmarked, setBookmarked] = useState(post.user_bookmarked);
-  const [playing,    setPlaying]    = useState(false);
   const [shareToast, setShareToast] = useState(false);
-  const [thumbErr,   setThumbErr]   = useState(false);
   const slideRef = useRef<HTMLDivElement>(null);
 
-  // ── Stop audio/video when scrolled out of view ─────────────────────────────
+  // ── Mount iframe when slide enters view; unmount (kill audio) when it leaves ─
   useEffect(() => {
     const el = slideRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry && !entry.isIntersecting) setPlaying(false); },
-      { threshold: 0.4 },
+      ([entry]) => {
+        setInView(entry.isIntersecting);
+        if (!entry.isIntersecting) setMuted(true); // reset mute on every scroll-away
+      },
+      { threshold: 0.72 },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
 
-  const extra = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
+  const extra      = (() => { try { return JSON.parse(post.extra_json || '{}') as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
   const youtubeId  = (extra['youtube_id'] as string) || '';
   const igHandle   = (extra['handle']     as string) || '';
   const igLikes    = (extra['likes']      as string) || '';
   const channel    = (extra['channel']    as string) || '';
 
-  // Background image — try hqdefault, fall back to sddefault
-  let bgUrl = '';
-  if (post.source === 'youtube' && youtubeId) {
-    bgUrl = thumbErr
-      ? `https://img.youtube.com/vi/${youtubeId}/sddefault.jpg`
-      : `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-  } else if (post.media_url) {
-    bgUrl = post.media_url;
-  }
-
-  // Source badge config
-  const SOURCE_META: Record<string, { label: string; color: string }> = {
-    youtube:   { label: 'YouTube',   color: 'rgba(255,0,0,0.8)' },
-    instagram: { label: 'Instagram', color: 'rgba(131,58,180,0.9)' },
-    x:         { label: '𝕏',        color: 'rgba(0,0,0,0.85)' },
-    '':        { label: 'Cosmos',    color: 'rgba(109,40,217,0.85)' },
-  };
-  const srcMeta = SOURCE_META[post.source] ?? { label: post.source, color: 'rgba(30,30,50,0.85)' };
-
+  // ── Wired interactivity ───────────────────────────────────────────────────
   const toggleLike = async () => {
     const next = !liked;
     setLiked(next);
@@ -1038,6 +1032,7 @@ function ShortVideoSlide({ post, onComment }: {
     try {
       const res  = await fetch(`/api/posts/${post.id}/like`, { method: 'POST', credentials: 'include' });
       const data = await res.json() as { ok: boolean; liked?: boolean };
+      if (!data.ok) throw new Error();
       setLiked(data.liked ?? next);
     } catch {
       setLiked(!next);
@@ -1049,159 +1044,233 @@ function ShortVideoSlide({ post, onComment }: {
     const next = !bookmarked;
     setBookmarked(next);
     try {
-      await fetch(`/api/posts/${post.id}/bookmark`, { method: 'POST', credentials: 'include' });
+      const res  = await fetch(`/api/posts/${post.id}/bookmark`, { method: 'POST', credentials: 'include' });
+      const data = await res.json() as { ok: boolean };
+      if (!data.ok) throw new Error();
     } catch { setBookmarked(!next); }
   };
 
   const handleShare = async () => {
     const url = post.external_link || `${window.location.origin}/api/posts/${post.id}`;
-    if (navigator.share) { try { await navigator.share({ title: post.ec_title || post.content.slice(0, 60), url }); } catch { /**/ } }
-    else { try { await navigator.clipboard.writeText(url); } catch { /**/ } setShareToast(true); setTimeout(() => setShareToast(false), 2000); }
+    if (navigator.share) {
+      try { await navigator.share({ title: post.ec_title || post.content.slice(0, 60), url }); } catch { /**/ }
+    } else {
+      try { await navigator.clipboard.writeText(url); } catch { /**/ }
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 2400);
+    }
   };
 
+  const authorName   = post.source === 'instagram' ? `@${igHandle || post.author_username}` : (channel || post.author_username);
   const displayTitle = post.ec_title || post.content;
-  const authorName   = post.source === 'instagram' ? `@${igHandle || post.author_username}` : post.author_username;
+  const bg           = SLIDE_GRADIENTS[(post.id?.charCodeAt?.(2) ?? 0) % SLIDE_GRADIENTS.length];
+
+  // iframe src: key forces remount when muted changes → video restarts with new audio state
+  const iframeSrc = youtubeId
+    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=${muted ? 1 : 0}&controls=0&loop=1&playlist=${youtubeId}&rel=0&playsinline=1&modestbranding=1`
+    : '';
 
   return (
     <div ref={slideRef} className="snap-start snap-always h-full relative flex-shrink-0 overflow-hidden bg-black">
 
-      {/* ── Background ── */}
-      {bgUrl && !playing && (
-        <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover"
-          onError={() => {
-            if (!thumbErr) setThumbErr(true);
-          }} />
-      )}
-      {!bgUrl && (
-        <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(135deg,#0d001a 0%,#1a0033 35%,#000d1a 70%,#000510 100%)' }} />
+      {/* ── Deep-space gradient (always present as base layer) ── */}
+      <div className="absolute inset-0" style={{ background: bg }} />
+
+      {/* ── Non-YouTube media (Instagram reels / user posts) ── */}
+      {post.source !== 'youtube' && post.media_url && (
+        <img src={post.media_url} alt="" className="absolute inset-0 w-full h-full object-cover"
+          onError={e => { e.currentTarget.style.display = 'none'; }} />
       )}
 
-      {/* YouTube embed */}
-      {playing && youtubeId && (
+      {/* ── YouTube iframe — mounts on view-enter, unmounts on view-exit ── */}
+      {inView && youtubeId && (
         <iframe
-          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+          key={muted ? 'muted' : 'unmuted'}
+          src={iframeSrc}
           className="absolute inset-0 w-full h-full border-none"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
+          style={{ zIndex: 1 }}
         />
       )}
 
-      {/* Dark gradient layers */}
-      {!playing && (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/25" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
-        </>
-      )}
+      {/* ── Gradient overlays — scrim for UI readability on top of iframe ── */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
+        background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.32) 100%)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2,
+        background: 'linear-gradient(to right, rgba(0,0,0,0.28) 0%, transparent 55%)' }} />
 
-      {/* ── Source badge (top-left) ── */}
-      {!playing && (
-        <div className="absolute top-4 left-4 flex items-center gap-2">
-          <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-white px-2.5 py-1 rounded-full"
-            style={{ background: srcMeta.color, backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.15)' }}>
-            {srcMeta.label}
-          </span>
-          {(channel || igHandle) && (
-            <span className="text-[10px] text-white/60 font-medium drop-shadow">
-              {channel || `@${igHandle}`}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── YouTube play button (center) ── */}
-      {post.source === 'youtube' && youtubeId && !playing && (
-        <button onClick={() => setPlaying(true)}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[68px] h-[68px] rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-          style={{ background: 'rgba(255,0,0,0.88)', boxShadow: '0 0 0 6px rgba(255,0,0,0.18), 0 8px 40px rgba(255,0,0,0.5)' }}>
-          <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white ml-1"><polygon points="5,3 19,12 5,21"/></svg>
-        </button>
-      )}
-
-      {/* ── Close player ── */}
-      {playing && (
-        <button onClick={() => setPlaying(false)}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4 stroke-white fill-none" strokeWidth={2.5}><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      )}
-
-      {/* ── Bottom-left: user info + content ── */}
-      {!playing && (
-        <div className="absolute bottom-0 left-0" style={{ right: '80px' }}>
-          <div className="px-5 pb-8 pt-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-            {/* Avatar + name */}
-            <div className="flex items-center gap-2.5 mb-2.5">
-              <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0"
-                style={{ border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 12px rgba(0,0,0,0.5)', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
-                <img src={post.author_avatar} alt={authorName} className="w-full h-full object-cover"
-                  onError={e => { e.currentTarget.style.display = 'none'; }} />
-              </div>
-              <div>
-                <p className="text-white font-semibold text-[13.5px] leading-tight drop-shadow">{authorName}</p>
-                {igLikes && <p className="text-white/55 text-[10.5px]">{igLikes} likes</p>}
-              </div>
-            </div>
-            {/* Title / Content */}
-            <p className="text-white/90 text-[13px] leading-snug line-clamp-3 drop-shadow">
-              {displayTitle}
-            </p>
+      {/* ── SOURCE BADGE — top-left ── */}
+      <div className="absolute top-4 left-4 flex items-center gap-2" style={{ zIndex: 10 }}>
+        {post.source === 'youtube' && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
+            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-shrink-0">
+              <path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z"/>
+              <polygon fill="white" points="9.75,15.02 15.5,12 9.75,8.98"/>
+            </svg>
+            <span className="text-white text-[9.5px] font-bold tracking-wider">SHORTS</span>
           </div>
-        </div>
+        )}
+        {post.source === 'instagram' && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
+            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.14)' }}>
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-shrink-0">
+              <defs><linearGradient id="igG" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#feda75"/><stop offset="30%" stopColor="#fa7e1e"/>
+                <stop offset="60%" stopColor="#d62976"/><stop offset="85%" stopColor="#962fbf"/>
+                <stop offset="100%" stopColor="#4f5bd5"/></linearGradient></defs>
+              <path fill="url(#igG)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+            <span className="text-white text-[9.5px] font-bold tracking-wider">REELS</span>
+          </div>
+        )}
+        {(channel || igHandle) && (
+          <span className="text-white/65 text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.95)' }}>
+            {channel || `@${igHandle}`}
+          </span>
+        )}
+      </div>
+
+      {/* ── MUTE TOGGLE — top-right ── */}
+      {inView && (youtubeId || post.media_url) && (
+        <motion.button
+          onClick={() => setMuted(m => !m)}
+          whileTap={{ scale: 0.86 }}
+          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ zIndex: 10, background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(18px)', border: '1px solid rgba(255,255,255,0.18)' }}
+          aria-label={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? (
+            <svg viewBox="0 0 24 24" className="w-[15px] h-[15px] fill-none stroke-white" strokeWidth={2}>
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="w-[15px] h-[15px] fill-none stroke-white" strokeWidth={2}>
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          )}
+        </motion.button>
       )}
 
-      {/* ── Bottom-right: glassmorphism action bar ── */}
-      {!playing && (
-        <div className="absolute bottom-8 right-4 flex flex-col items-center gap-5">
-          {/* Like */}
-          <motion.button onClick={toggleLike} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{ background: liked ? 'rgba(239,68,68,0.85)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: `1px solid ${liked ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.22)'}`, boxShadow: liked ? '0 0 20px rgba(239,68,68,0.4)' : '0 4px 16px rgba(0,0,0,0.3)' }}>
-              <svg viewBox="0 0 24 24" className={`w-5 h-5 transition-all ${liked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={2}>
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-              </svg>
-            </div>
-            <span className="text-white text-[11px] font-medium drop-shadow">{likeCount > 0 ? fmt(likeCount) : '0'}</span>
+      {/* ── TAP-TO-UNMUTE cta — fades in after 1s, disappears when unmuted ── */}
+      <AnimatePresence>
+        {inView && muted && youtubeId && (
+          <motion.button
+            key="unmute-cta"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0, transition: { delay: 1.1, duration: 0.35 } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.2 } }}
+            onClick={() => setMuted(false)}
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-full"
+            style={{ zIndex: 10, bottom: '48%', background: 'rgba(0,0,0,0.58)', backdropFilter: 'blur(22px)', border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 8px 36px rgba(0,0,0,0.45)' }}
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-none stroke-white/80" strokeWidth={2}>
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+            <span className="text-white/85 text-[11.5px] font-medium tracking-wide">Tap to unmute</span>
           </motion.button>
+        )}
+      </AnimatePresence>
 
-          {/* Comment */}
-          <motion.button onClick={() => onComment(post)} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
-              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      {/* ── BOTTOM-LEFT: author avatar + name + title ── */}
+      <div className="absolute bottom-0 left-0" style={{ right: '86px', zIndex: 10 }}>
+        <div className="px-5 pb-8 pt-28">
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <div className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden"
+              style={{ border: '2px solid rgba(255,255,255,0.32)', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+              <img src={post.author_avatar} alt="" className="w-full h-full object-cover"
+                onError={e => { e.currentTarget.style.display = 'none'; }} />
             </div>
-            <span className="text-white text-[11px] drop-shadow">{post.comment_count > 0 ? fmt(post.comment_count) : '0'}</span>
-          </motion.button>
+            <div>
+              <p className="text-white font-semibold text-[13.5px] leading-tight"
+                style={{ textShadow: '0 1px 8px rgba(0,0,0,1)' }}>{authorName}</p>
+              {igLikes && <p className="text-white/50 text-[10.5px] mt-0.5">{igLikes} likes</p>}
+            </div>
+          </div>
+          <p className="text-white/88 text-[13px] leading-snug line-clamp-3"
+            style={{ textShadow: '0 1px 8px rgba(0,0,0,1)' }}>{displayTitle}</p>
+        </div>
+      </div>
 
-          {/* Share */}
-          <motion.button onClick={handleShare} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5 relative">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.22)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
-              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth={2}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
-            </div>
-            <span className="text-white text-[11px] drop-shadow">Share</span>
+      {/* ── BOTTOM-RIGHT: action bar — ALWAYS visible, always wired ── */}
+      <div className="absolute bottom-8 right-3.5 flex flex-col items-center gap-5" style={{ zIndex: 10 }}>
+
+        {/* Like */}
+        <motion.button onClick={toggleLike} whileTap={{ scale: 0.84 }}
+          className="flex flex-col items-center gap-1.5 cursor-pointer">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200"
+            style={{
+              background: liked ? 'rgba(239,68,68,0.92)' : 'rgba(0,0,0,0.52)',
+              backdropFilter: 'blur(22px)',
+              border: `1px solid ${liked ? 'rgba(239,68,68,0.65)' : 'rgba(255,255,255,0.2)'}`,
+              boxShadow: liked ? '0 0 28px rgba(239,68,68,0.52), inset 0 1px 0 rgba(255,255,255,0.15)' : '0 4px 22px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}>
+            <svg viewBox="0 0 24 24" className={`w-[22px] h-[22px] transition-all duration-200 ${liked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={1.9}>
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+          </div>
+          <span className="text-white text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,1)' }}>
+            {likeCount > 0 ? fmt(likeCount) : '0'}
+          </span>
+        </motion.button>
+
+        {/* Comment */}
+        <motion.button onClick={() => onComment(post)} whileTap={{ scale: 0.84 }}
+          className="flex flex-col items-center gap-1.5 cursor-pointer">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(22px)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 4px 22px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] fill-none stroke-white" strokeWidth={1.9}>
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <span className="text-white text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,1)' }}>
+            {post.comment_count > 0 ? fmt(post.comment_count) : '0'}
+          </span>
+        </motion.button>
+
+        {/* Share */}
+        <motion.button onClick={handleShare} whileTap={{ scale: 0.84 }}
+          className="flex flex-col items-center gap-1.5 cursor-pointer relative">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(22px)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 4px 22px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] fill-none stroke-white" strokeWidth={1.9}>
+              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+            </svg>
+          </div>
+          <span className="text-white text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,1)' }}>Share</span>
+          <AnimatePresence>
             {shareToast && (
-              <span className="absolute -left-14 top-1/2 -translate-y-1/2 text-[10px] px-2.5 py-1 rounded-lg whitespace-nowrap"
-                style={{ background: 'rgba(20,20,40,0.95)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
+              <motion.span key="toast"
+                initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }}
+                className="absolute right-full mr-2 top-1/2 -translate-y-1/2 text-[10px] px-2.5 py-1.5 rounded-xl whitespace-nowrap"
+                style={{ background: 'rgba(10,10,25,0.95)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}>
                 Copied!
-              </span>
+              </motion.span>
             )}
-          </motion.button>
+          </AnimatePresence>
+        </motion.button>
 
-          {/* Save */}
-          <motion.button onClick={toggleBookmark} whileTap={{ scale: 0.88 }} className="flex flex-col items-center gap-1.5">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{ background: bookmarked ? 'rgba(139,92,246,0.85)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: `1px solid ${bookmarked ? 'rgba(139,92,246,0.7)' : 'rgba(255,255,255,0.22)'}`, boxShadow: bookmarked ? '0 0 20px rgba(139,92,246,0.4)' : '0 4px 16px rgba(0,0,0,0.3)' }}>
-              <svg viewBox="0 0 24 24" className={`w-5 h-5 ${bookmarked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={2}>
-                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
-              </svg>
-            </div>
-            <span className="text-white text-[11px] drop-shadow">Save</span>
-          </motion.button>
-        </div>
-      )}
+        {/* Save / Bookmark */}
+        <motion.button onClick={toggleBookmark} whileTap={{ scale: 0.84 }}
+          className="flex flex-col items-center gap-1.5 cursor-pointer">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200"
+            style={{
+              background: bookmarked ? 'rgba(139,92,246,0.92)' : 'rgba(0,0,0,0.52)',
+              backdropFilter: 'blur(22px)',
+              border: `1px solid ${bookmarked ? 'rgba(139,92,246,0.65)' : 'rgba(255,255,255,0.2)'}`,
+              boxShadow: bookmarked ? '0 0 28px rgba(139,92,246,0.52), inset 0 1px 0 rgba(255,255,255,0.15)' : '0 4px 22px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}>
+            <svg viewBox="0 0 24 24" className={`w-[22px] h-[22px] transition-all duration-200 ${bookmarked ? 'fill-white' : 'fill-none stroke-white'}`} strokeWidth={1.9}>
+              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <span className="text-white text-[11px] font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,1)' }}>Save</span>
+        </motion.button>
+      </div>
     </div>
   );
 }

@@ -465,17 +465,24 @@ export function YouTubeCard({ post, lm, onComment, onRefresh }: {
                 aria-label="Play video"
                 className="absolute inset-0 w-full h-full flex items-center justify-center group"
               >
-                {/* Center play button — sleek minimal ring style */}
+                {/* Center play button — premium frosted glass */}
                 <motion.div
-                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
                   className="relative flex items-center justify-center"
                 >
-                  {/* Outer ring (animated on hover) */}
-                  <div className="absolute w-[64px] h-[64px] rounded-full border border-white/25 group-hover:border-white/50 group-hover:scale-110 transition-all duration-300" />
-                  {/* Inner fill */}
-                  <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(255,0,0,0.90)', boxShadow: '0 0 0 3px rgba(255,255,255,0.15), 0 8px 32px rgba(255,0,0,0.55)' }}>
-                    <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] fill-white ml-0.5 drop-shadow">
+                  {/* Outer glow ring */}
+                  <div className="absolute w-[72px] h-[72px] rounded-full opacity-0 group-hover:opacity-100 transition-all duration-400"
+                    style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)' }} />
+                  {/* Frosted glass button */}
+                  <div className="w-[56px] h-[56px] rounded-full flex items-center justify-center transition-all duration-200"
+                    style={{
+                      background: 'rgba(255,255,255,0.18)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255,255,255,0.35)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.3)',
+                    }}>
+                    <svg viewBox="0 0 24 24" className="w-[20px] h-[20px] fill-white ml-1 drop-shadow-sm">
                       <polygon points="5,3 19,12 5,21"/>
                     </svg>
                   </div>

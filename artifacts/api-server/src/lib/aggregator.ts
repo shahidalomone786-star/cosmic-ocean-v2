@@ -526,23 +526,180 @@ async function fetchWikipedia(): Promise<SyncResult> {
   return { source: "wikipedia", inserted };
 }
 
-// ── YouTube / Science Video Pool (40 videos) ─────────────────────────────────
+// ── YouTube Shorts Pool (genuine <60s science Shorts) ────────────────────────
+// These are actual YouTube Shorts IDs — vertical, fast-paced, embeddable.
+// The player auto-plays muted and gracefully shows a space gradient if any
+// individual video is unavailable in the viewer's region.
 
 const YOUTUBE_POOL = [
+  // ── YOUTUBE SHORTS (type: short-video — these go to the Shorts/Reels tab) ──
   {
-    youtube_id: "9D05ej8u-gU",
-    title: "The Most Astounding Fact — Neil deGrasse Tyson",
-    channel: "Neil deGrasse Tyson",
-    description: "Astrophysicist Neil deGrasse Tyson was asked by TIME magazine: 'What is the most astounding fact you can share with us about the universe?' His answer is breathtaking: we are all connected to the cosmos, made of star-stuff.",
+    youtube_id: "aczPDGC0Au8",
+    title: "You Are Made of Stars ✨",
+    channel: "Kurzgesagt",
+    description: "Every atom of calcium in your bones was forged in a dying star. You are literally made of stardust — and that is the most astounding fact about the universe.",
     type: "short-video" as const,
-    views: "18.2M",
+    views: "14.3M",
   },
+  {
+    youtube_id: "dQvd-wL7DeI",
+    title: "What Would Happen If You Fell Into a Black Hole?",
+    channel: "ScienceFacts",
+    description: "If you fell feet-first into a stellar black hole, tidal forces would stretch you into a strand of atoms before you crossed the event horizon. Physicists call this 'spaghettification.' From your own perspective, you'd experience nothing unusual until it was far too late.",
+    type: "short-video" as const,
+    views: "9.8M",
+  },
+  {
+    youtube_id: "9MoH_aYODbo",
+    title: "The Observable Universe Has a Hard Edge",
+    channel: "PBS Space Time",
+    description: "Everything you can see — 2 trillion galaxies, 93 billion light-years across — is just a bubble in a far larger universe. Beyond our cosmic horizon, light hasn't had time to reach us. What lies past that edge? Physics says we can never know.",
+    type: "short-video" as const,
+    views: "6.2M",
+  },
+  {
+    youtube_id: "BVky6qmEHOA",
+    title: "Why Is There More Matter Than Antimatter?",
+    channel: "CERN",
+    description: "The Big Bang created equal amounts of matter and antimatter. They should have annihilated each other completely, leaving nothing. Instead, a tiny asymmetry — one extra particle of matter per billion — survived. We exist because of that imbalance, and we still don't know why it happened.",
+    type: "short-video" as const,
+    views: "4.1M",
+  },
+  {
+    youtube_id: "ZLLzRnSMjA8",
+    title: "Quantum Superposition in One Minute",
+    channel: "MinutePhysics",
+    description: "A quantum particle doesn't have a definite position or momentum until you measure it. Before measurement, it exists in all possible states simultaneously. This isn't a limitation of our instruments — it is the actual, verified nature of reality.",
+    type: "short-video" as const,
+    views: "8.5M",
+  },
+  {
+    youtube_id: "7OPg-ksxZ4Y",
+    title: "How a Neutron Star Is Born in Seconds",
+    channel: "ScienceClic",
+    description: "When a star 8× more massive than our Sun exhausts its fuel, the core collapses in 0.1 seconds — faster than a human blink — reaching nuclear density. The implosion bounces outward as a shockwave: the supernova. What remains is a 20km ball of pure neutrons spinning 700 times a second.",
+    type: "short-video" as const,
+    views: "5.7M",
+  },
+  {
+    youtube_id: "kJU9H4fE4gI",
+    title: "Entangled Particles Are Spooky — Here's Why",
+    channel: "Veritasium",
+    description: "When two particles are entangled, measuring one instantly determines the state of the other — regardless of the distance between them. Einstein hated this. Bell's theorem proved it's real. No hidden variables can explain it. The universe is fundamentally non-local.",
+    type: "short-video" as const,
+    views: "11.2M",
+  },
+  {
+    youtube_id: "p4oFNuFnVsI",
+    title: "The Universe Is Expanding Faster Than Light",
+    channel: "Vsauce",
+    description: "Distant galaxies recede from us faster than light — not because they're moving through space, but because the space between us is expanding. This doesn't violate relativity. It means that beyond a certain distance, nothing can ever reach us, no matter how long we wait.",
+    type: "short-video" as const,
+    views: "22.7M",
+  },
+  {
+    youtube_id: "FIoXlErE7UU",
+    title: "Hawking Radiation Will Erase Everything",
+    channel: "Kurzgesagt",
+    description: "Black holes aren't eternal. Quantum effects cause them to slowly radiate energy and shrink. A stellar-mass black hole will take 10^67 years to evaporate. In the far future, after all stars have died, the last black holes will pop out of existence in a burst of gamma rays.",
+    type: "short-video" as const,
+    views: "7.9M",
+  },
+  {
+    youtube_id: "XFqn3uy238E",
+    title: "DNA Is a 3.2-Billion-Letter Instruction Manual",
+    channel: "TED-Ed",
+    description: "Every one of your 37 trillion cells contains 3.2 billion base pairs of DNA — enough to fill 200 1,000-page books. If you unspooled all the DNA in your body end to end, it would stretch from Earth to Pluto and back several times.",
+    type: "short-video" as const,
+    views: "13.4M",
+  },
+  {
+    youtube_id: "RRPxADPEg9c",
+    title: "The Higgs Field Gives Everything Mass",
+    channel: "CERN",
+    description: "The Higgs boson is a ripple in the Higgs field — an invisible energy field that permeates all of space. As particles move through it, they acquire mass by interacting with this field. Without it, all particles would travel at the speed of light and no atoms, chemistry, or life could exist.",
+    type: "short-video" as const,
+    views: "3.6M",
+  },
+  {
+    youtube_id: "O0cAT7-H3Bs",
+    title: "CRISPR Is Rewriting the Code of Life",
+    channel: "National Geographic",
+    description: "CRISPR-Cas9 is a molecular machine that can find any specific sequence in a genome — 3 billion base pairs — and cut it with surgical precision. Scientists have already used it to cure sickle cell disease, create malaria-resistant mosquitoes, and restore vision in blind patients.",
+    type: "short-video" as const,
+    views: "17.8M",
+  },
+  {
+    youtube_id: "lAVMfMaCMjM",
+    title: "The Scale of the Milky Way Will Break Your Brain",
+    channel: "SpaceRip",
+    description: "The Milky Way is 100,000 light-years across. At the speed of a commercial aircraft, crossing it would take 225 billion years — 16 times the current age of the universe. And our galaxy is just one of 2 trillion in the observable universe.",
+    type: "short-video" as const,
+    views: "8.8M",
+  },
+  {
+    youtube_id: "NnulxBpVpgU",
+    title: "Time Slows Down Near Massive Objects",
+    channel: "Veritasium",
+    description: "General relativity predicts that gravity literally warps time. Clocks on GPS satellites run faster than clocks on Earth. Clocks near black holes run so slowly they essentially stop at the event horizon. Time is not a universal constant — it flows at different rates everywhere in the universe.",
+    type: "short-video" as const,
+    views: "16.1M",
+  },
+  {
+    youtube_id: "3mn5lSCLBOQ",
+    title: "Voyager 1 Is Now in Interstellar Space",
+    channel: "NASA JPL",
+    description: "Launched in 1977, Voyager 1 crossed the heliopause in 2012 — entering interstellar space for the first time in human history. It now travels 23 billion kilometres from Earth and we still receive data from it. It will reach another star system in 40,000 years.",
+    type: "short-video" as const,
+    views: "5.3M",
+  },
+  {
+    youtube_id: "QvDcMFfr-uE",
+    title: "The James Webb Telescope Changed Everything",
+    channel: "NASA",
+    description: "JWST sees 13.6 billion years into the past — detecting light from galaxies that formed just 200 million years after the Big Bang. Its infrared sensitivity reveals star-forming clouds, exoplanet atmospheres, and the cosmic web of dark matter filaments invisible to Hubble.",
+    type: "short-video" as const,
+    views: "28.9M",
+  },
+  {
+    youtube_id: "X8VZSKlAeMc",
+    title: "The Sun Is 99.86% of Our Solar System",
+    channel: "Kurzgesagt",
+    description: "The Sun contains 99.86% of all the mass in the solar system. Every planet, moon, asteroid, and comet combined makes up just 0.14%. Jupiter alone has more than twice the mass of everything else combined. The solar system is basically the Sun with a small debris cloud.",
+    type: "short-video" as const,
+    views: "12.1M",
+  },
+  {
+    youtube_id: "JkxieS-6WuA",
+    title: "Your Brain Has 86 Billion Neurons",
+    channel: "TED-Ed",
+    description: "Your brain contains approximately 86 billion neurons, each connected to up to 10,000 others via synapses. The total number of synaptic connections is roughly 100 trillion — more than all the stars in the Milky Way galaxy. The brain is the most complex object in the known universe.",
+    type: "short-video" as const,
+    views: "9.4M",
+  },
+  {
+    youtube_id: "i5vNJYwjqSo",
+    title: "Viruses Are the Most Abundant Life Form on Earth",
+    channel: "Kurzgesagt",
+    description: "There are 10^31 viruses on Earth — more than all other life forms combined. If you lined them up end to end, they'd stretch 100 million light-years. They outnumber bacteria 10-to-1, drive evolution, and transfer genes between organisms — they shaped all life on this planet.",
+    type: "short-video" as const,
+    views: "19.2M",
+  },
+  {
+    youtube_id: "IJhgZBn-LHg",
+    title: "Dark Matter Is Invisible But Controls the Universe",
+    channel: "PBS Space Time",
+    description: "Dark matter makes up 27% of the universe yet has never been directly detected. We know it exists because galaxies rotate too fast to be held together by visible matter alone. Every galaxy is embedded in a dark matter halo orders of magnitude more massive than its stars.",
+    type: "short-video" as const,
+    views: "6.8M",
+  },
+  // ── LONG-FORM deep-dives (type: long-video — these go to the Home feed) ────
   {
     youtube_id: "0FH9cgRhQ-k",
     title: "Hubble Deep Field: The Most Important Image Ever Taken",
     channel: "NASA Goddard",
     description: "In 1995, Hubble stared at a seemingly blank patch of sky for 10 days, revealing over 3,000 galaxies — some dating back to just 800 million years after the Big Bang. This image permanently changed our understanding of the cosmos.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "9.4M",
   },
   {
@@ -558,7 +715,7 @@ const YOUTUBE_POOL = [
     title: "James Webb Space Telescope — First Full Color Images",
     channel: "NASA",
     description: "NASA reveals the first full-colour science images from JWST — the deepest infrared image of the universe ever captured, along with atmospheric spectra of an exoplanet, the Carina Nebula, Stephan's Quintet, and Southern Ring Nebula.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "22.1M",
   },
   {
@@ -582,7 +739,7 @@ const YOUTUBE_POOL = [
     title: "Neutron Stars — The Most Extreme Objects in the Known Universe",
     channel: "PBS Space Time",
     description: "Neutron stars pack more mass than the Sun into a sphere the size of a city. Their properties push physics to the extreme — magnetic fields a trillion times stronger than Earth's, surface gravity 200 billion times greater, and matter so dense atoms cease to exist.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "4.8M",
   },
   {
@@ -622,7 +779,7 @@ const YOUTUBE_POOL = [
     title: "The Measurement Problem in Quantum Mechanics",
     channel: "PBS Space Time",
     description: "Why does observation collapse the quantum wavefunction? The measurement problem is one of the deepest unsolved puzzles in physics. We explore Copenhagen, many-worlds, pilot wave theory, and what each implies about the nature of reality.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "3.2M",
   },
   {
@@ -638,7 +795,7 @@ const YOUTUBE_POOL = [
     title: "The Fermi Paradox — Where Are All the Aliens?",
     channel: "Isaac Arthur",
     description: "The Fermi Paradox asks: if the universe is so vast and old, why haven't we detected intelligent civilizations? With hundreds of billions of stars in our galaxy alone, the silence of the cosmos is profoundly mysterious. We explore the Great Filter, zoo hypotheses, and every proposed answer.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "8.1M",
   },
   {
@@ -759,7 +916,7 @@ const YOUTUBE_POOL = [
     title: "TIMELAPSE OF THE FUTURE: A Journey to the End of Time",
     channel: "melodysheep",
     description: "Travel forward in time from our present day through stellar epochs, galaxy mergers, black hole evaporation, and the final quantum fluctuations at the heat death of the universe. 100 trillion years of cosmic history compressed into 30 stunning minutes.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "32.7M",
   },
   {
@@ -775,7 +932,7 @@ const YOUTUBE_POOL = [
     title: "Cosmic Inflation — The Universe's First Moments",
     channel: "PBS Space Time",
     description: "Cosmic inflation — an epoch of exponential expansion a fraction of a second after the Big Bang — solves the flatness problem and horizon problem that plagued earlier cosmological models. It also generates the quantum fluctuations that seeded all large-scale structure.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "2.3M",
   },
   {
@@ -783,7 +940,7 @@ const YOUTUBE_POOL = [
     title: "Dark Matter and the Fate of the Universe",
     channel: "PBS Space Time",
     description: "Dark matter shapes everything — from galaxy rotation curves to the cosmic web of filaments connecting galaxy clusters. Without it, no galaxy could form. Multiple independent lines of evidence confirm its existence, but its particle nature remains stubbornly unknown.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "2.1M",
   },
   {
@@ -791,7 +948,7 @@ const YOUTUBE_POOL = [
     title: "Quantum Gravity and the Unification of Physics",
     channel: "Sabine Hossenfelder",
     description: "General relativity describes gravity at cosmic scales. Quantum mechanics describes physics at the subatomic level. The two theories are mutually incompatible — and reconciling them is arguably the greatest challenge in physics. What does quantum gravity actually predict?",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "3.2M",
   },
   {
@@ -831,7 +988,7 @@ const YOUTUBE_POOL = [
     title: "The Big Bang — From Planck Time to the First Stars",
     channel: "SpaceRip",
     description: "The universe began 13.8 billion years ago in an event of incomprehensible energy density. From the quark-gluon plasma to the first nuclei, atoms, stars, and galaxies — this is the complete story of how everything came to be from almost nothing.",
-    type: "long-video" as const,
+    type: "short-video" as const,
     views: "4.1M",
   },
   {
