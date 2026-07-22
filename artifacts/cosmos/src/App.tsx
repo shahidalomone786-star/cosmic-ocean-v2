@@ -8,7 +8,7 @@ import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal'
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
 import CosmicNexus from './components/CosmicNexus';
-import { useAuthStore, PRESET_AVATARS } from './store/authStore';
+import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1477,6 +1477,49 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm 
   );
 });
 
+// ─── UserBadge ────────────────────────────────────────────────────────────────
+function UserBadge({ user, lm, onLogout }: { user: UserProfile; lm: boolean; onLogout: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {/* Avatar + name pill */}
+      <div
+        className={`flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border backdrop-blur-[18px] transition-all duration-300 ${
+          lm
+            ? 'border-purple-300/50 bg-purple-50/70 text-purple-800'
+            : 'border-purple-500/30 bg-purple-500/10 text-purple-200/90'
+        }`}
+        style={{ boxShadow: lm ? 'none' : '0 0 12px rgba(147,112,219,0.15)' }}
+      >
+        <img
+          src={user.avatar}
+          alt={user.username}
+          className="w-5 h-5 rounded-full object-cover border border-white/25 flex-shrink-0"
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+        <span className="text-[11px] font-mono tracking-[0.08em] max-w-[80px] truncate">
+          {user.username}
+        </span>
+      </div>
+      {/* Logout button */}
+      <button
+        onClick={onLogout}
+        title="Sign out"
+        className={`w-7 h-7 flex items-center justify-center rounded-full border backdrop-blur-[18px] transition-all duration-200 ${
+          lm
+            ? 'border-black/[0.10] bg-black/[0.04] text-slate-400 hover:text-red-500 hover:border-red-300/50 hover:bg-red-50/60'
+            : 'border-white/[0.10] bg-white/[0.04] text-white/35 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/[0.08]'
+        }`}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   // show3D = false → clean charcoal background, no iframe, no WarpIntro (default)
@@ -1520,7 +1563,7 @@ export default function App() {
   const [showChess,        setShowChess]        = useState(false);
   const [showProfile,      setShowProfile]      = useState(false);
   const [showNexus,        setShowNexus]        = useState(false);
-  const { isAuthenticated, recordChessResult, user } = useAuthStore();
+  const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
   const [videoStatus,      setVideoStatus]      = useState<'idle'|'loading'|'done'|'error'>('idle');
@@ -1882,41 +1925,51 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Language dropdown */}
-                <div className="relative">
-                  <button onClick={() => setLangOpen(o => !o)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
-                      lm
-                        ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18]'
-                        : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
-                    }`}>
-                    🌐 {language}
-                    <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
-                  </button>
-                  <AnimatePresence>
-                    {langOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                        className={`absolute right-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
-                          lm
-                            ? 'border-black/[0.08] bg-white/[0.95] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
-                            : 'border-white/[0.09] bg-[rgba(8,8,14,0.92)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
-                        }`}
-                      >
-                        {LANGUAGES.map(lang => (
-                          <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
-                            className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
-                              lm
-                                ? lang.label === language ? 'text-slate-900 bg-black/[0.06] border-slate-400' : 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.04] border-transparent'
-                                : lang.label === language ? 'text-white bg-white/[0.10] border-white/40'     : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-transparent'
-                            }`}>
-                            {lang.label}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                {/* Right side: user badge + language */}
+                <div className="flex items-center gap-2">
+
+                  {/* User profile badge — shown when signed in */}
+                  {isAuthenticated && user && (
+                    <UserBadge user={user} lm={lm} onLogout={logout} />
+                  )}
+
+                  {/* Language dropdown */}
+                  <div className="relative">
+                    <button onClick={() => setLangOpen(o => !o)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
+                        lm
+                          ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18]'
+                          : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
+                      }`}>
+                      🌐 {language}
+                      <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
+                    </button>
+                    <AnimatePresence>
+                      {langOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                          className={`absolute right-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
+                            lm
+                              ? 'border-black/[0.08] bg-white/[0.95] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
+                              : 'border-white/[0.09] bg-[rgba(8,8,14,0.92)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
+                          }`}
+                        >
+                          {LANGUAGES.map(lang => (
+                            <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
+                              className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
+                                lm
+                                  ? lang.label === language ? 'text-slate-900 bg-black/[0.06] border-slate-400' : 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.04] border-transparent'
+                                  : lang.label === language ? 'text-white bg-white/[0.10] border-white/40'     : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-transparent'
+                              }`}>
+                              {lang.label}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
                 </div>
               </div>
 
