@@ -222,8 +222,8 @@ export const stmts = {
       SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id
     ) cc2 ON cc2.post_id = ec.id
 
-    ORDER BY created_at DESC
-    LIMIT 200
+    ORDER BY 6 DESC
+    LIMIT 500
   `),
 
   getPostsByUser: db.prepare<[string], PostRow>(
@@ -273,10 +273,10 @@ export const stmts = {
     `INSERT INTO post_comments (id, post_id, user_id, content, parent_comment_id) VALUES (?, ?, ?, ?, ?)`,
   ),
 
-  // ── liked posts (enriched — user posts only) ──
-  getLikedPosts: db.prepare<[string], EnrichedPostRow>(`
+  // ── liked posts (enriched — user posts + external content) ──
+  getLikedPosts: db.prepare<[string, string], EnrichedPostRow>(`
     SELECT
-      p.*,
+      p.id, p.user_id, p.content, p.type, p.media_url, p.created_at,
       u.username   AS author_username,
       u.avatar_url AS author_avatar,
       COALESCE(lc.cnt, 0) AS like_count,
@@ -288,13 +288,29 @@ export const stmts = {
     LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id) lc ON lc.post_id = p.id
     LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id) cc ON cc.post_id = p.id
     WHERE pl.user_id = ?
-    ORDER BY pl.created_at DESC
+
+    UNION ALL
+
+    SELECT
+      ec.id, 'external' AS user_id, ec.content, ec.type, ec.media_url, ec.created_at,
+      ec.source AS author_username,
+      ''        AS author_avatar,
+      COALESCE(lc2.cnt, 0) AS like_count,
+      COALESCE(cc2.cnt, 0) AS comment_count,
+      ec.source, ec.external_link, ec.extra_json, ec.title AS ec_title
+    FROM post_likes pl2
+    JOIN external_content ec ON ec.id = pl2.post_id
+    LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id) lc2 ON lc2.post_id = ec.id
+    LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id) cc2 ON cc2.post_id = ec.id
+    WHERE pl2.user_id = ?
+
+    ORDER BY 6 DESC
   `),
 
-  // ── bookmarked posts (enriched — user posts only) ──
-  getBookmarkedPosts: db.prepare<[string], EnrichedPostRow>(`
+  // ── bookmarked posts (enriched — user posts + external content) ──
+  getBookmarkedPosts: db.prepare<[string, string], EnrichedPostRow>(`
     SELECT
-      p.*,
+      p.id, p.user_id, p.content, p.type, p.media_url, p.created_at,
       u.username   AS author_username,
       u.avatar_url AS author_avatar,
       COALESCE(lc.cnt, 0) AS like_count,
@@ -306,12 +322,35 @@ export const stmts = {
     LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id) lc ON lc.post_id = p.id
     LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id) cc ON cc.post_id = p.id
     WHERE pb.user_id = ?
-    ORDER BY pb.created_at DESC
+
+    UNION ALL
+
+    SELECT
+      ec.id, 'external' AS user_id, ec.content, ec.type, ec.media_url, ec.created_at,
+      ec.source AS author_username,
+      ''        AS author_avatar,
+      COALESCE(lc2.cnt, 0) AS like_count,
+      COALESCE(cc2.cnt, 0) AS comment_count,
+      ec.source, ec.external_link, ec.extra_json, ec.title AS ec_title
+    FROM post_bookmarks pb2
+    JOIN external_content ec ON ec.id = pb2.post_id
+    LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_likes GROUP BY post_id) lc2 ON lc2.post_id = ec.id
+    LEFT JOIN (SELECT post_id, COUNT(*) AS cnt FROM post_comments GROUP BY post_id) cc2 ON cc2.post_id = ec.id
+    WHERE pb2.user_id = ?
+
+    ORDER BY 6 DESC
   `),
 
   // ── external content ──
   upsertExternalContent: db.prepare<[string, string, string, string, string, string, string, string, string]>(`
     INSERT OR IGNORE INTO external_content
+      (id, source, title, content, media_url, external_link, type, extra_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `),
+  // Plain INSERT — use after an explicit DELETE so there is nothing to conflict with.
+  // Preferred over INSERT OR IGNORE in flows that delete-then-reinsert (e.g. fetchVideoPool).
+  insertExternalContent: db.prepare<[string, string, string, string, string, string, string, string, string]>(`
+    INSERT INTO external_content
       (id, source, title, content, media_url, external_link, type, extra_json, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `),

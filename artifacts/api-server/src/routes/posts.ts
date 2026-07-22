@@ -151,7 +151,7 @@ router.get("/users/me/likes", (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const posts = stmts.getLikedPosts.all(userId);
+  const posts = stmts.getLikedPosts.all(userId, userId);
   const likedSet = new Set(posts.map(p => p.id));
 
   const enriched = posts.map(p => ({
@@ -168,7 +168,7 @@ router.get("/users/me/bookmarks", (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const posts = stmts.getBookmarkedPosts.all(userId);
+  const posts = stmts.getBookmarkedPosts.all(userId, userId);
   const savedSet = new Set(posts.map(p => p.id));
 
   const enriched = posts.map(p => ({

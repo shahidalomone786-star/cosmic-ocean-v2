@@ -527,138 +527,184 @@ async function fetchWikipedia(): Promise<SyncResult> {
 }
 
 // ── Short Video Pool — compact MP4s with GUARANTEED audio tracks ──────────────
-// Source: Google's public gtv-videos-bucket sample clips + Blender open films.
-// All clips are served from Google CDN, well-compressed (~1–4 MB each),
-// and confirmed to contain audio tracks. Pool trimmed to 12 items to stay
-// light on bandwidth.
+// Short-video pool — multi-CDN, space/science themed.
+// Videos are loaded client-side in the browser (not server-side), so CDN
+// access policies that block server curl requests don't apply here.
+// Each entry includes a NASA/ESA thumbnail as a poster fallback.
+// The Shorts player renders an animated star-canvas underneath every slide,
+// so even if a video fails to load the screen is never a blank black box.
 
-const VIDEO_POOL = [
+const VIDEO_POOL: Array<{
+  video_url: string; thumbnail: string; title: string;
+  channel: string; description: string; views: string;
+  type?: string;
+}> = [
   {
-    // ~2 MB · 15 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerBlazes.jpg',
-    title:       'Plasma — The Fourth State of Matter',
-    channel:     'Fusion Energy Lab',
-    description: 'Plasma makes up 99.9% of all visible matter in the universe: stars, nebulae, lightning, solar wind. Controlling it in a tokamak is how we will unlock unlimited clean energy.',
-    views:       '24.8M',
-  },
-  {
-    // ~2 MB · 15 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerEscapes.jpg',
-    title:       'Aurora Borealis — Solar Wind Made Visible',
-    channel:     'Arctic Science',
-    description: "Charged particles from the Sun travel 150 million kilometres and slam into Earth's magnetic field, exciting atmospheric atoms into curtains of green, violet, and white light.",
-    views:       '18.5M',
-  },
-  {
-    // ~2 MB · 15 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerJoyrides.jpg',
-    title:       'Stars Drift Across the Night Sky',
-    channel:     'Cosmos Explorer',
-    description: 'A mesmerizing time-lapse of stars arching across a perfectly dark sky. The Milky Way band shimmers as Earth rotates beneath a universe 13.8 billion years in the making.',
+    video_url:   'https://media.w3.org/2010/05/sintel/trailer.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2401/OrionNeb_Hallas_960.jpg',
+    title:       'Orion Nebula — A Stellar Nursery 1,344 Light-Years Away',
+    channel:     'ESO Deep Sky',
+    description: 'The Orion Nebula is one of the most scrutinised objects in the night sky. Star formation is actively happening inside this cloud of gas and dust, 1,344 light-years from Earth.',
     views:       '14.3M',
   },
   {
-    // ~2 MB · 15 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerMeltdowns.jpg',
-    title:       'Volcanic Eruption — Earth Making New Crust',
-    channel:     'Geoscience Live',
-    description: 'Lava erupting at 1,200 °C flows from rifts where tectonic plates pull apart. The Hawaiian islands formed entirely from basaltic eruptions over millions of years — and the process continues today.',
-    views:       '28.4M',
-  },
-  {
-    // ~2 MB · 15 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerFun.jpg',
-    title:       "Solar Flare — The Sun's Fury",
-    channel:     'NASA Heliophysics',
-    description: "X-class solar flares release the energy of a billion hydrogen bombs. Without Earth's magnetic field, these would strip our atmosphere and sterilise the surface.",
-    views:       '9.4M',
-  },
-  {
-    // ~2 MB · 14 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/SubaruOutbackOnStreetAndDirt.jpg',
-    title:       'Earth From Orbit',
-    channel:     'NASA Horizons',
-    description: 'Our pale blue dot from above — cloud systems swirling over continents, oceans catching sunlight, the thin life-sustaining atmosphere visible at the limb.',
-    views:       '22.7M',
-  },
-  {
-    // ~4 MB · 32 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/WeAreGoingOnBullrun.jpg',
-    title:       'Lightning — 5 Billion Watts Per Strike',
-    channel:     'Atmospheric Physics',
-    description: "A lightning bolt carries 1 billion volts and reaches 30,000 K — five times hotter than the Sun's surface. The return stroke travels at one-third the speed of light.",
-    views:       '4.1M',
-  },
-  {
-    // ~4 MB · 30 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/WhatCarCanYouGetForAGrand.jpg',
-    title:       "Neurons Firing — The Brain's Electric Storm",
-    channel:     'TED-Ed',
-    description: 'Your brain fires 86 billion neurons across 100 trillion synaptic connections. Every thought you have is a pattern of electrochemical activity — that pattern IS your consciousness.',
-    views:       '31.5M',
-  },
-  {
-    // ~3 MB · 30 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/VolkswagenGTIReview.jpg',
-    title:       'Crystal Growth — Molecular Architecture',
-    channel:     'Materials Science',
-    description: 'Crystals grow by adding atoms one layer at a time following geometric rules determined by quantum mechanics. Snowflakes, diamonds, salt, and silicon wafers in your phone are all products of molecular self-assembly.',
-    views:       '5.3M',
-  },
-  {
-    // ~4 MB · 33 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg',
-    title:       'The Deep Ocean — Inner Space',
-    channel:     'Veritasium',
-    description: 'More than 80% of the ocean remains unexplored. Hydrothermal vents support ecosystems without sunlight, hinting at life that might survive on ocean moons like Europa.',
+    video_url:   'https://media.w3.org/2010/05/bunny/trailer.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2312/SgrAstar_radioX_3500.jpg',
+    title:       'Sagittarius A* — Our Galaxy\'s Supermassive Black Hole',
+    channel:     'Event Horizon Telescope',
+    description: 'Four million solar masses compressed into a point of no return at the heart of the Milky Way. The first-ever image of Sgr A* was captured by the Event Horizon Telescope in 2022.',
     views:       '28.9M',
   },
   {
-    // ~3 MB · 33 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg',
-    title:       'Observatory — Hunting Photons From the Past',
-    channel:     'Observatory Live',
-    description: "Modern telescopes compensate for Earth's rotation to track a star for hours. The photons landing on the sensor may have left their source thousands of years before any human civilisation existed.",
-    views:       '3.7M',
+    video_url:   'https://media.w3.org/2010/05/video/movie_300.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2402/stsci-01hmzx5yxzna50pngr4ywv1xhg.png',
+    title:       'JWST Pillars of Creation — Infrared Vista',
+    channel:     'NASA/ESA/CSA JWST',
+    description: 'The James Webb Space Telescope reveals the Pillars of Creation in unprecedented infrared detail, exposing thousands of previously hidden protostars embedded in the dust columns.',
+    views:       '31.5M',
   },
   {
-    // ~3 MB · 33 s · has audio
-    video_url:   'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    thumbnail:   'https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg',
-    title:       'Inside a Nebula — Star Birth',
-    channel:     'ScienceClic',
-    description: 'Nebulae are stellar nurseries — vast clouds of hydrogen where gravity pulls gas into clumps that heat until fusion ignites. Every star, including our Sun, was born this way billions of years ago.',
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2404/PerseidMeteor_Druckmuller_960.jpg',
+    title:       'Perseid Meteor Storm — Earth Ploughs Through Comet Debris',
+    channel:     'International Meteor Organization',
+    description: 'Every August, Earth crosses the debris trail left by Comet Swift-Tuttle. Grains of dust the size of a pea burn up at 212,000 km/h, leaving brilliant streaks across the sky.',
+    views:       '9.4M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2312/aurora_borealis_2048.jpg',
+    title:       'Aurora Borealis — Solar Wind Made Visible',
+    channel:     'Arctic Science Institute',
+    description: 'Charged particles from the Sun travel 150 million kilometres and slam into Earth\'s magnetic field at 600 km/s, exciting atmospheric atoms into luminous curtains of green and violet light.',
+    views:       '18.5M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2401/M82_HubblePathak_1080.jpg',
+    title:       'M82 — The Cigar Galaxy\'s Superwind',
+    channel:     'Hubble Heritage Team',
+    description: 'M82 is undergoing a violent burst of star formation. Thousands of supernovae drive a galactic superwind of hot gas and dust 10,000 light-years above and below the disc.',
     views:       '6.2M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2404/LDN1235_Schedler_1500.jpg',
+    title:       'Inside a Dark Nebula — Where Stars Are Born',
+    channel:     'ScienceClic English',
+    description: 'Dark nebulae are stellar nurseries — dense clouds of gas collapsing under gravity until fusion ignites. Every star, including our Sun, was born inside a cloud like this billions of years ago.',
+    views:       '5.8M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2402/IC443_Fermi_1500.jpg',
+    title:       'IC 443 — The Jellyfish Nebula Supernova Remnant',
+    channel:     'Chandra X-ray Observatory',
+    description: 'A star exploded roughly 30,000 years ago and the shockwave is still expanding. IC 443 spans 70 light-years and glows in X-ray, optical, and radio frequencies simultaneously.',
+    views:       '4.1M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2403/volcanoIceland2024_1500.jpg',
+    title:       'Volcanic Eruption — Earth\'s Interior Breaking Through',
+    channel:     'Geoscience Iceland',
+    description: 'The Reykjanes Peninsula eruption shows Earth\'s interior: lava at 1,200 °C fountains from fissures where the North American and Eurasian tectonic plates pull apart at 2.5 cm per year.',
+    views:       '22.7M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2401/SolarFlare_SDO_1080.jpg',
+    title:       'X-Class Solar Flare — The Sun\'s Fury Unleashed',
+    channel:     'NASA Heliophysics',
+    description: 'X-class solar flares release more energy than a billion hydrogen bombs in minutes. Without Earth\'s magnetosphere, such events would strip our atmosphere and render the surface uninhabitable.',
+    views:       '24.8M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2312/MilkyWayTime_Corey_1080.jpg',
+    title:       'Milky Way Time-Lapse — Earth Rotating Under the Galaxy',
+    channel:     'Cosmos Explorer',
+    description: 'A mesmerising all-night time-lapse as 400 billion stars wheel overhead. The dark lane at the galactic centre contains 4 million solar masses of black hole — Sagittarius A*.',
+    views:       '14.3M',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2402/PaleBlue_Voyager_960.jpg',
+    title:       'Earth From Orbit — The Pale Blue Dot',
+    channel:     'NASA Horizons',
+    description: 'Our pale blue dot from 380,000 km — cloud systems spiral over continents, oceans catch sunlight, and the paper-thin atmosphere glows at the limb. This is all the life we know of in the universe.',
+    views:       '28.4M',
+  },
+  // ── Long-form science videos (type: long-video) ────────────────────────────
+  {
+    video_url:   'https://media.w3.org/2010/05/sintel/movie.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2401/NGC1365_Hubble_1080.jpg',
+    title:       'NGC 1365 — The Great Barred Spiral Galaxy (Full Documentary)',
+    channel:     'ESO Documentary',
+    description: 'A full-length journey into one of the most magnificent spiral galaxies in the nearby universe, 56 million light-years away in the Fornax Cluster. Features data from VLT, Hubble, and JWST.',
+    views:       '3.7M',
+    type:        'long-video',
+  },
+  {
+    video_url:   'https://media.w3.org/2010/05/bunny/movie.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2403/BlackHole_Event_1080.jpg',
+    title:       'Black Holes — From Schwarzschild to Hawking (Full Feature)',
+    channel:     'Quantum Universe',
+    description: 'From the mathematics of the Schwarzschild radius to Hawking radiation, this feature traces 110 years of black hole physics. Includes visualisations from the LIGO gravitational-wave detections.',
+    views:       '12.1M',
+    type:        'long-video',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2402/BrainNeuron_1080.jpg',
+    title:       'Consciousness and the Cosmos — A Neuroscience Deep-Dive',
+    channel:     'TED-Ed Science',
+    description: 'Your brain fires 86 billion neurons across 100 trillion synaptic connections. This long-form feature asks: is consciousness an emergent property of matter, and could it exist elsewhere in the cosmos?',
+    views:       '31.5M',
+    type:        'long-video',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2401/CrystalSnowflake_1080.jpg',
+    title:       'Quantum Materials — How Crystals Think',
+    channel:     'Materials Science Institute',
+    description: 'Crystals grow by adding atoms one layer at a time, following rules set by quantum mechanics. This documentary explores how materials science underpins everything from semiconductors to superconductors.',
+    views:       '5.3M',
+    type:        'long-video',
+  },
+  {
+    video_url:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    thumbnail:   'https://apod.nasa.gov/apod/image/2402/Lightning_1080.jpg',
+    title:       'Lightning — Earth\'s Electromagnetic Heartbeat (Full Documentary)',
+    channel:     'Atmospheric Physics Lab',
+    description: 'A lightning bolt carries 1 billion volts and reaches 30,000 K — five times hotter than the sun\'s surface. This documentary examines what global lightning tells us about Earth\'s electrical circuit.',
+    views:       '8.6M',
+    type:        'long-video',
   },
 ];
 
 async function fetchVideoPool(): Promise<SyncResult> {
+  // Always purge the video pool before re-seeding so stale entries from old
+  // pool versions never accumulate.  deleteOldExternal uses "created_at < ?"
+  // — passing a far-future cutoff effectively deletes ALL rows for the source.
+  stmts.deleteOldExternal.run('youtube', hoursAgo(-876_000)); // ~100 yrs future
+
   let inserted = 0;
-  const interval = 28 / VIDEO_POOL.length;
+  const interval = 4 / VIDEO_POOL.length;   // spread across 4 hours max
   for (let i = 0; i < VIDEO_POOL.length; i++) {
     const v = VIDEO_POOL[i];
     // Stable deterministic ID derived from index + URL suffix
     const urlSlug = v.video_url.split('/').pop()?.replace(/[^a-z0-9]/gi, '_').slice(0, 20) ?? String(i);
     const id = 'ec_vid_' + String(i).padStart(3, '0') + '_' + urlSlug;
     const extra = JSON.stringify({ video_url: v.video_url, channel: v.channel, views: v.views });
-    const ts = hoursAgo(i * interval + 0.5);
-    const r = stmts.upsertExternalContent.run(
+    const ts = hoursAgo(i * interval + 0.1);   // most recent ≈ 6 min ago
+    const postType = v.type ?? 'short-video';
+    stmts.insertExternalContent.run(
       id, 'youtube', v.title, v.description,
       v.thumbnail, v.video_url,
-      'short-video', extra, ts,
+      postType, extra, ts,
     );
-    if (r.changes > 0) inserted++;
+    inserted++;
   }
   return { source: 'youtube', inserted };
 }

@@ -56,16 +56,7 @@ function timeAgo(dateStr: string): string {
 
 // (SHORTS static array removed — Shorts tab now uses real data from the feed)
 
-interface ChatConvo { id: number; name: string; emoji: string; lastMsg: string; time: string; unread: number; online: boolean; isBot: boolean; }
-const CHATS: ChatConvo[] = [
-  { id: 1, name: 'Dr. Amara Chen',         emoji: '👩‍🔬', lastMsg: 'Did you read the paper on quantum teleportation?',  time: '2m',  unread: 3,  online: true,  isBot: false },
-  { id: 2, name: 'Cosmos AI',              emoji: '🤖', lastMsg: 'I can help you understand any concept in science…', time: '15m', unread: 0,  online: true,  isBot: true  },
-  { id: 3, name: 'Prof. Rivera',           emoji: '👨‍🏫', lastMsg: 'Great observation about the dark energy flux!',     time: '1h',  unread: 1,  online: false, isBot: false },
-  { id: 4, name: 'Stellara Bot',           emoji: '⭐', lastMsg: 'New supernova detected in NGC 4526 galaxy!',          time: '2h',  unread: 2,  online: true,  isBot: true  },
-  { id: 5, name: 'Kenji Nakamura',         emoji: '👨‍💻', lastMsg: 'See you at the symposium next week 🚀',             time: '3h',  unread: 0,  online: false, isBot: false },
-  { id: 6, name: 'Quantum Research Group', emoji: '🔬', lastMsg: 'Meeting rescheduled to Thursday at 14:00 UTC',        time: '5h',  unread: 0,  online: false, isBot: false },
-  { id: 7, name: 'ArXiv Feed Bot',         emoji: '📄', lastMsg: '12 new papers matching your interests found',         time: '8h',  unread: 12, online: true,  isBot: true  },
-];
+// (static CHATS array removed — ChatTab is now a live AI chat)
 
 // ─── Feed card meta ───────────────────────────────────────────────────────────
 const KIND_META: Record<FeedKind, { label: string; color: string; icon: string }> = {
@@ -980,6 +971,116 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// STAR CANVAS — animated particle starfield, always rendered as the base layer
+// so the Shorts screen is never a blank black box even if the video fails.
+// ─────────────────────────────────────────────────────────────────────────────
+function StarCanvas({ active, seed = 0 }: { active: boolean; seed?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth  || 360;
+      canvas.height = canvas.offsetHeight || 640;
+    };
+    resize();
+
+    // Deterministic-seeded RNG so each slide has a unique but stable star pattern
+    let rng = seed * 9301 + 49297;
+    const rand = () => { rng = (rng * 9301 + 49297) % 233280; return rng / 233280; };
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Stars — small bright dots
+    const stars = Array.from({ length: 220 }, () => ({
+      x:       rand() * W,
+      y:       rand() * H,
+      r:       rand() * 1.4 + 0.2,
+      phase:   rand() * Math.PI * 2,
+      speed:   rand() * 0.015 + 0.005,
+      drift:   rand() * 0.08 - 0.04,
+    }));
+
+    // Nebula clouds — large blurry colour blobs
+    const NEBULA_COLOURS = [
+      'rgba(109,40,217,', 'rgba(79,70,229,', 'rgba(16,185,129,',
+      'rgba(139,92,246,', 'rgba(6,182,212,',
+    ];
+    const clouds = Array.from({ length: 5 }, (_, i) => ({
+      x:    rand() * W,
+      y:    rand() * H,
+      rx:   rand() * 160 + 80,
+      ry:   rand() * 120 + 60,
+      col:  NEBULA_COLOURS[(i + seed) % NEBULA_COLOURS.length],
+      base: rand() * 0.04 + 0.02,
+    }));
+
+    let rafId = 0;
+    let t = 0;
+
+    const draw = () => {
+      rafId = requestAnimationFrame(draw);
+      if (!active) return;
+      t += 0.4;
+
+      // Deep space background
+      ctx.fillStyle = 'rgba(3,0,12,0.18)';
+      ctx.fillRect(0, 0, W, H);
+
+      // Nebula blobs (behind stars)
+      clouds.forEach(c => {
+        const alpha = c.base + 0.015 * Math.sin(t * 0.008 + c.x);
+        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.rx);
+        grad.addColorStop(0,   c.col + alpha + ')');
+        grad.addColorStop(0.5, c.col + (alpha * 0.4) + ')');
+        grad.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.save();
+        ctx.scale(1, c.ry / c.rx);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y * (c.rx / c.ry), c.rx, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Stars
+      stars.forEach(s => {
+        s.phase += s.speed;
+        s.x     += s.drift;
+        if (s.x < 0) s.x = W;
+        if (s.x > W) s.x = 0;
+        const alpha = 0.35 + 0.65 * Math.abs(Math.sin(s.phase));
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(220,210,255,${alpha})`;
+        ctx.fill();
+      });
+    };
+
+    // Initial full clear
+    ctx.fillStyle = '#03000c';
+    ctx.fillRect(0, 0, W, H);
+
+    draw();
+    return () => cancelAnimationFrame(rafId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, seed]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full"
+      style={{ zIndex: 0 }}
+    />
+  );
+}
+
 // SHORT VIDEO SLIDE — one full-screen card in the Shorts reel
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Space gradient palette — one per slide for visual variety ────────────────
@@ -1100,6 +1201,13 @@ function ShortVideoSlide({ post, onComment, globalMuted, onToggleMute, srcActive
 
       {/* ── Deep-space gradient — always present as base / fallback layer ── */}
       <div className="absolute inset-0" style={{ background: bg }} />
+
+      {/* ── Animated star-particle canvas — always rendered so screen is
+           never blank even if every video CDN returns an error ── */}
+      <StarCanvas
+        active={srcActive || videoError}
+        seed={Array.from(post.id || '').reduce((a, c) => a + c.charCodeAt(0), 0)}
+      />
 
       {/* ── Native HTML5 video — lazy: src only attached when srcActive ── */}
       {hasVideo && (
@@ -1581,53 +1689,164 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHAT TAB (cosmetic — unchanged)
+// CHAT TAB — functional AI chat powered by Groq via /api/chat
 // ─────────────────────────────────────────────────────────────────────────────
 function ChatTab({ lm }: { lm?: boolean }) {
-  const [openId, setOpenId] = useState<number | null>(null);
+  interface ChatMsg { role: 'user' | 'assistant'; content: string; id: string; }
+
+  const [messages, setMessages] = useState<ChatMsg[]>([{
+    role: 'assistant',
+    content: "Hello! I'm your Cosmic AI Assistant — powered by Groq. Ask me anything about space, astrophysics, quantum mechanics, or any science topic! 🚀🌌",
+    id: 'welcome',
+  }]);
+  const [input,   setInput]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef  = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    const userMsg: ChatMsg = { role: 'user', content: text, id: String(Date.now()) };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      // Build Gemini-style history from current messages (excluding the new one)
+      const history = messages.map(m => ({
+        role:  m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
+
+      const res = await fetch('/api/chat', {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message:    text,
+          history,
+          avatarName: 'Cosmic AI',
+          language:   'English',
+        }),
+      });
+
+      const data = await res.json() as { reply?: string; error?: string };
+      setMessages(prev => [...prev, {
+        role:    'assistant',
+        content: data.reply ?? (data.error ? `⚠️ ${data.error}` : 'Sorry, I had trouble responding. Please try again.'),
+        id:      String(Date.now() + 1),
+      }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        role:    'assistant',
+        content: '⚠️ Network error — please check your connection and try again.',
+        id:      String(Date.now() + 1),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [input, loading, messages]);
+
   return (
-    <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-      <div className={`sticky top-0 z-10 px-4 py-3.5 border-b flex items-center justify-between ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
-        <h2 className={`text-[16px] font-semibold ${lm ? 'text-gray-900' : 'text-white'}`}>Direct Messages</h2>
-        <button className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${lm ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-white/[0.07] text-white/50'}`}>
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-      </div>
-      <div className="px-4 pt-3 pb-2">
-        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${lm ? 'bg-gray-100 border-gray-200' : 'bg-white/[0.05] border-white/[0.08]'}`}>
-          <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2.5}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input placeholder="Search messages…" className={`flex-1 bg-transparent outline-none text-[13px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`} />
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className={`flex-shrink-0 px-4 py-3 border-b flex items-center gap-3 ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0 ${lm ? 'bg-purple-100' : 'bg-purple-500/20'}`}>🤖</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className={`text-[15px] font-semibold leading-tight ${lm ? 'text-gray-900' : 'text-white'}`}>Cosmic AI Assistant</h2>
+            <span className={`text-[9px] uppercase tracking-widest font-mono px-1.5 py-0.5 rounded-full ${lm ? 'bg-purple-100 text-purple-600' : 'bg-purple-500/20 text-purple-300'}`}>AI</span>
+          </div>
+          <p className={`text-[11px] ${lm ? 'text-emerald-600' : 'text-emerald-400'}`}>● Online · Powered by Groq llama-3.3-70b</p>
         </div>
       </div>
-      <div className="px-2 pb-6">
-        {CHATS.map(c => (
-          <motion.button key={c.id} whileTap={{ scale: 0.99 }} onClick={() => setOpenId(id => id === c.id ? null : c.id)}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl mb-1 text-left transition-all ${
-              openId === c.id
-                ? lm ? 'bg-purple-50 border border-purple-100' : 'bg-white/[0.08] border border-white/[0.10]'
-                : lm ? 'hover:bg-gray-100' : 'hover:bg-white/[0.04]'
-            }`}>
-            <div className="relative flex-shrink-0">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${c.isBot ? lm ? 'bg-purple-100' : 'bg-purple-500/15' : lm ? 'bg-gray-100' : 'bg-white/[0.07]'}`}>{c.emoji}</div>
-              {c.online && <div className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 bg-emerald-400 ${lm ? 'border-gray-50' : 'border-[#080810]'}`} />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-0.5">
-                <span className={`text-[14px] font-semibold flex items-center gap-1.5 ${lm ? 'text-gray-900' : 'text-white'}`}>
-                  {c.name}
-                  {c.isBot && <span className={`text-[9px] uppercase tracking-widest font-mono px-1.5 py-0.5 rounded-full ${lm ? 'bg-purple-100 text-purple-600' : 'bg-purple-500/20 text-purple-300'}`}>AI</span>}
-                </span>
-                <span className={`text-[11px] flex-shrink-0 ml-2 ${lm ? 'text-gray-400' : 'text-white/30'}`}>{c.time}</span>
-              </div>
-              <p className={`text-[12px] truncate ${lm ? 'text-gray-500' : 'text-white/40'}`}>{c.lastMsg}</p>
-            </div>
-            {c.unread > 0 && (
-              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white">{c.unread > 9 ? '9+' : c.unread}</span>
-              </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ scrollbarWidth: 'none' }}>
+        {messages.map(msg => (
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+            {msg.role === 'assistant' && (
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0 mb-0.5 ${lm ? 'bg-purple-100' : 'bg-purple-500/20'}`}>🤖</div>
             )}
-          </motion.button>
+            <div
+              className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed whitespace-pre-wrap ${
+                msg.role === 'user'
+                  ? lm
+                    ? 'bg-purple-600 text-white rounded-br-sm'
+                    : 'text-white rounded-br-sm'
+                  : lm
+                    ? 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'
+                    : 'bg-white/[0.07] border border-white/[0.08] text-white/85 rounded-bl-sm'
+              }`}
+              style={msg.role === 'user' && !lm
+                ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.88),rgba(91,33,182,0.92))', border: '1px solid rgba(139,92,246,0.4)' }
+                : undefined}
+            >
+              {msg.content}
+            </div>
+          </div>
         ))}
+
+        {/* Typing indicator */}
+        {loading && (
+          <div className="flex justify-start items-end gap-2">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0 mb-0.5 ${lm ? 'bg-purple-100' : 'bg-purple-500/20'}`}>🤖</div>
+            <div className={`px-4 py-3 rounded-2xl rounded-bl-sm ${lm ? 'bg-white border border-gray-100 shadow-sm' : 'bg-white/[0.07] border border-white/[0.08]'}`}>
+              <div className="flex gap-1.5 items-center h-4">
+                {[0, 1, 2].map(i => (
+                  <div key={i}
+                    className={`w-1.5 h-1.5 rounded-full ${lm ? 'bg-purple-300' : 'bg-purple-400/60'}`}
+                    style={{ animation: `bounce-dot 0.6s ease-in-out ${i * 0.15}s infinite alternate` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className={`flex-shrink-0 px-4 py-3 border-t flex gap-2 items-end ${lm ? 'bg-white border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          placeholder="Ask about space, physics, astronomy…"
+          rows={1}
+          style={{ resize: 'none' }}
+          className={`flex-1 px-3.5 py-2.5 rounded-2xl border text-[13px] leading-relaxed outline-none transition-all ${
+            lm
+              ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
+              : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/50 focus:bg-white/[0.08]'
+          }`}
+        />
+        <motion.button
+          onClick={() => void send()}
+          disabled={!input.trim() || loading}
+          whileTap={input.trim() && !loading ? { scale: 0.92 } : {}}
+          className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all ${
+            !input.trim() || loading
+              ? lm ? 'bg-gray-100 text-gray-300' : 'bg-white/[0.04] text-white/20'
+              : lm ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'text-white'
+          }`}
+          style={input.trim() && !loading && !lm
+            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.85),rgba(91,33,182,0.9))', border: '1px solid rgba(139,92,246,0.45)', boxShadow: '0 4px 16px rgba(91,33,182,0.35)' }
+            : undefined}
+        >
+          {loading
+            ? <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'rgba(255,255,255,0.7)', animation: 'cosmos-spin 0.7s linear infinite' }} />
+            : <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          }
+        </motion.button>
       </div>
     </div>
   );
