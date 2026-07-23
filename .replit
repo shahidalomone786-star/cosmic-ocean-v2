@@ -8,17 +8,12 @@ deploymentTarget = "autoscale"
 args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
+[[ports]]
+localPort = 5173
+externalPort = 80
+
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Cosmos Dev Server"
+runButton = "Cosmos Dev Server"
 
 [[workflows.workflow]]
 name = "Cosmos Dev Server"
@@ -26,8 +21,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=22618 BASE_PATH=/ pnpm --filter @workspace/cosmos run dev"
-waitForPort = 22618
+args = "PORT=5173 BASE_PATH=/ pnpm --filter @workspace/cosmos run dev"
+waitForPort = 5173
 
 [workflows.workflow.metadata]
 outputType = "webview"
