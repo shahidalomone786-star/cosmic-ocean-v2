@@ -2,10 +2,28 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { CosmicFeedCard } from './CosmicCards';
+import { supabase } from '../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab     = 'shorts' | 'home' | 'search' | 'chat' | 'profile';
 type FeedKind = 'short-video' | 'post' | 'article' | 'long-video';
+type SearchFilter = FeedKind | 'all' | 'users';
+
+interface SearchedUser {
+  id:       string;
+  username: string;
+  avatar:   string;
+  email?:   string;
+}
+
+interface DirectMessage {
+  id:          string;
+  sender_id:   string;
+  receiver_id: string;
+  content:     string;
+  created_at:  string;
+  read:        boolean;
+}
 
 interface LivePost {
   id:              string;
@@ -66,7 +84,8 @@ const KIND_META: Record<FeedKind, { label: string; color: string; icon: string }
   'long-video':  { label: 'Video',   color: 'text-emerald-500', icon: '🎬' },
 };
 
-const SEARCH_FILTERS: { kind: FeedKind; label: string; icon: string }[] = [
+const SEARCH_FILTERS: { kind: SearchFilter; label: string; icon: string }[] = [
+  { kind: 'users',       label: 'People',      icon: '👥' },
   { kind: 'short-video', label: 'Short Video', icon: '⚡' },
   { kind: 'post',        label: 'Post',        icon: '✏️' },
   { kind: 'article',     label: 'Article',     icon: '📰' },
@@ -1574,22 +1593,54 @@ function HomeTab({ posts, loading, error, lm, onComment, onRefresh }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH TAB — filters live posts by type and query, with infinite scroll
+// SEARCH TAB — filters posts or searches users by username
 // ─────────────────────────────────────────────────────────────────────────────
-function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
-  posts:     LivePost[];
-  loading:   boolean;
-  lm?:       boolean;
-  onComment: (post: LivePost) => void;
-  onRefresh: () => void;
+function SearchTab({ posts, loading, lm, onComment, onRefresh, onViewUser }: {
+  posts:       LivePost[];
+  loading:     boolean;
+  lm?:         boolean;
+  onComment:   (post: LivePost) => void;
+  onRefresh:   () => void;
+  onViewUser:  (u: SearchedUser) => void;
 }) {
   const [q,            setQ]            = useState('');
-  const [active,       setActive]       = useState<FeedKind | 'all'>('all');
+  const [active,       setActive]       = useState<SearchFilter>('all');
   const [displayCount, setDisplayCount] = useState(20);
+  const [userResults,  setUserResults]  = useState<SearchedUser[]>([]);
+  const [userLoading,  setUserLoading]  = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // User search via Supabase
+  const searchUsers = useCallback(async (query: string) => {
+    setUserLoading(true);
+    setUserResults([]);
+    try {
+      let req = supabase.from('profiles').select('id, username, avatar, email');
+      if (query.trim()) {
+        req = req.ilike('username', `%${query.trim()}%`);
+      }
+      const { data } = await req.order('username').limit(40);
+      setUserResults((data ?? []) as SearchedUser[]);
+    } catch { /* ignore */ } finally {
+      setUserLoading(false);
+    }
+  }, []);
+
+  // Trigger user search whenever query changes (debounced) or filter switches to 'users'
+  useEffect(() => {
+    if (active !== 'users') return;
+    const t = setTimeout(() => void searchUsers(q), 350);
+    return () => clearTimeout(t);
+  }, [q, active, searchUsers]);
+
+  // Immediately run search when tab switches to 'users'
+  useEffect(() => {
+    if (active === 'users') void searchUsers(q);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
   const filtered = posts.filter(p => {
-    const matchKind = active === 'all' || p.type === active;
+    const matchKind = active === 'all' || active === 'users' || p.type === (active as FeedKind);
     const lower     = q.toLowerCase();
     const matchQ    = !q.trim()
       || p.content.toLowerCase().includes(lower)
@@ -1626,7 +1677,8 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
           <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2.5}>
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search the cosmos…"
+          <input value={q} onChange={e => setQ(e.target.value)}
+            placeholder={active === 'users' ? 'Search by username…' : 'Search the cosmos…'}
             className={`flex-1 bg-transparent outline-none text-[14px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`} />
           {q && (
             <button onClick={() => setQ('')} className={`text-[18px] leading-none ${lm ? 'text-gray-400 hover:text-gray-600' : 'text-white/30 hover:text-white/60'}`}>×</button>
@@ -1653,38 +1705,470 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh }: {
         </div>
       </div>
 
-      {/* Results */}
-      <div className="flex flex-col gap-3 p-4 pb-6">
-        {loading && [1, 2, 3].map(i => <PostSkeleton key={i} lm={lm} />)}
+      {/* ── User search results ── */}
+      {active === 'users' && (
+        <div className="flex flex-col gap-2 p-4 pb-6">
+          {userLoading && (
+            <div className="flex flex-col gap-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className={`flex items-center gap-3 p-3 rounded-2xl border animate-pulse ${lm ? 'bg-white border-gray-100' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+                  <div className={`w-11 h-11 rounded-full flex-shrink-0 ${lm ? 'bg-gray-100' : 'bg-white/[0.07]'}`} />
+                  <div className="flex-1 space-y-2">
+                    <div className={`h-3 rounded-full w-2/5 ${lm ? 'bg-gray-100' : 'bg-white/[0.07]'}`} />
+                    <div className={`h-2.5 rounded-full w-1/4 ${lm ? 'bg-gray-50' : 'bg-white/[0.04]'}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {!loading && filtered.length === 0 ? (
-          <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
-            <p className="text-3xl mb-3">🔭</p>
-            <p className="text-[14px]">{q || active !== 'all' ? 'Nothing matched — try a different search or filter.' : 'No posts yet in the cosmos.'}</p>
+          {!userLoading && userResults.length === 0 && (
+            <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              <p className="text-3xl mb-3">👥</p>
+              <p className="text-[14px]">{q ? 'No users found — try a different name.' : 'Search for people in the cosmos.'}</p>
+            </div>
+          )}
+
+          {!userLoading && userResults.map(u => (
+            <motion.button
+              key={u.id}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onViewUser(u)}
+              className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${lm ? 'bg-white border-gray-100 hover:border-purple-200 hover:shadow-sm' : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.14]'}`}
+            >
+              <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white text-[15px]">
+                {u.avatar ? (
+                  <img src={u.avatar} alt={u.username} className="w-full h-full object-cover"
+                    onError={e => { e.currentTarget.style.display = 'none'; }} />
+                ) : null}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-[14px] font-semibold truncate ${lm ? 'text-gray-900' : 'text-white'}`}>{u.username}</p>
+                <p className={`text-[11.5px] truncate ${lm ? 'text-gray-400' : 'text-white/35'}`}>@{u.username.toLowerCase().replace(/\s+/g, '')}</p>
+              </div>
+              <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-300' : 'stroke-white/20'}`} fill="none" strokeWidth={2}>
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Post results ── */}
+      {active !== 'users' && (
+        <div className="flex flex-col gap-3 p-4 pb-6">
+          {loading && [1, 2, 3].map(i => <PostSkeleton key={i} lm={lm} />)}
+
+          {!loading && filtered.length === 0 ? (
+            <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+              <p className="text-3xl mb-3">🔭</p>
+              <p className="text-[14px]">{q || active !== 'all' ? 'Nothing matched — try a different search or filter.' : 'No posts yet in the cosmos.'}</p>
+            </div>
+          ) : (
+            visible.map(post =>
+              post.source
+                ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+                : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
+            )
+          )}
+
+          {/* Infinite scroll sentinel */}
+          {!loading && hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-4">
+              <div className={`w-6 h-6 rounded-full border-2 animate-spin ${lm ? 'border-gray-200 border-t-purple-400' : 'border-white/[0.08] border-t-purple-500/60'}`} />
+            </div>
+          )}
+
+          {/* End of results */}
+          {!loading && !hasMore && filtered.length > 5 && (
+            <div className={`py-6 text-center text-[11px] font-mono tracking-widest uppercase ${lm ? 'text-gray-300' : 'text-white/15'}`}>
+              · · · {filtered.length} results · · ·
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER PROFILE MODAL — view another user's profile with follow + message
+// ─────────────────────────────────────────────────────────────────────────────
+function UserProfileModal({ target, lm, onClose, onMessage }: {
+  target:    SearchedUser;
+  lm?:       boolean;
+  onClose:   () => void;
+  onMessage: (u: SearchedUser) => void;
+}) {
+  const { user } = useAuthStore();
+  const [following,  setFollowing]  = useState(false);
+  const [followers,  setFollowers]  = useState(0);
+  const [following2, setFollowing2] = useState(0);  // how many they follow
+  const [fLoading,   setFLoading]   = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Fetch follower/following counts + whether current user already follows them
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setStatsLoading(true);
+      const [followerRes, followingRes, myFollowRes] = await Promise.all([
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', target.id),
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', target.id),
+        user
+          ? supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id).eq('following_id', target.id)
+          : Promise.resolve({ count: 0 }),
+      ]);
+      if (!cancelled) {
+        setFollowers(followerRes.count ?? 0);
+        setFollowing2(followingRes.count ?? 0);
+        setFollowing((myFollowRes.count ?? 0) > 0);
+        setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [target.id, user]);
+
+  const toggleFollow = async () => {
+    if (!user || fLoading) return;
+    setFLoading(true);
+    const next = !following;
+    setFollowing(next);
+    setFollowers(c => next ? c + 1 : Math.max(0, c - 1));
+    try {
+      if (next) {
+        await supabase.from('follows').insert({ follower_id: user.id, following_id: target.id });
+      } else {
+        await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', target.id);
+      }
+    } catch {
+      // Revert on error
+      setFollowing(!next);
+      setFollowers(c => next ? Math.max(0, c - 1) : c + 1);
+    } finally {
+      setFLoading(false);
+    }
+  };
+
+  const isOwnProfile = user?.id === target.id;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex flex-col"
+      style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(16px)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+        className={`absolute bottom-0 left-0 right-0 rounded-t-3xl flex flex-col overflow-hidden ${lm ? 'bg-white' : 'bg-[#0e0e1c]'}`}
+        style={{ maxHeight: '88vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className={`w-10 h-1 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/15'}`} />
+        </div>
+
+        {/* Close button */}
+        <button onClick={onClose} className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center ${lm ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-white/[0.08] text-white/50 hover:bg-white/[0.14]'}`}>
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+
+        <div className="overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+          {/* Profile header */}
+          <div className={`px-5 pt-4 pb-5 border-b ${lm ? 'border-gray-100' : 'border-white/[0.06]'}`}>
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white text-[28px]"
+                style={{ border: '3px solid rgba(139,92,246,0.5)', boxShadow: '0 0 24px rgba(139,92,246,0.2)' }}>
+                {target.avatar ? (
+                  <img src={target.avatar} alt={target.username} className="w-full h-full object-cover"
+                    onError={e => { e.currentTarget.style.display = 'none'; }} />
+                ) : (target.username[0] ?? '?').toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className={`text-[20px] font-bold leading-tight mb-0.5 ${lm ? 'text-gray-900' : 'text-white'}`}>{target.username}</h2>
+                <p className={`text-[12px] mb-3 ${lm ? 'text-gray-400' : 'text-white/40'}`}>@{target.username.toLowerCase().replace(/\s+/g, '')}</p>
+                {statsLoading ? (
+                  <div className="flex gap-5">
+                    {[0, 1].map(i => <div key={i} className={`h-7 w-16 rounded-lg animate-pulse ${lm ? 'bg-gray-100' : 'bg-white/[0.06]'}`} />)}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-5">
+                    {[
+                      { label: 'Followers', value: followers },
+                      { label: 'Following', value: following2 },
+                    ].map(s => (
+                      <div key={s.label} className="flex flex-col items-center">
+                        <span className={`text-[16px] font-bold leading-none ${lm ? 'text-gray-900' : 'text-white'}`}>{s.value}</span>
+                        <span className={`text-[10px] uppercase tracking-[0.14em] font-mono mt-0.5 ${lm ? 'text-gray-400' : 'text-white/35'}`}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            {!isOwnProfile && (
+              <div className="flex gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => void toggleFollow()}
+                  disabled={fLoading || statsLoading}
+                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all ${
+                    following
+                      ? lm ? 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200' : 'bg-white/[0.08] text-white/70 border border-white/[0.12] hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/25'
+                      : lm ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-100' : 'text-white'
+                  }`}
+                  style={!following && !lm ? { background: 'linear-gradient(135deg, rgba(139,92,246,0.55), rgba(109,40,217,0.6))', border: '1px solid rgba(139,92,246,0.4)' } : undefined}
+                >
+                  {fLoading ? '…' : following ? 'Following' : '+ Follow'}
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => { onClose(); onMessage(target); }}
+                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-all flex items-center justify-center gap-2 ${lm ? 'border-gray-200 text-gray-700 hover:bg-gray-50' : 'border-white/[0.12] text-white/70 hover:bg-white/[0.06]'}`}
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                  Message
+                </motion.button>
+              </div>
+            )}
           </div>
-        ) : (
-          visible.map(post =>
-            post.source
-              ? <CosmicFeedCard key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
-              : <LiveFeedCard   key={post.id} post={post} lm={lm} onComment={onComment} onRefresh={onRefresh} />
-          )
-        )}
 
-        {/* Infinite scroll sentinel */}
-        {!loading && hasMore && (
-          <div ref={sentinelRef} className="flex justify-center py-4">
+          {/* Empty state for posts (would need API call to load their posts; out of scope) */}
+          <div className={`py-14 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+            <p className="text-3xl mb-3">🌌</p>
+            <p className="text-[13px]">Explore their cosmic journey.</p>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DIRECT MESSAGE MODAL — real-time DM chat via Supabase
+// ─────────────────────────────────────────────────────────────────────────────
+function DirectMessageModal({ peer, lm, onClose }: {
+  peer:    SearchedUser;
+  lm?:     boolean;
+  onClose: () => void;
+}) {
+  const { user } = useAuthStore();
+  const [msgs,    setMsgs]    = useState<DirectMessage[]>([]);
+  const [input,   setInput]   = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef  = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch conversation history
+  const fetchMessages = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .or(
+        `and(sender_id.eq.${user.id},receiver_id.eq.${peer.id}),` +
+        `and(sender_id.eq.${peer.id},receiver_id.eq.${user.id})`
+      )
+      .order('created_at', { ascending: true })
+      .limit(200);
+    setMsgs((data ?? []) as DirectMessage[]);
+    setLoading(false);
+
+    // Mark unread messages as read
+    await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('receiver_id', user.id)
+      .eq('sender_id', peer.id)
+      .eq('read', false);
+  }, [user, peer.id]);
+
+  useEffect(() => { void fetchMessages(); }, [fetchMessages]);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs]);
+
+  // Real-time subscription via Supabase Realtime
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`dm-${[user.id, peer.id].sort().join('-')}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const m = payload.new as DirectMessage;
+          if (m.sender_id === peer.id) {
+            setMsgs(prev => [...prev, m]);
+            // Mark it read immediately
+            void supabase.from('messages').update({ read: true }).eq('id', m.id);
+          }
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user, peer.id]);
+
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text || !user || sending) return;
+    setInput('');
+    setSending(true);
+    const optimistic: DirectMessage = {
+      id:          `opt-${Date.now()}`,
+      sender_id:   user.id,
+      receiver_id: peer.id,
+      content:     text,
+      created_at:  new Date().toISOString(),
+      read:        false,
+    };
+    setMsgs(prev => [...prev, optimistic]);
+    try {
+      const { data } = await supabase
+        .from('messages')
+        .insert({ sender_id: user.id, receiver_id: peer.id, content: text })
+        .select()
+        .single();
+      if (data) {
+        // Replace optimistic with real
+        setMsgs(prev => prev.map(m => m.id === optimistic.id ? (data as DirectMessage) : m));
+      }
+    } catch {
+      // Remove optimistic on failure
+      setMsgs(prev => prev.filter(m => m.id !== optimistic.id));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: '100%' }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: '100%' }}
+      transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+      className={`fixed inset-0 z-[200] flex flex-col ${lm ? 'bg-gray-50' : 'bg-[#080810]'}`}
+    >
+      {/* Header */}
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 h-14 border-b ${lm ? 'bg-white border-gray-100' : 'bg-[#0e0e1c] border-white/[0.06]'}`}>
+        <button onClick={onClose} className={`flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] font-mono transition-colors ${lm ? 'text-gray-500 hover:text-gray-900' : 'text-white/40 hover:text-white'}`}>
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white text-[14px]">
+          {peer.avatar ? (
+            <img src={peer.avatar} alt={peer.username} className="w-full h-full object-cover"
+              onError={e => { e.currentTarget.style.display = 'none'; }} />
+          ) : (peer.username[0] ?? '?').toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-[14px] font-semibold leading-tight truncate ${lm ? 'text-gray-900' : 'text-white'}`}>{peer.username}</p>
+          <p className={`text-[11px] ${lm ? 'text-gray-400' : 'text-white/35'}`}>@{peer.username.toLowerCase().replace(/\s+/g, '')}</p>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ scrollbarWidth: 'none' }}>
+        {loading && (
+          <div className="flex justify-center pt-12">
             <div className={`w-6 h-6 rounded-full border-2 animate-spin ${lm ? 'border-gray-200 border-t-purple-400' : 'border-white/[0.08] border-t-purple-500/60'}`} />
           </div>
         )}
 
-        {/* End of results */}
-        {!loading && !hasMore && filtered.length > 5 && (
-          <div className={`py-6 text-center text-[11px] font-mono tracking-widest uppercase ${lm ? 'text-gray-300' : 'text-white/15'}`}>
-            · · · {filtered.length} results · · ·
+        {!loading && msgs.length === 0 && (
+          <div className={`py-16 text-center ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+            <p className="text-4xl mb-3">💬</p>
+            <p className="text-[14px] font-medium mb-1">No messages yet</p>
+            <p className="text-[12px]">Start the conversation with {peer.username}.</p>
           </div>
         )}
+
+        {msgs.map(msg => {
+          const isMe = msg.sender_id === user?.id;
+          const t = new Date(msg.created_at);
+          const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return (
+            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+              {!isMe && (
+                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mb-0.5 bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold">
+                  {peer.avatar
+                    ? <img src={peer.avatar} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    : (peer.username[0] ?? '?').toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col gap-0.5" style={{ maxWidth: '72%' }}>
+                <div className={`px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed whitespace-pre-wrap ${
+                  isMe
+                    ? lm ? 'bg-purple-600 text-white rounded-br-sm' : 'text-white rounded-br-sm'
+                    : lm ? 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm' : 'bg-white/[0.08] border border-white/[0.08] text-white/85 rounded-bl-sm'
+                }`}
+                  style={isMe && !lm
+                    ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.88),rgba(91,33,182,0.92))', border: '1px solid rgba(139,92,246,0.4)' }
+                    : undefined}
+                >
+                  {msg.content}
+                </div>
+                <p className={`text-[10px] ${isMe ? 'text-right' : 'text-left'} ${lm ? 'text-gray-300' : 'text-white/20'}`}>{timeStr}</p>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
       </div>
-    </div>
+
+      {/* Input */}
+      <div className={`flex-shrink-0 px-4 py-3 border-t flex gap-2 items-end ${lm ? 'bg-white border-gray-100' : 'bg-[#0e0e1c] border-white/[0.05]'}`}>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }}
+          placeholder={`Message ${peer.username}…`}
+          rows={1}
+          style={{ resize: 'none' }}
+          className={`flex-1 px-3.5 py-2.5 rounded-2xl border text-[13px] leading-relaxed outline-none transition-all ${
+            lm
+              ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
+              : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/50 focus:bg-white/[0.08]'
+          }`}
+        />
+        <motion.button
+          onClick={() => void sendMessage()}
+          disabled={!input.trim() || sending}
+          whileTap={input.trim() && !sending ? { scale: 0.92 } : {}}
+          className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all ${
+            !input.trim() || sending
+              ? lm ? 'bg-gray-100 text-gray-300' : 'bg-white/[0.04] text-white/20'
+              : lm ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'text-white'
+          }`}
+          style={input.trim() && !sending && !lm
+            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.85),rgba(91,33,182,0.9))', border: '1px solid rgba(139,92,246,0.45)', boxShadow: '0 4px 16px rgba(91,33,182,0.35)' }
+            : undefined}
+        >
+          {sending
+            ? <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'rgba(255,255,255,0.7)', animation: 'cosmos-spin 0.7s linear infinite' }} />
+            : <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          }
+        </motion.button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1903,10 +2387,29 @@ function ProfileTab({ posts, loading, onCreatePost, lm, onComment, onRefresh }: 
 
   const myPosts = posts.filter(p => p.user_id === user?.id);
 
+  const [followerCount,  setFollowerCount]  = useState<number | null>(null);
+  const [followingCount, setFollowingCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const [fR, fG] = await Promise.all([
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id),
+      ]);
+      if (!cancelled) {
+        setFollowerCount(fR.count ?? 0);
+        setFollowingCount(fG.count ?? 0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   const stats = [
     { label: 'Posts',     value: loading ? '…' : String(myPosts.length) },
-    { label: 'Followers', value: '0'    },
-    { label: 'Following', value: '0'    },
+    { label: 'Followers', value: followerCount === null ? '…' : String(followerCount) },
+    { label: 'Following', value: followingCount === null ? '…' : String(followingCount) },
   ];
 
   return (
@@ -2114,6 +2617,8 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
   const [direction,      setDirection]      = useState(0);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [commentingPost, setCommentingPost] = useState<LivePost | null>(null);
+  const [viewingUser,    setViewingUser]    = useState<SearchedUser | null>(null);
+  const [messagingUser,  setMessagingUser]  = useState<SearchedUser | null>(null);
 
   // ── Live posts state ──────────────────────────────────────────────────────
   const [posts,        setPosts]        = useState<LivePost[]>([]);
@@ -2205,7 +2710,7 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
             >
               {activeTab === 'shorts'  && <ShortsTab  posts={posts} loading={postsLoading} onComment={handleComment} />}
               {activeTab === 'home'    && <HomeTab    posts={posts} loading={postsLoading} error={postsError} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
-              {activeTab === 'search'  && <SearchTab  posts={posts} loading={postsLoading} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
+              {activeTab === 'search'  && <SearchTab  posts={posts} loading={postsLoading} lm={lm} onComment={handleComment} onRefresh={fetchPosts} onViewUser={u => setViewingUser(u)} />}
               {activeTab === 'chat'    && <ChatTab    lm={lm} />}
               {activeTab === 'profile' && <ProfileTab posts={posts} loading={postsLoading} onCreatePost={openCreatePost} lm={lm} onComment={handleComment} onRefresh={fetchPosts} />}
             </motion.div>
@@ -2236,6 +2741,29 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
             lm={lm}
             onClose={() => setCommentingPost(null)}
             onRefresh={fetchPosts}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewingUser && (
+          <UserProfileModal
+            key={`profile-${viewingUser.id}`}
+            target={viewingUser}
+            lm={lm}
+            onClose={() => setViewingUser(null)}
+            onMessage={u => { setViewingUser(null); setMessagingUser(u); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {messagingUser && (
+          <DirectMessageModal
+            key={`dm-${messagingUser.id}`}
+            peer={messagingUser}
+            lm={lm}
+            onClose={() => setMessagingUser(null)}
           />
         )}
       </AnimatePresence>
