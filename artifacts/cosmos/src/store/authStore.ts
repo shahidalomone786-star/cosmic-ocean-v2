@@ -11,6 +11,7 @@ export interface UserProfile {
   joinDate: string;
   chessWins: number;
   chessLosses: number;
+  timeSpentSeconds: number;
 }
 
 interface AuthState {
@@ -25,6 +26,7 @@ interface AuthState {
   checkSession:    () => Promise<void>;
   updateProfile:   (updates: Partial<Pick<UserProfile, 'username' | 'avatar'>>) => Promise<void>;
   recordChessResult: (result: 'win' | 'loss') => Promise<void>;
+  addTimeSpent:    (seconds: number) => Promise<void>;
 }
 
 // ─── Preset avatars ───────────────────────────────────────────────────────────
@@ -47,17 +49,19 @@ type ProfileRow = {
   chess_wins?: number | null;
   chess_losses?: number | null;
   join_date?: string | null;
+  time_spent_seconds?: number | null;
 };
 
 function buildProfile(authUser: SupabaseAuthUser, row?: ProfileRow | null): UserProfile {
   return {
-    id:          authUser.id,
-    email:       authUser.email ?? '',
-    username:    row?.username  ?? authUser.email?.split('@')[0] ?? 'Explorer',
-    avatar:      row?.avatar    ?? PRESET_AVATARS[0].url,
-    joinDate:    row?.join_date ?? authUser.created_at ?? new Date().toISOString(),
-    chessWins:   row?.chess_wins   ?? 0,
-    chessLosses: row?.chess_losses ?? 0,
+    id:               authUser.id,
+    email:            authUser.email ?? '',
+    username:         row?.username  ?? authUser.email?.split('@')[0] ?? 'Explorer',
+    avatar:           row?.avatar    ?? PRESET_AVATARS[0].url,
+    joinDate:         row?.join_date ?? authUser.created_at ?? new Date().toISOString(),
+    chessWins:        row?.chess_wins         ?? 0,
+    chessLosses:      row?.chess_losses       ?? 0,
+    timeSpentSeconds: row?.time_spent_seconds ?? 0,
   };
 }
 
@@ -76,13 +80,14 @@ async function fetchOrCreateProfile(authUser: SupabaseAuthUser): Promise<UserPro
   if (!data) {
     // First sign-in: seed the row (trigger may have already done it — upsert is safe)
     const newRow = {
-      id:           authUser.id,
-      email:        authUser.email ?? '',
-      username:     authUser.email?.split('@')[0] ?? 'Explorer',
-      avatar:       PRESET_AVATARS[0].url,
-      join_date:    new Date().toISOString(),
-      chess_wins:   0,
-      chess_losses: 0,
+      id:                 authUser.id,
+      email:              authUser.email ?? '',
+      username:           authUser.email?.split('@')[0] ?? 'Explorer',
+      avatar:             PRESET_AVATARS[0].url,
+      join_date:          new Date().toISOString(),
+      chess_wins:         0,
+      chess_losses:       0,
+      time_spent_seconds: 0,
     };
     await supabase.from('profiles').upsert(newRow);
     return buildProfile(authUser, newRow);
@@ -112,13 +117,14 @@ export const useAuthStore = create<AuthState>()(
         if (!data.user) return { ok: false, error: 'Signup failed — please check your email for a confirmation link.' };
 
         const newRow = {
-          id:           data.user.id,
+          id:                 data.user.id,
           email,
           username,
-          avatar:       PRESET_AVATARS[0].url,
-          join_date:    new Date().toISOString(),
-          chess_wins:   0,
-          chess_losses: 0,
+          avatar:             PRESET_AVATARS[0].url,
+          join_date:          new Date().toISOString(),
+          chess_wins:         0,
+          chess_losses:       0,
+          time_spent_seconds: 0,
         };
         await supabase.from('profiles').upsert(newRow);
         const profile = buildProfile(data.user, newRow);
@@ -175,6 +181,17 @@ export const useAuthStore = create<AuthState>()(
         await supabase
           .from('profiles')
           .update({ chess_wins: updated.chessWins, chess_losses: updated.chessLosses })
+          .eq('id', user.id);
+      },
+
+      async addTimeSpent(seconds) {
+        const { user } = get();
+        if (!user || seconds <= 0) return;
+        const newTotal = user.timeSpentSeconds + seconds;
+        set({ user: { ...user, timeSpentSeconds: newTotal } });
+        await supabase
+          .from('profiles')
+          .update({ time_spent_seconds: newTotal })
           .eq('id', user.id);
       },
     }),

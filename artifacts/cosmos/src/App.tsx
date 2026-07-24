@@ -1542,6 +1542,7 @@ export default function App() {
   const [sceneIdx,         setSceneIdx]         = useState(() => Math.floor(Math.random() * cosmicScenes.length));
   const overlayControls = useAnimation();
   const bgIframeRef     = useRef<HTMLIFrameElement>(null);
+  const lastFlushRef    = useRef<number>(Date.now());
 
   // ── Unified search state ──────────────────────────────────────────────────
   const [nasaQuery,        setNasaQuery]        = useState('');
@@ -1578,6 +1579,29 @@ export default function App() {
   useEffect(() => {
     useAuthStore.getState().checkSession();
   }, []);
+
+  // ── Track time spent on site; flush to Supabase every 60 s ───────────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    lastFlushRef.current = Date.now();
+
+    const intervalId = setInterval(() => {
+      useAuthStore.getState().addTimeSpent(60);
+      lastFlushRef.current = Date.now();
+    }, 60_000);
+
+    const flushRemaining = () => {
+      const elapsed = Math.round((Date.now() - lastFlushRef.current) / 1000);
+      if (elapsed > 0) useAuthStore.getState().addTimeSpent(elapsed);
+    };
+
+    window.addEventListener('beforeunload', flushRemaining);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('beforeunload', flushRemaining);
+      flushRemaining();
+    };
+  }, [isAuthenticated]);
 
   // ── Inject Google Translate once on mount ─────────────────────────────────
   useEffect(() => {
@@ -1925,13 +1949,8 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Right side: user badge + language */}
+                {/* Right side: language dropdown */}
                 <div className="flex items-center gap-2">
-
-                  {/* User profile badge — shown when signed in */}
-                  {isAuthenticated && user && (
-                    <UserBadge user={user} lm={lm} onLogout={logout} />
-                  )}
 
                   {/* Language dropdown */}
                   <div className="relative">

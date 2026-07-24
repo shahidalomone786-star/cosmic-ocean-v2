@@ -66,6 +66,15 @@ const Eyebrow = ({ children, lm }: { children: React.ReactNode; lm?: boolean }) 
   <p className={`text-[9px] uppercase tracking-[0.38em] font-mono ${lm ? 'text-gray-400' : 'text-white/25'}`}>{children}</p>
 );
 
+// ─── Time formatter ───────────────────────────────────────────────────────────
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HISTORY VIEW
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,7 +101,7 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
             Back
           </button>
         }
-        center={<Eyebrow lm={lm}>Game History</Eyebrow>}
+        center={<Eyebrow lm={lm}>History</Eyebrow>}
       />
       <HR lm={lm} />
 
@@ -123,6 +132,17 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
             No games recorded yet. Challenge a scientist to begin.
           </p>
         )}
+
+        {/* ── Time Spent ── */}
+        <p className={`text-[10px] uppercase tracking-[0.3em] font-mono mb-4 mt-10 ${lm ? 'text-gray-400' : 'text-white/25'}`}>Time Spent</p>
+        <div className="grid grid-cols-1 gap-3">
+          <StatCard
+            lm={lm}
+            label="Total Time on Site"
+            value={formatTime(user.timeSpentSeconds)}
+            accent="linear-gradient(90deg, transparent, rgba(34,197,94,0.65), transparent)"
+          />
+        </div>
       </div>
     </motion.div>
   );
@@ -428,7 +448,7 @@ function ProfileView({
             }`}
             style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
-            <span className={`transition-colors ${lm ? 'text-gray-600 group-hover:text-gray-900' : 'text-white/55 group-hover:text-white'}`}>View Game History</span>
+            <span className={`transition-colors ${lm ? 'text-gray-600 group-hover:text-gray-900' : 'text-white/55 group-hover:text-white'}`}>History</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
               className={`transition-colors ${lm ? 'text-gray-300 group-hover:text-gray-600' : 'text-white/20 group-hover:text-white/60'}`}>
               <polyline points="9 18 15 12 9 6"/>
