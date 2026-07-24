@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
+import { Globe, Orbit, Telescope, Sparkles, Satellite } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -1296,12 +1297,23 @@ const MP_CARD_THEME: Record<string, {
   },
 };
 
+// ─── Lucide icon map for Masterpiece cards ───────────────────────────────────
+const MP_PIECE_ICONS: Record<string, React.ElementType> = {
+  'blue-dot':        Globe,
+  'solar-system':    Orbit,
+  'deep-space':      Telescope,
+  'infinite-galaxy': Sparkles,
+  'gaia-starmap':    Satellite,
+};
+
 // ─── Masterpiece Card ────────────────────────────────────────────────────────
 function MasterpieceCard({
   piece, index, lm, onSelect,
 }: { piece: MasterpieceItem; index: number; lm?: boolean; onSelect: () => void }) {
   const [hovered, setHovered] = useState(false);
   const th = MP_CARD_THEME[piece.theme];
+
+  const PieceIcon = MP_PIECE_ICONS[piece.id] ?? Globe;
 
   // Light-mode: fall back to a clean card style
   if (lm) {
@@ -1320,9 +1332,12 @@ function MasterpieceCard({
           className="w-full h-24 flex items-center justify-center relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${th.bgFrom}, ${th.bgTo})` }}
         >
-          <span className="text-4xl relative z-10" style={{ filter: `drop-shadow(0 0 10px ${th.primary})` }}>
-            {piece.icon}
-          </span>
+          <PieceIcon
+            size={36}
+            strokeWidth={1.4}
+            className="relative z-10"
+            style={{ color: th.primary, filter: `drop-shadow(0 0 10px ${th.primary})` }}
+          />
           {/* Subtle glow blob */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -1386,14 +1401,17 @@ function MasterpieceCard({
           <rect width="100%" height="100%" fill={`url(#hex-card-${piece.id})`} />
         </svg>
         {/* Icon */}
-        <motion.span
-          className="relative z-10 text-4xl"
+        <motion.div
+          className="relative z-10"
           animate={{ scale: hovered ? 1.15 : 1 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          style={{ filter: `drop-shadow(0 0 14px ${th.primary})` }}
         >
-          {piece.icon}
-        </motion.span>
+          <PieceIcon
+            size={36}
+            strokeWidth={1.4}
+            style={{ color: th.primary, filter: `drop-shadow(0 0 14px ${th.primary})` }}
+          />
+        </motion.div>
         {/* Top-right glow dot */}
         <motion.div
           className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full"
@@ -2561,7 +2579,7 @@ export default function App() {
                     className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`}
                     style={{ fontFamily: 'var(--app-font-heading)' }}
                   >
-                    🎨 Cosmic Masterpieces
+                    Cosmic Masterpieces
                   </h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
                     Cinematic 3D Experiences

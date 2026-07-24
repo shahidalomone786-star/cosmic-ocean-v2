@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, type LucideIcon } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface MasterpieceItem {
@@ -12,13 +13,22 @@ export interface MasterpieceItem {
 
 export type MasterpieceTheme = 'blue' | 'amber' | 'purple' | 'cyan' | 'emerald';
 
-// ─── Iframe URLs per card ─────────────────────────────────────────────────────
+// ─── Iframe URLs per card (all NASA Eyes — mobile-friendly WebGL) ─────────────
 const IFRAME_URLS: Record<string, string> = {
-  'blue-dot':       'https://eyes.nasa.gov/apps/earth/',
-  'solar-system':   'https://www.solarsystemscope.com/iframe',
-  'deep-space':     'https://sketchfab.com/models/19323d9b4b0a430fb8932fcde84377b7/embed?autostart=1&ui_theme=dark&dnt=1',
-  'infinite-galaxy':'https://sketchfab.com/models/261fb59bb3df4ddca8764ef1a0ce5e91/embed?autostart=1&ui_theme=dark&dnt=1',
-  'gaia-starmap':   'https://stellarium-web.org/',
+  'blue-dot':        'https://eyes.nasa.gov/apps/earth/',
+  'solar-system':    'https://eyes.nasa.gov/apps/solar-system/',
+  'deep-space':      'https://eyes.nasa.gov/apps/exo/',
+  'infinite-galaxy': 'https://eyes.nasa.gov/apps/asteroids/',
+  'gaia-starmap':    'https://eyes.nasa.gov/apps/dsn/',
+};
+
+// ─── Lucide icon map per card ─────────────────────────────────────────────────
+const PIECE_ICONS: Record<string, LucideIcon> = {
+  'blue-dot':        Globe,
+  'solar-system':    Orbit,
+  'deep-space':      Telescope,
+  'infinite-galaxy': Sparkles,
+  'gaia-starmap':    Satellite,
 };
 
 // ─── Theme Palettes ───────────────────────────────────────────────────────────
@@ -227,9 +237,17 @@ function LoadingScene({ item, t }: { item: MasterpieceItem; t: typeof THEMES[Mas
         >
           <div className="w-full h-full rounded-full" style={{ background: `radial-gradient(circle, ${t.primary}, ${t.glow.replace('0.5)', '0.8)')})`, boxShadow: `0 0 20px ${t.glow}` }} />
         </motion.div>
-        <span className="relative z-10 text-3xl" style={{ filter: `drop-shadow(0 0 12px ${t.primary})` }}>
-          {item.icon}
-        </span>
+        {(() => {
+          const Icon = PIECE_ICONS[item.id] ?? Globe;
+          return (
+            <Icon
+              className="relative z-10"
+              size={36}
+              strokeWidth={1.4}
+              style={{ color: t.primary, filter: `drop-shadow(0 0 10px ${t.primary})` }}
+            />
+          );
+        })()}
       </div>
 
       {/* Title */}
