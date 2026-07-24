@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, PRESET_AVATARS } from '../store/authStore';
+import { supabase } from '../lib/supabase';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function compressImage(file: File): Promise<string> {
@@ -75,15 +76,51 @@ function formatTime(seconds: number): string {
   return `${h}h ${m}m`;
 }
 
+// ─── Carrom history row type ──────────────────────────────────────────────────
+interface CarromHistoryRow {
+  id:        string;
+  mode:      string;
+  opponent:  string | null;
+  result:    string;
+  my_score:  number;
+  opp_score: number;
+  profit:    number;
+  played_at: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HISTORY VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
   const { user } = useAuthStore();
+  const [carromRows,    setCarromRows]    = useState<CarromHistoryRow[]>([]);
+  const [carromLoading, setCarromLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('carrom_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('played_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setCarromRows((data ?? []) as CarromHistoryRow[]);
+        setCarromLoading(false);
+      })
+      .catch(() => setCarromLoading(false));
+  }, [user]);
+
   if (!user) return null;
 
   const total   = user.chessWins + user.chessLosses;
   const winRate = total === 0 ? '—' : `${Math.round((user.chessWins / total) * 100)}%`;
+
+  // Carrom aggregates
+  const carromWins   = carromRows.filter(r => r.result === 'win').length;
+  const carromLosses = carromRows.filter(r => r.result === 'loss').length;
+  const carromProfit = carromRows.reduce((s, r) => s + r.profit, 0);
+  const carromTotal  = carromRows.length;
 
   return (
     <motion.div key="history"
@@ -118,6 +155,7 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
           </div>
         </div>
 
+        {/* ── Grandmaster Chess ── */}
         <p className={`text-[10px] uppercase tracking-[0.3em] font-mono mb-4 ${lm ? 'text-gray-400' : 'text-white/25'}`}>Grandmaster Chess</p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -128,9 +166,67 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
         </div>
 
         {total === 0 && (
-          <p className={`text-center text-[12px] font-mono mt-8 ${lm ? 'text-gray-400' : 'text-white/20'}`}>
-            No games recorded yet. Challenge a scientist to begin.
+          <p className={`text-center text-[12px] font-mono mt-4 mb-2 ${lm ? 'text-gray-400' : 'text-white/20'}`}>
+            No chess games recorded yet. Challenge a scientist to begin.
           </p>
+        )}
+
+        {/* ── Premium Carrom History ── */}
+        <div className={`mt-10 mb-4 flex items-center gap-3`}>
+          <p className={`text-[10px] uppercase tracking-[0.3em] font-mono ${lm ? 'text-gray-400' : 'text-white/25'}`}>🎯 Premium Carrom History</p>
+          {carromLoading && (
+            <div className={`w-3.5 h-3.5 rounded-full border-2 animate-spin ${lm ? 'border-gray-200 border-t-amber-500' : 'border-white/10 border-t-amber-400'}`} />
+          )}
+        </div>
+
+        {!carromLoading && (
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <StatCard lm={lm} label="Wins"         value={carromWins}   accent="linear-gradient(90deg, transparent, rgba(245,158,11,0.8), transparent)" />
+              <StatCard lm={lm} label="Losses"       value={carromLosses} accent="linear-gradient(90deg, transparent, rgba(239,68,68,0.55), transparent)" />
+              <StatCard lm={lm} label="Profit (pts)" value={carromProfit >= 0 ? `+${carromProfit}` : `${carromProfit}`} accent="linear-gradient(90deg, transparent, rgba(34,197,94,0.65), transparent)" />
+              <StatCard lm={lm} label="Games Played" value={carromTotal}  accent="linear-gradient(90deg, transparent, rgba(139,92,246,0.7), transparent)" />
+            </div>
+
+            {carromTotal === 0 ? (
+              <p className={`text-center text-[12px] font-mono mt-2 mb-2 ${lm ? 'text-gray-400' : 'text-white/20'}`}>
+                No carrom games yet. Pocket some coins to get started!
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className={`text-[9px] uppercase tracking-[0.25em] font-mono mb-1 ${lm ? 'text-gray-400' : 'text-white/20'}`}>Recent Games</p>
+                {carromRows.slice(0, 10).map(row => (
+                  <div
+                    key={row.id}
+                    className={`flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                      lm ? 'bg-black/[0.03] border border-black/[0.07]' : ''
+                    }`}
+                    style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-[18px]">
+                        {row.result === 'win' ? '🏆' : row.result === 'loss' ? '😔' : '🤝'}
+                      </span>
+                      <div>
+                        <p className={`text-[12px] font-medium ${lm ? 'text-gray-800' : 'text-white/80'}`}>
+                          {row.result === 'win' ? 'Win' : row.result === 'loss' ? 'Loss' : 'Draw'}
+                          {row.opponent ? ` vs ${row.opponent}` : ''}
+                        </p>
+                        <p className={`text-[10px] font-mono ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                          {row.my_score}–{row.opp_score} · {row.mode.toUpperCase()} · {new Date(row.played_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[13px] font-mono font-semibold ${
+                      row.profit > 0 ? 'text-green-400' : row.profit < 0 ? 'text-red-400' : (lm ? 'text-gray-400' : 'text-white/30')
+                    }`}>
+                      {row.profit > 0 ? `+${row.profit}` : row.profit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* ── Time Spent ── */}

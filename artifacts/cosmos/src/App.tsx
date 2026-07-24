@@ -4,6 +4,7 @@ import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, 
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
+import CosmicCarromModal from './components/CosmicCarrom';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
@@ -1562,6 +1563,7 @@ export default function App() {
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
+  const [showCarrom,       setShowCarrom]       = useState(false);
   const [showProfile,      setShowProfile]      = useState(false);
   const [showNexus,        setShowNexus]        = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
@@ -2377,6 +2379,59 @@ export default function App() {
                 </motion.div>
               </div>
 
+              {/* ── Cosmic Carrom ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>Cosmic Carrom</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Physics Board Game</span>
+                </div>
+                <motion.div
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowCarrom(true)}
+                  className={`cursor-pointer w-full rounded-2xl overflow-hidden border transition-all duration-300 ${
+                    lm
+                      ? 'border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 hover:border-amber-400 hover:shadow-[0_8px_28px_rgba(245,158,11,0.18)]'
+                      : 'border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-orange-500/8 to-yellow-500/10 hover:border-amber-400/50 hover:shadow-[0_12px_40px_rgba(245,158,11,0.3)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-5 px-5 py-5">
+                    {/* Carrom board icon */}
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-4xl flex-shrink-0 ${
+                      lm ? 'bg-white shadow-sm border border-amber-100' : 'bg-white/[0.06] border border-white/[0.10]'
+                    }`}>
+                      🎯
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[15px] font-semibold tracking-[-0.01em] mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>
+                        Play Cosmic Carrom
+                      </p>
+                      <p className={`text-[12px] leading-relaxed ${lm ? 'text-slate-500' : 'text-white/40'}`}>
+                        Realistic 2D physics board. Pass &amp; Play, challenge Mom (unbeatable grandmaster) or Feynman (beginner), or watch AI spectate.
+                      </p>
+                      {/* Avatar previews */}
+                      <div className="flex items-center gap-1.5 mt-2.5">
+                        {[
+                          { img: '/mehera.jpg', name: 'Mom' },
+                          { img: 'https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg', name: 'Einstein' },
+                          { img: 'https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg', name: 'Feynman' },
+                          { img: '/carl-sagan.jpg', name: 'Sagan' },
+                          { img: 'https://upload.wikimedia.org/wikipedia/commons/7/79/Tesla_circa_1890.jpeg', name: 'Tesla' },
+                        ].map(av => (
+                          <div key={av.name} className="w-6 h-6 rounded-full overflow-hidden border-2 border-amber-300/40 -ml-1 first:ml-0 shadow-sm">
+                            <img src={av.img} alt={av.name} className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                        ))}
+                        <span className={`ml-1 text-[10px] ${lm ? 'text-slate-400' : 'text-white/30'}`}>5 avatars</span>
+                      </div>
+                    </div>
+                    <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg ${
+                      lm ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/20 text-amber-300'
+                    }`}>›</div>
+                  </div>
+                </motion.div>
+              </div>
+
               {/* ── My Command Center ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -2528,6 +2583,16 @@ export default function App() {
             onClose={() => setShowChess(false)}
             lm={lm}
             onGameEnd={recordChessResult}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[300]  Cosmic Carrom Modal ── */}
+      <AnimatePresence>
+        {showCarrom && (
+          <CosmicCarromModal
+            onClose={() => setShowCarrom(false)}
+            lm={lm}
           />
         )}
       </AnimatePresence>
