@@ -5,6 +5,7 @@ import LibraryView, { type LibrarySharedContext } from './components/LibraryView
 import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
 import CosmicCarromModal from './components/CosmicCarrom';
+import Cosmic3DViewerModal, { type MasterpieceItem } from './components/Cosmic3DViewerModal';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
@@ -1194,6 +1195,249 @@ const FUN_GAMES: FunGameItem[] = [
   { id: 'game-hexgl',       title: 'HexGL Racing',   description: 'Futuristic anti-gravity racing at breathtaking speed.',              categoryTag: '🕹️ GAME', iframeUrl: 'https://hexgl.bkcore.com/play/',                  wikiQuery: 'WipEout (video game)' },
 ];
 
+// ─── Cosmic Masterpieces Data ────────────────────────────────────────────────
+const COSMIC_MASTERPIECES: MasterpieceItem[] = [
+  {
+    id:       'blue-dot',
+    title:    'The Blue Dot',
+    subtitle: 'Real-time 3D Earth & ISS',
+    icon:     '🌍',
+    theme:    'blue',
+  },
+  {
+    id:       'solar-system',
+    title:    'Solar System',
+    subtitle: 'Interactive Orbital Explorer',
+    icon:     '☀️',
+    theme:    'amber',
+  },
+  {
+    id:       'deep-space',
+    title:    'Deep Space Artifacts',
+    subtitle: '3D Black Holes & Nebulae',
+    icon:     '🕳️',
+    theme:    'purple',
+  },
+  {
+    id:       'infinite-galaxy',
+    title:    'Infinite Galaxy',
+    subtitle: 'Procedural Starfield Engine',
+    icon:     '🌌',
+    theme:    'cyan',
+  },
+  {
+    id:       'gaia-starmap',
+    title:    'The Gaia Star Map',
+    subtitle: 'ESA Real Star Positions',
+    icon:     '⭐',
+    theme:    'emerald',
+  },
+];
+
+// ─── Masterpiece Card theme palette (card-level) ─────────────────────────────
+const MP_CARD_THEME: Record<string, {
+  primary: string; glow: string; border: string; borderHover: string;
+  bgFrom: string; bgTo: string; tag: string; tagBorder: string; tagText: string;
+}> = {
+  blue: {
+    primary:     '#38bdf8',
+    glow:        'rgba(56,189,248,0.55)',
+    border:      'rgba(56,189,248,0.22)',
+    borderHover: 'rgba(56,189,248,0.65)',
+    bgFrom:      'rgba(2,24,54,0.72)',
+    bgTo:        'rgba(3,10,28,0.88)',
+    tag:         'rgba(56,189,248,0.12)',
+    tagBorder:   'rgba(56,189,248,0.35)',
+    tagText:     '#38bdf8',
+  },
+  amber: {
+    primary:     '#f59e0b',
+    glow:        'rgba(245,158,11,0.55)',
+    border:      'rgba(245,158,11,0.22)',
+    borderHover: 'rgba(245,158,11,0.65)',
+    bgFrom:      'rgba(35,18,2,0.72)',
+    bgTo:        'rgba(22,10,2,0.88)',
+    tag:         'rgba(245,158,11,0.12)',
+    tagBorder:   'rgba(245,158,11,0.35)',
+    tagText:     '#f59e0b',
+  },
+  purple: {
+    primary:     '#a855f7',
+    glow:        'rgba(168,85,247,0.55)',
+    border:      'rgba(168,85,247,0.22)',
+    borderHover: 'rgba(168,85,247,0.65)',
+    bgFrom:      'rgba(20,5,40,0.72)',
+    bgTo:        'rgba(10,3,22,0.88)',
+    tag:         'rgba(168,85,247,0.12)',
+    tagBorder:   'rgba(168,85,247,0.35)',
+    tagText:     '#a855f7',
+  },
+  cyan: {
+    primary:     '#22d3ee',
+    glow:        'rgba(34,211,238,0.55)',
+    border:      'rgba(34,211,238,0.22)',
+    borderHover: 'rgba(34,211,238,0.65)',
+    bgFrom:      'rgba(2,22,30,0.72)',
+    bgTo:        'rgba(1,12,18,0.88)',
+    tag:         'rgba(34,211,238,0.12)',
+    tagBorder:   'rgba(34,211,238,0.35)',
+    tagText:     '#22d3ee',
+  },
+  emerald: {
+    primary:     '#10b981',
+    glow:        'rgba(16,185,129,0.55)',
+    border:      'rgba(16,185,129,0.22)',
+    borderHover: 'rgba(16,185,129,0.65)',
+    bgFrom:      'rgba(2,22,14,0.72)',
+    bgTo:        'rgba(1,12,8,0.88)',
+    tag:         'rgba(16,185,129,0.12)',
+    tagBorder:   'rgba(16,185,129,0.35)',
+    tagText:     '#10b981',
+  },
+};
+
+// ─── Masterpiece Card ────────────────────────────────────────────────────────
+function MasterpieceCard({
+  piece, index, lm, onSelect,
+}: { piece: MasterpieceItem; index: number; lm?: boolean; onSelect: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const th = MP_CARD_THEME[piece.theme];
+
+  // Light-mode: fall back to a clean card style
+  if (lm) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.07, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        whileHover={{ scale: 1.03, y: -4 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onSelect}
+        className="flex-shrink-0 w-48 rounded-2xl overflow-hidden cursor-pointer border border-slate-200 bg-white shadow-[0_4px_18px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_32px_rgba(0,0,0,0.14)] hover:border-slate-300 transition-all duration-300"
+      >
+        {/* Gradient header strip */}
+        <div
+          className="w-full h-24 flex items-center justify-center relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${th.bgFrom}, ${th.bgTo})` }}
+        >
+          <span className="text-4xl relative z-10" style={{ filter: `drop-shadow(0 0 10px ${th.primary})` }}>
+            {piece.icon}
+          </span>
+          {/* Subtle glow blob */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: `radial-gradient(ellipse 70% 60% at 50% 55%, ${th.glow.replace('0.55)', '0.18)')}, transparent)` }}
+          />
+        </div>
+        <div className="p-3">
+          <p className="text-[12px] font-semibold tracking-wide text-slate-900 mb-0.5 truncate">{piece.title}</p>
+          <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">{piece.subtitle}</p>
+          <div
+            className="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full border"
+            style={{ background: th.tag, borderColor: th.tagBorder, color: th.tagText }}
+          >
+            ✦ 3D
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Dark-mode: full glassmorphism + glow
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ scale: 1.04, y: -6 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex-shrink-0 w-48 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300"
+      style={{
+        border:         `1px solid ${hovered ? th.borderHover : th.border}`,
+        background:     `linear-gradient(145deg, ${th.bgFrom}, ${th.bgTo})`,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        boxShadow:      hovered
+          ? `0 0 0 1px ${th.border}, 0 12px 40px rgba(0,0,0,0.6), 0 0 32px ${th.glow}`
+          : `0 0 0 1px ${th.border}, 0 4px 18px rgba(0,0,0,0.5)`,
+      }}
+    >
+      {/* Header area */}
+      <div className="w-full h-28 flex items-center justify-center relative overflow-hidden">
+        {/* Radial glow background */}
+        <motion.div
+          className="absolute inset-0 pointer-events-none"
+          animate={{ opacity: hovered ? 1 : 0.4 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            background: `radial-gradient(ellipse 80% 70% at 50% 55%, ${th.glow.replace('0.55)', '0.22)')}, transparent 75%)`,
+          }}
+        />
+        {/* Hex grid SVG mini */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.07] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id={`hex-card-${piece.id}`} x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+              <polygon points="15,0.5 29.5,8 29.5,23 15,30.5 0.5,23 0.5,8" fill="none" stroke={th.primary} strokeWidth="0.6" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#hex-card-${piece.id})`} />
+        </svg>
+        {/* Icon */}
+        <motion.span
+          className="relative z-10 text-4xl"
+          animate={{ scale: hovered ? 1.15 : 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          style={{ filter: `drop-shadow(0 0 14px ${th.primary})` }}
+        >
+          {piece.icon}
+        </motion.span>
+        {/* Top-right glow dot */}
+        <motion.div
+          className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
+          style={{ background: th.primary, boxShadow: `0 0 8px ${th.primary}` }}
+        />
+      </div>
+
+      {/* Body */}
+      <div className="px-3 pb-3 pt-2">
+        <p
+          className="text-[12px] font-semibold tracking-wide mb-0.5 truncate"
+          style={{ color: '#fff', textShadow: `0 0 12px ${th.glow}` }}
+        >
+          {piece.title}
+        </p>
+        <p className="text-[10px] leading-relaxed line-clamp-2 text-white/40">{piece.subtitle}</p>
+
+        {/* 3D badge */}
+        <div
+          className="mt-2.5 inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border"
+          style={{ background: th.tag, borderColor: th.tagBorder, color: th.tagText }}
+        >
+          <motion.span
+            animate={{ opacity: [1, 0.4, 1] }}
+            transition={{ duration: 1.8, repeat: Infinity, delay: index * 0.25 }}
+            style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: th.primary, boxShadow: `0 0 6px ${th.primary}` }}
+          />
+          3D Engine
+        </div>
+      </div>
+
+      {/* Bottom glow line */}
+      <motion.div
+        className="h-[1.5px] w-full"
+        animate={{ opacity: hovered ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        style={{ background: `linear-gradient(90deg, transparent, ${th.primary}, transparent)` }}
+      />
+    </motion.div>
+  );
+}
+
 // ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
 function AdvSimCard({ sim, onSelect, lm }: { sim: AdvSimItem; onSelect: () => void; lm?: boolean }) {
   const imgUrl = useWikiThumbnail(sim.wikiQuery);
@@ -1564,6 +1808,7 @@ export default function App() {
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
   const [showCarrom,       setShowCarrom]       = useState(false);
+  const [masterpieceModal, setMasterpieceModal] = useState<MasterpieceItem | null>(null);
   const [showProfile,      setShowProfile]      = useState(false);
   const [showNexus,        setShowNexus]        = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
@@ -2309,6 +2554,39 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ── Cosmic Masterpieces ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-4">
+                  <h2
+                    className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`}
+                    style={{ fontFamily: 'var(--app-font-heading)' }}
+                  >
+                    🎨 Cosmic Masterpieces
+                  </h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
+                    Cinematic 3D Experiences
+                  </span>
+                  <span className={`ml-auto text-[9px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                    lm ? 'bg-violet-100 text-violet-600 border border-violet-200' : 'bg-violet-500/15 text-violet-300 border border-violet-500/30'
+                  }`}>
+                    Coming Soon
+                  </span>
+                </div>
+
+                {/* ── Scrollable card row ── */}
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-3">
+                  {COSMIC_MASTERPIECES.map((piece, idx) => (
+                    <MasterpieceCard
+                      key={piece.id}
+                      piece={piece}
+                      index={idx}
+                      lm={lm}
+                      onSelect={() => setMasterpieceModal(piece)}
+                    />
+                  ))}
+                </div>
+              </div>
+
               {/* ── Arcade Zone ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -2621,6 +2899,16 @@ export default function App() {
               setSelectedCard(null);
               openChatWithContext(avatarName, ctx);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[300]  Cosmic 3D Viewer Modal ── */}
+      <AnimatePresence>
+        {masterpieceModal && (
+          <Cosmic3DViewerModal
+            item={masterpieceModal}
+            onClose={() => setMasterpieceModal(null)}
           />
         )}
       </AnimatePresence>
