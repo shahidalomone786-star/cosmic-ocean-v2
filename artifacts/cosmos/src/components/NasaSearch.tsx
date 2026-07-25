@@ -1,4 +1,4 @@
-import { RefObject, useEffect, useState } from 'react';
+import { RefObject, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
@@ -163,6 +163,86 @@ function getTopicCover(text: string) {
   return { from:'#030310', via:'#060622', to:'#030310', accent:'#6366f1', symbol:'◈', label:'Science' };
 }
 
+// ─── Wikipedia image cache + fetcher ─────────────────────────────────────────
+const _wikiImgCache = new Map<string, string | null>();
+
+const STOP_WORDS = new Set([
+  'a','an','the','of','for','in','on','at','to','and','or','but',
+  'with','by','from','as','into','via','is','are','was','were',
+  'be','been','being','have','has','had','do','does','did','will',
+  'would','could','should','may','might','shall','its','their',
+  'this','that','these','those','using','based','towards','effect',
+  'effects','study','studies','analysis','approach','method','methods',
+  'new','high','low','large','small','role','roles','between','during',
+]);
+
+function _extractWikiQuery(title: string): string {
+  const words = title
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()));
+  // Take the first 3 meaningful words as the Wikipedia search query
+  return words.slice(0, 3).join(' ');
+}
+
+async function _fetchWikiThumb(query: string): Promise<string | null> {
+  const key = query.toLowerCase().trim();
+  if (_wikiImgCache.has(key)) return _wikiImgCache.get(key)!;
+  if (!key) { _wikiImgCache.set(key, null); return null; }
+  try {
+    const slug = encodeURIComponent(query.replace(/\s+/g, '_'));
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) {
+      // Try with just the first keyword as fallback
+      const firstWord = query.split(' ')[0];
+      if (firstWord && firstWord !== query) {
+        const res2 = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstWord)}`,
+          { signal: AbortSignal.timeout(4000) }
+        );
+        if (res2.ok) {
+          const json2 = await res2.json();
+          const url2 = (json2.thumbnail?.source as string | undefined) ?? null;
+          _wikiImgCache.set(key, url2);
+          return url2;
+        }
+      }
+      _wikiImgCache.set(key, null);
+      return null;
+    }
+    const json = await res.json();
+    const url = (json.thumbnail?.source as string | undefined) ?? null;
+    _wikiImgCache.set(key, url);
+    return url;
+  } catch {
+    _wikiImgCache.set(key, null);
+    return null;
+  }
+}
+
+/** Returns: undefined = still fetching, null = no image found, string = image URL */
+function useWikiImage(title: string, enabled: boolean): string | null | undefined {
+  const query = _extractWikiQuery(title);
+  const cacheKey = query.toLowerCase().trim();
+  const initialValue = !enabled ? null : _wikiImgCache.has(cacheKey) ? _wikiImgCache.get(cacheKey)! : undefined;
+  const [img, setImg] = useState<string | null | undefined>(initialValue);
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || fetchedRef.current) return;
+    if (_wikiImgCache.has(cacheKey)) { setImg(_wikiImgCache.get(cacheKey)); return; }
+    fetchedRef.current = true;
+    let alive = true;
+    _fetchWikiThumb(query).then(url => { if (alive) setImg(url); });
+    return () => { alive = false; };
+  }, [enabled, query, cacheKey]);
+
+  return img;
+}
+
 // ─── Status badges ────────────────────────────────────────────────────────────
 type StatusBadgeType = 'Official' | 'Research' | 'Peer Reviewed' | 'Open Access' | 'Encyclopedia' | 'Video';
 
@@ -199,47 +279,66 @@ function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
   );
 }
 
-// ─── CoverImage — skeleton → fade-in → topic-cover fallback ──────────────────
+// ─── CoverImage — real image first (direct or Wikipedia), clean fallback ─────
 function CoverImage({ src, alt, title, lm }: { src?: string; alt: string; title: string; lm?: boolean }) {
+  // Only reach out to Wikipedia when the item has no direct image
+  const needsWiki = !src;
+  const wikiImg = useWikiImage(title, needsWiki);
+
+  const resolvedSrc = src ?? (wikiImg ?? undefined);
+  const isWikiLoading = needsWiki && wikiImg === undefined;
+
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
-  const cover = getTopicCover(title);
-  const showCover = !src || imgFailed;
+
+  // Reset load state whenever the resolved URL changes
+  const prevSrcRef = useRef<string | undefined>(undefined);
+  if (prevSrcRef.current !== resolvedSrc) {
+    prevSrcRef.current = resolvedSrc;
+    // Calling setState during render is the documented derived-state pattern in React.
+    // It triggers a synchronous re-render with reset values before painting.
+    setImgLoaded(false);
+    setImgFailed(false);
+  }
+
+  const showSkeleton = isWikiLoading || (!!resolvedSrc && !imgFailed && !imgLoaded);
+  const showFallback = !isWikiLoading && (!resolvedSrc || imgFailed);
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Skeleton shimmer while loading */}
-      {src && !imgFailed && !imgLoaded && (
-        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#080818]'}`}>
-          <motion.div
+      {/* Thin loading state — no animations, just a flat dark base */}
+      {showSkeleton && (
+        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
+      )}
+
+      {/* Clean static fallback — no icons, no symbols, no animated backgrounds */}
+      {showFallback && (
+        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#0a0a18]'}`}>
+          {/* Very subtle noise texture via a fine dot pattern at near-zero opacity */}
+          <div
             className="absolute inset-0"
-            style={{ background: lm ? 'linear-gradient(90deg,transparent,rgba(0,0,0,0.045),transparent)' : 'linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)' }}
-            animate={{ x: ['-100%','200%'] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              background: lm
+                ? 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, transparent 100%)'
+                : 'linear-gradient(160deg, rgba(255,255,255,0.018) 0%, transparent 100%)',
+            }}
           />
+          {/* Title text as ghost watermark at the bottom */}
+          <div
+            className="absolute bottom-0 inset-x-0 px-3 pb-2 pt-6"
+            style={{ background: lm ? 'linear-gradient(to top,rgba(0,0,0,0.06),transparent)' : 'linear-gradient(to top,rgba(0,0,0,0.55),transparent)' }}
+          >
+            <p className={`text-[9px] leading-tight line-clamp-2 tracking-wide select-none ${lm ? 'text-gray-400' : 'text-white/18'}`}>
+              {title}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Topic cover (no image or failed) */}
-      {showCover && (
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center"
-          style={{ background: `linear-gradient(135deg, ${cover.from} 0%, ${cover.via} 50%, ${cover.to} 100%)` }}
-        >
-          {/* Radial glow */}
-          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, ${cover.accent}28 0%, transparent 65%)` }} />
-          {/* Subtle dot grid */}
-          <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
-          {/* Symbol */}
-          <span className="relative text-[56px] leading-none font-light select-none pointer-events-none" style={{ color: cover.accent, opacity: 0.32, fontFamily: 'Georgia, "Times New Roman", serif' }}>{cover.symbol}</span>
-          <span className="relative mt-2 text-[8px] uppercase tracking-[0.35em] font-semibold pointer-events-none" style={{ color: cover.accent, opacity: 0.4 }}>{cover.label}</span>
-        </div>
-      )}
-
-      {/* Actual image with fade-in */}
-      {src && !imgFailed && (
+      {/* Real image — direct src or Wikipedia thumbnail, fades in on load */}
+      {resolvedSrc && !imgFailed && (
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
@@ -302,18 +401,23 @@ function NoImagePlaceholder({ source, lm }: { source: UnifiedItem['source']; lm?
   );
 }
 
-// ─── ExtNoImagePlaceholder (used in modals — topic-cover aware) ───────────────
-function ExtNoImagePlaceholder({ source, title, lm }: { source: string; title?: string; lm?: boolean }) {
-  const cover = getTopicCover(title ?? source);
+// ─── ExtNoImagePlaceholder (used in modals) — clean static dark glass ─────────
+function ExtNoImagePlaceholder({ title, lm }: { source: string; title?: string; lm?: boolean }) {
   return (
-    <div
-      className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: `linear-gradient(135deg, ${cover.from} 0%, ${cover.via} 50%, ${cover.to} 100%)` }}
-    >
-      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, ${cover.accent}28 0%, transparent 65%)` }} />
-      <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
-      <span className="relative text-[56px] leading-none font-light select-none" style={{ color: cover.accent, opacity: 0.3, fontFamily: 'Georgia, serif' }}>{cover.symbol}</span>
-      <span className="relative mt-2 text-[8px] uppercase tracking-[0.35em] font-semibold" style={{ color: cover.accent, opacity: 0.38 }}>{cover.label}</span>
+    <div className={`w-full h-full relative overflow-hidden flex items-end ${lm ? 'bg-gray-100' : 'bg-[#0a0a18]'}`}>
+      <div
+        className="absolute inset-0"
+        style={{
+          background: lm
+            ? 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, transparent 100%)'
+            : 'linear-gradient(160deg, rgba(255,255,255,0.018) 0%, transparent 100%)',
+        }}
+      />
+      {title && (
+        <p className={`relative px-4 pb-3 text-[10px] leading-snug line-clamp-2 tracking-wide select-none ${lm ? 'text-gray-400' : 'text-white/18'}`}>
+          {title}
+        </p>
+      )}
     </div>
   );
 }
@@ -529,12 +633,40 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
   );
 }
 
-// ─── Research / Book row card — premium with topic cover accent ────────────────
+// ─── Research thumbnail strip — Wikipedia image or clean dark fallback ───────
+function ResearchThumb({ title, lm }: { title: string; lm?: boolean }) {
+  const wikiImg = useWikiImage(title, true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className={`relative flex-shrink-0 w-16 sm:w-20 self-stretch overflow-hidden ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`}>
+      {/* Real Wikipedia image */}
+      {wikiImg && !failed && (
+        <img
+          src={wikiImg}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+          style={{ opacity: loaded ? 1 : 0 }}
+        />
+      )}
+      {/* Subtle right-edge scrim so it blends into card body */}
+      {wikiImg && !failed && loaded && (
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, transparent 60%, rgba(0,0,0,0.35))' }} />
+      )}
+    </div>
+  );
+}
+
+// ─── Research / Book row card ──────────────────────────────────────────────────
 function ResearchRowCard({ item, idx, onOpen, lm }: {
   item: SectionItem; idx: number; onOpen: () => void; lm?: boolean;
 }) {
   const statusBadges = getStatusBadges(item.source);
-  const cover = getTopicCover(item.title);
 
   return (
     <motion.div
@@ -550,18 +682,11 @@ function ResearchRowCard({ item, idx, onOpen, lm }: {
           : 'bg-[#0b0b18]/60 border-white/[0.07] hover:border-white/[0.16] hover:bg-[#0d0d1e]/80 backdrop-blur-sm hover:-translate-y-0.5'
       }`}
     >
-      {/* Left accent bar */}
-      <div className="flex-shrink-0 w-0.5 rounded-l-2xl" style={{ background: `linear-gradient(to bottom, ${cover.accent}90, ${cover.accent}30)` }} />
+      {/* Left accent bar — single pixel, neutral */}
+      <div className={`flex-shrink-0 w-0.5 rounded-l-2xl ${lm ? 'bg-gray-200' : 'bg-white/[0.10]'}`} />
 
-      {/* Thumbnail strip — topic cover miniature */}
-      <div
-        className="relative flex-shrink-0 w-16 sm:w-20 self-stretch flex flex-col items-center justify-center overflow-hidden"
-        style={{ background: `linear-gradient(160deg, ${cover.from} 0%, ${cover.via} 100%)` }}
-      >
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 50%, ${cover.accent}30 0%, transparent 70%)` }} />
-        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
-        <span className="relative text-[22px] leading-none select-none" style={{ color: cover.accent, opacity: 0.45, fontFamily: 'Georgia, serif' }}>{cover.symbol}</span>
-      </div>
+      {/* Thumbnail strip — Wikipedia image or clean dark fallback */}
+      <ResearchThumb title={item.title} lm={lm} />
 
       {/* Body */}
       <div className="flex-1 min-w-0 px-4 py-3.5">
