@@ -427,7 +427,7 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
     >
       {/* Cover — fixed aspect, never empty */}
       <div className="relative w-full aspect-[16/9] flex-shrink-0">
-        <CoverImage src={item.imageUrl} alt={item.title} title={item.title} source={item.source} lm={lm} />
+        <CoverImage src={item.imageUrl ?? ''} alt={item.title ?? ''} lm={lm} />
         {/* Scrim */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent pointer-events-none" />
         {/* Hover shimmer */}
@@ -533,7 +533,7 @@ function ResearchRowCard({ item, idx, onOpen, lm }: {
       <div className={`flex-shrink-0 w-0.5 rounded-l-2xl ${lm ? 'bg-gray-200' : 'bg-white/[0.10]'}`} />
 
       {/* Thumbnail strip — Wikipedia image or source logo */}
-      <ResearchThumb title={item.title} source={item.source} lm={lm} />
+      <ResearchThumb source={item.source} lm={lm} />
 
       {/* Body */}
       <div className="flex-1 min-w-0 px-4 py-3.5">
