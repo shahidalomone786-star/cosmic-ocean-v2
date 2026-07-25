@@ -124,6 +124,125 @@ function extSourceCfg(source: string) {
   };
 }
 
+// ─── Topic cover illustrations (pure CSS — zero external deps) ────────────────
+const TOPIC_COVERS: Record<string, { from: string; via: string; to: string; accent: string; symbol: string; label: string }> = {
+  'quantum':          { from:'#010c1f', via:'#031d4a', to:'#010c1f', accent:'#60a5fa', symbol:'ψ',   label:'Quantum Mechanics' },
+  'relativity':       { from:'#160600', via:'#2e1100', to:'#0a0300', accent:'#fb923c', symbol:'c²',  label:'Relativity' },
+  'cosmology':        { from:'#050010', via:'#0d002a', to:'#030010', accent:'#a78bfa', symbol:'∞',   label:'Cosmology' },
+  'astrophysics':     { from:'#00080f', via:'#001428', to:'#00080f', accent:'#38bdf8', symbol:'✦',   label:'Astrophysics' },
+  'black hole':       { from:'#020005', via:'#070010', to:'#020005', accent:'#c084fc', symbol:'●',   label:'Black Holes' },
+  'string theory':    { from:'#000e08', via:'#001e10', to:'#000e08', accent:'#34d399', symbol:'∿',   label:'String Theory' },
+  'psychology':       { from:'#120008', via:'#240010', to:'#090004', accent:'#f472b6', symbol:'ψ',   label:'Psychology' },
+  'philosophy':       { from:'#080800', via:'#161600', to:'#040400', accent:'#fbbf24', symbol:'φ',   label:'Philosophy' },
+  'neuroscience':     { from:'#021000', via:'#042200', to:'#010a00', accent:'#4ade80', symbol:'⌁',   label:'Neuroscience' },
+  'particle physics': { from:'#08000e', via:'#150020', to:'#05000a', accent:'#e879f9', symbol:'⊕',   label:'Particle Physics' },
+  'dark matter':      { from:'#06000e', via:'#0f001e', to:'#04000a', accent:'#818cf8', symbol:'◌',   label:'Dark Matter' },
+  'dark energy':      { from:'#08000a', via:'#140014', to:'#06000a', accent:'#d946ef', symbol:'Λ',   label:'Dark Energy' },
+  'galaxy':           { from:'#030010', via:'#080020', to:'#030010', accent:'#6366f1', symbol:'⊛',   label:'Galaxy' },
+  'supernova':        { from:'#140200', via:'#2a0600', to:'#080100', accent:'#f97316', symbol:'★',   label:'Supernova' },
+  'neutron star':     { from:'#000814', via:'#001028', to:'#000814', accent:'#67e8f9', symbol:'◎',   label:'Neutron Star' },
+  'telescope':        { from:'#000a14', via:'#001424', to:'#000810', accent:'#0ea5e9', symbol:'◎',   label:'Telescope' },
+  'gravity':          { from:'#080800', via:'#161400', to:'#040400', accent:'#d97706', symbol:'g',   label:'Gravity' },
+  'space':            { from:'#020208', via:'#04041a', to:'#020208', accent:'#818cf8', symbol:'✦',   label:'Space' },
+};
+
+function getTopicCover(text: string) {
+  const lower = text.toLowerCase();
+  for (const [key, cfg] of Object.entries(TOPIC_COVERS)) {
+    if (lower.includes(key)) return cfg;
+  }
+  return { from:'#030310', via:'#060622', to:'#030310', accent:'#6366f1', symbol:'◈', label:'Science' };
+}
+
+// ─── Status badges ────────────────────────────────────────────────────────────
+type StatusBadgeType = 'Official' | 'Research' | 'Peer Reviewed' | 'Open Access' | 'Encyclopedia' | 'Video';
+
+const STATUS_CFG: Record<StatusBadgeType, { dot: string; darkCls: string; lightCls: string }> = {
+  'Official':      { dot:'#38bdf8', darkCls:'bg-sky-500/15 border-sky-400/25 text-sky-300',         lightCls:'bg-sky-50 border-sky-200 text-sky-700' },
+  'Research':      { dot:'#34d399', darkCls:'bg-emerald-500/15 border-emerald-400/25 text-emerald-300', lightCls:'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  'Peer Reviewed': { dot:'#a78bfa', darkCls:'bg-violet-500/15 border-violet-400/25 text-violet-300', lightCls:'bg-violet-50 border-violet-200 text-violet-700' },
+  'Open Access':   { dot:'#fbbf24', darkCls:'bg-amber-400/12 border-amber-300/20 text-amber-300',   lightCls:'bg-amber-50 border-amber-200 text-amber-700' },
+  'Encyclopedia':  { dot:'#fb923c', darkCls:'bg-orange-500/12 border-orange-400/20 text-orange-300', lightCls:'bg-orange-50 border-orange-200 text-orange-700' },
+  'Video':         { dot:'#f87171', darkCls:'bg-red-500/15 border-red-400/25 text-red-300',         lightCls:'bg-red-50 border-red-200 text-red-700' },
+};
+
+function getStatusBadges(source: string): StatusBadgeType[] {
+  switch (source) {
+    case 'nasa':            return ['Official'];
+    case 'esa':             return ['Official'];
+    case 'wiki':            return ['Encyclopedia'];
+    case 'arxiv':           return ['Research', 'Open Access'];
+    case 'openalex':        return ['Research', 'Open Access'];
+    case 'semanticscholar': return ['Research', 'Peer Reviewed'];
+    case 'inspirehep':      return ['Research', 'Peer Reviewed'];
+    case 'book':            return ['Research'];
+    default:                return ['Research'];
+  }
+}
+
+function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
+  const { dot, darkCls, lightCls } = STATUS_CFG[type];
+  return (
+    <span className={`inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border backdrop-blur-md flex-shrink-0 ${lm ? lightCls : darkCls}`}>
+      <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: dot }} />
+      {type}
+    </span>
+  );
+}
+
+// ─── CoverImage — skeleton → fade-in → topic-cover fallback ──────────────────
+function CoverImage({ src, alt, title, lm }: { src?: string; alt: string; title: string; lm?: boolean }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+  const cover = getTopicCover(title);
+  const showCover = !src || imgFailed;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Skeleton shimmer while loading */}
+      {src && !imgFailed && !imgLoaded && (
+        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#080818]'}`}>
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: lm ? 'linear-gradient(90deg,transparent,rgba(0,0,0,0.045),transparent)' : 'linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)' }}
+            animate={{ x: ['-100%','200%'] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+      )}
+
+      {/* Topic cover (no image or failed) */}
+      {showCover && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center"
+          style={{ background: `linear-gradient(135deg, ${cover.from} 0%, ${cover.via} 50%, ${cover.to} 100%)` }}
+        >
+          {/* Radial glow */}
+          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, ${cover.accent}28 0%, transparent 65%)` }} />
+          {/* Subtle dot grid */}
+          <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+          {/* Symbol */}
+          <span className="relative text-[56px] leading-none font-light select-none pointer-events-none" style={{ color: cover.accent, opacity: 0.32, fontFamily: 'Georgia, "Times New Roman", serif' }}>{cover.symbol}</span>
+          <span className="relative mt-2 text-[8px] uppercase tracking-[0.35em] font-semibold pointer-events-none" style={{ color: cover.accent, opacity: 0.4 }}>{cover.label}</span>
+        </div>
+      )}
+
+      {/* Actual image with fade-in */}
+      {src && !imgFailed && (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          onError={() => setImgFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+          style={{ opacity: imgLoaded ? 1 : 0 }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── SourceBadge (legacy) ─────────────────────────────────────────────────────
 export function SourceBadge({ source, lm }: { source: UnifiedItem['source']; lm?: boolean }) {
   const { icon: Icon, label, darkCls, lightCls } = LEGACY_SOURCE_CONFIG[source];
@@ -174,12 +293,18 @@ function NoImagePlaceholder({ source, lm }: { source: UnifiedItem['source']; lm?
   );
 }
 
-// ─── ExtNoImagePlaceholder (new) ─────────────────────────────────────────────
-function ExtNoImagePlaceholder({ source, lm }: { source: string; lm?: boolean }) {
-  const { icon: Icon } = extSourceCfg(source);
+// ─── ExtNoImagePlaceholder (used in modals — topic-cover aware) ───────────────
+function ExtNoImagePlaceholder({ source, title, lm }: { source: string; title?: string; lm?: boolean }) {
+  const cover = getTopicCover(title ?? source);
   return (
-    <div className={`w-full h-full flex items-center justify-center ${lm ? 'bg-gradient-to-br from-gray-50 to-gray-100' : 'bg-gradient-to-br from-white/[0.03] to-black/20'}`}>
-      <Icon size={38} strokeWidth={1} className={lm ? 'text-gray-300' : 'text-white/15'} />
+    <div
+      className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden"
+      style={{ background: `linear-gradient(135deg, ${cover.from} 0%, ${cover.via} 50%, ${cover.to} 100%)` }}
+    >
+      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, ${cover.accent}28 0%, transparent 65%)` }} />
+      <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+      <span className="relative text-[56px] leading-none font-light select-none" style={{ color: cover.accent, opacity: 0.3, fontFamily: 'Georgia, serif' }}>{cover.symbol}</span>
+      <span className="relative mt-2 text-[8px] uppercase tracking-[0.35em] font-semibold" style={{ color: cover.accent, opacity: 0.38 }}>{cover.label}</span>
     </div>
   );
 }
@@ -302,85 +427,183 @@ function AISummaryCard({ text, lm }: { text: string; lm?: boolean }) {
   );
 }
 
-// ─── Section item card (image + text, for Wikipedia / NASA / ESA) ─────────────
+// ─── Section item card (Wikipedia / NASA / ESA) — premium Apple-quality ───────
 function SectionItemCard({ item, idx, onOpen, lm }: {
   item: SectionItem; idx: number; onOpen: () => void; lm?: boolean;
 }) {
+  const statusBadges = getStatusBadges(item.source);
+  const cfg = extSourceCfg(item.source);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, delay: Math.min((idx % 6) * 0.05, 0.35), ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.32, delay: Math.min((idx % 6) * 0.06, 0.4), ease: [0.16, 1, 0.3, 1] }}
       onClick={onOpen}
-      className={`group relative w-full rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${
+      role="article"
+      aria-label={item.title}
+      className={`group relative w-full h-full flex flex-col rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${
         lm
-          ? 'bg-white border-gray-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(0,0,0,0.13)]'
-          : 'bg-white/[0.035] border-white/[0.07] shadow-[0_2px_20px_rgba(0,0,0,0.45)] hover:border-white/[0.16] hover:-translate-y-1 hover:shadow-[0_16px_44px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.04)]'
+          ? 'bg-white border-gray-200/80 shadow-[0_2px_16px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1.5 hover:shadow-[0_20px_52px_rgba(0,0,0,0.15)]'
+          : 'bg-[#0b0b18]/70 border-white/[0.08] shadow-[0_2px_24px_rgba(0,0,0,0.6)] hover:border-white/[0.18] hover:-translate-y-1.5 hover:shadow-[0_20px_56px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-sm'
       }`}
     >
-      {/* Image */}
-      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/25'}`}>
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.title} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-        ) : (
-          <ExtNoImagePlaceholder source={item.source} lm={lm} />
+      {/* Cover — fixed aspect, never empty */}
+      <div className="relative w-full aspect-[16/9] flex-shrink-0">
+        <CoverImage src={item.imageUrl} alt={item.title} title={item.title} lm={lm} />
+        {/* Scrim */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent pointer-events-none" />
+        {/* Hover shimmer */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+          style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.05) 0%,transparent 55%)' }} />
+        {/* Image zoom on hover */}
+        {item.imageUrl && (
+          <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.04] pointer-events-none" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-2.5 left-2.5"><ExtSourceBadge source={item.source} lm={lm} /></div>
-        {item.date && <span className="absolute top-2.5 right-2.5 text-[9px] text-white/65 bg-black/55 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest font-medium">{item.date.length === 4 ? item.date : item.date.slice(0, 10)}</span>}
-        <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-          <span className="text-[9px] text-white/80 bg-black/65 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-semibold">View details</span>
+        {/* Top row badges */}
+        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1">
+            <ExtSourceBadge source={item.source} lm={lm} />
+            {statusBadges.slice(0, 1).map(b => <StatusBadge key={b} type={b} lm={lm} />)}
+          </div>
+          {item.date && (
+            <span className="flex-shrink-0 text-[8.5px] text-white/75 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest font-medium">
+              {item.date.length === 4 ? item.date : item.date.slice(0, 10)}
+            </span>
+          )}
         </div>
       </div>
-      {/* Text */}
-      <div className="px-4 py-4">
-        <p className={`text-[13.5px] font-semibold leading-snug tracking-[-0.01em] mb-1.5 line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/92'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>{item.title}</p>
-        {item.description && <p className={`text-[12px] leading-relaxed tracking-wide line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/42'}`}>{item.description}</p>}
+
+      {/* Body — grows to fill equal height */}
+      <div className="flex flex-col flex-1 px-4 pt-3 pb-4">
+        {/* Secondary status badges */}
+        {statusBadges.length > 1 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {statusBadges.slice(1).map(b => <StatusBadge key={b} type={b} lm={lm} />)}
+          </div>
+        )}
+        {/* Title */}
+        <p className={`text-[13.5px] font-semibold leading-snug tracking-[-0.01em] line-clamp-2 mb-1.5 ${lm ? 'text-gray-900' : 'text-white/92'}`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}>
+          {item.title}
+        </p>
+        {/* Description */}
+        {item.description && (
+          <p className={`text-[11.5px] leading-relaxed line-clamp-3 flex-1 ${lm ? 'text-gray-500' : 'text-white/40'}`}>
+            {item.description}
+          </p>
+        )}
+        {/* Footer — source label + Open button */}
+        <div className="flex items-center justify-between mt-3 pt-2.5 gap-2"
+          style={{ borderTop: lm ? '1px solid rgba(0,0,0,0.07)' : '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <cfg.icon size={10} strokeWidth={2} className={`flex-shrink-0 ${lm ? 'text-gray-400' : 'text-white/28'}`} />
+            <span className={`text-[9.5px] uppercase tracking-[0.15em] truncate ${lm ? 'text-gray-400' : 'text-white/28'}`}>{cfg.label}</span>
+          </div>
+          <a
+            href={item.url ?? '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            aria-label={`Open ${item.title}`}
+            className={`flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border transition-all duration-200 ${
+              lm
+                ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
+                : 'bg-white/[0.06] border-white/[0.12] text-white/55 hover:bg-white/[0.14] hover:border-white/[0.26] hover:text-white/90'
+            }`}
+          >
+            Open <ExternalLink size={8} strokeWidth={2.5} />
+          </a>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-// ─── Research / Book row card (text-only, dense list) ─────────────────────────
+// ─── Research / Book row card — premium with topic cover accent ────────────────
 function ResearchRowCard({ item, idx, onOpen, lm }: {
   item: SectionItem; idx: number; onOpen: () => void; lm?: boolean;
 }) {
-  const { icon: Icon } = extSourceCfg(item.source);
+  const statusBadges = getStatusBadges(item.source);
+  const cover = getTopicCover(item.title);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(idx * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
       onClick={onOpen}
-      className={`group flex items-start gap-4 rounded-xl border px-5 py-4 cursor-pointer transition-all duration-200 ${
+      role="article"
+      aria-label={item.title}
+      className={`group relative flex items-stretch rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200 ${
         lm
-          ? 'bg-white border-gray-200/80 hover:border-gray-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]'
-          : 'bg-white/[0.025] border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.045]'
+          ? 'bg-white border-gray-200/80 hover:border-gray-300 hover:shadow-[0_6px_28px_rgba(0,0,0,0.09)] hover:-translate-y-0.5'
+          : 'bg-[#0b0b18]/60 border-white/[0.07] hover:border-white/[0.16] hover:bg-[#0d0d1e]/80 backdrop-blur-sm hover:-translate-y-0.5'
       }`}
     >
-      {/* Icon chip */}
-      <div className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center mt-0.5 ${lm ? 'bg-gray-50 border border-gray-200' : 'bg-white/[0.05] border border-white/[0.09]'}`}>
-        <Icon size={15} strokeWidth={1.8} className={lm ? 'text-gray-400' : 'text-white/40'} />
+      {/* Left accent bar */}
+      <div className="flex-shrink-0 w-0.5 rounded-l-2xl" style={{ background: `linear-gradient(to bottom, ${cover.accent}90, ${cover.accent}30)` }} />
+
+      {/* Thumbnail strip — topic cover miniature */}
+      <div
+        className="relative flex-shrink-0 w-16 sm:w-20 self-stretch flex flex-col items-center justify-center overflow-hidden"
+        style={{ background: `linear-gradient(160deg, ${cover.from} 0%, ${cover.via} 100%)` }}
+      >
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 50%, ${cover.accent}30 0%, transparent 70%)` }} />
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+        <span className="relative text-[22px] leading-none select-none" style={{ color: cover.accent, opacity: 0.45, fontFamily: 'Georgia, serif' }}>{cover.symbol}</span>
       </div>
+
       {/* Body */}
-      <div className="flex-1 min-w-0">
-        <p className={`text-[13px] font-semibold leading-snug tracking-[-0.01em] mb-1 line-clamp-2 group-hover:opacity-80 transition-opacity ${lm ? 'text-gray-900' : 'text-white/90'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>{item.title}</p>
-        {item.description && <p className={`text-[11.5px] leading-relaxed line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/38'}`}>{item.description}</p>}
+      <div className="flex-1 min-w-0 px-4 py-3.5">
+        {/* Badges */}
+        <div className="flex flex-wrap items-center gap-1 mb-1.5">
+          <ExtSourceBadge source={item.source} lm={lm} />
+          {statusBadges.slice(0, 2).map(b => <StatusBadge key={b} type={b} lm={lm} />)}
+        </div>
+        {/* Title */}
+        <p className={`text-[13px] font-semibold leading-snug tracking-[-0.01em] mb-1 line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/90'}`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}>
+          {item.title}
+        </p>
+        {/* Description */}
+        {item.description && (
+          <p className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/35'}`}>{item.description}</p>
+        )}
         {/* Meta row */}
-        <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           {item.authors && item.authors.length > 0 && (
-            <span className={`text-[10px] tracking-wide ${lm ? 'text-gray-400' : 'text-white/28'}`}>{item.authors.slice(0, 2).join(', ')}{item.authors.length > 2 ? ' et al.' : ''}</span>
+            <span className={`text-[9.5px] tracking-wide ${lm ? 'text-gray-400' : 'text-white/28'}`}>
+              {item.authors.slice(0, 2).join(', ')}{item.authors.length > 2 ? ' et al.' : ''}
+            </span>
           )}
-          {item.date && <span className={`text-[10px] tabular-nums ${lm ? 'text-gray-400' : 'text-white/25'}`}>{item.date.length === 4 ? item.date : item.date.slice(0, 7)}</span>}
+          {item.date && (
+            <span className={`text-[9.5px] tabular-nums ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+              {item.date.length === 4 ? item.date : item.date.slice(0, 7)}
+            </span>
+          )}
           {item.citationCount !== undefined && item.citationCount > 0 && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${lm ? 'bg-gray-50 border-gray-200 text-gray-400' : 'bg-white/[0.04] border-white/[0.08] text-white/25'}`}>
+            <span className={`text-[8.5px] px-1.5 py-0.5 rounded-full border ${lm ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-white/[0.04] border-white/[0.08] text-white/28'}`}>
               {item.citationCount.toLocaleString()} citations
             </span>
           )}
+          {/* Open button — pushed right */}
+          <a
+            href={item.url ?? '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            aria-label={`Open ${item.title}`}
+            className={`ml-auto flex-shrink-0 inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border transition-all duration-200 ${
+              lm
+                ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
+                : 'bg-white/[0.05] border-white/[0.10] text-white/40 hover:bg-white/[0.12] hover:border-white/[0.22] hover:text-white/85'
+            }`}
+          >
+            Open <ExternalLink size={7} strokeWidth={2.5} />
+          </a>
         </div>
       </div>
-      {/* Arrow */}
-      <ChevronRight size={14} strokeWidth={1.8} className={`flex-shrink-0 mt-1 transition-all duration-200 group-hover:translate-x-0.5 ${lm ? 'text-gray-300 group-hover:text-gray-500' : 'text-white/15 group-hover:text-white/40'}`} />
     </motion.div>
   );
 }
@@ -421,37 +644,121 @@ function RelatedTopics({ topics, onSearch, lm }: {
   );
 }
 
-// ─── Video card ───────────────────────────────────────────────────────────────
+// ─── Video card — premium with skeleton + topic-cover fallback ────────────────
 function VideoCard({ video, idx, onClick, lm }: { video: VideoItem; idx: number; onClick: () => void; lm?: boolean }) {
+  const [thumbLoaded, setThumbLoaded] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const cover = getTopicCover(video.title);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: Math.min(idx * 0.06, 0.4), ease: [0.16, 1, 0.3, 1] }}
       onClick={onClick}
-      className={`group relative w-full rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${lm ? 'bg-white border-gray-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(0,0,0,0.13)]' : 'bg-white/[0.035] border-white/[0.07] shadow-[0_2px_20px_rgba(0,0,0,0.45)] hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_16px_44px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.04)]'}`}
+      role="article"
+      aria-label={video.title}
+      className={`group relative w-full h-full flex flex-col rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${
+        lm
+          ? 'bg-white border-gray-200/80 shadow-[0_2px_16px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1.5 hover:shadow-[0_20px_52px_rgba(0,0,0,0.15)]'
+          : 'bg-[#0b0b18]/70 border-white/[0.08] shadow-[0_2px_24px_rgba(0,0,0,0.6)] hover:border-white/[0.18] hover:-translate-y-1.5 hover:shadow-[0_20px_56px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-sm'
+      }`}
     >
-      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/35'}`}>
-        <img src={video.thumbnail} alt={video.title} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent pointer-events-none" />
+      {/* Thumbnail */}
+      <div className="relative w-full aspect-[16/9] flex-shrink-0 overflow-hidden">
+        {/* Skeleton */}
+        {!thumbLoaded && !thumbFailed && (
+          <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#080818]'}`}>
+            <motion.div
+              className="absolute inset-0"
+              style={{ background: lm ? 'linear-gradient(90deg,transparent,rgba(0,0,0,0.04),transparent)' : 'linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)' }}
+              animate={{ x: ['-100%','200%'] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            {/* Center play ghost */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-12 h-12 rounded-full border ${lm ? 'border-gray-200' : 'border-white/[0.08]'}`} />
+            </div>
+          </div>
+        )}
+        {/* Topic cover fallback */}
+        {thumbFailed && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${cover.from} 0%, ${cover.via} 50%, ${cover.to} 100%)` }}
+          >
+            <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, ${cover.accent}25 0%, transparent 65%)` }} />
+            <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+            <span className="relative text-[50px] leading-none select-none" style={{ color: cover.accent, opacity: 0.28, fontFamily: 'Georgia, serif' }}>{cover.symbol}</span>
+          </div>
+        )}
+        {/* YouTube thumbnail */}
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          loading="lazy"
+          onLoad={() => setThumbLoaded(true)}
+          onError={() => setThumbFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-[1.04]"
+          style={{ opacity: thumbLoaded ? 1 : 0 }}
+        />
+        {/* Gradient scrim */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/8 to-transparent pointer-events-none" />
+        {/* Hover shimmer */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+          style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 55%)' }} />
+        {/* Play button */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-white/18 backdrop-blur-sm border border-white/28 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.55)] group-hover:bg-white/32 group-hover:scale-110 group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.8)] transition-all duration-300">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 ml-0.5 fill-white drop-shadow"><polygon points="5,3 19,12 5,21" /></svg>
+          <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] group-hover:bg-white/28 group-hover:scale-110 group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.9)] transition-all duration-300">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 ml-0.5 fill-white drop-shadow-lg"><polygon points="5,3 19,12 5,21" /></svg>
           </div>
         </div>
-        <div className="absolute top-2.5 left-2.5">
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border bg-red-500/25 border-red-400/30 text-red-200/90">
-            <svg viewBox="0 0 24 24" className="w-2 h-2 fill-current"><polygon points="5,3 19,12 5,21" /></svg>
+        {/* Top badges */}
+        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border bg-red-500/22 border-red-400/28 text-red-200/90 backdrop-blur-md">
+            <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
             Video
           </span>
+          <span className="inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border bg-black/35 border-white/15 text-white/60 backdrop-blur-md">
+            YouTube
+          </span>
         </div>
+        {/* Watch now hover pill */}
         <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-          <span className="text-[9px] text-white/80 bg-black/65 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-semibold">Watch now</span>
+          <span className="text-[8.5px] text-white/85 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-semibold">Watch now</span>
         </div>
       </div>
-      <div className="px-4 py-3.5">
-        <p className={`text-[13px] font-semibold leading-snug tracking-[-0.01em] mb-1 line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/92'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>{video.title}</p>
-        {video.channelTitle && <p className={`text-[10.5px] tracking-wide ${lm ? 'text-gray-400' : 'text-white/38'}`}>{video.channelTitle}</p>}
+
+      {/* Text body */}
+      <div className="flex flex-col flex-1 px-4 pt-3 pb-4">
+        <p className={`text-[13px] font-semibold leading-snug tracking-[-0.01em] mb-1 line-clamp-2 flex-1 ${lm ? 'text-gray-900' : 'text-white/92'}`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}>
+          {video.title}
+        </p>
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-2.5 pt-2.5 gap-2"
+          style={{ borderTop: lm ? '1px solid rgba(0,0,0,0.07)' : '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <svg viewBox="0 0 24 24" className={`w-2.5 h-2.5 flex-shrink-0 fill-current ${lm ? 'text-gray-400' : 'text-white/28'}`}><polygon points="5,3 19,12 5,21" /></svg>
+            {video.channelTitle && (
+              <span className={`text-[9.5px] tracking-wide truncate ${lm ? 'text-gray-400' : 'text-white/35'}`}>{video.channelTitle}</span>
+            )}
+          </div>
+          <a
+            href={`https://www.youtube.com/watch?v=${video.videoId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            aria-label={`Watch ${video.title} on YouTube`}
+            className={`flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border transition-all duration-200 ${
+              lm
+                ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
+                : 'bg-white/[0.06] border-white/[0.12] text-white/55 hover:bg-white/[0.14] hover:border-white/[0.26] hover:text-white/90'
+            }`}
+          >
+            Open <ExternalLink size={8} strokeWidth={2.5} />
+          </a>
+        </div>
       </div>
     </motion.div>
   );
@@ -581,7 +888,7 @@ function SectionItemDetailModal({ item, onClose, chatAvatars, onShareToChat, lm 
         <div className="w-full aspect-[16/9] flex-shrink-0 overflow-hidden bg-black/30">
           {item.imageUrl
             ? <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display='none'; }} />
-            : <ExtNoImagePlaceholder source={item.source} lm={lm} />
+            : <ExtNoImagePlaceholder source={item.source} title={item.title} lm={lm} />
           }
         </div>
 
@@ -792,7 +1099,7 @@ export default function NasaSearch({
                 {sections.videos.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Film} label="Cosmic Cinema" sub="YouTube Videos" count={sections.videos.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
                       {sections.videos.map((v, i) => <VideoCard key={v.videoId} video={v} idx={i} lm={lm} onClick={() => onVideoClick?.(v)} />)}
                     </div>
                   </motion.div>
@@ -802,7 +1109,7 @@ export default function NasaSearch({
                 {sections.wikipedia.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                       {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
                     </div>
                   </motion.div>
@@ -822,7 +1129,7 @@ export default function NasaSearch({
                 {sections.nasa.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                       {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
                     </div>
                   </motion.div>
@@ -832,7 +1139,7 @@ export default function NasaSearch({
                 {sections.esa.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                       {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
                     </div>
                   </motion.div>
