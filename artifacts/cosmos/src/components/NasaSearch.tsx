@@ -1,4 +1,4 @@
-import { useState, useEffect, type RefObject } from 'react';
+import { useState, useEffect, useMemo, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
@@ -162,6 +162,14 @@ function getTopicCover(text: string) {
     if (lower.includes(key)) return cfg;
   }
   return { from:'#030310', via:'#060622', to:'#030310', accent:'#6366f1', symbol:'◈', label:'Science' };
+}
+
+// ─── Shorts detection heuristic (no duration metadata available) ──────────────
+// Checks title + description for "#shorts", "shorts" keyword, or related signals.
+// Fails gracefully — ambiguous videos are treated as Long Videos.
+function isShortVideo(video: VideoItem): boolean {
+  const text = `${video.title} ${video.description}`.toLowerCase();
+  return text.includes('#shorts') || text.includes('#short ') || /\bshorts\b/.test(text);
 }
 
 // ─── Status badges ────────────────────────────────────────────────────────────
@@ -626,7 +634,7 @@ function RelatedTopics({ topics, onSearch, lm }: {
 }
 
 // ─── Video card — premium with skeleton + topic-cover fallback ────────────────
-function VideoCard({ video, idx, onClick, lm }: { video: VideoItem; idx: number; onClick: () => void; lm?: boolean }) {
+function VideoCard({ video, idx, onClick, lm, isShort }: { video: VideoItem; idx: number; onClick: () => void; lm?: boolean; isShort?: boolean }) {
   const [thumbLoaded, setThumbLoaded] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
   const cover = getTopicCover(video.title);
@@ -700,9 +708,16 @@ function VideoCard({ video, idx, onClick, lm }: { video: VideoItem; idx: number;
             <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
             Video
           </span>
-          <span className="inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border bg-black/35 border-white/15 text-white/60 backdrop-blur-md">
-            YouTube
-          </span>
+          {isShort ? (
+            <span className="inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border bg-pink-500/22 border-pink-400/30 text-pink-200/90 backdrop-blur-md">
+              <span className="w-1 h-1 rounded-full bg-pink-400 flex-shrink-0" />
+              Shorts
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border bg-black/35 border-white/15 text-white/60 backdrop-blur-md">
+              YouTube
+            </span>
+          )}
         </div>
         {/* Watch now hover pill */}
         <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
@@ -964,6 +979,93 @@ function SectionsLoadingSkeleton({ lm }: { lm?: boolean }) {
   );
 }
 
+// ─── Filter bar ───────────────────────────────────────────────────────────────
+type SearchFilter =
+  | 'all' | 'videos' | 'shorts' | 'longVideos'
+  | 'wikipedia' | 'research' | 'nasa' | 'esa' | 'books' | 'aiSummary';
+
+interface FilterCounts {
+  videos: number; shorts: number; longVideos: number;
+  wikipedia: number; research: number; nasa: number;
+  esa: number; books: number; aiSummary: number;
+}
+
+function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={`flex flex-col items-center gap-4 py-16 ${lm ? 'text-gray-400' : 'text-white/35'}`}
+    >
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${lm ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.04] border-white/[0.08]'}`}>
+        <Telescope size={24} strokeWidth={1.2} className={lm ? 'text-gray-400' : 'text-white/35'} />
+      </div>
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <p className={`text-[13px] font-medium ${lm ? 'text-gray-600' : 'text-white/50'}`}>No {label} found</p>
+        <p className={`text-[11px] uppercase tracking-[0.22em]`}>Try a broader search term</p>
+      </div>
+    </motion.div>
+  );
+}
+
+function SearchFilterBar({
+  active, counts, lm, onChange,
+}: {
+  active: SearchFilter; counts: FilterCounts; lm?: boolean; onChange: (f: SearchFilter) => void;
+}) {
+  type Chip = { id: SearchFilter; label: string; count?: number };
+  const chips: Chip[] = ([
+    { id: 'all'        as SearchFilter, label: 'All' },
+    { id: 'videos'     as SearchFilter, label: 'Videos',      count: counts.videos },
+    { id: 'shorts'     as SearchFilter, label: 'Shorts',      count: counts.shorts },
+    { id: 'longVideos' as SearchFilter, label: 'Long Videos', count: counts.longVideos },
+    { id: 'wikipedia'  as SearchFilter, label: 'Wikipedia',   count: counts.wikipedia },
+    { id: 'research'   as SearchFilter, label: 'Research',    count: counts.research },
+    { id: 'nasa'       as SearchFilter, label: 'NASA',        count: counts.nasa },
+    { id: 'esa'        as SearchFilter, label: 'ESA',         count: counts.esa },
+    { id: 'books'      as SearchFilter, label: 'Books',       count: counts.books },
+    { id: 'aiSummary'  as SearchFilter, label: 'AI Summary',  count: counts.aiSummary },
+  ] as Chip[]).filter(c => c.count === undefined || c.count > 0);
+
+  return (
+    <div className="w-full overflow-x-auto scrollbar-hide -mx-1 px-1 mb-5">
+      <div className="flex items-center gap-1.5 min-w-max py-0.5">
+        {chips.map((chip, i) => {
+          const isActive = active === chip.id;
+          return (
+            <motion.button
+              key={chip.id}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, delay: i * 0.022 }}
+              onClick={() => onChange(chip.id)}
+              className={`flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border whitespace-nowrap transition-all duration-200 ${
+                isActive
+                  ? lm
+                    ? 'bg-gray-900 border-gray-900 text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)]'
+                    : 'bg-white/[0.14] border-white/[0.28] text-white shadow-[0_2px_12px_rgba(0,0,0,0.5)]'
+                  : lm
+                    ? 'bg-white border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-800'
+                    : 'bg-transparent border-white/[0.08] text-white/38 hover:border-white/[0.18] hover:text-white/65 hover:bg-white/[0.04]'
+              }`}
+            >
+              {chip.label}
+              {chip.count !== undefined && chip.count > 0 && (
+                <span className={`text-[8.5px] tabular-nums leading-none ${
+                  isActive
+                    ? lm ? 'text-white/65' : 'text-white/50'
+                    : lm ? 'text-gray-400' : 'text-white/22'
+                }`}>
+                  {chip.count}
+                </span>
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   results:          UnifiedItem[];
@@ -994,6 +1096,28 @@ export default function NasaSearch({
   sections, chatAvatars, onSectionItemShare, onRelatedTopicSearch,
 }: Props) {
   const [selectedSectionItem, setSelectedSectionItem] = useState<SectionItem | null>(null);
+  const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
+
+  // Reset filter whenever the search query changes
+  useEffect(() => { setActiveFilter('all'); }, [sections?.query]);
+
+  // Classify videos into shorts / long for instant client-side filtering
+  const classifiedVideos = useMemo(() => {
+    const vids = sections?.videos ?? [];
+    return { shorts: vids.filter(isShortVideo), long: vids.filter(v => !isShortVideo(v)) };
+  }, [sections]);
+
+  const filterCounts: FilterCounts = useMemo(() => ({
+    videos:     sections?.videos?.length ?? 0,
+    shorts:     classifiedVideos.shorts.length,
+    longVideos: classifiedVideos.long.length,
+    wikipedia:  sections?.wikipedia?.length ?? 0,
+    research:   sections?.research?.length ?? 0,
+    nasa:       sections?.nasa?.length ?? 0,
+    esa:        sections?.esa?.length ?? 0,
+    books:      sections?.books?.length ?? 0,
+    aiSummary:  sections?.aiSummary ? 1 : 0,
+  }), [sections, classifiedVideos]);
 
   if (status === 'idle') return null;
 
@@ -1001,6 +1125,12 @@ export default function NasaSearch({
 
   // ── SECTIONED VIEW (new unified endpoint) ─────────────────────────────────
   if (sections !== undefined && sections !== null) {
+    // Which videos to show depends on the active filter
+    const videosToShow =
+      activeFilter === 'shorts'     ? classifiedVideos.shorts :
+      activeFilter === 'longVideos' ? classifiedVideos.long   :
+      sections.videos;
+
     const hasAny =
       (sections.videos?.length ?? 0) > 0 ||
       (sections.wikipedia?.length ?? 0) > 0 ||
@@ -1052,6 +1182,16 @@ export default function NasaSearch({
               </button>
             </div>
 
+            {/* Filter bar — client-side, instant, no new API calls */}
+            {!isLoading && hasAny && (
+              <SearchFilterBar
+                active={activeFilter}
+                counts={filterCounts}
+                lm={lm}
+                onChange={setActiveFilter}
+              />
+            )}
+
             {/* Loading skeleton */}
             {isLoading && <SectionsLoadingSkeleton lm={lm} />}
 
@@ -1078,54 +1218,50 @@ export default function NasaSearch({
             {/* ── Sections (only when done and has content) ── */}
             {status === 'done' && hasAny && (
               <>
-                {/* 1. AI Summary */}
-                {sections.aiSummary?.text && <AISummaryCard text={sections.aiSummary.text} lm={lm} />}
+                {/* Knowledge panels — All mode only */}
+                {activeFilter === 'all' && (
+                  <>
+                    {sections.aiSummary?.text && <AISummaryCard text={sections.aiSummary.text} lm={lm} />}
+                    <InlineRelatedTopics topics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />
+                    <SuggestedSearches query={sections.query} relatedTopics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />
+                    <LatestResearch research={sections.research ?? []} lm={lm} />
+                    <TrendingResearch research={sections.research ?? []} lm={lm} />
+                    <FeaturedNASA nasa={sections.nasa ?? []} lm={lm} />
+                    <PopularPapers research={sections.research ?? []} books={sections.books ?? []} lm={lm} />
+                  </>
+                )}
 
-                {/* ── New knowledge sections below AI Summary ─────────────────── */}
-                {/* Related Topics (inline, after AI Summary) */}
-                <InlineRelatedTopics
-                  topics={sections.relatedTopics}
-                  onSearch={onRelatedTopicSearch}
-                  lm={lm}
-                />
+                {/* AI Summary — standalone filter mode */}
+                {activeFilter === 'aiSummary' && (
+                  sections.aiSummary?.text
+                    ? <AISummaryCard text={sections.aiSummary.text} lm={lm} />
+                    : <FilterEmptyState label="AI Summary" lm={lm} />
+                )}
 
-                {/* Suggested Searches */}
-                <SuggestedSearches
-                  query={sections.query}
-                  relatedTopics={sections.relatedTopics}
-                  onSearch={onRelatedTopicSearch}
-                  lm={lm}
-                />
-
-                {/* Latest Research */}
-                <LatestResearch research={sections.research ?? []} lm={lm} />
-
-                {/* Trending Research */}
-                <TrendingResearch research={sections.research ?? []} lm={lm} />
-
-                {/* Featured NASA Articles */}
-                <FeaturedNASA nasa={sections.nasa ?? []} lm={lm} />
-
-                {/* Popular Papers */}
-                <PopularPapers
-                  research={sections.research ?? []}
-                  books={sections.books ?? []}
-                  lm={lm}
-                />
-                {/* ── End new knowledge sections ───────────────────────────────── */}
-
-                {/* 2. YouTube Videos */}
-                {sections.videos.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={Film} label="Cosmic Cinema" sub="YouTube Videos" count={sections.videos.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-                      {sections.videos.map((v, i) => <VideoCard key={v.videoId} video={v} idx={i} lm={lm} onClick={() => onVideoClick?.(v)} />)}
-                    </div>
-                  </motion.div>
+                {/* Videos — all / videos / shorts / longVideos */}
+                {(activeFilter === 'all' || activeFilter === 'videos' || activeFilter === 'shorts' || activeFilter === 'longVideos') && (
+                  videosToShow.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader
+                        icon={Film}
+                        label={activeFilter === 'shorts' ? 'YouTube Shorts' : activeFilter === 'longVideos' ? 'Long Videos' : 'Cosmic Cinema'}
+                        sub={activeFilter === 'shorts' ? 'Short-form videos' : activeFilter === 'longVideos' ? 'Long-form YouTube videos' : 'YouTube Videos'}
+                        count={videosToShow.length}
+                        lm={lm}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                        {videosToShow.map((v, i) => (
+                          <VideoCard key={v.videoId} video={v} idx={i} lm={lm} isShort={isShortVideo(v)} onClick={() => onVideoClick?.(v)} />
+                        ))}
+                      </div>
+                    </motion.div>
+                  ) : (activeFilter === 'shorts' || activeFilter === 'longVideos') ? (
+                    <FilterEmptyState label={activeFilter === 'shorts' ? 'Shorts' : 'Long Videos'} lm={lm} />
+                  ) : null
                 )}
 
                 {/* 3. Wikipedia */}
-                {sections.wikipedia.length > 0 && (
+                {(activeFilter === 'all' || activeFilter === 'wikipedia') && sections.wikipedia.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
@@ -1135,7 +1271,7 @@ export default function NasaSearch({
                 )}
 
                 {/* 4. Research Papers */}
-                {sections.research.length > 0 && (
+                {(activeFilter === 'all' || activeFilter === 'research') && sections.research.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
                     <div className="flex flex-col gap-3">
@@ -1145,7 +1281,7 @@ export default function NasaSearch({
                 )}
 
                 {/* 5. NASA */}
-                {sections.nasa.length > 0 && (
+                {(activeFilter === 'all' || activeFilter === 'nasa') && sections.nasa.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
@@ -1155,7 +1291,7 @@ export default function NasaSearch({
                 )}
 
                 {/* 6. ESA */}
-                {sections.esa.length > 0 && (
+                {(activeFilter === 'all' || activeFilter === 'esa') && sections.esa.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
@@ -1165,7 +1301,7 @@ export default function NasaSearch({
                 )}
 
                 {/* 7. Books */}
-                {sections.books.length > 0 && (
+                {(activeFilter === 'all' || activeFilter === 'books') && sections.books.length > 0 && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                     <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
                     <div className="flex flex-col gap-3">
@@ -1174,8 +1310,8 @@ export default function NasaSearch({
                   </motion.div>
                 )}
 
-                {/* 8. Related Topics */}
-                <RelatedTopics topics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />
+                {/* 8. Related Topics — All mode only */}
+                {activeFilter === 'all' && <RelatedTopics topics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />}
 
                 {/* Infinite scroll sentinel */}
                 {(isEverythingMode || sections.hasMore) && (
