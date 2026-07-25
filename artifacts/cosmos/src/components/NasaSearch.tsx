@@ -1,4 +1,4 @@
-import { RefObject, useEffect, useRef, useState } from 'react';
+import { useState, useEffect, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
@@ -164,86 +164,6 @@ function getTopicCover(text: string) {
   return { from:'#030310', via:'#060622', to:'#030310', accent:'#6366f1', symbol:'◈', label:'Science' };
 }
 
-// ─── Wikipedia image cache + fetcher ─────────────────────────────────────────
-const _wikiImgCache = new Map<string, string | null>();
-
-const STOP_WORDS = new Set([
-  'a','an','the','of','for','in','on','at','to','and','or','but',
-  'with','by','from','as','into','via','is','are','was','were',
-  'be','been','being','have','has','had','do','does','did','will',
-  'would','could','should','may','might','shall','its','their',
-  'this','that','these','those','using','based','towards','effect',
-  'effects','study','studies','analysis','approach','method','methods',
-  'new','high','low','large','small','role','roles','between','during',
-]);
-
-function _extractWikiQuery(title: string): string {
-  const words = title
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()));
-  // Take the first 3 meaningful words as the Wikipedia search query
-  return words.slice(0, 3).join(' ');
-}
-
-async function _fetchWikiThumb(query: string): Promise<string | null> {
-  const key = query.toLowerCase().trim();
-  if (_wikiImgCache.has(key)) return _wikiImgCache.get(key)!;
-  if (!key) { _wikiImgCache.set(key, null); return null; }
-  try {
-    const slug = encodeURIComponent(query.replace(/\s+/g, '_'));
-    const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    if (!res.ok) {
-      // Try with just the first keyword as fallback
-      const firstWord = query.split(' ')[0];
-      if (firstWord && firstWord !== query) {
-        const res2 = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstWord)}`,
-          { signal: AbortSignal.timeout(4000) }
-        );
-        if (res2.ok) {
-          const json2 = await res2.json();
-          const url2 = (json2.thumbnail?.source as string | undefined) ?? null;
-          _wikiImgCache.set(key, url2);
-          return url2;
-        }
-      }
-      _wikiImgCache.set(key, null);
-      return null;
-    }
-    const json = await res.json();
-    const url = (json.thumbnail?.source as string | undefined) ?? null;
-    _wikiImgCache.set(key, url);
-    return url;
-  } catch {
-    _wikiImgCache.set(key, null);
-    return null;
-  }
-}
-
-/** Returns: undefined = still fetching, null = no image found, string = image URL */
-function useWikiImage(title: string, enabled: boolean): string | null | undefined {
-  const query = _extractWikiQuery(title);
-  const cacheKey = query.toLowerCase().trim();
-  const initialValue = !enabled ? null : _wikiImgCache.has(cacheKey) ? _wikiImgCache.get(cacheKey)! : undefined;
-  const [img, setImg] = useState<string | null | undefined>(initialValue);
-  const fetchedRef = useRef(false);
-
-  useEffect(() => {
-    if (!enabled || fetchedRef.current) return;
-    if (_wikiImgCache.has(cacheKey)) { setImg(_wikiImgCache.get(cacheKey)); return; }
-    fetchedRef.current = true;
-    let alive = true;
-    _fetchWikiThumb(query).then(url => { if (alive) setImg(url); });
-    return () => { alive = false; };
-  }, [enabled, query, cacheKey]);
-
-  return img;
-}
-
 // ─── Status badges ────────────────────────────────────────────────────────────
 type StatusBadgeType = 'Official' | 'Research' | 'Peer Reviewed' | 'Open Access' | 'Encyclopedia' | 'Video';
 
@@ -280,45 +200,21 @@ function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
   );
 }
 
-// ─── CoverImage — real image → source logo fallback ──────────────────────────
-function CoverImage({ src, alt, title, source = '', lm }: {
-  src?: string; alt: string; title: string; source?: string; lm?: boolean;
-}) {
-  // Only reach out to Wikipedia when the item has no direct image
-  const needsWiki = !src;
-  const wikiImg = useWikiImage(title, needsWiki);
-
-  const resolvedSrc = src ?? (wikiImg ?? undefined);
-  const isWikiLoading = needsWiki && wikiImg === undefined;
-
+// ─── CoverImage — real image only, skeleton while loading ────────────────────
+// Only called when item.imageUrl is confirmed present. No wiki fetch, no logo.
+function CoverImage({ src, alt, lm }: { src: string; alt: string; lm?: boolean }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Reset load state whenever the resolved URL changes
-  const prevSrcRef = useRef<string | undefined>(undefined);
-  if (prevSrcRef.current !== resolvedSrc) {
-    prevSrcRef.current = resolvedSrc;
-    setImgLoaded(false);
-    setImgFailed(false);
-  }
-
-  const showSkeleton = isWikiLoading || (!!resolvedSrc && !imgFailed && !imgLoaded);
-  const showFallback = !isWikiLoading && (!resolvedSrc || imgFailed);
-
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Flat dark base while we wait for Wiki fetch / image load */}
-      {showSkeleton && (
+      {/* Skeleton base — shown while loading or if image URL is broken */}
+      {(!imgLoaded || imgFailed) && (
         <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
       )}
-
-      {/* Premium source-logo fallback */}
-      {showFallback && <SourceLogo source={source} lm={lm} />}
-
-      {/* Real image — fades in on load */}
-      {resolvedSrc && !imgFailed && (
+      {!imgFailed && (
         <img
-          src={resolvedSrc}
+          src={src}
           alt={alt}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
@@ -601,42 +497,14 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
   );
 }
 
-// ─── Research thumbnail strip — Wikipedia image or clean dark fallback ───────
-function ResearchThumb({ title, source, lm }: { title: string; source: string; lm?: boolean }) {
-  const wikiImg = useWikiImage(title, true);
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  // Show logo strip while fetching (undefined) or when no image found (null | failed)
-  const showLogo = wikiImg === null || (wikiImg !== undefined && failed);
-
+// ─── Research thumbnail strip — arXiv logo only; null for all other sources ───
+// Rule: arXiv gets its premium dark logo strip.
+//       Books and all other research sources get no thumbnail at all.
+function ResearchThumb({ source, lm }: { source: string; lm?: boolean }) {
+  if (source !== 'arxiv') return null;
   return (
-    <div className="relative flex-shrink-0 w-16 sm:w-20 self-stretch overflow-hidden">
-      {/* Source logo — shown when wiki returns nothing or image fails */}
-      {showLogo && <SourceLogoStrip source={source} lm={lm} />}
-
-      {/* Flat dark base while fetching */}
-      {wikiImg === undefined && (
-        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
-      )}
-
-      {/* Real Wikipedia image */}
-      {wikiImg && !failed && (
-        <img
-          src={wikiImg}
-          alt=""
-          aria-hidden="true"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-          style={{ opacity: loaded ? 1 : 0 }}
-        />
-      )}
-      {/* Right-edge scrim so thumbnail blends into card body */}
-      {wikiImg && !failed && loaded && (
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, transparent 55%, rgba(0,0,0,0.40))' }} />
-      )}
+    <div className="relative flex-shrink-0 w-[72px] self-stretch overflow-hidden">
+      <SourceLogoStrip source="arxiv" lm={lm} />
     </div>
   );
 }
