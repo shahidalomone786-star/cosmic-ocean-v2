@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
+import { SourceLogo, SourceLogoStrip } from './SourceLogos';
 import {
   KnowledgeCoverage,
   InlineRelatedTopics,
@@ -279,8 +280,10 @@ function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
   );
 }
 
-// ─── CoverImage — real image first (direct or Wikipedia), clean fallback ─────
-function CoverImage({ src, alt, title, lm }: { src?: string; alt: string; title: string; lm?: boolean }) {
+// ─── CoverImage — real image → source logo fallback ──────────────────────────
+function CoverImage({ src, alt, title, source = '', lm }: {
+  src?: string; alt: string; title: string; source?: string; lm?: boolean;
+}) {
   // Only reach out to Wikipedia when the item has no direct image
   const needsWiki = !src;
   const wikiImg = useWikiImage(title, needsWiki);
@@ -295,8 +298,6 @@ function CoverImage({ src, alt, title, lm }: { src?: string; alt: string; title:
   const prevSrcRef = useRef<string | undefined>(undefined);
   if (prevSrcRef.current !== resolvedSrc) {
     prevSrcRef.current = resolvedSrc;
-    // Calling setState during render is the documented derived-state pattern in React.
-    // It triggers a synchronous re-render with reset values before painting.
     setImgLoaded(false);
     setImgFailed(false);
   }
@@ -306,36 +307,15 @@ function CoverImage({ src, alt, title, lm }: { src?: string; alt: string; title:
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Thin loading state — no animations, just a flat dark base */}
+      {/* Flat dark base while we wait for Wiki fetch / image load */}
       {showSkeleton && (
         <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
       )}
 
-      {/* Clean static fallback — no icons, no symbols, no animated backgrounds */}
-      {showFallback && (
-        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#0a0a18]'}`}>
-          {/* Very subtle noise texture via a fine dot pattern at near-zero opacity */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: lm
-                ? 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, transparent 100%)'
-                : 'linear-gradient(160deg, rgba(255,255,255,0.018) 0%, transparent 100%)',
-            }}
-          />
-          {/* Title text as ghost watermark at the bottom */}
-          <div
-            className="absolute bottom-0 inset-x-0 px-3 pb-2 pt-6"
-            style={{ background: lm ? 'linear-gradient(to top,rgba(0,0,0,0.06),transparent)' : 'linear-gradient(to top,rgba(0,0,0,0.55),transparent)' }}
-          >
-            <p className={`text-[9px] leading-tight line-clamp-2 tracking-wide select-none ${lm ? 'text-gray-400' : 'text-white/18'}`}>
-              {title}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Premium source-logo fallback */}
+      {showFallback && <SourceLogo source={source} lm={lm} />}
 
-      {/* Real image — direct src or Wikipedia thumbnail, fades in on load */}
+      {/* Real image — fades in on load */}
       {resolvedSrc && !imgFailed && (
         <img
           src={resolvedSrc}
@@ -401,23 +381,11 @@ function NoImagePlaceholder({ source, lm }: { source: UnifiedItem['source']; lm?
   );
 }
 
-// ─── ExtNoImagePlaceholder (used in modals) — clean static dark glass ─────────
-function ExtNoImagePlaceholder({ title, lm }: { source: string; title?: string; lm?: boolean }) {
+// ─── ExtNoImagePlaceholder (used in modals) — premium source logo ────────────
+function ExtNoImagePlaceholder({ source, lm }: { source: string; title?: string; lm?: boolean }) {
   return (
-    <div className={`w-full h-full relative overflow-hidden flex items-end ${lm ? 'bg-gray-100' : 'bg-[#0a0a18]'}`}>
-      <div
-        className="absolute inset-0"
-        style={{
-          background: lm
-            ? 'linear-gradient(160deg, rgba(0,0,0,0.04) 0%, transparent 100%)'
-            : 'linear-gradient(160deg, rgba(255,255,255,0.018) 0%, transparent 100%)',
-        }}
-      />
-      {title && (
-        <p className={`relative px-4 pb-3 text-[10px] leading-snug line-clamp-2 tracking-wide select-none ${lm ? 'text-gray-400' : 'text-white/18'}`}>
-          {title}
-        </p>
-      )}
+    <div className="w-full h-full relative overflow-hidden">
+      <SourceLogo source={source} lm={lm} />
     </div>
   );
 }
@@ -563,7 +531,7 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
     >
       {/* Cover — fixed aspect, never empty */}
       <div className="relative w-full aspect-[16/9] flex-shrink-0">
-        <CoverImage src={item.imageUrl} alt={item.title} title={item.title} lm={lm} />
+        <CoverImage src={item.imageUrl} alt={item.title} title={item.title} source={item.source} lm={lm} />
         {/* Scrim */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent pointer-events-none" />
         {/* Hover shimmer */}
@@ -634,13 +602,24 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
 }
 
 // ─── Research thumbnail strip — Wikipedia image or clean dark fallback ───────
-function ResearchThumb({ title, lm }: { title: string; lm?: boolean }) {
+function ResearchThumb({ title, source, lm }: { title: string; source: string; lm?: boolean }) {
   const wikiImg = useWikiImage(title, true);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  // Show logo strip while fetching (undefined) or when no image found (null | failed)
+  const showLogo = wikiImg === null || (wikiImg !== undefined && failed);
+
   return (
-    <div className={`relative flex-shrink-0 w-16 sm:w-20 self-stretch overflow-hidden ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`}>
+    <div className="relative flex-shrink-0 w-16 sm:w-20 self-stretch overflow-hidden">
+      {/* Source logo — shown when wiki returns nothing or image fails */}
+      {showLogo && <SourceLogoStrip source={source} lm={lm} />}
+
+      {/* Flat dark base while fetching */}
+      {wikiImg === undefined && (
+        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
+      )}
+
       {/* Real Wikipedia image */}
       {wikiImg && !failed && (
         <img
@@ -654,9 +633,9 @@ function ResearchThumb({ title, lm }: { title: string; lm?: boolean }) {
           style={{ opacity: loaded ? 1 : 0 }}
         />
       )}
-      {/* Subtle right-edge scrim so it blends into card body */}
+      {/* Right-edge scrim so thumbnail blends into card body */}
       {wikiImg && !failed && loaded && (
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, transparent 60%, rgba(0,0,0,0.35))' }} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, transparent 55%, rgba(0,0,0,0.40))' }} />
       )}
     </div>
   );
@@ -685,8 +664,8 @@ function ResearchRowCard({ item, idx, onOpen, lm }: {
       {/* Left accent bar — single pixel, neutral */}
       <div className={`flex-shrink-0 w-0.5 rounded-l-2xl ${lm ? 'bg-gray-200' : 'bg-white/[0.10]'}`} />
 
-      {/* Thumbnail strip — Wikipedia image or clean dark fallback */}
-      <ResearchThumb title={item.title} lm={lm} />
+      {/* Thumbnail strip — Wikipedia image or source logo */}
+      <ResearchThumb title={item.title} source={item.source} lm={lm} />
 
       {/* Body */}
       <div className="flex-1 min-w-0 px-4 py-3.5">
