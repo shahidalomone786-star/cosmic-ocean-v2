@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite } from 'lucide-react';
-import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus } from './components/NasaSearch';
+import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 import GrandmasterChessModal from './components/GrandmasterChess';
@@ -1815,6 +1815,7 @@ export default function App() {
   const [isEverythingMode, setIsEverythingMode] = useState(false);
   const [isLoadingMore,    setIsLoadingMore]    = useState(false);
   const [selectedCard,     setSelectedCard]     = useState<UnifiedItem | null>(null);
+  const [searchSections,   setSearchSections]   = useState<SearchSections | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // ── Portal prefetch state ──────────────────────────────────────────────────
@@ -1906,58 +1907,25 @@ export default function App() {
     setIsEverythingMode(everything);
     setSearchStatus('loading');
     setSearchResults([]);
+    setSearchSections(null);
     setSearchError('');
+    setVideoResults([]);
+    setVideoStatus('idle');
+
+    const actualQuery = everything
+      ? EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)]
+      : term;
+
     try {
-      const nasaTerm  = everything ? 'cosmos' : term;
-      const wikiTerm  = everything ? 'cosmology astronomy' : term;
-      const arxivTerm = everything ? 'cosmology astrophysics' : term;
-
-      const [nasaRes, wikiRes, arxivRes, spacexRes, cernRes] = await Promise.all([
-        fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=1`),
-        fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
-        fetch(`/api/search/arxiv?q=${encodeURIComponent(arxivTerm)}`),
-        fetch(`/api/search/spacex?q=${encodeURIComponent(term)}&everything=${everything ? '1' : '0'}&limit=4`),
-        fetch(`/api/search/cern?q=${encodeURIComponent(term)}`),
-      ]);
-
-      const nasaItems: UnifiedItem[] = nasaRes.ok
-        ? ((await nasaRes.json() as { collection: { items: NasaItem[] } }).collection.items ?? [])
-            .map(item => ({ source: 'nasa' as const, item }))
-        : [];
-
-      const wikiItems: UnifiedItem[] = wikiRes.ok
-        ? Object.values(
-            ((await wikiRes.json() as { query?: { pages?: Record<string, WikiItem> } }).query?.pages) ?? {}
-          ).map(item => ({ source: 'wiki' as const, item }))
-        : [];
-
-      const arxivItems: UnifiedItem[] = arxivRes.ok
-        ? ((await arxivRes.json() as { items?: ArxivItem[] }).items ?? [])
-            .map(item => ({ source: 'arxiv' as const, item }))
-        : [];
-
-      const spacexItems: UnifiedItem[] = spacexRes.ok
-        ? ((await spacexRes.json() as { docs?: SpaceXItem[] }).docs ?? [])
-            .map(item => ({ source: 'spacex' as const, item }))
-        : [];
-
-      const cernItems: UnifiedItem[] = cernRes.ok
-        ? ((await cernRes.json() as { items?: CernItem[] }).items ?? [])
-            .map(item => ({ source: 'cern' as const, item }))
-        : [];
-
-      setSearchResults(interleaveAll(nasaItems, wikiItems, arxivItems, spacexItems, cernItems));
+      const resp = await fetch(
+        `/api/search/unified?q=${encodeURIComponent(actualQuery)}&page=1`
+      );
+      if (!resp.ok) throw new Error(`Search failed (${resp.status})`);
+      const data = await resp.json() as SearchSections;
+      setSearchSections(data);
+      setVideoResults(data.videos ?? []);
+      setVideoStatus('done');
       setSearchStatus('done');
-
-      // ── Fire video search independently (doesn't block article results) ──
-      setVideoStatus('loading');
-      fetch(`/api/search/videos?q=${encodeURIComponent(term)}&limit=8`)
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then((data: { videos?: VideoItem[] }) => {
-          setVideoResults(data.videos ?? []);
-          setVideoStatus('done');
-        })
-        .catch(() => setVideoStatus('error'));
     } catch (err: unknown) {
       setSearchError((err as Error)?.message ?? String(err));
       setSearchStatus('error');
@@ -1965,45 +1933,42 @@ export default function App() {
   }, []);
 
   const loadMore = useCallback(async () => {
-    if (isLoadingMore || !isEverythingMode) return;
+    if (isLoadingMore) return;
+    // Need either sections mode or everything mode to paginate
+    if (!searchSections && !isEverythingMode) return;
     setIsLoadingMore(true);
     try {
-      const nasaTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
-      const wikiTerm = EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
-      const page     = Math.floor(Math.random() * 8) + 1;
-
-      const spacexOffset = Math.floor(Math.random() * 30);
-      const [nasaRes, wikiRes, spacexRes] = await Promise.all([
-        fetch(`https://images-api.nasa.gov/search?q=${encodeURIComponent(nasaTerm)}&media_type=image&page=${page}`),
-        fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(wikiTerm)}&gsrlimit=10&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json&origin=*`),
-        fetch(`/api/search/spacex?q=&everything=1&limit=3&offset=${spacexOffset}`),
-      ]);
-
-      const nasaItems: UnifiedItem[] = nasaRes.ok
-        ? ((await nasaRes.json() as { collection: { items: NasaItem[] } }).collection.items ?? [])
-            .filter(item => item.links?.length)
-            .map(item => ({ source: 'nasa' as const, item }))
-        : [];
-
-      const wikiItems: UnifiedItem[] = wikiRes.ok
-        ? Object.values(
-            ((await wikiRes.json() as { query?: { pages?: Record<string, WikiItem> } }).query?.pages) ?? {}
-          ).map(item => ({ source: 'wiki' as const, item }))
-        : [];
-
-      const spacexItems: UnifiedItem[] = spacexRes?.ok
-        ? ((await spacexRes.json() as { docs?: SpaceXItem[] }).docs ?? [])
-            .map(item => ({ source: 'spacex' as const, item }))
-        : [];
-
-      setSearchResults(prev => [...prev, ...interleaveAll(nasaItems, wikiItems, spacexItems)]);
+      const currentPage = searchSections?.page ?? 1;
+      const q = searchSections?.query
+        ?? EVERYTHING_TERMS[Math.floor(Math.random() * EVERYTHING_TERMS.length)];
+      const resp = await fetch(
+        `/api/search/unified?q=${encodeURIComponent(q)}&page=${currentPage + 1}`
+      );
+      if (!resp.ok) return;
+      const data = await resp.json() as SearchSections;
+      setSearchSections(prev => {
+        if (!prev) return data;
+        return {
+          ...data,
+          page:          data.page,
+          aiSummary:     prev.aiSummary,    // keep original AI summary
+          videos:        prev.videos,        // keep original videos
+          relatedTopics: prev.relatedTopics, // keep original topics
+          wikipedia: [...prev.wikipedia, ...data.wikipedia],
+          research:  [...prev.research,  ...data.research],
+          nasa:      [...prev.nasa,      ...data.nasa],
+          esa:       [...prev.esa,       ...data.esa],
+          books:     [...prev.books,     ...data.books],
+        };
+      });
     } catch { /* silently swallow */ }
     finally { setIsLoadingMore(false); }
-  }, [isLoadingMore, isEverythingMode]);
+  }, [isLoadingMore, searchSections, isEverythingMode]);
 
   const clearSearch = useCallback(() => {
     setNasaQuery('');
     setSearchResults([]);
+    setSearchSections(null);
     setSearchStatus('idle');
     setSearchError('');
     setIsEverythingMode(false);
@@ -2383,6 +2348,19 @@ export default function App() {
                   videoStatus={videoStatus}
                   onVideoClick={setActiveVideo}
                   lm={lm}
+                  sections={searchSections}
+                  chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+                  onSectionItemShare={(avatarName, title, desc, src) => {
+                    openChatWithContext(avatarName, {
+                      title,
+                      description: desc,
+                      source: src as 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern',
+                    });
+                  }}
+                  onRelatedTopicSearch={topic => {
+                    setNasaQuery(topic);
+                    searchAll(topic, 'specific');
+                  }}
                 />
               </div>
             )}

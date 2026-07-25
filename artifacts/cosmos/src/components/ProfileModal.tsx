@@ -98,7 +98,7 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    void supabase
       .from('carrom_history')
       .select('*')
       .eq('user_id', user.id)
@@ -107,8 +107,7 @@ function HistoryView({ onBack, lm }: { onBack: () => void; lm?: boolean }) {
       .then(({ data }) => {
         setCarromRows((data ?? []) as CarromHistoryRow[]);
         setCarromLoading(false);
-      })
-      .catch(() => setCarromLoading(false));
+      }, () => setCarromLoading(false));
   }, [user]);
 
   if (!user) return null;
