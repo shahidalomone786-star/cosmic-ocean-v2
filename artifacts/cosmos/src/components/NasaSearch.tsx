@@ -8,6 +8,15 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
+import {
+  KnowledgeCoverage,
+  InlineRelatedTopics,
+  SuggestedSearches,
+  LatestResearch,
+  TrendingResearch,
+  FeaturedNASA,
+  PopularPapers,
+} from './SearchKnowledgePanel';
 
 // ─── Legacy types (unchanged — keep backward compat) ──────────────────────────
 export type { VideoItem };
@@ -1046,6 +1055,11 @@ export default function NasaSearch({
             transition={{ duration: 0.35, ease: 'easeOut' }}
             className="w-full max-w-2xl pointer-events-auto"
           >
+            {/* Knowledge Coverage — live counts, always above everything */}
+            {status === 'done' && hasAny && (
+              <KnowledgeCoverage sections={sections} lm={lm} />
+            )}
+
             {/* Status bar */}
             <div className="flex items-center justify-between mb-5 px-0.5">
               <div className="flex items-center gap-2 min-w-0">
@@ -1094,6 +1108,39 @@ export default function NasaSearch({
               <>
                 {/* 1. AI Summary */}
                 {sections.aiSummary?.text && <AISummaryCard text={sections.aiSummary.text} lm={lm} />}
+
+                {/* ── New knowledge sections below AI Summary ─────────────────── */}
+                {/* Related Topics (inline, after AI Summary) */}
+                <InlineRelatedTopics
+                  topics={sections.relatedTopics}
+                  onSearch={onRelatedTopicSearch}
+                  lm={lm}
+                />
+
+                {/* Suggested Searches */}
+                <SuggestedSearches
+                  query={sections.query}
+                  relatedTopics={sections.relatedTopics}
+                  onSearch={onRelatedTopicSearch}
+                  lm={lm}
+                />
+
+                {/* Latest Research */}
+                <LatestResearch research={sections.research ?? []} lm={lm} />
+
+                {/* Trending Research */}
+                <TrendingResearch research={sections.research ?? []} lm={lm} />
+
+                {/* Featured NASA Articles */}
+                <FeaturedNASA nasa={sections.nasa ?? []} lm={lm} />
+
+                {/* Popular Papers */}
+                <PopularPapers
+                  research={sections.research ?? []}
+                  books={sections.books ?? []}
+                  lm={lm}
+                />
+                {/* ── End new knowledge sections ───────────────────────────────── */}
 
                 {/* 2. YouTube Videos */}
                 {sections.videos.length > 0 && (
