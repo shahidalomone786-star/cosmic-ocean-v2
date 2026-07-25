@@ -1,5 +1,10 @@
 import { RefObject, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Globe, BookOpen, FileText, Rocket, Atom,
+  Film, LayoutGrid, Telescope, X,
+  type LucideIcon,
+} from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,25 +61,55 @@ export type UnifiedItem =
 
 export type NasaStatus = 'idle' | 'loading' | 'done' | 'error';
 
-// ─── Source badge ──────────────────────────────────────────────────────────────
-const SOURCE_CONFIG: Record<UnifiedItem['source'], { emoji: string; label: string; cls: string }> = {
-  nasa:   { emoji: '🪐', label: 'NASA',      cls: 'bg-sky-500/20 border-sky-400/25 text-sky-300/90'       },
-  wiki:   { emoji: '🔍', label: 'Wikipedia', cls: 'bg-amber-400/15 border-amber-300/20 text-amber-200/90' },
-  arxiv:  { emoji: '📚', label: 'arXiv',    cls: 'bg-emerald-500/15 border-emerald-400/20 text-emerald-300/90' },
-  spacex: { emoji: '🚀', label: 'SpaceX',   cls: 'bg-slate-400/15 border-slate-300/20 text-slate-200/90'  },
-  cern:   { emoji: '⚛️', label: 'CERN',     cls: 'bg-purple-500/15 border-purple-400/20 text-purple-300/90' },
+// ─── Source config ────────────────────────────────────────────────────────────
+const SOURCE_CONFIG: Record<UnifiedItem['source'], {
+  icon: LucideIcon;
+  label: string;
+  darkCls: string;
+  lightCls: string;
+}> = {
+  nasa:   {
+    icon: Globe,     label: 'NASA',
+    darkCls:  'bg-sky-500/20 border-sky-400/25 text-sky-300/90',
+    lightCls: 'bg-sky-50 border-sky-200 text-sky-700',
+  },
+  wiki:   {
+    icon: BookOpen,  label: 'Wikipedia',
+    darkCls:  'bg-amber-400/15 border-amber-300/20 text-amber-200/90',
+    lightCls: 'bg-amber-50 border-amber-200 text-amber-700',
+  },
+  arxiv:  {
+    icon: FileText,  label: 'arXiv',
+    darkCls:  'bg-emerald-500/15 border-emerald-400/20 text-emerald-300/90',
+    lightCls: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  },
+  spacex: {
+    icon: Rocket,    label: 'SpaceX',
+    darkCls:  'bg-slate-400/15 border-slate-300/20 text-slate-200/90',
+    lightCls: 'bg-slate-50 border-slate-200 text-slate-700',
+  },
+  cern:   {
+    icon: Atom,      label: 'CERN',
+    darkCls:  'bg-purple-500/15 border-purple-400/20 text-purple-300/90',
+    lightCls: 'bg-purple-50 border-purple-200 text-purple-700',
+  },
 };
 
-export function SourceBadge({ source }: { source: UnifiedItem['source'] }) {
-  const { emoji, label, cls } = SOURCE_CONFIG[source];
+export function SourceBadge({ source, lm }: { source: UnifiedItem['source']; lm?: boolean }) {
+  const { icon: Icon, label, darkCls, lightCls } = SOURCE_CONFIG[source];
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border backdrop-blur-md ${cls}`}>
-      {emoji} {label}
+    <span
+      className={`inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border backdrop-blur-md ${
+        lm ? lightCls : darkCls
+      }`}
+    >
+      <Icon size={9} strokeWidth={2.5} />
+      {label}
     </span>
   );
 }
 
-// ─── Extract display data from any source ─────────────────────────────────────
+// ─── Extract display data ──────────────────────────────────────────────────────
 function extractDisplay(unified: UnifiedItem): {
   imgUrl?: string; title: string; desc: string; date: string;
 } {
@@ -112,24 +147,182 @@ function extractDisplay(unified: UnifiedItem): {
   }
 }
 
-// ─── Placeholder tile when no image available ─────────────────────────────────
-function NoImagePlaceholder({ source }: { source: UnifiedItem['source'] }) {
-  const glyphs: Record<UnifiedItem['source'], { glyph: string; style: string }> = {
-    nasa:   { glyph: '✦',  style: 'from-sky-900/30 via-black/40 to-transparent text-sky-200/20'     },
-    wiki:   { glyph: 'W',  style: 'from-amber-900/25 via-black/40 to-transparent text-amber-200/20' },
-    arxiv:  { glyph: 'Σ',  style: 'from-emerald-900/25 via-black/40 to-transparent text-emerald-200/20' },
-    spacex: { glyph: '🚀', style: 'from-slate-900/35 via-black/40 to-transparent text-slate-200/20' },
-    cern:   { glyph: '⚛', style: 'from-purple-900/25 via-black/40 to-transparent text-purple-200/20' },
+// ─── No-image placeholder ─────────────────────────────────────────────────────
+function NoImagePlaceholder({ source, lm }: { source: UnifiedItem['source']; lm?: boolean }) {
+  const cfg: Record<UnifiedItem['source'], { Icon: LucideIcon; gradDark: string; gradLight: string; colorDark: string; colorLight: string }> = {
+    nasa:   { Icon: Globe,    gradDark: 'from-sky-950/80 to-black/60',     gradLight: 'from-sky-50 to-sky-100/80',     colorDark: '#38bdf8', colorLight: '#0ea5e9' },
+    wiki:   { Icon: BookOpen, gradDark: 'from-amber-950/70 to-black/60',   gradLight: 'from-amber-50 to-amber-100/80', colorDark: '#fbbf24', colorLight: '#d97706' },
+    arxiv:  { Icon: FileText, gradDark: 'from-emerald-950/70 to-black/60', gradLight: 'from-emerald-50 to-emerald-100/80', colorDark: '#34d399', colorLight: '#059669' },
+    spacex: { Icon: Rocket,   gradDark: 'from-slate-900/80 to-black/60',   gradLight: 'from-slate-50 to-slate-100/80', colorDark: '#94a3b8', colorLight: '#475569' },
+    cern:   { Icon: Atom,     gradDark: 'from-purple-950/70 to-black/60',  gradLight: 'from-purple-50 to-purple-100/80', colorDark: '#c084fc', colorLight: '#9333ea' },
   };
-  const { glyph, style } = glyphs[source];
+  const { Icon, gradDark, gradLight, colorDark, colorLight } = cfg[source];
   return (
-    <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${style}`}>
-      <span className="text-5xl font-thin select-none opacity-60">{glyph}</span>
+    <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${lm ? gradLight : gradDark}`}>
+      <Icon
+        size={40}
+        strokeWidth={1}
+        style={{ color: lm ? colorLight : colorDark, opacity: 0.25 }}
+      />
     </div>
   );
 }
 
-// ─── Detail Modal ──────────────────────────────────────────────────────────────
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+function SkeletonCard({ idx, lm }: { idx: number; lm?: boolean }) {
+  const delay = idx * 0.08;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1,  y: 0  }}
+      transition={{ duration: 0.35, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={`rounded-2xl overflow-hidden border ${
+        lm
+          ? 'bg-white border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
+          : 'border-white/[0.07] bg-white/[0.03]'
+      }`}
+    >
+      {/* Image skeleton */}
+      <div className={`w-full aspect-[16/9] relative overflow-hidden ${lm ? 'bg-gray-100' : 'bg-white/[0.05]'}`}>
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background: lm
+              ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent)'
+              : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent)',
+          }}
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: delay * 0.5 }}
+        />
+      </div>
+      {/* Text skeleton */}
+      <div className="px-5 py-5 flex flex-col gap-2.5">
+        {/* Title line */}
+        <motion.div
+          className={`h-3.5 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`}
+          style={{ width: `${62 + (idx % 3) * 8}%` }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay: delay * 0.3 }}
+        />
+        {/* Desc lines */}
+        <motion.div
+          className={`h-2.5 rounded-full ${lm ? 'bg-gray-100' : 'bg-white/[0.04]'}`}
+          style={{ width: '92%' }}
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay: delay * 0.3 + 0.15 }}
+        />
+        <motion.div
+          className={`h-2.5 rounded-full ${lm ? 'bg-gray-100' : 'bg-white/[0.04]'}`}
+          style={{ width: `${55 + (idx % 2) * 15}%` }}
+          animate={{ opacity: [0.3, 0.7, 0.3] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay: delay * 0.3 + 0.3 }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Skeleton video card ──────────────────────────────────────────────────────
+function SkeletonVideoCard({ idx, lm }: { idx: number; lm?: boolean }) {
+  const delay = idx * 0.1;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={`rounded-2xl overflow-hidden border ${
+        lm
+          ? 'bg-white border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
+          : 'border-white/[0.07] bg-white/[0.03]'
+      }`}
+    >
+      <div className={`w-full aspect-[16/9] relative overflow-hidden ${lm ? 'bg-gray-100' : 'bg-white/[0.05]'}`}>
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background: lm
+              ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent)'
+              : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent)',
+          }}
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: delay * 0.4 }}
+        />
+        {/* Play button ghost */}
+        <div className={`absolute inset-0 flex items-center justify-center`}>
+          <div className={`w-12 h-12 rounded-full border ${lm ? 'border-gray-200 bg-gray-50' : 'border-white/[0.08] bg-white/[0.04]'}`} />
+        </div>
+      </div>
+      <div className="px-4 py-3.5 flex flex-col gap-2">
+        <motion.div
+          className={`h-3 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`}
+          style={{ width: '78%' }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay }}
+        />
+        <motion.div
+          className={`h-2.5 rounded-full ${lm ? 'bg-gray-100' : 'bg-white/[0.04]'}`}
+          style={{ width: '45%' }}
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 1.8, repeat: Infinity, delay: delay + 0.2 }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+function SectionHeader({
+  icon: Icon, label, sub, count, lm,
+}: {
+  icon: LucideIcon; label: string; sub: string; count?: number; lm?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-5 px-0.5">
+      {/* Icon chip */}
+      <div className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center ${
+        lm ? 'bg-gray-100 border border-gray-200' : 'bg-white/[0.07] border border-white/[0.10]'
+      }`}>
+        <Icon size={13} strokeWidth={2} className={lm ? 'text-gray-500' : 'text-white/60'} />
+      </div>
+
+      {/* Labels */}
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span
+          className={`text-[13px] font-semibold tracking-wide flex-shrink-0 ${
+            lm ? 'text-gray-800' : 'text-white/85'
+          }`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}
+        >
+          {label}
+        </span>
+        <span className={`text-[10px] uppercase tracking-[0.2em] truncate ${lm ? 'text-gray-400' : 'text-white/28'}`}>
+          {sub}
+        </span>
+      </div>
+
+      {/* Count pill */}
+      {count !== undefined && (
+        <span className={`flex-shrink-0 text-[9px] font-semibold tabular-nums px-2 py-0.5 rounded-full border ${
+          lm ? 'bg-gray-100 border-gray-200 text-gray-500' : 'bg-white/[0.06] border-white/[0.09] text-white/35'
+        }`}>
+          {count}
+        </span>
+      )}
+
+      {/* Separator line */}
+      <div
+        className="flex-1 h-px min-w-0"
+        style={{
+          background: lm
+            ? 'linear-gradient(90deg, #e5e7eb, transparent)'
+            : 'linear-gradient(90deg, rgba(255,255,255,0.07), transparent)',
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
 export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat, lm }: {
   item: UnifiedItem;
   onClose: () => void;
@@ -186,20 +379,24 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
           </div>
         ) : (
           <div className="w-full aspect-[16/9] flex-shrink-0 overflow-hidden bg-black/30">
-            <NoImagePlaceholder source={unified.source} />
+            <NoImagePlaceholder source={unified.source} lm={lm} />
           </div>
         )}
 
         {/* Info — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide">
           <div className="flex items-center gap-2.5 mb-3">
-            <SourceBadge source={unified.source} />
+            <SourceBadge source={unified.source} lm={lm} />
             {date && (
               <span className="text-[10px] text-white/35 uppercase tracking-[0.22em]">{date}</span>
             )}
           </div>
-          <h2 className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] mb-3 ${lm ? 'text-gray-900' : 'text-white'}`}
-            style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</h2>
+          <h2
+            className={`text-[17px] font-semibold leading-snug tracking-[-0.01em] mb-3 ${lm ? 'text-gray-900' : 'text-white'}`}
+            style={{ fontFamily: 'var(--app-font-heading)' }}
+          >
+            {title}
+          </h2>
           {desc && (
             <p className={`text-[13px] leading-relaxed tracking-wide ${lm ? 'text-gray-600' : 'text-white/55'}`}>{desc}</p>
           )}
@@ -228,7 +425,7 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
           {chatAvatars && onShareToChat && (
             <div className={`mt-6 pt-5 border-t ${lm ? 'border-gray-100' : 'border-white/10'}`}>
               <p className={`text-[9px] uppercase tracking-[0.22em] mb-3 ${lm ? 'text-gray-400' : 'text-white/35'}`}>
-                💬 Discuss with a Scientist
+                Discuss with a Scientist
               </p>
               <div className="flex gap-4">
                 {chatAvatars.map(av => (
@@ -262,7 +459,7 @@ export function DetailModal({ item: unified, onClose, chatAvatars, onShareToChat
   );
 }
 
-// ─── Article Card ──────────────────────────────────────────────────────────────
+// ─── Result card ──────────────────────────────────────────────────────────────
 function ResultCard({ unified, idx, onClick, lm }: {
   unified: UnifiedItem;
   idx: number;
@@ -273,66 +470,79 @@ function ResultCard({ unified, idx, onClick, lm }: {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, delay: Math.min((idx % 12) * 0.04, 0.5) }}
+      transition={{ duration: 0.32, delay: Math.min((idx % 8) * 0.05, 0.4), ease: [0.16, 1, 0.3, 1] }}
       onClick={onClick}
       className={`group relative w-full rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${
         lm
-          ? 'bg-white border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:border-gray-300 hover:-translate-y-[3px] hover:shadow-[0_12px_32px_rgba(0,0,0,0.14)]'
-          : 'bg-white/[0.04] border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.5)] hover:border-white/[0.18] hover:-translate-y-[3px] hover:shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.04)]'
+          ? 'bg-white border-gray-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(0,0,0,0.13)]'
+          : 'bg-white/[0.035] border-white/[0.07] shadow-[0_2px_20px_rgba(0,0,0,0.45)] hover:border-white/[0.16] hover:-translate-y-1 hover:shadow-[0_16px_44px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.04)]'
       }`}
     >
-      {/* Image area */}
-      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/30'}`}>
+      {/* Image */}
+      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/25'}`}>
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={title}
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            onError={e => { (e.currentTarget as HTMLImageElement).parentElement!.style.background = lm ? '#f3f4f6' : '#111'; }}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            onError={e => {
+              (e.currentTarget as HTMLImageElement).parentElement!.replaceChildren();
+              const ph = document.createElement('div');
+              ph.className = 'w-full h-full';
+              (e.currentTarget as HTMLImageElement).parentElement!.appendChild(ph);
+            }}
           />
         ) : (
-          <NoImagePlaceholder source={unified.source} />
+          <NoImagePlaceholder source={unified.source} lm={lm} />
         )}
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        {/* Gradient vignette */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent pointer-events-none" />
 
-        {/* Source badge — top-left over image */}
-        <div className="absolute top-3 left-3">
-          <SourceBadge source={unified.source} />
+        {/* Source badge — top-left */}
+        <div className="absolute top-2.5 left-2.5">
+          <SourceBadge source={unified.source} lm={lm} />
         </div>
 
-        {/* Date badge — top-right */}
+        {/* Date — top-right */}
         {date && (
-          <span className="absolute top-3 right-3 text-[10px] text-white/60 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest">
+          <span className="absolute top-2.5 right-2.5 text-[9px] text-white/65 bg-black/55 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest font-medium">
             {date}
           </span>
         )}
 
-        {/* Hover hint */}
-        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <span className="text-[10px] text-white/70 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase">
+        {/* Hover reveal */}
+        <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+          <span className="text-[9px] text-white/80 bg-black/65 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-semibold">
             View details
           </span>
         </div>
       </div>
 
-      {/* Text */}
-      <div className="px-5 py-5">
-        <p className={`text-[14px] font-medium leading-snug tracking-[0.01em] mb-2 ${lm ? 'text-gray-900' : 'text-white'}`}
-          style={{ fontFamily: 'var(--app-font-heading)' }}>{title}</p>
+      {/* Text body */}
+      <div className="px-4 py-4">
+        <p
+          className={`text-[13.5px] font-semibold leading-snug tracking-[-0.01em] mb-1.5 line-clamp-2 ${
+            lm ? 'text-gray-900' : 'text-white/92'
+          }`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}
+        >
+          {title}
+        </p>
         {desc && (
-          <p className={`text-[12.5px] leading-relaxed tracking-wide line-clamp-3 ${lm ? 'text-gray-500' : 'text-white/50'}`}>{desc}</p>
+          <p className={`text-[12px] leading-relaxed tracking-wide line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/42'}`}>
+            {desc}
+          </p>
         )}
       </div>
     </motion.div>
   );
 }
 
-// ─── Video Card ────────────────────────────────────────────────────────────────
+// ─── Video card ───────────────────────────────────────────────────────────────
 function VideoCard({ video, idx, onClick, lm }: {
   video:   VideoItem;
   idx:     number;
@@ -341,76 +551,69 @@ function VideoCard({ video, idx, onClick, lm }: {
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1,  y: 0  }}
-      transition={{ duration: 0.28, delay: Math.min(idx * 0.06, 0.45) }}
+      transition={{ duration: 0.32, delay: Math.min(idx * 0.06, 0.4), ease: [0.16, 1, 0.3, 1] }}
       onClick={onClick}
       className={`group relative w-full rounded-2xl overflow-hidden border transition-all duration-300 ease-out cursor-pointer transform-gpu ${
         lm
-          ? 'bg-white border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.08)] hover:border-gray-300 hover:-translate-y-[3px] hover:shadow-[0_12px_32px_rgba(0,0,0,0.14)]'
-          : 'bg-white/[0.04] border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.5)] hover:border-white/[0.22] hover:-translate-y-[3px] hover:shadow-[0_16px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.05)]'
+          ? 'bg-white border-gray-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.07)] hover:border-gray-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(0,0,0,0.13)]'
+          : 'bg-white/[0.035] border-white/[0.07] shadow-[0_2px_20px_rgba(0,0,0,0.45)] hover:border-white/[0.20] hover:-translate-y-1 hover:shadow-[0_16px_44px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.04)]'
       }`}
     >
       {/* Thumbnail */}
-      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/40'}`}>
+      <div className={`relative w-full aspect-[16/9] overflow-hidden ${lm ? 'bg-gray-100' : 'bg-black/35'}`}>
         <img
           src={video.thumbnail}
           alt={video.title}
           loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent pointer-events-none" />
 
-        {/* Dark gradient overlay — stays dark on image regardless of lm */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-
-        {/* ▶ Play button */}
+        {/* Play button */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] group-hover:bg-white/35 group-hover:scale-110 group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.8)] transition-all duration-300">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 ml-0.5 fill-white drop-shadow">
+          <div className="w-12 h-12 rounded-full bg-white/18 backdrop-blur-sm border border-white/28 flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.55)] group-hover:bg-white/32 group-hover:scale-110 group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.8)] transition-all duration-300">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 ml-0.5 fill-white drop-shadow">
               <polygon points="5,3 19,12 5,21" />
             </svg>
           </div>
         </div>
 
-        {/* Video badge — top-left */}
-        <div className="absolute top-3 left-3">
-          <span className="inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border bg-red-500/25 border-red-400/30 text-red-200/90">
-            ▶ Video
+        {/* Video badge */}
+        <div className="absolute top-2.5 left-2.5">
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border bg-red-500/25 border-red-400/30 text-red-200/90">
+            <svg viewBox="0 0 24 24" className="w-2 h-2 fill-current"><polygon points="5,3 19,12 5,21" /></svg>
+            Video
           </span>
         </div>
 
-        {/* Hover label */}
-        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <span className="text-[10px] text-white/70 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-medium">
+        {/* Hover reveal */}
+        <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+          <span className="text-[9px] text-white/80 bg-black/65 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-widest uppercase font-semibold">
             Watch now
           </span>
         </div>
       </div>
 
       {/* Text */}
-      <div className="px-4 py-4">
-        <p className={`text-[13px] font-medium leading-snug tracking-[0.01em] mb-1.5 line-clamp-2 ${lm ? 'text-gray-900' : 'text-white'}`}
-          style={{ fontFamily: 'var(--app-font-heading)' }}>{video.title}</p>
+      <div className="px-4 py-3.5">
+        <p
+          className={`text-[13px] font-semibold leading-snug tracking-[-0.01em] mb-1 line-clamp-2 ${
+            lm ? 'text-gray-900' : 'text-white/92'
+          }`}
+          style={{ fontFamily: 'var(--app-font-heading)' }}
+        >
+          {video.title}
+        </p>
         {video.channelTitle && (
-          <p className={`text-[11px] tracking-wide ${lm ? 'text-gray-400' : 'text-white/40'}`}>{video.channelTitle}</p>
+          <p className={`text-[10.5px] tracking-wide ${lm ? 'text-gray-400' : 'text-white/38'}`}>
+            {video.channelTitle}
+          </p>
         )}
       </div>
     </motion.div>
-  );
-}
-
-// ─── Section Divider ──────────────────────────────────────────────────────────
-function SectionHeader({ icon, label, sub, lm }: { icon: string; label: string; sub: string; lm?: boolean }) {
-  return (
-    <div className="flex items-center gap-3 mb-4 px-1">
-      <span className="text-[16px]">{icon}</span>
-      <div className="flex items-baseline gap-2.5">
-        <span className={`text-[13px] font-semibold tracking-wide ${lm ? 'text-gray-700' : 'text-white/80'}`}>{label}</span>
-        <span className={`text-[10px] uppercase tracking-[0.2em] ${lm ? 'text-gray-400' : 'text-white/30'}`}>{sub}</span>
-      </div>
-      <div className={`flex-1 h-px ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`} />
-    </div>
   );
 }
 
@@ -424,14 +627,13 @@ interface Props {
   sentinelRef:      RefObject<HTMLDivElement | null>;
   isEverythingMode: boolean;
   isLoadingMore:    boolean;
-  // Video Media Hub
   videoResults?:    VideoItem[];
   videoStatus?:     'idle' | 'loading' | 'done' | 'error';
   onVideoClick?:    (video: VideoItem) => void;
   lm?:              boolean;
 }
 
-// ─── SearchResults — pure display ─────────────────────────────────────────────
+// ─── SearchResults ────────────────────────────────────────────────────────────
 export default function NasaSearch({
   results, status, errMsg, onClear, onCardClick, sentinelRef, isEverythingMode, isLoadingMore,
   videoResults = [], videoStatus = 'idle', onVideoClick, lm,
@@ -442,125 +644,198 @@ export default function NasaSearch({
     acc[r.source] = (acc[r.source] ?? 0) + 1;
     return acc;
   }, {});
+
   const sourceLabel = (Object.entries(sourceCounts) as [UnifiedItem['source'], number][])
-    .map(([s, n]) => `${SOURCE_CONFIG[s].emoji} ${n} ${SOURCE_CONFIG[s].label}`)
+    .map(([s, n]) => `${n} ${SOURCE_CONFIG[s].label}`)
     .join(' · ');
 
   const showVideos = videoStatus !== 'idle' && (videoResults.length > 0 || videoStatus === 'loading');
+  const isLoading  = status === 'loading';
 
   return (
     <AnimatePresence>
       <motion.div
         key="search-results"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1,  y: 0  }}
-        exit={{ opacity: 0,     y: 12 }}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0  }}
+        exit={{ opacity: 0,   y: 10  }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="w-full max-w-2xl pointer-events-auto"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5 px-1">
-          <span className={`text-[11px] uppercase tracking-[0.2em] ${lm ? 'text-gray-400' : 'text-white/40'}`}>
-            {status === 'loading' ? 'Scanning NASA · Wikipedia · arXiv · SpaceX · CERN…' :
-             status === 'error'   ? 'Transmission error' :
-             results.length === 0 ? 'No signals found' :
-             isEverythingMode
-               ? `${results.length} results — scroll for more`
-               : sourceLabel}
-          </span>
-          <button onClick={onClear}
-            className={`text-[11px] uppercase tracking-widest transition-colors duration-200 ${lm ? 'text-gray-400 hover:text-gray-700' : 'text-white/30 hover:text-white/70'}`}>
-            ✕ Clear
+
+        {/* ── Status bar ── */}
+        <div className="flex items-center justify-between mb-5 px-0.5">
+          <div className="flex items-center gap-2 min-w-0">
+            {isLoading && (
+              <motion.div
+                className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-sky-400"
+                animate={{ opacity: [1, 0.25, 1] }}
+                transition={{ duration: 1.1, repeat: Infinity }}
+              />
+            )}
+            <span className={`text-[10.5px] uppercase tracking-[0.2em] truncate ${
+              lm ? 'text-gray-400' : 'text-white/38'
+            }`}>
+              {isLoading          ? 'Scanning NASA · Wikipedia · arXiv · SpaceX · CERN' :
+               status === 'error' ? 'Transmission error' :
+               results.length === 0 && videoResults.length === 0 ? 'No signals found' :
+               isEverythingMode   ? `${results.length} results · scroll to explore` :
+               sourceLabel}
+            </span>
+          </div>
+          <button
+            onClick={onClear}
+            className={`flex-shrink-0 flex items-center gap-1.5 text-[10px] uppercase tracking-widest ml-4 transition-colors duration-200 ${
+              lm ? 'text-gray-400 hover:text-gray-700' : 'text-white/28 hover:text-white/65'
+            }`}
+          >
+            <X size={10} strokeWidth={2.5} />
+            Clear
           </button>
         </div>
 
-        {/* Loading state */}
-        {status === 'loading' && (
-          <div className="flex justify-center gap-2 py-12">
-            {[0, 1, 2].map(i => (
-              <motion.div key={i} className={`w-2 h-2 rounded-full ${lm ? 'bg-gray-400' : 'bg-white/50'}`}
-                animate={{ opacity: [0.3, 1, 0.3], y: [0, -6, 0] }}
-                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }} />
-            ))}
-          </div>
+        {/* ── Loading — skeleton grid ── */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25 }}
+          >
+            {/* Video skeleton strip */}
+            <div className="mb-8">
+              <div className={`flex items-center gap-2.5 mb-5 px-0.5`}>
+                <div className={`w-7 h-7 rounded-lg ${lm ? 'bg-gray-100 border border-gray-200' : 'bg-white/[0.06] border border-white/[0.08]'}`} />
+                <div className={`h-3 w-28 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`} />
+                <div className="flex-1 h-px" style={{ background: lm ? 'linear-gradient(90deg,#e5e7eb,transparent)' : 'linear-gradient(90deg,rgba(255,255,255,0.07),transparent)' }} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[0, 1].map(i => <SkeletonVideoCard key={i} idx={i} lm={lm} />)}
+              </div>
+            </div>
+
+            {/* Article skeleton grid */}
+            <div>
+              <div className={`flex items-center gap-2.5 mb-5 px-0.5`}>
+                <div className={`w-7 h-7 rounded-lg ${lm ? 'bg-gray-100 border border-gray-200' : 'bg-white/[0.06] border border-white/[0.08]'}`} />
+                <div className={`h-3 w-32 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`} />
+                <div className="flex-1 h-px" style={{ background: lm ? 'linear-gradient(90deg,#e5e7eb,transparent)' : 'linear-gradient(90deg,rgba(255,255,255,0.07),transparent)' }} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[0, 1, 2, 3].map(i => <SkeletonCard key={i} idx={i} lm={lm} />)}
+              </div>
+            </div>
+          </motion.div>
         )}
 
-        {/* Error */}
+        {/* ── Error ── */}
         {status === 'error' && (
-          <p className="text-center text-red-500/80 text-[13px] tracking-wide py-8">{errMsg}</p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className={`flex flex-col items-center gap-3 py-14 ${lm ? 'text-gray-400' : 'text-white/35'}`}
+          >
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${
+              lm ? 'bg-red-50 border-red-100' : 'bg-red-500/10 border-red-500/20'
+            }`}>
+              <X size={18} strokeWidth={1.5} className={lm ? 'text-red-400' : 'text-red-400/70'} />
+            </div>
+            <p className={`text-[11px] uppercase tracking-[0.22em] ${lm ? 'text-gray-400' : 'text-white/35'}`}>
+              Transmission interrupted
+            </p>
+            <p className={`text-[12px] ${lm ? 'text-gray-500' : 'text-white/40'}`}>{errMsg}</p>
+          </motion.div>
         )}
 
-        {/* Empty */}
+        {/* ── Empty ── */}
         {status === 'done' && results.length === 0 && videoResults.length === 0 && (
-          <div className={`flex flex-col items-center gap-3 py-12 ${lm ? 'text-gray-400' : 'text-white/40'}`}>
-            <p className="text-4xl">🔭</p>
-            <p className="text-[12px] uppercase tracking-[0.25em]">No signals found in this region</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`flex flex-col items-center gap-4 py-16 ${lm ? 'text-gray-400' : 'text-white/35'}`}
+          >
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${
+              lm ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.04] border-white/[0.08]'
+            }`}>
+              <Telescope size={24} strokeWidth={1.2} className={lm ? 'text-gray-400' : 'text-white/35'} />
+            </div>
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <p className={`text-[13px] font-medium ${lm ? 'text-gray-600' : 'text-white/50'}`}>
+                No signals detected
+              </p>
+              <p className={`text-[11px] uppercase tracking-[0.22em] ${lm ? 'text-gray-400' : 'text-white/28'}`}>
+                Try a different search term
+              </p>
+            </div>
+          </motion.div>
         )}
 
         {/* ══ COSMIC CINEMA — Video section ══════════════════════════════════ */}
-        {showVideos && (
+        {!isLoading && showVideos && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1,  y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="mb-8"
           >
-            <SectionHeader icon="🎬" label="Cosmic Cinema" sub="YouTube Videos" lm={lm} />
+            <SectionHeader
+              icon={Film}
+              label="Cosmic Cinema"
+              sub="YouTube Videos"
+              count={videoStatus === 'done' ? videoResults.length : undefined}
+              lm={lm}
+            />
 
-            {/* Loading spinner for videos */}
+            {/* Video loading skeleton */}
             {videoStatus === 'loading' && (
-              <div className="flex items-center gap-3 py-6 px-2">
-                <div className="flex gap-1.5">
-                  {[0, 1, 2].map(i => (
-                    <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-red-400/60"
-                      animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.3, 1] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />
-                  ))}
-                </div>
-                <span className={`text-[11px] uppercase tracking-[0.2em] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
-                  Scanning for videos…
-                </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[0, 1].map(i => <SkeletonVideoCard key={i} idx={i} lm={lm} />)}
               </div>
             )}
 
-            {/* 2-column video grid */}
+            {/* Video grid — responsive */}
             {videoStatus === 'done' && videoResults.length > 0 && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {videoResults.slice(0, 8).map((v, i) => (
-                  <VideoCard
-                    key={v.videoId}
-                    video={v}
-                    idx={i}
-                    lm={lm}
-                    onClick={() => onVideoClick?.(v)}
-                  />
+                  <VideoCard key={v.videoId} video={v} idx={i} lm={lm} onClick={() => onVideoClick?.(v)} />
                 ))}
               </div>
             )}
 
-            {/* No videos found */}
+            {/* No videos */}
             {videoStatus === 'done' && videoResults.length === 0 && (
-              <p className={`text-[11px] tracking-wide px-1 pb-2 ${lm ? 'text-gray-400' : 'text-white/25'}`}>
-                No videos found — try a different search term.
+              <p className={`text-[11px] tracking-wide px-0.5 pb-2 ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+                No videos found for this topic.
               </p>
             )}
           </motion.div>
         )}
 
-        {/* ══ ARTICLES & DATA — original results ═════════════════════════════ */}
-        {status === 'done' && results.length > 0 && (
-          <div>
+        {/* ══ ARTICLES & DATA ══════════════════════════════════════════════════ */}
+        {!isLoading && status === 'done' && results.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1,  y: 0 }}
+            transition={{ duration: 0.3, delay: showVideos ? 0.05 : 0, ease: [0.16, 1, 0.3, 1] }}
+          >
             {showVideos && (
-              <SectionHeader icon="📝" label="Articles & Data" sub={sourceLabel} lm={lm} />
+              <SectionHeader
+                icon={LayoutGrid}
+                label="Articles & Data"
+                sub={sourceLabel}
+                count={results.length}
+                lm={lm}
+              />
             )}
-            <div className="flex flex-col gap-5">
+
+            {/* Responsive 2-column grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {results.map((unified, idx) => {
-                const key = unified.source === 'nasa'   ? `nasa-${unified.item.data?.[0]?.title}-${idx}` :
-                            unified.source === 'wiki'   ? `wiki-${unified.item.pageid}-${idx}` :
-                            unified.source === 'arxiv'  ? `arxiv-${unified.item.id}-${idx}` :
-                            unified.source === 'spacex' ? `spacex-${unified.item.id}-${idx}` :
-                            `cern-${unified.item.id}-${idx}`;
+                const key =
+                  unified.source === 'nasa'   ? `nasa-${unified.item.data?.[0]?.title}-${idx}`   :
+                  unified.source === 'wiki'   ? `wiki-${unified.item.pageid}-${idx}`             :
+                  unified.source === 'arxiv'  ? `arxiv-${unified.item.id}-${idx}`                :
+                  unified.source === 'spacex' ? `spacex-${unified.item.id}-${idx}`               :
+                  `cern-${unified.item.id}-${idx}`;
                 return (
                   <ResultCard
                     key={key}
@@ -571,33 +846,45 @@ export default function NasaSearch({
                   />
                 );
               })}
-
-              {/* Infinite scroll sentinel — Everything mode only */}
-              {isEverythingMode && (
-                <div ref={sentinelRef} className="w-full flex flex-col items-center py-6 gap-3">
-                  {isLoadingMore ? (
-                    <>
-                      <div className="flex gap-2">
-                        {[0, 1, 2].map(i => (
-                          <motion.div key={i} className={`w-1.5 h-1.5 rounded-full ${lm ? 'bg-gray-400' : 'bg-white/40'}`}
-                            animate={{ opacity: [0.2, 0.8, 0.2], scale: [1, 1.3, 1] }}
-                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />
-                        ))}
-                      </div>
-                      <span className={`text-[10px] uppercase tracking-[0.25em] ${lm ? 'text-gray-400' : 'text-white/25'}`}>
-                        Loading more results…
-                      </span>
-                    </>
-                  ) : (
-                    <span className={`text-[10px] uppercase tracking-[0.2em] ${lm ? 'text-gray-300' : 'text-white/15'}`}>
-                      Scroll to explore the universe
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
+
+            {/* Infinite scroll sentinel */}
+            {isEverythingMode && (
+              <div ref={sentinelRef} className="w-full flex flex-col items-center py-8 gap-3">
+                {isLoadingMore ? (
+                  <>
+                    {/* Pulsing ring */}
+                    <div className="relative w-8 h-8">
+                      <motion.div
+                        className={`absolute inset-0 rounded-full border ${lm ? 'border-gray-300' : 'border-white/20'}`}
+                        animate={{ scale: [1, 1.5, 1], opacity: [0.8, 0, 0.8] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+                      />
+                      <motion.div
+                        className={`absolute inset-1 rounded-full border ${lm ? 'border-gray-300' : 'border-white/30'}`}
+                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.2, 1] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut', delay: 0.15 }}
+                      />
+                      <div className={`absolute inset-2.5 rounded-full ${lm ? 'bg-gray-400' : 'bg-white/50'}`} />
+                    </div>
+                    <span className={`text-[10px] uppercase tracking-[0.25em] ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+                      Loading more results
+                    </span>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3 w-full max-w-xs">
+                    <div className={`flex-1 h-px ${lm ? 'bg-gray-200' : 'bg-white/[0.06]'}`} />
+                    <span className={`text-[9px] uppercase tracking-[0.22em] flex-shrink-0 ${lm ? 'text-gray-300' : 'text-white/15'}`}>
+                      Scroll to explore
+                    </span>
+                    <div className={`flex-1 h-px ${lm ? 'bg-gray-200' : 'bg-white/[0.06]'}`} />
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
         )}
+
       </motion.div>
     </AnimatePresence>
   );
