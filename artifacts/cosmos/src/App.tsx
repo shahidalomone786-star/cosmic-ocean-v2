@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -2156,23 +2156,23 @@ export default function App() {
                   initial={{ opacity: 0, y: -14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  className={`flex items-center gap-0.5 px-1.5 py-1.5 rounded-full border backdrop-blur-[36px] ${
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-full border backdrop-blur-[44px] ${
                     lm
-                      ? 'bg-white/85 border-black/[0.07] shadow-[0_8px_32px_rgba(0,0,0,0.08),0_1px_0_rgba(255,255,255,0.95)_inset]'
-                      : 'bg-[rgba(10,10,18,0.72)] border-white/[0.09] shadow-[0_8px_40px_rgba(0,0,0,0.7),0_1px_0_rgba(255,255,255,0.05)_inset]'
+                      ? 'bg-white/[0.92] border-black/[0.07] shadow-[0_2px_20px_rgba(0,0,0,0.09),0_1px_0_rgba(255,255,255,0.96)_inset]'
+                      : 'bg-[rgba(6,6,14,0.80)] border-white/[0.10] shadow-[0_2px_20px_rgba(0,0,0,0.85),0_1px_0_rgba(255,255,255,0.06)_inset,0_0_0_1px_rgba(255,255,255,0.025)_inset]'
                   }`}
                 >
                   {/* Library */}
                   <button
                     onClick={() => setShowLibrary(true)}
                     title="Research Library"
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11.5px] font-medium tracking-[0.025em] transition-all duration-200 active:scale-[0.97] ${
                       lm
-                        ? 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.06]'
-                        : 'text-white/50 hover:text-white hover:bg-white/[0.08]'
+                        ? 'text-slate-500 hover:text-slate-900 hover:bg-black/[0.07] active:bg-black/[0.10]'
+                        : 'text-white/45 hover:text-white/95 hover:bg-white/[0.09] active:bg-white/[0.06]'
                     }`}
                   >
-                    <BookOpen size={13} strokeWidth={2} />
+                    <BookOpen size={14} strokeWidth={1.8} />
                     <span>Library</span>
                   </button>
 
@@ -2180,13 +2180,13 @@ export default function App() {
                   <button
                     onClick={() => setShowNexus(true)}
                     title="Cosmic Nexus"
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11.5px] font-medium tracking-[0.025em] transition-all duration-200 active:scale-[0.97] ${
                       lm
-                        ? 'text-violet-600 hover:text-violet-900 hover:bg-violet-500/[0.07]'
-                        : 'text-violet-300/65 hover:text-violet-200 hover:bg-violet-500/[0.10]'
+                        ? 'text-violet-600 hover:text-violet-900 hover:bg-violet-500/[0.08] active:bg-violet-500/[0.12]'
+                        : 'text-violet-300/60 hover:text-violet-200/95 hover:bg-violet-500/[0.11] active:bg-violet-500/[0.07]'
                     }`}
                   >
-                    <Orbit size={13} strokeWidth={2} />
+                    <Orbit size={14} strokeWidth={1.8} />
                     <span>Nexus</span>
                   </button>
 
@@ -2198,13 +2198,13 @@ export default function App() {
                     <button
                       onClick={() => setLangOpen(o => !o)}
                       title="Language"
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-[11.5px] font-medium tracking-[0.025em] transition-all duration-200 active:scale-[0.97] ${
                         lm
-                          ? 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.06]'
-                          : 'text-white/50 hover:text-white hover:bg-white/[0.08]'
+                          ? 'text-slate-500 hover:text-slate-900 hover:bg-black/[0.07] active:bg-black/[0.10]'
+                          : 'text-white/45 hover:text-white/95 hover:bg-white/[0.09] active:bg-white/[0.06]'
                       }`}
                     >
-                      <Globe size={13} strokeWidth={2} />
+                      <Globe size={14} strokeWidth={1.8} />
                       <span className="max-w-[52px] truncate">{language}</span>
                       <ChevronDown size={9} strokeWidth={2.5} className={`flex-shrink-0 transition-transform duration-200 ${langOpen ? 'rotate-180' : ''} ${lm ? 'text-slate-400' : 'text-white/28'}`} />
                     </button>
@@ -2249,13 +2249,13 @@ export default function App() {
                       });
                     }}
                     title={show3D ? 'Disable 3D Background' : 'Enable 3D Background'}
-                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 ${
+                    className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 active:scale-[0.92] ${
                       show3D
-                        ? lm ? 'bg-black/[0.09] text-slate-800' : 'bg-white/[0.13] text-white'
-                        : lm ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.06]' : 'text-white/35 hover:text-white hover:bg-white/[0.08]'
+                        ? lm ? 'bg-black/[0.10] text-slate-800 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)]' : 'bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
+                        : lm ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.07]' : 'text-white/35 hover:text-white/90 hover:bg-white/[0.09]'
                     }`}
                   >
-                    <Layers3 size={14} strokeWidth={2} />
+                    <Layers3 size={14} strokeWidth={1.8} />
                   </button>
 
                   {/* Light / Dark toggle — only when 3D off */}
@@ -2263,13 +2263,13 @@ export default function App() {
                     <button
                       onClick={() => setIsLightMode(m => !m)}
                       title={isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
-                      className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 ${
+                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 active:scale-[0.92] ${
                         lm
-                          ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.06]'
-                          : 'text-white/35 hover:text-white hover:bg-white/[0.08]'
+                          ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.07]'
+                          : 'text-white/35 hover:text-white/90 hover:bg-white/[0.09]'
                       }`}
                     >
-                      {isLightMode ? <Moon size={14} strokeWidth={2} /> : <Sun size={14} strokeWidth={2} />}
+                      {isLightMode ? <Moon size={14} strokeWidth={1.8} /> : <Sun size={14} strokeWidth={1.8} />}
                     </button>
                   )}
                 </motion.div>
@@ -2284,26 +2284,33 @@ export default function App() {
                 hasSearchResults ? 'max-w-2xl' : 'max-w-md'
               }`}
             >
-              <div className={`w-full backdrop-blur-[28px] rounded-full px-6 py-4 transition-all duration-300 ${
+              <div className={`w-full backdrop-blur-[32px] rounded-full px-5 py-3.5 flex items-center gap-3 transition-all duration-300 ${
                 lm
-                  ? 'bg-white/[0.55] border border-black/[0.10] shadow-[0_0_0_1px_rgba(0,0,0,0.04),0_8px_48px_rgba(0,0,0,0.08),0_2px_16px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.90)] focus-within:border-black/[0.18] focus-within:bg-white/[0.70] focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_8px_48px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)]'
-                  : 'bg-white/[0.05] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_8px_48px_rgba(0,0,0,0.7),0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-white/[0.20] focus-within:bg-white/[0.08] focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.07),0_8px_48px_rgba(0,0,0,0.8),0_2px_24px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)]'
+                  ? 'bg-white/[0.60] border border-black/[0.09] shadow-[0_0_0_1px_rgba(0,0,0,0.04),0_8px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] focus-within:border-black/[0.16] focus-within:bg-white/[0.74] focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_10px_48px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)]'
+                  : 'bg-white/[0.055] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_8px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-violet-400/[0.28] focus-within:bg-white/[0.075] focus-within:shadow-[0_0_0_1px_rgba(167,139,250,0.10),0_8px_48px_rgba(0,0,0,0.75),0_0_28px_rgba(139,92,246,0.09),inset_0_1px_0_rgba(255,255,255,0.12)]'
               }`}>
+                <Search
+                  size={16}
+                  strokeWidth={2}
+                  className={`flex-shrink-0 transition-colors duration-200 ${
+                    lm ? 'text-slate-400' : 'text-white/30'
+                  }`}
+                />
                 <input
                   type="text"
                   value={nasaQuery}
-                  placeholder="Search the cosmos..."
+                  placeholder="Search the cosmos…"
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
                   onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
-                  className={`w-full bg-transparent outline-none text-[15px] tracking-wide font-light leading-relaxed ${
-                    lm ? 'text-slate-900 placeholder-slate-400' : 'text-white placeholder-white/40'
+                  className={`flex-1 bg-transparent outline-none text-[15px] tracking-wide font-light leading-relaxed ${
+                    lm ? 'text-slate-900 placeholder-slate-400/75' : 'text-white/95 placeholder-white/28'
                   }`}
                 />
               </div>
 
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2.5">
                 {TAGS.map(tag => {
                   const isEverything = tag === 'Everything';
                   return (
@@ -2318,14 +2325,14 @@ export default function App() {
                           setIsEverythingMode(false);
                         }
                       }}
-                      className={`text-[11px] uppercase tracking-[0.14em] backdrop-blur-[16px] px-3.5 py-1.5 rounded-full transition-all duration-300 ease-out cursor-pointer hover:-translate-y-px ${
+                      className={`text-[11px] uppercase tracking-[0.13em] backdrop-blur-[18px] px-4 py-2 rounded-full transition-all duration-250 ease-out cursor-pointer hover:-translate-y-px active:translate-y-0 active:scale-[0.97] ${
                         lm
                           ? isEverything
-                            ? 'text-slate-800 bg-black/[0.08] border border-black/[0.14] shadow-[0_2px_12px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.80)] hover:bg-black/[0.13] hover:text-slate-900 hover:border-black/[0.22] hover:shadow-[0_4px_20px_rgba(0,0,0,0.12)] font-medium'
-                            : 'text-slate-600 bg-black/[0.05] border border-black/[0.09] shadow-[0_1px_8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.70)] hover:bg-black/[0.09] hover:text-slate-800 hover:border-black/[0.16] hover:shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
+                            ? 'text-slate-800 bg-black/[0.08] border border-black/[0.13] shadow-[0_2px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.82)] hover:bg-black/[0.12] hover:text-slate-900 hover:border-black/[0.20] hover:shadow-[0_4px_22px_rgba(0,0,0,0.13),inset_0_1px_0_rgba(255,255,255,0.90)] font-medium'
+                            : 'text-slate-500 bg-black/[0.04] border border-black/[0.08] shadow-[0_1px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-black/[0.08] hover:text-slate-800 hover:border-black/[0.14] hover:shadow-[0_2px_14px_rgba(0,0,0,0.10),inset_0_1px_0_rgba(255,255,255,0.80)]'
                           : isEverything
-                            ? 'text-white/95 bg-white/[0.09] border border-white/[0.18] shadow-[0_2px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.10)] hover:bg-white/[0.13] hover:text-white hover:border-white/[0.28] hover:shadow-[0_4px_20px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.14)] font-medium'
-                            : 'text-white/55 bg-white/[0.04] border border-white/[0.08] shadow-[0_1px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-white/[0.08] hover:text-white/85 hover:border-white/[0.15] hover:shadow-[0_2px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]'
+                            ? 'text-white/88 bg-white/[0.08] border border-white/[0.16] shadow-[0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.09)] hover:bg-white/[0.12] hover:text-white hover:border-violet-300/[0.24] hover:shadow-[0_4px_22px_rgba(0,0,0,0.55),0_0_18px_rgba(139,92,246,0.12),inset_0_1px_0_rgba(255,255,255,0.13)] font-medium'
+                            : 'text-white/48 bg-white/[0.035] border border-white/[0.07] shadow-[0_1px_8px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.045)] hover:bg-white/[0.075] hover:text-white/82 hover:border-white/[0.13] hover:shadow-[0_2px_14px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.07)]'
                       }`}>
                       {isEverything ? '✦ Everything' : tag}
                     </button>
@@ -2335,13 +2342,13 @@ export default function App() {
 
               {!hasSearchResults && (
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={() => setShowPortal(true)}
-                  className={`mt-1 px-8 py-3 rounded-full border backdrop-blur-[18px] text-[12px] uppercase tracking-[0.28em] font-medium transition-all duration-300 ${
+                  className={`mt-1 px-9 py-3 rounded-full border backdrop-blur-[22px] text-[11.5px] uppercase tracking-[0.30em] font-medium transition-all duration-300 ${
                     lm
-                      ? 'border-black/[0.12] bg-black/[0.06] text-slate-700 shadow-[0_4px_24px_rgba(0,0,0,0.08)] hover:bg-black/[0.10] hover:shadow-[0_4px_32px_rgba(0,0,0,0.14)]'
-                      : 'border-white/[0.14] bg-white/[0.06] text-white/80 shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:shadow-[0_4px_32px_rgba(255,255,255,0.07)]'
+                      ? 'border-black/[0.11] bg-black/[0.05] text-slate-600 shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-black/[0.09] hover:text-slate-800 hover:border-black/[0.17] hover:shadow-[0_6px_28px_rgba(0,0,0,0.13),inset_0_1px_0_rgba(255,255,255,0.82)]'
+                      : 'border-white/[0.12] bg-white/[0.05] text-white/68 shadow-[0_4px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.07)] hover:bg-white/[0.08] hover:text-white/92 hover:border-white/[0.18] hover:shadow-[0_6px_32px_rgba(0,0,0,0.55),0_0_22px_rgba(139,92,246,0.09),inset_0_1px_0_rgba(255,255,255,0.10)]'
                   }`}
                 >
                   Explore Portal ✦
