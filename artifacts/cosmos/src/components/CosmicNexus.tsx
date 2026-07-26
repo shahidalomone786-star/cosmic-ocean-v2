@@ -1450,6 +1450,8 @@ function ShortVideoSlide({ post, onComment, globalMuted, onToggleMute, srcActive
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHORTS TAB — full-screen vertical reel from real short-video posts
+// Virtualized: only active ± 1 slides are fully mounted; all others are
+// lightweight placeholder divs that preserve scroll height without any GPU cost.
 // ─────────────────────────────────────────────────────────────────────────────
 function ShortsTab({ posts, loading, onComment }: {
   posts:     LivePost[];
@@ -1460,10 +1462,39 @@ function ShortsTab({ posts, loading, onComment }: {
 
   // ── Global mute state — persists across slides once user unmutes ──────────
   const [globalMuted,  setGlobalMuted]  = useState(true);
-  // ── Active index — tracks which slide is in view for lazy loading ─────────
+  // ── Active index — primary source of truth for virtualization ────────────
   const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleToggleMute = useCallback(() => setGlobalMuted(m => !m), []);
+
+  // ── Scroll-based active index tracking (passive, 60fps-safe) ─────────────
+  // Uses scrollTop / clientHeight instead of IntersectionObserver so
+  // virtualized placeholder divs can also advance the index.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let rafId = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const slideH = container.clientHeight;
+        if (slideH <= 0) return;
+        const idx = Math.round(container.scrollTop / slideH);
+        setActiveIndex(prev => {
+          const clamped = Math.max(0, Math.min(idx, shorts.length - 1));
+          return prev === clamped ? prev : clamped;
+        });
+      });
+    };
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [shorts.length]);
 
   if (loading) {
     return (
@@ -1489,19 +1520,38 @@ function ShortsTab({ posts, loading, onComment }: {
   }
 
   return (
-    <div className="h-full overflow-y-auto snap-y snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-      {shorts.map((post, idx) => (
-        <ShortVideoSlide
-          key={post.id}
-          post={post}
-          onComment={onComment}
-          globalMuted={globalMuted}
-          onToggleMute={handleToggleMute}
-          // Strict lazy loading: only active slide + immediate next get a src
-          srcActive={idx >= activeIndex && idx <= activeIndex + 1}
-          onBecameActive={() => setActiveIndex(idx)}
-        />
-      ))}
+    <div
+      ref={containerRef}
+      className="h-full overflow-y-auto snap-y snap-mandatory"
+      style={{ scrollbarWidth: 'none', scrollBehavior: 'auto' }}
+    >
+      {shorts.map((post, idx) => {
+        // ── Virtualization: only mount heavy slide within ±1 of active ──────
+        // Every other position gets a zero-cost placeholder that keeps
+        // the scroll height correct for snap-scroll to work.
+        const isNear = Math.abs(idx - activeIndex) <= 1;
+        if (!isNear) {
+          return (
+            <div
+              key={post.id}
+              className="snap-start snap-always h-full w-full flex-shrink-0 bg-black"
+            />
+          );
+        }
+        return (
+          <ShortVideoSlide
+            key={post.id}
+            post={post}
+            onComment={onComment}
+            globalMuted={globalMuted}
+            onToggleMute={handleToggleMute}
+            // Preload src only for active + immediately next slide
+            srcActive={idx >= activeIndex && idx <= activeIndex + 1}
+            // IntersectionObserver inside slide acts as secondary confirmation
+            onBecameActive={() => setActiveIndex(idx)}
+          />
+        );
+      })}
     </div>
   );
 }

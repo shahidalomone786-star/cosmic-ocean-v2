@@ -135,7 +135,7 @@ async function fetchAISummary(query: string): Promise<string | null> {
 async function fetchNASA(query: string, page: number): Promise<SectionItem[]> {
   const url =
     `https://images-api.nasa.gov/search?q=${encodeURIComponent(query)}` +
-    `&media_type=image&page=${page}&page_size=6`;
+    `&media_type=image&page=${page}&page_size=15`;
   const resp = await fetch(url, { signal: timeout(9_000) });
   if (!resp.ok) return [];
 
@@ -145,7 +145,7 @@ async function fetchNASA(query: string, page: number): Promise<SectionItem[]> {
   };
   const data = await resp.json() as { collection?: { items?: NasaHit[] } };
 
-  return (data.collection?.items ?? []).slice(0, 6).map(item => {
+  return (data.collection?.items ?? []).slice(0, 15).map(item => {
     const d = item.data?.[0] ?? {};
     return {
       id: `nasa-${d.nasa_id ?? Math.random().toString(36).slice(2)}`,
@@ -166,10 +166,10 @@ async function fetchNASA(query: string, page: number): Promise<SectionItem[]> {
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
 
 async function fetchWikipedia(query: string, page: number): Promise<SectionItem[]> {
-  const offset = (page - 1) * 6;
+  const offset = (page - 1) * 15;
   const url =
     `https://en.wikipedia.org/w/api.php?action=query&generator=search` +
-    `&gsrsearch=${encodeURIComponent(query)}&gsrlimit=6&gsroffset=${offset}` +
+    `&gsrsearch=${encodeURIComponent(query)}&gsrlimit=15&gsroffset=${offset}` +
     `&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600` +
     `&format=json&origin=*`;
   const resp = await fetch(url, { signal: timeout(9_000) });
@@ -217,7 +217,7 @@ async function fetchESA(query: string, page: number): Promise<SectionItem[]> {
   };
   const data = await resp.json() as { results?: EsaItem[] };
 
-  return (data.results ?? []).slice(0, 6).map(item => {
+  return (data.results ?? []).slice(0, 15).map(item => {
     const imageUrl =
       item.image_url ??
       item.wallpapers?.[0]?.url ??
@@ -239,10 +239,10 @@ async function fetchESA(query: string, page: number): Promise<SectionItem[]> {
 // ── arXiv API ─────────────────────────────────────────────────────────────────
 
 async function fetchArXiv(query: string, page: number): Promise<SectionItem[]> {
-  const start = (page - 1) * 5;
+  const start = (page - 1) * 15;
   const url =
     `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}` +
-    `&max_results=5&start=${start}&sortBy=relevance`;
+    `&max_results=15&start=${start}&sortBy=relevance`;
   const resp = await fetch(url, {
     headers: { Accept: "application/atom+xml" },
     signal: timeout(22_000), // arXiv is slow
@@ -314,7 +314,7 @@ async function fetchOpenAlex(
 ): Promise<{ items: SectionItem[]; concepts: string[] }> {
   const url =
     `https://api.openalex.org/works?search=${encodeURIComponent(query)}` +
-    `&per-page=5&page=${page}&filter=${encodeURIComponent(filter)}` +
+    `&per-page=15&page=${page}&filter=${encodeURIComponent(filter)}` +
     `&sort=relevance_score:desc&mailto=cosmos%40replit.app`;
   const resp = await fetch(url, { signal: timeout(9_000) });
   if (!resp.ok) return { items: [], concepts: [] };
@@ -348,10 +348,10 @@ async function fetchOpenAlex(
 // ── Semantic Scholar API ──────────────────────────────────────────────────────
 
 async function fetchSemanticScholar(query: string, page: number): Promise<SectionItem[]> {
-  const offset = (page - 1) * 5;
+  const offset = (page - 1) * 15;
   const url =
     `https://api.semanticscholar.org/graph/v1/paper/search` +
-    `?query=${encodeURIComponent(query)}&limit=5&offset=${offset}` +
+    `?query=${encodeURIComponent(query)}&limit=15&offset=${offset}` +
     `&fields=title,abstract,authors,year,citationCount,externalIds`;
   const resp = await fetch(url, {
     headers: { "User-Agent": "CosmosScience/1.0" },
@@ -390,7 +390,7 @@ async function fetchSemanticScholar(query: string, page: number): Promise<Sectio
 
 async function fetchInspireHEP(query: string, page: number): Promise<SectionItem[]> {
   const url =
-    `https://inspirehep.net/api/literature?sort=mostrecent&size=5&page=${page}` +
+    `https://inspirehep.net/api/literature?sort=mostrecent&size=15&page=${page}` +
     `&q=${encodeURIComponent(query)}`;
   const resp = await fetch(url, {
     headers: { Accept: "application/json" },
@@ -596,7 +596,7 @@ router.get("/search/unified", async (req, res) => {
     if (seenTitles.has(key)) continue;
     seenTitles.add(key);
     research.push(item);
-    if (research.length >= 12) break;
+    if (research.length >= 50) break;
   }
 
   // Sort by citation count (desc) where available, keep others in insertion order
@@ -618,12 +618,14 @@ router.get("/search/unified", async (req, res) => {
     .map(([name]) => name);
 
   // ── hasMore: true if any source returned a full page ─────────────────────
+  // Thresholds are set at ~2/3 of the per-page limit (15) so a slightly
+  // sparse result still triggers pagination rather than stopping too early.
   const hasMore =
-    nasa.length >= 5 ||
-    wikipedia.length >= 5 ||
-    research.length >= 10 ||
-    esa.length >= 5 ||
-    bookItems.length >= 5;
+    nasa.length >= 10 ||
+    wikipedia.length >= 10 ||
+    research.length >= 25 ||
+    esa.length >= 10 ||
+    bookItems.length >= 10;
 
   const response: SearchResponse = {
     query: q,

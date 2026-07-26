@@ -1018,39 +1018,58 @@ function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
 
 // ─── Immersive Shorts Feed (Reels / TikTok-style) ────────────────────────────
 function ShortsImmersiveFeed({
-  videos, onClose, lm,
+  videos, onClose,
 }: { videos: VideoItem[]; onClose: () => void; lm?: boolean }) {
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdx]       = useState(0);
+  const [muted, setMuted]               = useState(true);   // start muted → autoplay works everywhere
+  const [showUnmuteHint, setShowUnmuteHint] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // ── IntersectionObserver — clean active-slide tracking, no scroll math ──────
   useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idx = Number((entry.target as HTMLElement).dataset.idx);
+            if (!isNaN(idx)) setActiveIdx(idx);
+          }
+        }
+      },
+      { root: container, threshold: 0.55 },
+    );
+    container.querySelectorAll('[data-idx]').forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [videos.length]);
+
+  // ── Auto-hide unmute hint after 3.5s ────────────────────────────────────────
+  useEffect(() => {
+    if (!showUnmuteHint) return;
+    const t = setTimeout(() => setShowUnmuteHint(false), 3500);
+    return () => clearTimeout(t);
+  }, [showUnmuteHint]);
+
+  // ── Keyboard navigation ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const scrollTo = (idx: number) =>
+      scrollRef.current?.scrollTo({ top: idx * (scrollRef.current.clientHeight), behavior: 'smooth' });
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowDown') {
-        setActiveIdx(i => {
-          const next = Math.min(i + 1, videos.length - 1);
-          scrollRef.current?.scrollTo({ top: next * (scrollRef.current?.clientHeight ?? 0), behavior: 'smooth' });
-          return next;
-        });
-      }
-      if (e.key === 'ArrowUp') {
-        setActiveIdx(i => {
-          const prev = Math.max(i - 1, 0);
-          scrollRef.current?.scrollTo({ top: prev * (scrollRef.current?.clientHeight ?? 0), behavior: 'smooth' });
-          return prev;
-        });
-      }
+      if (e.key === 'Escape')    onClose();
+      if (e.key === 'ArrowDown') scrollTo(Math.min(activeIdx + 1, videos.length - 1));
+      if (e.key === 'ArrowUp')   scrollTo(Math.max(activeIdx - 1, 0));
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [onClose, videos.length]);
+  }, [activeIdx, videos.length, onClose]);
 
-  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    const idx = Math.round(el.scrollTop / el.clientHeight);
-    if (idx !== activeIdx) setActiveIdx(idx);
+  function handleUnmute() {
+    setMuted(false);
+    setShowUnmuteHint(false);
   }
 
+  // ── Empty state ──────────────────────────────────────────────────────────────
   if (videos.length === 0) {
     return (
       <motion.div
@@ -1065,112 +1084,169 @@ function ShortsImmersiveFeed({
         </button>
         <Telescope size={40} strokeWidth={1} className="text-white/18" />
         <p className="text-white/40 text-[14px] font-medium">No Shorts found for this topic</p>
-        <p className="text-white/22 text-[11px] uppercase tracking-[0.2em]">Try searching a different topic</p>
+        <p className="text-white/22 text-[11px] uppercase tracking-[0.2em]">Try a different search term</p>
       </motion.div>
     );
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[400] bg-black overflow-hidden"
     >
-      {/* Back button */}
+      {/* ── HUD — Back ─────────────────────────────────────────────────────── */}
       <button
         onClick={onClose}
-        className="absolute top-4 left-4 z-[410] flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/70 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-black/90 hover:border-white/30 transition-all duration-200 text-[12px] font-medium tracking-[0.02em]"
+        className="absolute top-4 left-4 z-[410] flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 text-white/75 hover:text-white hover:bg-black/80 hover:border-white/30 transition-all duration-200 text-[12px] font-medium"
       >
-        <ChevronLeft size={14} strokeWidth={2.5} />
-        Back
+        <ChevronLeft size={14} strokeWidth={2.5} /> Back
       </button>
 
-      {/* Slide counter */}
-      <div className="absolute top-4 right-4 z-[410] px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white/40 text-[11px] font-medium tabular-nums">
-        {activeIdx + 1} / {videos.length}
+      {/* ── HUD — Unmute + Counter (top-right) ─────────────────────────────── */}
+      <div className="absolute top-4 right-4 z-[410] flex items-center gap-2">
+        {/* Mute/Unmute toggle */}
+        <button
+          onClick={handleUnmute}
+          title={muted ? 'Tap to unmute' : 'Sound on'}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border backdrop-blur-xl transition-all duration-200 text-[11.5px] font-medium ${
+            muted
+              ? 'bg-white/[0.12] border-white/25 text-white/80 hover:bg-white/20 hover:text-white'
+              : 'bg-white/[0.06] border-white/10 text-white/35 cursor-default'
+          }`}
+        >
+          {muted ? (
+            /* Muted icon */
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current flex-shrink-0">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
+            </svg>
+          ) : (
+            /* Sound-on icon */
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current flex-shrink-0">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          )}
+          {muted ? 'Unmute' : 'Live'}
+        </button>
+
+        {/* Slide counter */}
+        <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white/40 text-[11px] font-medium tabular-nums">
+          {activeIdx + 1} / {videos.length}
+        </div>
       </div>
 
-      {/* Right-side progress pills */}
-      <div className="absolute top-16 right-4 z-[410] flex flex-col gap-1.5 items-center">
-        {videos.slice(0, 14).map((_, i) => (
+      {/* ── "Tap to unmute" toast ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {muted && showUnmuteHint && (
           <motion.div
+            initial={{ opacity: 0, y: 14, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            onClick={handleUnmute}
+            className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[410] flex items-center gap-2 px-4 py-2.5 rounded-full bg-black/80 backdrop-blur-xl border border-white/20 text-white text-[13px] font-medium cursor-pointer select-none hover:bg-black/90 transition-colors duration-150"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current flex-shrink-0">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
+            </svg>
+            Tap to unmute
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Right-side progress pills (plain CSS transitions — no Framer re-renders) ── */}
+      <div className="absolute top-1/2 -translate-y-1/2 right-3 z-[410] flex flex-col gap-1.5 items-center">
+        {videos.slice(0, 12).map((_, i) => (
+          <div
             key={i}
-            animate={{
+            onClick={() => scrollRef.current?.scrollTo({ top: i * (scrollRef.current.clientHeight), behavior: 'smooth' })}
+            className="rounded-full cursor-pointer"
+            style={{
+              width: '3px',
               height: i === activeIdx ? '22px' : '4px',
-              opacity: i === activeIdx ? 1 : i < activeIdx ? 0.55 : 0.22,
-              backgroundColor: i === activeIdx ? '#ffffff' : 'rgba(255,255,255,0.5)',
-            }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="w-[3px] rounded-full cursor-pointer"
-            onClick={() => {
-              scrollRef.current?.scrollTo({
-                top: i * (scrollRef.current?.clientHeight ?? 0),
-                behavior: 'smooth',
-              });
+              opacity: i === activeIdx ? 1 : i < activeIdx ? 0.5 : 0.2,
+              backgroundColor: i === activeIdx ? '#ffffff' : 'rgba(255,255,255,0.6)',
+              transition: 'height 0.22s cubic-bezier(0.16,1,0.3,1), opacity 0.22s ease',
             }}
           />
         ))}
       </div>
 
-      {/* Scroll feed */}
+      {/* ── Scroll feed ────────────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
         className="w-full h-full overflow-y-scroll"
-        style={{ scrollSnapType: 'y mandatory', scrollBehavior: 'smooth' }}
+        style={{
+          scrollSnapType: 'y mandatory',
+          // Do NOT set scrollBehavior here — CSS snap already provides snapping.
+          // Adding smooth here fights the snap and creates jank.
+          overscrollBehavior: 'none',
+          WebkitOverflowScrolling: 'touch', // momentum scrolling on iOS
+        }}
       >
         {videos.map((video, i) => {
-          const isNear = Math.abs(i - activeIdx) <= 1;
+          const isActive  = i === activeIdx;
+          const isPreload = i === activeIdx + 1; // preload next only
+          const mounted   = isActive || isPreload;
+
           return (
             <div
               key={video.videoId}
-              className="relative w-full flex items-center justify-center bg-black"
-              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', height: '100dvh', minHeight: '100vh' }}
+              data-idx={i}
+              className="relative w-full overflow-hidden"
+              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', height: '100dvh' }}
             >
-              {/* Blurred background thumbnail */}
-              <div className="absolute inset-0 overflow-hidden">
-                <img
-                  src={video.thumbnail}
-                  alt=""
-                  aria-hidden
-                  className="w-full h-full object-cover scale-110"
-                  style={{ filter: 'blur(28px) brightness(0.28) saturate(1.4)' }}
-                />
-              </div>
+              {/* Blurred ambient background — fast paint, always rendered */}
+              <img
+                src={video.thumbnail}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(32px) brightness(0.22) saturate(1.7)', transform: 'scale(1.1)' }}
+              />
 
-              {/* 9:16 iframe container */}
+              {/* 9:16 column — fills full viewport height, correct aspect-ratio width */}
+              {/* width = min(100vw, 9/16 * 100dvh) — edge-to-edge on phones, pillarboxed on desktop */}
               <div
-                className="relative z-10 w-full mx-auto overflow-hidden rounded-2xl"
-                style={{
-                  maxWidth: 'min(360px, calc(100dvh * 9/16))',
-                  aspectRatio: '9/16',
-                  maxHeight: 'calc(100dvh - 24px)',
-                }}
+                className="relative z-10 h-full mx-auto overflow-hidden"
+                style={{ width: 'min(100%, calc(100dvh * 9 / 16))' }}
               >
-                {isNear ? (
+                {mounted ? (
                   <iframe
-                    key={`${video.videoId}-${i === activeIdx ? 'active' : 'near'}`}
-                    src={`https://www.youtube.com/embed/${video.videoId}?autoplay=${i === activeIdx ? 1 : 0}&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${video.videoId}`}
-                    className="w-full h-full"
-                    style={{ border: 'none' }}
-                    allow="autoplay; encrypted-media"
+                    /* key changes when muted toggled → remount with new params */
+                    key={`yt-${video.videoId}-${muted ? 'm' : 'u'}`}
+                    src={
+                      `https://www.youtube.com/embed/${video.videoId}` +
+                      `?autoplay=${isActive ? 1 : 0}` +
+                      `&mute=${muted ? 1 : 0}` +
+                      `&controls=0&modestbranding=1&rel=0&showinfo=0` +
+                      `&loop=1&playlist=${video.videoId}`
+                    }
+                    className="absolute inset-0 w-full h-full"
+                    style={{ border: 'none', display: 'block' }}
+                    allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
+                    loading={isActive ? 'eager' : 'lazy'}
                   />
                 ) : (
-                  /* Placeholder thumbnail for distant slides */
+                  /* Thumbnail stand-in for slides not yet near active */
                   <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-full h-full object-cover opacity-35"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ opacity: 0.4 }}
                     loading="lazy"
                   />
                 )}
               </div>
 
-              {/* Bottom title overlay */}
-              <div className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-10 pt-24 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none">
+              {/* Bottom gradient + title — rendered for all slides for layout stability */}
+              <div
+                className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-10 pt-28 pointer-events-none"
+                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.38) 55%, transparent 100%)' }}
+              >
                 <p
                   className="text-white font-semibold text-[15px] leading-snug tracking-[-0.01em] line-clamp-2 mb-1.5"
                   style={{ fontFamily: 'var(--app-font-heading)' }}
@@ -1182,12 +1258,12 @@ function ShortsImmersiveFeed({
                 )}
               </div>
 
-              {/* Scroll-down cue (not on last slide) */}
-              {i === activeIdx && i < videos.length - 1 && (
+              {/* Swipe-up cue — only on active non-last slide */}
+              {isActive && i < videos.length - 1 && (
                 <motion.div
-                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
-                  animate={{ y: [0, 6, 0], opacity: [0.35, 0.65, 0.35] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+                  animate={{ y: [0, 7, 0], opacity: [0.28, 0.58, 0.28] }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
                 >
                   <ChevronDown size={22} strokeWidth={1.4} className="text-white/50" />
                 </motion.div>

@@ -1936,6 +1936,8 @@ export default function App() {
     if (isLoadingMore) return;
     // Need either sections mode or everything mode to paginate
     if (!searchSections && !isEverythingMode) return;
+    // Stop if the last page indicated no more results (non-everything mode only)
+    if (!isEverythingMode && searchSections && !searchSections.hasMore) return;
     setIsLoadingMore(true);
     try {
       const currentPage = searchSections?.page ?? 1;
@@ -2001,17 +2003,20 @@ export default function App() {
   }, [showPortal, portalFetched]);
 
   // ── IntersectionObserver — infinite scroll ────────────────────────────────
+  // Attaches for ALL search modes (specific filter or Everything).
+  // loadMore() itself guards against fetching when hasMore is false.
   useEffect(() => {
-    if (!isEverythingMode || searchStatus !== 'done') return;
+    if (searchStatus !== 'done') return;
+    if (!searchSections && !isEverythingMode) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
       entries => { if (entries[0]?.isIntersecting) loadMore(); },
-      { threshold: 0.1 }
+      { rootMargin: '200px', threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isEverythingMode, searchStatus, loadMore]);
+  }, [isEverythingMode, searchStatus, searchSections, loadMore]);
 
   // ── Scene rotation — paused when any UI interaction is active ─────────────
   useEffect(() => {
