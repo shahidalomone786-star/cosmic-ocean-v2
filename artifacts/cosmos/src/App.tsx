@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Cpu, Dices, Droplets, FlaskConical, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, RotateCw, Target, Thermometer, Wind, Zap } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -11,6 +11,7 @@ import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal'
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
 import CosmicNexus from './components/CosmicNexus';
+import SimulationSearch from './components/SimulationSearch';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -1016,50 +1017,97 @@ const COVER_PALETTE: Record<CoverTheme, { primary: string; glow: string; bgFrom:
   emerald: { primary: '#10b981', glow: 'rgba(16,185,129,0.52)',  bgFrom: 'rgba(2,22,14,0.82)',  bgTo: 'rgba(1,12,8,0.92)'   },
 };
 
-/** Lucide icon + colour for each PhET subject (Quantum Lab) */
-const SIM_SUBJECT_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
-  Waves:          { Icon: Waves,        theme: 'cyan'    },
-  Motion:         { Icon: Activity,     theme: 'blue'    },
-  Forces:         { Icon: Zap,          theme: 'amber'   },
-  Gravity:        { Icon: Globe,        theme: 'emerald' },
-  Electricity:    { Icon: Cpu,          theme: 'blue'    },
-  Magnetism:      { Icon: Magnet,       theme: 'purple'  },
-  Optics:         { Icon: Star,         theme: 'amber'   },
-  Matter:         { Icon: Layers3,      theme: 'purple'  },
-  Fluids:         { Icon: Droplets,     theme: 'cyan'    },
-  Thermodynamics: { Icon: Thermometer,  theme: 'amber'   },
-  Nuclear:        { Icon: Atom,         theme: 'purple'  },
-  Atomic:         { Icon: Atom,         theme: 'blue'    },
-  Chemistry:      { Icon: FlaskConical, theme: 'emerald' },
-  Biology:        { Icon: Leaf,         theme: 'emerald' },
-  'Earth Science':{ Icon: Globe,        theme: 'blue'    },
-  'Math/Physics': { Icon: Network,      theme: 'purple'  },
+/** Lucide icon + colour keyed by PhET slug — every simulation gets a distinct icon */
+const SIM_SLUG_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+  'wave-on-a-string':            { Icon: Waves,        theme: 'cyan'    },
+  'pendulum-lab':                { Icon: Timer,        theme: 'amber'   },
+  'projectile-motion':           { Icon: Rocket,       theme: 'blue'    },
+  'forces-and-motion-basics':    { Icon: Zap,          theme: 'amber'   },
+  'gravity-and-orbits':          { Icon: Orbit,        theme: 'emerald' },
+  'my-solar-system':             { Icon: Globe,        theme: 'emerald' },
+  'charges-and-fields':          { Icon: Cpu,          theme: 'blue'    },
+  'john-travoltage':             { Icon: Magnet,       theme: 'cyan'    },
+  'faradays-law':                { Icon: Magnet,       theme: 'purple'  },
+  'ohms-law':                    { Icon: Activity,     theme: 'blue'    },
+  'circuit-construction-kit-dc': { Icon: Network,      theme: 'blue'    },
+  'capacitor-lab-basics':        { Icon: Layers3,      theme: 'cyan'    },
+  'bending-light':               { Icon: Sparkles,     theme: 'amber'   },
+  'color-vision':                { Icon: Star,         theme: 'amber'   },
+  'wave-interference':           { Icon: Radio,        theme: 'purple'  },
+  'fourier-making-waves':        { Icon: Sigma,        theme: 'emerald' },
+  'density':                     { Icon: Gauge,        theme: 'purple'  },
+  'buoyancy':                    { Icon: Droplets,     theme: 'cyan'    },
+  'balancing-act':               { Icon: Scale,        theme: 'amber'   },
+  'collision-lab':               { Icon: Target,       theme: 'blue'    },
+  'energy-forms-and-changes':    { Icon: Flame,        theme: 'amber'   },
+  'states-of-matter':            { Icon: Thermometer,  theme: 'purple'  },
+  'gas-properties':              { Icon: Wind,         theme: 'cyan'    },
+  'rutherford-scattering':       { Icon: Atom,         theme: 'purple'  },
+  'models-of-the-hydrogen-atom': { Icon: Atom,         theme: 'blue'    },
+  'build-an-atom':               { Icon: Atom,         theme: 'emerald' },
+  'build-a-molecule':            { Icon: FlaskConical, theme: 'emerald' },
+  'molecule-shapes':             { Icon: Network,      theme: 'purple'  },
+  'natural-selection':           { Icon: Leaf,         theme: 'emerald' },
+  'neuron':                      { Icon: Activity,     theme: 'purple'  },
+  'gene-expression-essentials':  { Icon: Microscope,   theme: 'emerald' },
+  'greenhouse-effect':           { Icon: Globe,        theme: 'blue'    },
+  'gravity-force-lab':           { Icon: Orbit,        theme: 'blue'    },
+  'friction':                    { Icon: Wind,         theme: 'amber'   },
+  'vector-addition':             { Icon: Compass,      theme: 'purple'  },
 };
 
-/** Lucide icon + colour for each Advanced Sandbox category tag (strip leading emoji) */
-const ADV_CAT_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
-  Chaos:          { Icon: RotateCw,     theme: 'purple'  },
-  Mechanics:      { Icon: Zap,          theme: 'amber'   },
-  Energy:         { Icon: Zap,          theme: 'amber'   },
-  Kinematics:     { Icon: Activity,     theme: 'blue'    },
-  Vibration:      { Icon: Waves,        theme: 'cyan'    },
-  Waves:          { Icon: Waves,        theme: 'cyan'    },
-  Molecular:      { Icon: Microscope,   theme: 'emerald' },
-  '2D Dynamics':  { Icon: Target,       theme: 'blue'    },
-  'Rigid Body':   { Icon: Layers3,      theme: 'purple'  },
-  Momentum:       { Icon: Zap,          theme: 'amber'   },
-  Gravity:        { Icon: Globe,        theme: 'blue'    },
-  Electricity:    { Icon: Cpu,          theme: 'blue'    },
-  Quantum:        { Icon: Atom,         theme: 'purple'  },
-  Chemistry:      { Icon: FlaskConical, theme: 'emerald' },
-  Thermodynamics: { Icon: Thermometer,  theme: 'amber'   },
-  Atomic:         { Icon: Atom,         theme: 'purple'  },
-  Nuclear:        { Icon: Atom,         theme: 'purple'  },
-  Optics:         { Icon: Star,         theme: 'amber'   },
-  Friction:       { Icon: Wind,         theme: 'cyan'    },
-  Magnetism:      { Icon: Magnet,       theme: 'purple'  },
-  Elasticity:     { Icon: RotateCw,     theme: 'blue'    },
-  Fluids:         { Icon: Droplets,     theme: 'cyan'    },
+/** Lucide icon + colour keyed by Advanced Sandbox id — every simulation gets a distinct icon */
+const ADV_SIM_ID_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+  'mpl-double-pendulum':  { Icon: RotateCw,     theme: 'purple'  },
+  'mpl-pendulum':         { Icon: Timer,        theme: 'amber'   },
+  'mpl-driven-pendulum':  { Icon: Flame,        theme: 'amber'   },
+  'mpl-clock':            { Icon: Scale,        theme: 'cyan'    },
+  'mpl-chaotic-pendulum': { Icon: Waves,        theme: 'purple'  },
+  'mpl-dangling-stick':   { Icon: Rocket,       theme: 'blue'    },
+  'mpl-single-spring':    { Icon: RotateCw,     theme: 'cyan'    },
+  'mpl-double-spring':    { Icon: Network,      theme: 'cyan'    },
+  'mpl-spring2d':         { Icon: Waves,        theme: 'cyan'    },
+  'mpl-spring-array':     { Icon: Radio,        theme: 'blue'    },
+  'mpl-molecule3':        { Icon: Atom,         theme: 'emerald' },
+  'mpl-molecule5':        { Icon: Microscope,   theme: 'emerald' },
+  'mpl-billiards':        { Icon: Target,       theme: 'blue'    },
+  'mpl-collision':        { Icon: Zap,          theme: 'blue'    },
+  'mpl-rigid-body':       { Icon: Layers3,      theme: 'amber'   },
+  'mpl-newtons-cradle':   { Icon: Activity,     theme: 'cyan'    },
+  'mpl-pile-driver':      { Icon: Zap,          theme: 'amber'   },
+  'mpl-circular-motion':  { Icon: Orbit,        theme: 'emerald' },
+  'mpl-sumo':             { Icon: Wind,         theme: 'amber'   },
+  'mpl-spinning':         { Icon: Compass,      theme: 'purple'  },
+  'mpl-polygons':         { Icon: Atom,         theme: 'purple'  },
+  'mpl-roller-single':    { Icon: Flame,        theme: 'emerald' },
+  'mpl-roller-spring':    { Icon: RotateCw,     theme: 'emerald' },
+  'mpl-roller-flight':    { Icon: Wind,         theme: 'cyan'    },
+  'mpl-wave1':            { Icon: Waves,        theme: 'blue'    },
+  'mpl-wave2':            { Icon: Activity,     theme: 'purple'  },
+  'mpl-lorenz':           { Icon: Thermometer,  theme: 'amber'   },
+  'mpl-dp-chaos':         { Icon: Gauge,        theme: 'amber'   },
+  'mpl-harmonic':         { Icon: Thermometer,  theme: 'purple'  },
+  'mpl-cart2':            { Icon: Cpu,          theme: 'blue'    },
+  'phet-qwi':             { Icon: Waves,        theme: 'emerald' },
+  'phet-photo':           { Icon: FlaskConical, theme: 'emerald' },
+  'phet-blackbody':       { Icon: Sun,          theme: 'amber'   },
+  'phet-rutherford':      { Icon: Atom,         theme: 'cyan'    },
+  'phet-hydrogen':        { Icon: Atom,         theme: 'blue'    },
+  'phet-skatepark':       { Icon: Flame,        theme: 'blue'    },
+  'phet-masses-springs':  { Icon: RotateCw,     theme: 'blue'    },
+  'phet-hookes-law':      { Icon: Gauge,        theme: 'purple'  },
+  'phet-under-pressure':  { Icon: Droplets,     theme: 'blue'    },
+  'phet-acid-base':       { Icon: FlaskConical, theme: 'purple'  },
+  'phet-ph-scale':        { Icon: Sigma,        theme: 'blue'    },
+  'phet-isotopes':        { Icon: Atom,         theme: 'amber'   },
+  'phet-atomic':          { Icon: Microscope,   theme: 'blue'    },
+  'phet-reactions':       { Icon: FlaskConical, theme: 'amber'   },
+  'phet-circuit-ac':      { Icon: Cpu,          theme: 'purple'  },
+  'phet-faraday-lab':     { Icon: Magnet,       theme: 'purple'  },
+  'phet-molarity':        { Icon: Droplets,     theme: 'emerald' },
+  'phet-beers-law':       { Icon: Sparkles,     theme: 'amber'   },
+  'phet-molecules-light': { Icon: Waves,        theme: 'amber'   },
+  'phet-resistance':      { Icon: Network,      theme: 'amber'   },
 };
 
 /** Lucide icon + colour for each Arcade game id */
@@ -1167,7 +1215,7 @@ function PremiumCover({
 
 // ─── Quantum Lab Card ─────────────────────────────────────────────────────────
 function PortalSimCard({ sim, index = 0, onSelect, lm }: { sim: SimItem; index?: number; onSelect: () => void; lm?: boolean }) {
-  const cover = SIM_SUBJECT_COVER[sim.subject] ?? { Icon: Atom, theme: 'purple' as CoverTheme };
+  const cover = SIM_SLUG_COVER[sim.slug] ?? { Icon: Atom, theme: 'purple' as CoverTheme };
 
   return (
     <motion.div
@@ -1185,10 +1233,10 @@ function PortalSimCard({ sim, index = 0, onSelect, lm }: { sim: SimItem; index?:
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+          <span className={`inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
             lm ? 'border-violet-300/60 text-violet-700 bg-violet-50' : 'border-violet-400/30 text-violet-300/80 bg-violet-500/10'
           }`}>
-            ⚗️ Simulation
+            <FlaskConical size={9} strokeWidth={1.8} />Simulation
           </span>
         </div>
         <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{sim.title}</p>
@@ -1232,10 +1280,10 @@ function SimulationModal({ sim, onClose, lm }: { sim: SimItem; onClose: () => vo
         </motion.button>
         {/* Title area */}
         <div className="flex-1 flex items-center gap-2 min-w-0">
-          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+          <span className={`hidden sm:inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
             lm ? 'border-violet-300/60 text-violet-700 bg-violet-50' : 'border-violet-400/30 text-violet-300/80 bg-violet-500/10'
           }`}>
-            🧪 PhET
+            <Atom size={9} strokeWidth={1.8} />PhET
           </span>
           <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{sim.title}</span>
         </div>
@@ -1617,9 +1665,8 @@ function MasterpieceCard({
 
 // ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
 function AdvSimCard({ sim, index = 0, onSelect, lm }: { sim: AdvSimItem; index?: number; onSelect: () => void; lm?: boolean }) {
-  // Parse category key by stripping leading emoji/symbol chars (e.g. "⚙️ Chaos" → "Chaos")
-  const catKey = sim.categoryTag.replace(/^[^A-Za-z0-9]+/, '').trim();
-  const cover = ADV_CAT_COVER[catKey] ?? { Icon: FlaskConical, theme: 'emerald' as CoverTheme };
+  const cover = ADV_SIM_ID_COVER[sim.id] ?? { Icon: FlaskConical, theme: 'emerald' as CoverTheme };
+  const catLabel = sim.categoryTag.replace(/^[^A-Za-z0-9]+/, '').trim();
 
   return (
     <motion.div
@@ -1637,10 +1684,10 @@ function AdvSimCard({ sim, index = 0, onSelect, lm }: { sim: AdvSimItem; index?:
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+          <span className={`inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
             lm ? 'border-cyan-300/60 text-cyan-700 bg-cyan-50' : 'border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10'
           }`}>
-            {sim.categoryTag}
+            <Settings2 size={9} strokeWidth={1.8} />{catLabel}
           </span>
         </div>
         <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{sim.title}</p>
@@ -1683,10 +1730,10 @@ function AdvSandboxModal({ sim, onClose, lm }: { sim: AdvSimItem; onClose: () =>
         </motion.button>
         {/* Title area */}
         <div className="flex-1 flex items-center gap-2 min-w-0">
-          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+          <span className={`hidden sm:inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
             lm ? 'border-cyan-300/60 text-cyan-700 bg-cyan-50' : 'border-cyan-400/30 text-cyan-300/80 bg-cyan-500/10'
           }`}>
-            {sim.categoryTag}
+            <Settings2 size={9} strokeWidth={1.8} />{sim.categoryTag.replace(/^[^A-Za-z0-9]+/, '').trim()}
           </span>
           <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{sim.title}</span>
         </div>
@@ -1736,10 +1783,10 @@ function FunGameCard({ game, index = 0, onSelect, lm }: { game: FunGameItem; ind
       <PremiumCover Icon={cover.Icon} theme={cover.theme} uid={`game-${game.id}`} index={index} lm={lm} />
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
+          <span className={`inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
             lm ? 'border-amber-300/60 text-amber-700 bg-amber-50' : 'border-amber-400/30 text-amber-300/80 bg-amber-500/10'
           }`}>
-            {game.categoryTag}
+            <Gamepad2 size={9} strokeWidth={1.8} />Game
           </span>
         </div>
         <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{game.title}</p>
@@ -1780,10 +1827,10 @@ function ArcadeModal({ game, onClose, lm }: { game: FunGameItem; onClose: () => 
           <span>Back</span>
         </motion.button>
         <div className="flex-1 flex items-center gap-2 min-w-0">
-          <span className={`hidden sm:inline text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+          <span className={`hidden sm:inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border flex-shrink-0 ${
             lm ? 'border-amber-300/60 text-amber-700 bg-amber-50' : 'border-amber-400/30 text-amber-300/80 bg-amber-500/10'
           }`}>
-            🕹️ Arcade
+            <Gamepad2 size={9} strokeWidth={1.8} />Arcade
           </span>
           <span className={`text-[13px] font-semibold tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white/90'}`}>{game.title}</span>
         </div>
@@ -2590,7 +2637,7 @@ export default function App() {
                       ? 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
                       : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
                   }`}>
-                  🌐 {language}
+                  <Globe size={13} strokeWidth={1.6} className="flex-shrink-0" />{language}
                   <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
                 </button>
                 <AnimatePresence>
@@ -2707,10 +2754,13 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ── Simulation Search ── */}
+              <SimulationSearch lm={lm} />
+
               {/* ── Quantum Lab ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✨ Quantum Lab</h2>
+                  <h2 className={`text-[15px] font-medium tracking-wide flex items-center gap-1.5 ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}><Atom size={15} strokeWidth={1.6} className="flex-shrink-0" />Quantum Lab</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Interactive Science Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
@@ -2729,7 +2779,7 @@ export default function App() {
               {/* ── Advanced Sandbox ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>⚙️ Advanced Sandbox</h2>
+                  <h2 className={`text-[15px] font-medium tracking-wide flex items-center gap-1.5 ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}><Settings2 size={15} strokeWidth={1.6} className="flex-shrink-0" />Advanced Sandbox</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Next-Gen STEM Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
@@ -2781,7 +2831,7 @@ export default function App() {
               {/* ── Arcade Zone ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
-                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>🎮 Arcade Zone</h2>
+                  <h2 className={`text-[15px] font-medium tracking-wide flex items-center gap-1.5 ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}><Gamepad2 size={15} strokeWidth={1.6} className="flex-shrink-0" />Arcade Zone</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Pure Fun & Games</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
@@ -2867,10 +2917,10 @@ export default function App() {
                 >
                   <div className="flex items-center gap-5 px-5 py-5">
                     {/* Carrom board icon */}
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-4xl flex-shrink-0 ${
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 ${
                       lm ? 'bg-white shadow-sm border border-amber-100' : 'bg-white/[0.06] border border-white/[0.10]'
                     }`}>
-                      🎯
+                      <Target size={34} strokeWidth={1.3} className={lm ? 'text-amber-500' : 'text-amber-400'} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-[15px] font-semibold tracking-[-0.01em] mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>
