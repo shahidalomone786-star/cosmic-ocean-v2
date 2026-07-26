@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Cpu, Dices, Droplets, FlaskConical, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, RotateCw, Target, Thermometer, Wind, Zap } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -1005,9 +1005,169 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
 }
 
 // ─── PhET Simulation Card ────────────────────────────────────────────────────
-function PortalSimCard({ sim, onSelect, lm }: { sim: SimItem; onSelect: () => void; lm?: boolean }) {
-  const imgUrl = useWikiThumbnail(sim.wikiQuery);
-  const loaded = imgUrl !== '';
+// ─── Premium icon-cover design system (shared by Quantum Lab, Advanced Sandbox, Arcade Zone) ───
+type CoverTheme = 'blue' | 'purple' | 'cyan' | 'amber' | 'emerald';
+
+const COVER_PALETTE: Record<CoverTheme, { primary: string; glow: string; bgFrom: string; bgTo: string }> = {
+  blue:    { primary: '#38bdf8', glow: 'rgba(56,189,248,0.52)',  bgFrom: 'rgba(2,24,54,0.82)',  bgTo: 'rgba(3,10,28,0.92)'  },
+  purple:  { primary: '#a855f7', glow: 'rgba(168,85,247,0.52)',  bgFrom: 'rgba(20,5,40,0.82)',  bgTo: 'rgba(10,3,22,0.92)'  },
+  cyan:    { primary: '#22d3ee', glow: 'rgba(34,211,238,0.52)',  bgFrom: 'rgba(2,22,30,0.82)',  bgTo: 'rgba(1,12,18,0.92)'  },
+  amber:   { primary: '#f59e0b', glow: 'rgba(245,158,11,0.52)',  bgFrom: 'rgba(35,18,2,0.82)',  bgTo: 'rgba(22,10,2,0.92)'  },
+  emerald: { primary: '#10b981', glow: 'rgba(16,185,129,0.52)',  bgFrom: 'rgba(2,22,14,0.82)',  bgTo: 'rgba(1,12,8,0.92)'   },
+};
+
+/** Lucide icon + colour for each PhET subject (Quantum Lab) */
+const SIM_SUBJECT_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+  Waves:          { Icon: Waves,        theme: 'cyan'    },
+  Motion:         { Icon: Activity,     theme: 'blue'    },
+  Forces:         { Icon: Zap,          theme: 'amber'   },
+  Gravity:        { Icon: Globe,        theme: 'emerald' },
+  Electricity:    { Icon: Cpu,          theme: 'blue'    },
+  Magnetism:      { Icon: Magnet,       theme: 'purple'  },
+  Optics:         { Icon: Star,         theme: 'amber'   },
+  Matter:         { Icon: Layers3,      theme: 'purple'  },
+  Fluids:         { Icon: Droplets,     theme: 'cyan'    },
+  Thermodynamics: { Icon: Thermometer,  theme: 'amber'   },
+  Nuclear:        { Icon: Atom,         theme: 'purple'  },
+  Atomic:         { Icon: Atom,         theme: 'blue'    },
+  Chemistry:      { Icon: FlaskConical, theme: 'emerald' },
+  Biology:        { Icon: Leaf,         theme: 'emerald' },
+  'Earth Science':{ Icon: Globe,        theme: 'blue'    },
+  'Math/Physics': { Icon: Network,      theme: 'purple'  },
+};
+
+/** Lucide icon + colour for each Advanced Sandbox category tag (strip leading emoji) */
+const ADV_CAT_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+  Chaos:          { Icon: RotateCw,     theme: 'purple'  },
+  Mechanics:      { Icon: Zap,          theme: 'amber'   },
+  Energy:         { Icon: Zap,          theme: 'amber'   },
+  Kinematics:     { Icon: Activity,     theme: 'blue'    },
+  Vibration:      { Icon: Waves,        theme: 'cyan'    },
+  Waves:          { Icon: Waves,        theme: 'cyan'    },
+  Molecular:      { Icon: Microscope,   theme: 'emerald' },
+  '2D Dynamics':  { Icon: Target,       theme: 'blue'    },
+  'Rigid Body':   { Icon: Layers3,      theme: 'purple'  },
+  Momentum:       { Icon: Zap,          theme: 'amber'   },
+  Gravity:        { Icon: Globe,        theme: 'blue'    },
+  Electricity:    { Icon: Cpu,          theme: 'blue'    },
+  Quantum:        { Icon: Atom,         theme: 'purple'  },
+  Chemistry:      { Icon: FlaskConical, theme: 'emerald' },
+  Thermodynamics: { Icon: Thermometer,  theme: 'amber'   },
+  Atomic:         { Icon: Atom,         theme: 'purple'  },
+  Nuclear:        { Icon: Atom,         theme: 'purple'  },
+  Optics:         { Icon: Star,         theme: 'amber'   },
+  Friction:       { Icon: Wind,         theme: 'cyan'    },
+  Magnetism:      { Icon: Magnet,       theme: 'purple'  },
+  Elasticity:     { Icon: RotateCw,     theme: 'blue'    },
+  Fluids:         { Icon: Droplets,     theme: 'cyan'    },
+};
+
+/** Lucide icon + colour for each Arcade game id */
+const GAME_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+  'game-2048':        { Icon: Brain,    theme: 'purple'  },
+  'game-tetris':      { Icon: Layers3,  theme: 'cyan'    },
+  'game-flappy':      { Icon: Wind,     theme: 'blue'    },
+  'game-pacman':      { Icon: Ghost,    theme: 'amber'   },
+  'game-breakout':    { Icon: Target,   theme: 'blue'    },
+  'game-minesweeper': { Icon: Puzzle,   theme: 'amber'   },
+  'game-mahjong':     { Icon: Dices,    theme: 'purple'  },
+  'game-sudoku':      { Icon: Brain,    theme: 'emerald' },
+  'game-asteroids':   { Icon: Sparkles, theme: 'blue'    },
+  'game-hexgl':       { Icon: Zap,      theme: 'amber'   },
+};
+
+/**
+ * Shared premium cover tile — glassmorphism dark background, hex-grid texture,
+ * centred glowing Lucide icon, animated pulsing accent dot.
+ * Matches the visual language of Cosmic Masterpieces exactly.
+ */
+function PremiumCover({
+  Icon, theme, uid, index = 0, lm,
+}: {
+  Icon: React.ElementType;
+  theme: CoverTheme;
+  uid: string;
+  index?: number;
+  lm?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const p = COVER_PALETTE[theme];
+
+  // Light-mode: same dark header strip as MasterpieceCard uses (premium contrast)
+  if (lm) {
+    return (
+      <div
+        className="w-full h-28 flex items-center justify-center relative overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${p.bgFrom}, ${p.bgTo})` }}
+      >
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse 70% 60% at 50% 55%, ${p.glow.replace('0.52)', '0.16)')}, transparent)` }}
+        />
+        <svg className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id={`hclm-${uid}`} x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+              <polygon points="15,0.5 29.5,8 29.5,23 15,30.5 0.5,23 0.5,8" fill="none" stroke={p.primary} strokeWidth="0.6" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#hclm-${uid})`} />
+        </svg>
+        <Icon size={32} strokeWidth={1.4} style={{ color: p.primary, filter: `drop-shadow(0 0 10px ${p.primary})`, position: 'relative', zIndex: 10 }} />
+        <div
+          className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full pointer-events-none"
+          style={{ background: p.primary, boxShadow: `0 0 6px ${p.primary}` }}
+        />
+      </div>
+    );
+  }
+
+  // Dark-mode: full glassmorphism + animated glow
+  return (
+    <div
+      className="w-full h-28 flex items-center justify-center relative overflow-hidden"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ background: `linear-gradient(145deg, ${p.bgFrom}, ${p.bgTo})` }}
+    >
+      {/* Radial glow blob */}
+      <div
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(ellipse 80% 70% at 50% 55%, ${p.glow.replace('0.52)', '0.22)')}, transparent 75%)`,
+          opacity: hovered ? 1 : 0.45,
+        }}
+      />
+      {/* Hex grid texture */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.07] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id={`hc-${uid}`} x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+            <polygon points="15,0.5 29.5,8 29.5,23 15,30.5 0.5,23 0.5,8" fill="none" stroke={p.primary} strokeWidth="0.6" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#hc-${uid})`} />
+      </svg>
+      {/* Icon */}
+      <motion.div
+        className="relative z-10"
+        animate={{ scale: hovered ? 1.15 : 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
+        <Icon size={34} strokeWidth={1.4} style={{ color: p.primary, filter: `drop-shadow(0 0 14px ${p.primary})` }} />
+      </motion.div>
+      {/* Pulsing accent dot */}
+      <motion.div
+        className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full pointer-events-none"
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
+        style={{ background: p.primary, boxShadow: `0 0 8px ${p.primary}` }}
+      />
+    </div>
+  );
+}
+
+// ─── Quantum Lab Card ─────────────────────────────────────────────────────────
+function PortalSimCard({ sim, index = 0, onSelect, lm }: { sim: SimItem; index?: number; onSelect: () => void; lm?: boolean }) {
+  const cover = SIM_SUBJECT_COVER[sim.subject] ?? { Icon: Atom, theme: 'purple' as CoverTheme };
 
   return (
     <motion.div
@@ -1020,29 +1180,8 @@ function PortalSimCard({ sim, onSelect, lm }: { sim: SimItem; onSelect: () => vo
           : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
       }`}
     >
-      {/* Thumbnail */}
-      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
-        {/* Shimmer skeleton shown while fetch is in-flight */}
-        {!loaded && (
-          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
-        )}
-        {loaded && (
-          <img
-            src={imgUrl}
-            alt={sim.title}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        )}
-        {/* Play icon overlay */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
-          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
-            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </div>
-      </div>
+      {/* Premium icon cover */}
+      <PremiumCover Icon={cover.Icon} theme={cover.theme} uid={`sim-${sim.slug}`} index={index} lm={lm} />
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
@@ -1477,9 +1616,10 @@ function MasterpieceCard({
 }
 
 // ─── Advanced Sandbox Card ─────────────────────────────────────────────────────
-function AdvSimCard({ sim, onSelect, lm }: { sim: AdvSimItem; onSelect: () => void; lm?: boolean }) {
-  const imgUrl = useWikiThumbnail(sim.wikiQuery);
-  const loaded = imgUrl !== '';
+function AdvSimCard({ sim, index = 0, onSelect, lm }: { sim: AdvSimItem; index?: number; onSelect: () => void; lm?: boolean }) {
+  // Parse category key by stripping leading emoji/symbol chars (e.g. "⚙️ Chaos" → "Chaos")
+  const catKey = sim.categoryTag.replace(/^[^A-Za-z0-9]+/, '').trim();
+  const cover = ADV_CAT_COVER[catKey] ?? { Icon: FlaskConical, theme: 'emerald' as CoverTheme };
 
   return (
     <motion.div
@@ -1492,27 +1632,8 @@ function AdvSimCard({ sim, onSelect, lm }: { sim: AdvSimItem; onSelect: () => vo
           : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
       }`}
     >
-      {/* Thumbnail */}
-      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
-        {!loaded && (
-          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
-        )}
-        {loaded && (
-          <img
-            src={imgUrl}
-            alt={sim.title}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        )}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
-          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
-            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </div>
-      </div>
+      {/* Premium icon cover */}
+      <PremiumCover Icon={cover.Icon} theme={cover.theme} uid={`adv-${sim.id}`} index={index} lm={lm} />
       {/* Info */}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
@@ -1598,9 +1719,8 @@ function AdvSandboxModal({ sim, onClose, lm }: { sim: AdvSimItem; onClose: () =>
 }
 
 // ─── Arcade Zone Card ─────────────────────────────────────────────────────────
-function FunGameCard({ game, onSelect, lm }: { game: FunGameItem; onSelect: () => void; lm?: boolean }) {
-  const imgUrl = useWikiThumbnail(game.wikiQuery);
-  const loaded = imgUrl !== '';
+function FunGameCard({ game, index = 0, onSelect, lm }: { game: FunGameItem; index?: number; onSelect: () => void; lm?: boolean }) {
+  const cover = GAME_COVER[game.id] ?? { Icon: Zap, theme: 'amber' as CoverTheme };
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
@@ -1612,22 +1732,8 @@ function FunGameCard({ game, onSelect, lm }: { game: FunGameItem; onSelect: () =
           : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
       }`}
     >
-      <div className={`w-full h-28 overflow-hidden relative ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
-        {!loaded && (
-          <div className={`absolute inset-0 animate-pulse ${lm ? 'bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100' : 'bg-gradient-to-r from-white/[0.04] via-white/[0.10] to-white/[0.04]'}`} />
-        )}
-        {loaded && (
-          <img src={imgUrl} alt={game.title} loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        )}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30">
-          <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 backdrop-blur-sm flex items-center justify-center shadow-lg">
-            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </div>
-      </div>
+      {/* Premium icon cover */}
+      <PremiumCover Icon={cover.Icon} theme={cover.theme} uid={`game-${game.id}`} index={index} lm={lm} />
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
           <span className={`text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full border ${
@@ -2608,10 +2714,11 @@ export default function App() {
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Interactive Science Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-                  {PHET_SIMULATIONS.map(sim => (
+                  {PHET_SIMULATIONS.map((sim, idx) => (
                     <PortalSimCard
                       key={sim.slug}
                       sim={sim}
+                      index={idx}
                       onSelect={() => setSimulationModal(sim)}
                       lm={lm}
                     />
@@ -2626,10 +2733,11 @@ export default function App() {
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Next-Gen STEM Simulations</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-                  {ADVANCED_SIMS.map(sim => (
+                  {ADVANCED_SIMS.map((sim, idx) => (
                     <AdvSimCard
                       key={sim.id}
                       sim={sim}
+                      index={idx}
                       onSelect={() => setAdvModal(sim)}
                       lm={lm}
                     />
@@ -2677,10 +2785,11 @@ export default function App() {
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Pure Fun & Games</span>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-                  {FUN_GAMES.map(game => (
+                  {FUN_GAMES.map((game, idx) => (
                     <FunGameCard
                       key={game.id}
                       game={game}
+                      index={idx}
                       onSelect={() => setArcadeModal(game)}
                       lm={lm}
                     />
