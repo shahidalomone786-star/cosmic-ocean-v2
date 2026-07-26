@@ -8,6 +8,7 @@ export interface VideoItem {
   thumbnail:    string;
   channelTitle: string;
   description:  string;
+  isShort?:     boolean;
 }
 
 // ─── Video Player Modal ────────────────────────────────────────────────────────

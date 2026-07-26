@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -2144,73 +2144,86 @@ export default function App() {
               hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
             }`}
           >
-            {/* ── Two-row header: row 1 = nav pills + language, row 2 = utility icons ── */}
-            <div className="absolute top-4 left-4 right-4 z-30 pointer-events-auto flex flex-col gap-y-2.5">
-
-              {/* Row 1 — nav pills (left) + language dropdown (right) */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  {/* Library button */}
+            {/* ── Premium floating pill nav — hidden in search-results view ── */}
+            {!hasSearchResults && (
+              <div className="absolute top-5 left-0 right-0 z-30 pointer-events-auto flex justify-center px-4">
+                <motion.div
+                  initial={{ opacity: 0, y: -14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className={`flex items-center gap-0.5 px-1.5 py-1.5 rounded-full border backdrop-blur-[36px] ${
+                    lm
+                      ? 'bg-white/85 border-black/[0.07] shadow-[0_8px_32px_rgba(0,0,0,0.08),0_1px_0_rgba(255,255,255,0.95)_inset]'
+                      : 'bg-[rgba(10,10,18,0.72)] border-white/[0.09] shadow-[0_8px_40px_rgba(0,0,0,0.7),0_1px_0_rgba(255,255,255,0.05)_inset]'
+                  }`}
+                >
+                  {/* Library */}
                   <button
                     onClick={() => setShowLibrary(true)}
-                    title="Open Research Library"
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                    title="Research Library"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
                       lm
-                        ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
-                        : 'border-white/[0.12] bg-white/[0.06] text-white/75 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
+                        ? 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.06]'
+                        : 'text-white/50 hover:text-white hover:bg-white/[0.08]'
                     }`}
                   >
-                    <span className="text-[13px]">📚</span>
+                    <BookOpen size={13} strokeWidth={2} />
                     <span>Library</span>
                   </button>
 
-                  {/* Cosmic Nexus button */}
+                  {/* Nexus */}
                   <button
                     onClick={() => setShowNexus(true)}
-                    title="Open Cosmic Nexus Social Hub"
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.13em] transition-all duration-300 ${
+                    title="Cosmic Nexus"
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
                       lm
-                        ? 'border-purple-300/60 bg-purple-50/80 text-purple-700 hover:bg-purple-100/90 hover:border-purple-400/70 hover:text-purple-900'
-                        : 'border-purple-500/30 bg-purple-500/10 text-purple-300/90 hover:bg-purple-500/18 hover:border-purple-400/50 hover:text-purple-200'
+                        ? 'text-violet-600 hover:text-violet-900 hover:bg-violet-500/[0.07]'
+                        : 'text-violet-300/65 hover:text-violet-200 hover:bg-violet-500/[0.10]'
                     }`}
                   >
-                    <span className="text-[13px]">🌐</span>
+                    <Orbit size={13} strokeWidth={2} />
                     <span>Nexus</span>
                   </button>
-                </div>
 
-                {/* Right side: language dropdown */}
-                <div className="flex items-center gap-2">
+                  {/* Divider */}
+                  <div className={`w-px h-5 mx-1 flex-shrink-0 rounded-full ${lm ? 'bg-black/[0.10]' : 'bg-white/[0.08]'}`} />
 
                   {/* Language dropdown */}
                   <div className="relative">
-                    <button onClick={() => setLangOpen(o => !o)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-[18px] text-[11px] uppercase tracking-[0.15em] transition-all duration-300 ${
+                    <button
+                      onClick={() => setLangOpen(o => !o)}
+                      title="Language"
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11.5px] font-medium tracking-[0.02em] transition-all duration-200 ${
                         lm
-                          ? 'border-black/[0.10] bg-black/[0.05] text-slate-700 hover:bg-black/[0.09] hover:border-black/[0.18]'
-                          : 'border-white/[0.12] bg-white/[0.06] text-white/80 hover:bg-white/[0.11] hover:border-white/[0.2]'
-                      }`}>
-                      🌐 {language}
-                      <span className={`text-[9px] ${lm ? 'text-slate-400' : 'text-white/35'}`}>{langOpen ? '▲' : '▼'}</span>
+                          ? 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.06]'
+                          : 'text-white/50 hover:text-white hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      <Globe size={13} strokeWidth={2} />
+                      <span className="max-w-[52px] truncate">{language}</span>
+                      <ChevronDown size={9} strokeWidth={2.5} className={`flex-shrink-0 transition-transform duration-200 ${langOpen ? 'rotate-180' : ''} ${lm ? 'text-slate-400' : 'text-white/28'}`} />
                     </button>
                     <AnimatePresence>
                       {langOpen && (
                         <motion.div
-                          initial={{ opacity: 0, y: -8, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -8, scale: 0.94 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                          className={`absolute right-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
+                          initial={{ opacity: 0, y: -8, scale: 0.94 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.94 }}
+                          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                          className={`absolute left-0 mt-2 w-40 rounded-2xl border backdrop-blur-[28px] overflow-hidden z-50 ${
                             lm
-                              ? 'border-black/[0.08] bg-white/[0.95] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
-                              : 'border-white/[0.09] bg-[rgba(8,8,14,0.92)] shadow-[0_20px_60px_rgba(0,0,0,0.8)]'
+                              ? 'border-black/[0.08] bg-white/[0.97] shadow-[0_20px_60px_rgba(0,0,0,0.12)]'
+                              : 'border-white/[0.09] bg-[rgba(8,8,14,0.95)] shadow-[0_20px_60px_rgba(0,0,0,0.85)]'
                           }`}
                         >
                           {LANGUAGES.map(lang => (
                             <button key={lang.label} onClick={() => { setLanguage(lang.label); setLangOpen(false); }}
-                              className={`w-full text-left px-4 py-3 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
+                              className={`w-full text-left px-4 py-2.5 text-[12px] tracking-wide transition-all duration-150 border-l-2 ${
                                 lm
                                   ? lang.label === language ? 'text-slate-900 bg-black/[0.06] border-slate-400' : 'text-slate-600 hover:text-slate-900 hover:bg-black/[0.04] border-transparent'
                                   : lang.label === language ? 'text-white bg-white/[0.10] border-white/40'     : 'text-white/55 hover:text-white hover:bg-white/[0.06] border-transparent'
-                              }`}>
+                              }`}
+                            >
                               {lang.label}
                             </button>
                           ))}
@@ -2219,45 +2232,44 @@ export default function App() {
                     </AnimatePresence>
                   </div>
 
-                </div>
-              </div>
+                  {/* Divider */}
+                  <div className={`w-px h-5 mx-1 flex-shrink-0 rounded-full ${lm ? 'bg-black/[0.10]' : 'bg-white/[0.08]'}`} />
 
-              {/* Row 2 — utility icon toggles, always visible */}
-              <div className="flex items-center justify-end gap-2">
-                {/* Background Animation (3D) toggle */}
-                <button
-                  onClick={() => {
-                    setShow3D(prev => {
-                      if (!prev) { setShowIntro(true); setIsLightMode(false); }
-                      return !prev;
-                    });
-                  }}
-                  title={show3D ? 'Disable 3D Background' : 'Enable 3D Background'}
-                  className={`w-9 h-9 flex items-center justify-center rounded-full border backdrop-blur-[18px] text-[16px] transition-all duration-300 ${
-                    lm
-                      ? 'border-black/[0.10] bg-black/[0.05] text-slate-500 hover:bg-black/[0.09] hover:border-black/[0.18] hover:text-slate-900'
-                      : 'border-white/[0.12] bg-white/[0.06] text-white/60 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
-                  }`}
-                >
-                  {show3D ? '◑' : '◐'}
-                </button>
-
-                {/* Light / Dark mode toggle — only when 3D is off */}
-                {!show3D && (
+                  {/* 3D toggle */}
                   <button
-                    onClick={() => setIsLightMode(m => !m)}
-                    title={isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
-                    className={`w-9 h-9 flex items-center justify-center rounded-full border backdrop-blur-[18px] text-[15px] transition-all duration-300 ${
-                      lm
-                        ? 'border-black/[0.12] bg-black/[0.06] text-slate-600 hover:bg-black/[0.10] hover:border-black/[0.20] hover:text-slate-900'
-                        : 'border-white/[0.12] bg-white/[0.06] text-white/60 hover:bg-white/[0.11] hover:border-white/[0.22] hover:text-white'
+                    onClick={() => {
+                      setShow3D(prev => {
+                        if (!prev) { setShowIntro(true); setIsLightMode(false); }
+                        return !prev;
+                      });
+                    }}
+                    title={show3D ? 'Disable 3D Background' : 'Enable 3D Background'}
+                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 ${
+                      show3D
+                        ? lm ? 'bg-black/[0.09] text-slate-800' : 'bg-white/[0.13] text-white'
+                        : lm ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.06]' : 'text-white/35 hover:text-white hover:bg-white/[0.08]'
                     }`}
                   >
-                    {isLightMode ? '🌙' : '☀️'}
+                    <Layers3 size={14} strokeWidth={2} />
                   </button>
-                )}
+
+                  {/* Light / Dark toggle — only when 3D off */}
+                  {!show3D && (
+                    <button
+                      onClick={() => setIsLightMode(m => !m)}
+                      title={isLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                      className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 ${
+                        lm
+                          ? 'text-slate-400 hover:text-slate-900 hover:bg-black/[0.06]'
+                          : 'text-white/35 hover:text-white hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      {isLightMode ? <Moon size={14} strokeWidth={2} /> : <Sun size={14} strokeWidth={2} />}
+                    </button>
+                  )}
+                </motion.div>
               </div>
-            </div>
+            )}
 
             {/* Search bar + tags */}
             <motion.div

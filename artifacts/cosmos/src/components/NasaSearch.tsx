@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo, type RefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
   Film, LayoutGrid, Telescope, X, Sparkles,
   FlaskConical, Database, Library, Tags, Satellite,
-  ExternalLink, ChevronRight,
+  ExternalLink, ChevronRight, ChevronLeft, ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
@@ -164,12 +164,21 @@ function getTopicCover(text: string) {
   return { from:'#030310', via:'#060622', to:'#030310', accent:'#6366f1', symbol:'◈', label:'Science' };
 }
 
-// ─── Shorts detection heuristic (no duration metadata available) ──────────────
-// Checks title + description for "#shorts", "shorts" keyword, or related signals.
-// Fails gracefully — ambiguous videos are treated as Long Videos.
+// ─── Shorts detection ─────────────────────────────────────────────────────────
+// Primary: trust the backend `isShort` flag (set when video came from a #shorts
+// query). Fallback: scan title + description text for shorts signals.
 function isShortVideo(video: VideoItem): boolean {
+  if (video.isShort === true)  return true;
+  if (video.isShort === false) return false;
   const text = `${video.title} ${video.description}`.toLowerCase();
-  return text.includes('#shorts') || text.includes('#short ') || /\bshorts\b/.test(text);
+  return (
+    text.includes('#shorts') ||
+    text.includes('#short ') ||
+    /\bshorts\b/.test(text)   ||
+    text.includes('short video') ||
+    text.includes('60 seconds') ||
+    text.includes('60s ')
+  );
 }
 
 // ─── Status badges ────────────────────────────────────────────────────────────
@@ -1007,6 +1016,191 @@ function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
   );
 }
 
+// ─── Immersive Shorts Feed (Reels / TikTok-style) ────────────────────────────
+function ShortsImmersiveFeed({
+  videos, onClose, lm,
+}: { videos: VideoItem[]; onClose: () => void; lm?: boolean }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowDown') {
+        setActiveIdx(i => {
+          const next = Math.min(i + 1, videos.length - 1);
+          scrollRef.current?.scrollTo({ top: next * (scrollRef.current?.clientHeight ?? 0), behavior: 'smooth' });
+          return next;
+        });
+      }
+      if (e.key === 'ArrowUp') {
+        setActiveIdx(i => {
+          const prev = Math.max(i - 1, 0);
+          scrollRef.current?.scrollTo({ top: prev * (scrollRef.current?.clientHeight ?? 0), behavior: 'smooth' });
+          return prev;
+        });
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose, videos.length]);
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const idx = Math.round(el.scrollTop / el.clientHeight);
+    if (idx !== activeIdx) setActiveIdx(idx);
+  }
+
+  if (videos.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[400] bg-black/96 backdrop-blur-2xl flex flex-col items-center justify-center gap-5"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-5 left-5 flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/[0.08] border border-white/15 text-white/65 hover:text-white hover:bg-white/[0.14] transition-all duration-200 text-[12px] font-medium"
+        >
+          <ChevronLeft size={13} strokeWidth={2.5} /> Back
+        </button>
+        <Telescope size={40} strokeWidth={1} className="text-white/18" />
+        <p className="text-white/40 text-[14px] font-medium">No Shorts found for this topic</p>
+        <p className="text-white/22 text-[11px] uppercase tracking-[0.2em]">Try searching a different topic</p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed inset-0 z-[400] bg-black overflow-hidden"
+    >
+      {/* Back button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 left-4 z-[410] flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/70 backdrop-blur-xl border border-white/15 text-white/70 hover:text-white hover:bg-black/90 hover:border-white/30 transition-all duration-200 text-[12px] font-medium tracking-[0.02em]"
+      >
+        <ChevronLeft size={14} strokeWidth={2.5} />
+        Back
+      </button>
+
+      {/* Slide counter */}
+      <div className="absolute top-4 right-4 z-[410] px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white/40 text-[11px] font-medium tabular-nums">
+        {activeIdx + 1} / {videos.length}
+      </div>
+
+      {/* Right-side progress pills */}
+      <div className="absolute top-16 right-4 z-[410] flex flex-col gap-1.5 items-center">
+        {videos.slice(0, 14).map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{
+              height: i === activeIdx ? '22px' : '4px',
+              opacity: i === activeIdx ? 1 : i < activeIdx ? 0.55 : 0.22,
+              backgroundColor: i === activeIdx ? '#ffffff' : 'rgba(255,255,255,0.5)',
+            }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="w-[3px] rounded-full cursor-pointer"
+            onClick={() => {
+              scrollRef.current?.scrollTo({
+                top: i * (scrollRef.current?.clientHeight ?? 0),
+                behavior: 'smooth',
+              });
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Scroll feed */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="w-full h-full overflow-y-scroll"
+        style={{ scrollSnapType: 'y mandatory', scrollBehavior: 'smooth' }}
+      >
+        {videos.map((video, i) => {
+          const isNear = Math.abs(i - activeIdx) <= 1;
+          return (
+            <div
+              key={video.videoId}
+              className="relative w-full flex items-center justify-center bg-black"
+              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', height: '100dvh', minHeight: '100vh' }}
+            >
+              {/* Blurred background thumbnail */}
+              <div className="absolute inset-0 overflow-hidden">
+                <img
+                  src={video.thumbnail}
+                  alt=""
+                  aria-hidden
+                  className="w-full h-full object-cover scale-110"
+                  style={{ filter: 'blur(28px) brightness(0.28) saturate(1.4)' }}
+                />
+              </div>
+
+              {/* 9:16 iframe container */}
+              <div
+                className="relative z-10 w-full mx-auto overflow-hidden rounded-2xl"
+                style={{
+                  maxWidth: 'min(360px, calc(100dvh * 9/16))',
+                  aspectRatio: '9/16',
+                  maxHeight: 'calc(100dvh - 24px)',
+                }}
+              >
+                {isNear ? (
+                  <iframe
+                    key={`${video.videoId}-${i === activeIdx ? 'active' : 'near'}`}
+                    src={`https://www.youtube.com/embed/${video.videoId}?autoplay=${i === activeIdx ? 1 : 0}&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${video.videoId}`}
+                    className="w-full h-full"
+                    style={{ border: 'none' }}
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                ) : (
+                  /* Placeholder thumbnail for distant slides */
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-full h-full object-cover opacity-35"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+
+              {/* Bottom title overlay */}
+              <div className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-10 pt-24 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none">
+                <p
+                  className="text-white font-semibold text-[15px] leading-snug tracking-[-0.01em] line-clamp-2 mb-1.5"
+                  style={{ fontFamily: 'var(--app-font-heading)' }}
+                >
+                  {video.title}
+                </p>
+                {video.channelTitle && (
+                  <p className="text-white/50 text-[12px] font-medium">{video.channelTitle}</p>
+                )}
+              </div>
+
+              {/* Scroll-down cue (not on last slide) */}
+              {i === activeIdx && i < videos.length - 1 && (
+                <motion.div
+                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+                  animate={{ y: [0, 6, 0], opacity: [0.35, 0.65, 0.35] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <ChevronDown size={22} strokeWidth={1.4} className="text-white/50" />
+                </motion.div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Filter bar ───────────────────────────────────────────────────────────────
 function SearchFilterBar({
   active, counts, lm, onChange,
 }: {
@@ -1148,6 +1342,17 @@ export default function NasaSearch({
 
     return (
       <>
+        {/* ── Immersive Shorts Feed — full-screen overlay ── */}
+        <AnimatePresence>
+          {activeFilter === 'shorts' && (
+            <ShortsImmersiveFeed
+              videos={classifiedVideos.shorts}
+              onClose={() => setActiveFilter('all')}
+              lm={lm}
+            />
+          )}
+        </AnimatePresence>
+
         <AnimatePresence>
           <motion.div
             key="sections-view"

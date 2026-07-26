@@ -34,6 +34,7 @@ interface VideoItem {
   thumbnail: string;
   channelTitle: string;
   description: string;
+  isShort?: boolean;
 }
 
 export interface SearchResponse {
@@ -434,7 +435,26 @@ async function fetchInspireHEP(query: string, page: number): Promise<SectionItem
 
 // ── YouTube (internal web client — no API key needed) ─────────────────────────
 
-async function fetchYouTube(query: string): Promise<VideoItem[]> {
+type YTRenderer = {
+  videoRenderer?: {
+    videoId?: string;
+    title?: { runs?: { text: string }[] };
+    longBylineText?: { runs?: { text: string }[] };
+    descriptionSnippet?: { runs?: { text: string }[] };
+  };
+};
+type YTSection = { itemSectionRenderer?: { contents?: YTRenderer[] } };
+type YTResponse = {
+  contents?: {
+    twoColumnSearchResultsRenderer?: {
+      primaryContents?: {
+        sectionListRenderer?: { contents?: YTSection[] };
+      };
+    };
+  };
+};
+
+async function ytSearch(query: string, isShort: boolean): Promise<VideoItem[]> {
   const YT_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
   const resp = await fetch(
     `https://www.youtube.com/youtubei/v1/search?key=${YT_KEY}&prettyPrint=false`,
@@ -458,32 +478,13 @@ async function fetchYouTube(query: string): Promise<VideoItem[]> {
             gl: "US",
           },
         },
-        query,
+        query: isShort ? `${query} #shorts` : query,
         params: "EgIQAQ%3D%3D", // videos only
       }),
       signal: timeout(12_000),
     },
   );
   if (!resp.ok) return [];
-
-  type YTRenderer = {
-    videoRenderer?: {
-      videoId?: string;
-      title?: { runs?: { text: string }[] };
-      longBylineText?: { runs?: { text: string }[] };
-      descriptionSnippet?: { runs?: { text: string }[] };
-    };
-  };
-  type YTSection = { itemSectionRenderer?: { contents?: YTRenderer[] } };
-  type YTResponse = {
-    contents?: {
-      twoColumnSearchResultsRenderer?: {
-        primaryContents?: {
-          sectionListRenderer?: { contents?: YTSection[] };
-        };
-      };
-    };
-  };
 
   const data = await resp.json() as YTResponse;
   const sections =
@@ -494,7 +495,7 @@ async function fetchYouTube(query: string): Promise<VideoItem[]> {
 
   return renderers
     .filter(r => r.videoRenderer?.videoId)
-    .slice(0, 8)
+    .slice(0, isShort ? 12 : 8)
     .map(r => {
       const vr = r.videoRenderer!;
       const videoId = vr.videoId ?? "";
@@ -504,9 +505,28 @@ async function fetchYouTube(query: string): Promise<VideoItem[]> {
         thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
         channelTitle: vr.longBylineText?.runs?.map(r => r.text).join("") ?? "",
         description: vr.descriptionSnippet?.runs?.map(r => r.text).join("") ?? "",
+        isShort,
       };
     })
     .filter(v => v.videoId.length > 0);
+}
+
+async function fetchYouTube(query: string): Promise<VideoItem[]> {
+  // Run regular videos + shorts-specific query in parallel
+  const [regular, shorts] = await Promise.all([
+    ytSearch(query, false).catch(() => [] as VideoItem[]),
+    ytSearch(query, true).catch(()  => [] as VideoItem[]),
+  ]);
+
+  // Merge: shorts first (so they appear in results), dedup by videoId
+  const seen = new Set<string>();
+  const merged: VideoItem[] = [];
+  for (const v of [...shorts, ...regular]) {
+    if (!v.videoId || seen.has(v.videoId)) continue;
+    seen.add(v.videoId);
+    merged.push(v);
+  }
+  return merged.slice(0, 16);
 }
 
 // ── Main route ────────────────────────────────────────────────────────────────
