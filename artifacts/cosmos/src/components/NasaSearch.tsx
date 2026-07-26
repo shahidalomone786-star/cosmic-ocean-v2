@@ -1018,12 +1018,13 @@ function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
 
 // ─── Immersive Shorts Feed (Reels / TikTok-style) ────────────────────────────
 function ShortsImmersiveFeed({
-  videos, onClose,
-}: { videos: VideoItem[]; onClose: () => void; lm?: boolean }) {
+  videos, onClose, onLoadMore, hasMore = true,
+}: { videos: VideoItem[]; onClose: () => void; lm?: boolean; onLoadMore?: () => void; hasMore?: boolean }) {
   const [activeIdx, setActiveIdx]       = useState(0);
   const [muted, setMuted]               = useState(true);   // start muted → autoplay works everywhere
   const [showUnmuteHint, setShowUnmuteHint] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadingMoreRef = useRef(false);
 
   // ── IntersectionObserver — clean active-slide tracking, no scroll math ──────
   useEffect(() => {
@@ -1043,6 +1044,18 @@ function ShortsImmersiveFeed({
     container.querySelectorAll('[data-idx]').forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, [videos.length]);
+
+  // ── Trigger loadMore when within 3 slides of the end ────────────────────────
+  useEffect(() => {
+    // Bail out early — all paths explicit to satisfy noImplicitReturns
+    if (!onLoadMore || !hasMore || loadingMoreRef.current) return;
+    if (activeIdx < videos.length - 3) return;
+    loadingMoreRef.current = true;
+    onLoadMore();
+    // Reset the guard after a short debounce so repeated swipes don't multi-fire
+    const t = setTimeout(() => { loadingMoreRef.current = false; }, 2000);
+    return () => clearTimeout(t);
+  }, [activeIdx, videos.length, onLoadMore, hasMore]);
 
   // ── Auto-hide unmute hint after 3.5s ────────────────────────────────────────
   useEffect(() => {
@@ -1132,8 +1145,17 @@ function ShortsImmersiveFeed({
         </button>
 
         {/* Slide counter */}
-        <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white/40 text-[11px] font-medium tabular-nums">
-          {activeIdx + 1} / {videos.length}
+        <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-[11px] font-medium tabular-nums flex items-center gap-1.5">
+          <span className="text-white/40">{activeIdx + 1} / {videos.length}</span>
+          {hasMore && activeIdx >= videos.length - 3 && (
+            <motion.span
+              className="text-white/30"
+              animate={{ opacity: [0.3, 0.8, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              ···
+            </motion.span>
+          )}
         </div>
       </div>
 
@@ -1355,6 +1377,9 @@ interface Props {
   chatAvatars?:          { name: string; image?: string }[];
   onSectionItemShare?:   (avatarName: string, title: string, description: string, source: string) => void;
   onRelatedTopicSearch?: (topic: string) => void;
+  // ── Shorts infinite scroll ──
+  onLoadMore?:    () => void;
+  shortsHasMore?: boolean;
 }
 
 // ─── Main NasaSearch component ────────────────────────────────────────────────
@@ -1364,6 +1389,7 @@ export default function NasaSearch({
   videoResults = [], videoStatus = 'idle', onVideoClick,
   lm,
   sections, chatAvatars, onSectionItemShare, onRelatedTopicSearch,
+  onLoadMore, shortsHasMore = true,
 }: Props) {
   const [selectedSectionItem, setSelectedSectionItem] = useState<SectionItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
@@ -1425,6 +1451,8 @@ export default function NasaSearch({
               videos={classifiedVideos.shorts}
               onClose={() => setActiveFilter('all')}
               lm={lm}
+              onLoadMore={onLoadMore}
+              hasMore={shortsHasMore}
             />
           )}
         </AnimatePresence>

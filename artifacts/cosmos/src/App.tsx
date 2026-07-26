@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star } from 'lucide-react';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
@@ -25,6 +25,26 @@ const cosmicScenes = [
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
+
+const TYPEWRITER_PHRASES = [
+  'Search the cosmos…',
+  'Search Quantum Mechanics…',
+  'Search Black Holes…',
+  'Search Neutron Stars…',
+  'Search Dark Matter…',
+  'Search Exoplanets…',
+  'Search the Multiverse…',
+  'Search String Theory…',
+];
+
+// Map each TAGS entry to its Lucide icon component
+const TAG_ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
+  'Quantum Mechanics':  Atom,
+  'General Relativity': Orbit,
+  'String Theory':      Waves,
+  'Astrophysics':       Star,
+  'Everything':         Sparkles,
+};
 
 const EVERYTHING_TERMS = [
   'nebula', 'galaxy', 'cosmos', 'supernova', 'aurora', 'jupiter', 'saturn',
@@ -1793,6 +1813,8 @@ export default function App() {
   // lm = light mode is actively visible (3D off + light on)
   const lm = isLightMode && !show3D;
   const [focused,      setFocused]     = useState(false);
+  const twTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typedPlaceholder, setTypedPlaceholder] = useState('');
   const [showPortal,   setShowPortal]  = useState(false);
   const [showLibrary,  setShowLibrary] = useState(false);
   const [language,     setLanguage]    = useState('English');
@@ -2001,6 +2023,40 @@ export default function App() {
     fetchWikiTitles(['Black hole', 'Supermassive black hole', 'Event horizon'], setPortalBlackHoles);
     fetchWikiTitles(['Theory of relativity', 'Schrödinger equation', 'Standard Model'], setPortalEquations);
   }, [showPortal, portalFetched]);
+
+  // ── Typewriter placeholder animation ─────────────────────────────────────
+  useEffect(() => {
+    if (focused || nasaQuery) {
+      if (twTimerRef.current) clearTimeout(twTimerRef.current);
+      setTypedPlaceholder('');
+      return;
+    }
+    let phraseIdx = 0, charIdx = 0, deleting = false;
+    const phrases = TYPEWRITER_PHRASES;
+    function tick() {
+      const phrase = phrases[phraseIdx];
+      if (!deleting) {
+        charIdx++;
+        setTypedPlaceholder(phrase.slice(0, charIdx));
+        if (charIdx === phrase.length) {
+          twTimerRef.current = setTimeout(() => { deleting = true; tick(); }, 2400);
+          return;
+        }
+      } else {
+        charIdx--;
+        setTypedPlaceholder(phrase.slice(0, charIdx));
+        if (charIdx === 0) {
+          deleting = false;
+          phraseIdx = (phraseIdx + 1) % phrases.length;
+          twTimerRef.current = setTimeout(tick, 420);
+          return;
+        }
+      }
+      twTimerRef.current = setTimeout(tick, deleting ? 26 : 55);
+    }
+    twTimerRef.current = setTimeout(tick, 800);
+    return () => { if (twTimerRef.current) clearTimeout(twTimerRef.current); };
+  }, [focused, nasaQuery]);
 
   // ── IntersectionObserver — infinite scroll ────────────────────────────────
   // Attaches for ALL search modes (specific filter or Everything).
@@ -2299,7 +2355,7 @@ export default function App() {
                 <input
                   type="text"
                   value={nasaQuery}
-                  placeholder="Search the cosmos…"
+                  placeholder={typedPlaceholder || 'Search the cosmos…'}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
                   onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
@@ -2334,7 +2390,12 @@ export default function App() {
                             ? 'text-white/88 bg-white/[0.08] border border-white/[0.16] shadow-[0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.09)] hover:bg-white/[0.12] hover:text-white hover:border-violet-300/[0.24] hover:shadow-[0_4px_22px_rgba(0,0,0,0.55),0_0_18px_rgba(139,92,246,0.12),inset_0_1px_0_rgba(255,255,255,0.13)] font-medium'
                             : 'text-white/48 bg-white/[0.035] border border-white/[0.07] shadow-[0_1px_8px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.045)] hover:bg-white/[0.075] hover:text-white/82 hover:border-white/[0.13] hover:shadow-[0_2px_14px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.07)]'
                       }`}>
-                      {isEverything ? '✦ Everything' : tag}
+                      {(() => { const TagIcon = TAG_ICON_MAP[tag]; return (
+                        <span className="flex items-center gap-1.5">
+                          {TagIcon && <TagIcon size={11} strokeWidth={1.8} className="flex-shrink-0" />}
+                          {tag}
+                        </span>
+                      ); })()}
                     </button>
                   );
                 })}
@@ -2385,6 +2446,8 @@ export default function App() {
                     setNasaQuery(topic);
                     searchAll(topic, 'specific');
                   }}
+                  onLoadMore={loadMore}
+                  shortsHasMore={searchSections?.hasMore ?? true}
                 />
               </div>
             )}
