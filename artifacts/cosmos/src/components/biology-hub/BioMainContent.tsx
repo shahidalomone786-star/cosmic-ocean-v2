@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone, ArrowRight, Clock, Users, Star, Lock,
+  Dna, ArrowRight, Clock, Users, Star, Lock,
 } from 'lucide-react';
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
 import BioDNAIcon from './BioDNAIcon';
+import Anatomy3DViewer from './anatomy3d/Anatomy3DViewer';
 
 // ─── Biology Hub — Main Content Area ─────────────────────────────────────────
 // Phase 1: Premium placeholder sections with clear extension points for Phase 2.
@@ -287,88 +288,7 @@ function OverviewSection({ lm }: { lm: boolean }) {
 }
 
 function AnatomySection({ lm }: { lm: boolean }) {
-  const systems = [
-    { name: 'Skeletal System', bones: '206 bones', icon: Bone, color: 'text-slate-300' },
-    { name: 'Muscular System', muscles: '600+ muscles', icon: Zap, color: 'text-amber-400' },
-    { name: 'Cardiovascular', note: 'Heart + 60,000 mi vessels', icon: Heart, color: 'text-rose-400' },
-    { name: 'Nervous System', note: '86 billion neurons', icon: Brain, color: 'text-violet-400' },
-    { name: 'Respiratory', note: 'Lungs + airways', icon: Activity, color: 'text-sky-400' },
-    { name: 'Digestive', note: '30 ft GI tract', icon: Network, color: 'text-orange-400' },
-  ];
-
-  return (
-    <div>
-      <SectionHeader lm={lm} title="3D Anatomy" subtitle="Interactive Explorer" badge={<ComingSoonBadge />} />
-
-      {/* 3D viewer placeholder */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl mb-5 flex items-center justify-center"
-        style={{
-          height: 220,
-          background: lm
-            ? 'linear-gradient(135deg, rgba(236,253,245,0.9), rgba(224,252,255,0.9))'
-            : 'linear-gradient(135deg, rgba(2,12,8,0.95), rgba(4,12,20,0.95))',
-          border: lm
-            ? '1px solid rgba(52,211,153,0.2)'
-            : '1px solid rgba(52,211,153,0.12)',
-        }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 50% 50%, rgba(52,211,153,0.08) 0%, transparent 65%)' }}
-        />
-        <div className="text-center relative z-10">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            className="w-20 h-20 rounded-full border border-dashed mb-3 mx-auto flex items-center justify-center"
-            style={{ borderColor: 'rgba(52,211,153,0.3)' }}
-          >
-            <Layers3 size={28} strokeWidth={1.4} className="text-emerald-400" />
-          </motion.div>
-          <p className="text-[13px] font-semibold" style={{ color: lm ? '#065f46' : 'rgba(255,255,255,0.8)' }}>
-            3D Human Body Viewer
-          </p>
-          <p className="text-[11px] mt-1" style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.3)' }}>
-            Full interactive 3D model — launching in Phase 2
-          </p>
-          <div className="flex items-center justify-center gap-1.5 mt-2.5">
-            <Lock size={10} className="text-violet-400" />
-            <span className="text-[10px] text-violet-400">Phase 2 feature</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Body systems list */}
-      <SectionHeader lm={lm} title="Body Systems" subtitle="Overview" />
-      <div className="grid grid-cols-1 gap-2.5">
-        {systems.map((sys, i) => (
-          <motion.div
-            key={sys.name}
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.06, duration: 0.4 }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl"
-            style={glassCard(lm)}
-          >
-            <sys.icon size={15} strokeWidth={1.8} className={sys.color} />
-            <div className="flex-1">
-              <p className="text-[12px] font-medium" style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.85)' }}>
-                {sys.name}
-              </p>
-              <p className="text-[10px]" style={{ color: lm ? 'rgba(6,78,59,0.45)' : 'rgba(255,255,255,0.3)' }}>
-                {'bones' in sys ? sys.bones : 'muscles' in sys ? sys.muscles : sys.note}
-              </p>
-            </div>
-            <ArrowRight size={12} style={{ color: lm ? 'rgba(52,211,153,0.4)' : 'rgba(52,211,153,0.3)' }} />
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
+  return <Anatomy3DViewer lm={lm} />;
 }
 
 function DNASection({ lm }: { lm: boolean }) {
@@ -617,9 +537,6 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery }: BioMainContentP
     }
   };
 
-  // Show overview when activeSection is the default and no search
-  const showOverview = activeSection === '3d-anatomy' && !searchQuery.trim();
-
   return (
     <motion.main
       initial={{ opacity: 0, y: 12 }}
@@ -635,7 +552,7 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery }: BioMainContentP
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          {showOverview ? <OverviewSection lm={lm} /> : renderSection()}
+          {renderSection()}
         </motion.div>
       </AnimatePresence>
       <div className="h-8" />
