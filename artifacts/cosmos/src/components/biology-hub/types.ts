@@ -2,6 +2,7 @@
 
 export type BioSectionId =
   | '3d-anatomy'
+  | 'microscope'
   | 'organs'
   | 'body-systems'
   | 'skeleton'
@@ -37,6 +38,15 @@ export const BIO_NAV_ITEMS: BioNavItem[] = [
     glow: 'rgba(52,211,153,0.3)',
     description: 'Interactive 3D human body explorer',
     badge: 'Interactive',
+  },
+  {
+    id: 'microscope',
+    label: 'Microscope',
+    iconName: 'ScanLine',
+    color: 'text-teal-300',
+    glow: 'rgba(94,234,212,0.3)',
+    description: 'Virtual microscope with 8 specimen slides',
+    badge: 'New',
   },
   {
     id: 'organs',

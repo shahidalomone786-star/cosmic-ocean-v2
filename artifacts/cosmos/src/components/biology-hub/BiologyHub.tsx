@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Layers3, Heart, Network, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone,
+  Dna, Bone, ScanLine,
 } from 'lucide-react';
 import BioHeader from './BioHeader';
 import BioSidebar from './BioSidebar';
@@ -22,7 +22,7 @@ interface BiologyHubProps {
 const MOBILE_ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
   Layers3, Heart, Network, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone,
+  Dna, Bone, ScanLine,
 };
 
 // ─── Mobile horizontal scroll navigation ──────────────────────────────────────

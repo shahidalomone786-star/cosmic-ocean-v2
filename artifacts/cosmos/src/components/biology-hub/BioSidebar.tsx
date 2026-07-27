@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone,
+  Dna, Bone, ScanLine,
 } from 'lucide-react';
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
 
@@ -19,13 +19,13 @@ interface BioSidebarProps {
 const ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone,
+  Dna, Bone, ScanLine,
 };
 
 const SECTION_GROUPS = [
   {
     label: 'Human Body',
-    ids: ['3d-anatomy', 'organs', 'body-systems', 'skeleton', 'muscles', 'brain'],
+    ids: ['3d-anatomy', 'microscope', 'organs', 'body-systems', 'skeleton', 'muscles', 'brain'],
   },
   {
     label: 'Molecular',

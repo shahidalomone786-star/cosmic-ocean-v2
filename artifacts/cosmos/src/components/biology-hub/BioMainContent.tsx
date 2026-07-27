@@ -13,6 +13,7 @@ import SimulationsSection from './sections/SimulationsSection';
 import VideosSection from './sections/VideosSection';
 import TopicSection from './sections/TopicSection';
 import BioSearchResults from './sections/BioSearchResults';
+import MicroscopeSection from './sections/MicroscopeSection';
 
 // ─── Biology Hub — Main Content Area ─────────────────────────────────────────
 // Phase 3: Intelligence & Data Layer — all sections wired to live APIs.
@@ -436,6 +437,7 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery }: BioMainContentP
     // ── Section switch ──
     switch (activeSection) {
       case '3d-anatomy':  return <AnatomySection lm={lm} />;
+      case 'microscope':  return <MicroscopeSection lm={lm} />;
       case 'cells':       return <CellsSection lm={lm} />;
       case 'dna':         return <DNASection lm={lm} />;
       case 'brain':       return <BrainSection lm={lm} />;
