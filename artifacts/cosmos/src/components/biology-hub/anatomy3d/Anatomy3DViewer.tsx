@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Brain, Wind, Bone, Dna, Microscope,
   X, ExternalLink, ChevronRight, AlertCircle, Loader2,
-  RotateCcw,
+  RotateCcw, Layers,
 } from 'lucide-react';
 import { ORGAN_DATA, ORGAN_LIST, type OrganId } from './organData';
 
@@ -100,17 +100,22 @@ function OrganCard({
 type ViewerState = 'loading' | 'ready' | 'error' | 'unavailable';
 
 function SketchfabViewer({
-  sketchfabId, organName, lm,
-}: { sketchfabId: string | null; organName: string; lm: boolean }) {
-  const [state, setState] = useState<ViewerState>(sketchfabId ? 'loading' : 'unavailable');
+  modelId, organName, lm, onRetryRequest,
+}: {
+  modelId:        string | null;
+  organName:      string;
+  lm:             boolean;
+  onRetryRequest?: () => void;
+}) {
+  const [state, setState] = useState<ViewerState>(modelId ? 'loading' : 'unavailable');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!sketchfabId) { setState('unavailable'); return; }
+    if (!modelId) { setState('unavailable'); return; }
     setState('loading');
     timerRef.current = setTimeout(() => setState('error'), 10_000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [sketchfabId]);
+  }, [modelId]);
 
   const handleLoad  = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -121,8 +126,8 @@ function SketchfabViewer({
     setState('error');
   }, []);
 
-  const embedUrl = sketchfabId
-    ? `https://sketchfab.com/models/${sketchfabId}/embed?autostart=1&ui_infos=0&ui_controls=1&ui_watermark=0&preload=1`
+  const embedUrl = modelId
+    ? `https://sketchfab.com/models/${modelId}/embed?autostart=1&preload=1&ui_theme=dark`
     : null;
 
   if (state === 'unavailable' || state === 'error') {
@@ -132,10 +137,11 @@ function SketchfabViewer({
         organName={organName}
         canRetry={state === 'error'}
         onRetry={() => {
-          if (sketchfabId) {
+          if (modelId) {
             setState('loading');
             timerRef.current = setTimeout(() => setState('error'), 10_000);
           }
+          onRetryRequest?.();
         }}
       />
     );
@@ -182,6 +188,7 @@ function SketchfabViewer({
       {/* Iframe */}
       {embedUrl && (
         <iframe
+          key={modelId}
           src={embedUrl}
           title={`3D model of ${organName}`}
           className="w-full h-full rounded-xl border-0"
@@ -276,6 +283,89 @@ function UnavailableModel({
   );
 }
 
+// ─── Premium Variant Switcher ─────────────────────────────────────────────────
+function VariantSwitcher({
+  models, activeIdx, onSelect, accentRgb,
+}: {
+  models:    { id: string; name: string }[];
+  activeIdx: number;
+  onSelect:  (idx: number) => void;
+  accentRgb: string;
+}) {
+  if (models.length <= 1) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.45, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute bottom-4 left-1/2 z-20 flex items-center gap-1.5 px-2 py-1.5 rounded-2xl"
+      style={{
+        transform:       'translateX(-50%)',
+        background:      'rgba(0,0,0,0.55)',
+        backdropFilter:  'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        border:          `1px solid rgba(${accentRgb},0.22)`,
+        boxShadow:       `0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(${accentRgb},0.1), inset 0 1px 0 rgba(255,255,255,0.06)`,
+        maxWidth:        'calc(100% - 32px)',
+        flexWrap:        'nowrap' as const,
+        overflowX:       'auto' as const,
+        scrollbarWidth:  'none' as const,
+      }}
+    >
+      {/* Icon label */}
+      <div
+        className="flex-shrink-0 flex items-center gap-1 pr-1.5 mr-0.5"
+        style={{ borderRight: `1px solid rgba(${accentRgb},0.18)` }}
+      >
+        <Layers size={10} style={{ color: `rgba(${accentRgb},0.7)` }} strokeWidth={2} />
+        <span
+          className="text-[9px] uppercase tracking-[0.16em] font-semibold whitespace-nowrap"
+          style={{ color: `rgba(${accentRgb},0.55)` }}
+        >
+          View
+        </span>
+      </div>
+
+      {/* Pill buttons */}
+      {models.map((model, idx) => {
+        const isActive = idx === activeIdx;
+        return (
+          <button
+            key={model.id}
+            onClick={() => onSelect(idx)}
+            className="relative flex-shrink-0 px-3 py-1 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-200 whitespace-nowrap"
+            style={{
+              background: isActive
+                ? `rgba(${accentRgb},0.22)`
+                : 'transparent',
+              border: isActive
+                ? `1px solid rgba(${accentRgb},0.45)`
+                : '1px solid transparent',
+              color: isActive
+                ? `rgb(${accentRgb})`
+                : 'rgba(255,255,255,0.45)',
+              boxShadow: isActive
+                ? `0 0 12px rgba(${accentRgb},0.2), inset 0 1px 0 rgba(${accentRgb},0.1)`
+                : 'none',
+            }}
+          >
+            {isActive && (
+              <motion.span
+                layoutId="variant-active-pill"
+                className="absolute inset-0 rounded-xl pointer-events-none"
+                style={{ background: `rgba(${accentRgb},0.1)` }}
+                transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+              />
+            )}
+            <span className="relative z-10">{model.name}</span>
+          </button>
+        );
+      })}
+    </motion.div>
+  );
+}
+
 // ─── Organ detail modal ───────────────────────────────────────────────────────
 function OrganModal({
   organId, onClose, lm,
@@ -283,6 +373,12 @@ function OrganModal({
   const organ = ORGAN_DATA[organId];
   const rgb   = organ.accentRgb;
   const Icon  = ICON_MAP[organ.lucideIconName] ?? Microscope;
+
+  // Active model variant index — resets to 0 each time the modal opens for this organ
+  const [activeModelIdx, setActiveModelIdx] = useState(0);
+
+  const activeModel = organ.models[activeModelIdx] ?? null;
+  const activeModelId = activeModel?.id ?? null;
 
   // Close on Escape
   useEffect(() => {
@@ -369,11 +465,20 @@ function OrganModal({
           <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
             {/* 3D viewer pane */}
             <div className="flex-1 min-h-0 p-4 lg:p-5" style={{ minHeight: '260px' }}>
-              <div className="w-full h-full" style={{ minHeight: '240px' }}>
+              {/* Relative wrapper so the variant switcher can overlay the bottom */}
+              <div className="relative w-full h-full" style={{ minHeight: '240px' }}>
                 <SketchfabViewer
-                  sketchfabId={organ.sketchfabId}
-                  organName={organ.name}
+                  modelId={activeModelId}
+                  organName={activeModel?.name ?? organ.name}
                   lm={lm}
+                />
+
+                {/* ── Premium Variant Switcher (floats above iframe) ── */}
+                <VariantSwitcher
+                  models={organ.models}
+                  activeIdx={activeModelIdx}
+                  onSelect={setActiveModelIdx}
+                  accentRgb={rgb}
                 />
               </div>
             </div>
@@ -438,7 +543,7 @@ function OrganModal({
               </div>
 
               {/* Sketchfab credit */}
-              {organ.sketchfabCredit && organ.sketchfabId && (
+              {organ.sketchfabCredit && organ.models.length > 0 && (
                 <p
                   className="text-[9px] mt-auto pt-2"
                   style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.2)' }}

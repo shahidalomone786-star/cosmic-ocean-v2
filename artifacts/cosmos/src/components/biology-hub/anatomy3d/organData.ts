@@ -8,6 +8,14 @@ export interface OrganFact {
   value: string;
 }
 
+/** A single Sketchfab model variant selectable in the Premium Variant Switcher. */
+export interface OrganModel {
+  /** 32-char hex Sketchfab model ID (no dashes). */
+  id:   string;
+  /** Display name shown in the variant switcher pill. */
+  name: string;
+}
+
 export interface OrganData {
   id:             OrganId;
   name:           string;
@@ -20,11 +28,11 @@ export interface OrganData {
   description:    string;
   facts:          OrganFact[];
   /**
-   * Sketchfab model ID for embed, or null → show polished "Model Unavailable" card.
-   * Format: 32-char hex (no dashes), e.g. "e410da98b1e5445eae2acafaaa53587d"
+   * One or more Sketchfab model variants. Index 0 is the default.
+   * Empty array → show polished "Model Unavailable" card.
    * The viewer automatically times out after 10 s and falls back gracefully.
    */
-  sketchfabId:    string | null;
+  models:          OrganModel[];
   /** Credit line shown in viewer footer */
   sketchfabCredit?: string;
 }
@@ -46,9 +54,13 @@ export const ORGAN_DATA: Record<OrganId, OrganData> = {
       { label: 'Output',      value: '~5 L/min'   },
       { label: 'Valves',      value: '4 (mitral, tricuspid, aortic, pulmonic)' },
     ],
-    sketchfabId:     '8f647a38fba44efcb6ab26ea3f86b04d',
+    models: [
+      { id: '80d8881f839f47a8907dfafe7589e41b', name: 'Animated Heart'   },
+      { id: '3f8072336ce94d18b3d0d055a1ece089', name: 'Realistic Static'  },
+    ],
     sketchfabCredit: 'Sketchfab · CC Attribution',
   },
+
   brain: {
     id:             'brain',
     name:           'Human Brain',
@@ -65,9 +77,15 @@ export const ORGAN_DATA: Record<OrganId, OrganData> = {
       { label: 'Energy use', value: '20 % of body total'  },
       { label: 'Lobes',      value: '4 (frontal, parietal, temporal, occipital)' },
     ],
-    sketchfabId:     'a10a8dbce47c4a07959d0a871196fb63',
+    models: [
+      { id: '1d7d557c8a5c4fe888c2d43752ff4a7f', name: 'Premium Brain'  },
+      { id: 'e073c2590bc24daaa7323f4daa5b7784', name: 'Human Brain'    },
+      { id: '36870e0970f044a8957b0af3a180a7eb', name: 'Anatomy View'   },
+      { id: 'c51b432b0b5046c1b4268061b9214feb', name: 'Standard View'  },
+    ],
     sketchfabCredit: 'Sketchfab · CC Attribution',
   },
+
   lungs: {
     id:             'lungs',
     name:           'Human Lungs',
@@ -84,9 +102,13 @@ export const ORGAN_DATA: Record<OrganId, OrganData> = {
       { label: 'Breaths / day',  value: '~20,000'      },
       { label: 'Lobes',          value: '5 (3 right, 2 left)' },
     ],
-    sketchfabId:     'f5d97e44b04e4a0da8e46e97fce83264',
+    models: [
+      { id: '133fdce799ef46c3b6a2d5ecc446e9d6', name: 'PBR Lungs'          },
+      { id: '066a1eafdcf54865b4c6b8688dac5834', name: 'Respiratory System' },
+    ],
     sketchfabCredit: 'Sketchfab · CC Attribution',
   },
+
   skeleton: {
     id:             'skeleton',
     name:           'Human Skeleton',
@@ -103,9 +125,13 @@ export const ORGAN_DATA: Record<OrganId, OrganData> = {
       { label: 'Joints',        value: '360+'               },
       { label: 'Marrow output', value: '2.4 M red cells/s'  },
     ],
-    sketchfabId:     '4a43db1c4a8840e19a80d3e7c57e7a6e',
+    models: [
+      { id: '657a31ed9704423c8c4e752fb2506a74', name: 'High-Res Skeleton' },
+      { id: 'cd6f68c60baf43d089de2b0cbc148dfc', name: 'With Organs'       },
+    ],
     sketchfabCredit: 'Sketchfab · CC Attribution',
   },
+
   dna: {
     id:             'dna',
     name:           'DNA Double Helix',
@@ -122,7 +148,9 @@ export const ORGAN_DATA: Record<OrganId, OrganData> = {
       { label: 'Diameter',          value: '~2 nm'                 },
       { label: 'Chromosomes',       value: '23 pairs (diploid)'    },
     ],
-    sketchfabId:     'e7b35df75b7440118d3a3e23e4f898a1',
+    models: [
+      { id: '51f5ab2ffc364f60be00289eb6909535', name: 'Stylized DNA' },
+    ],
     sketchfabCredit: 'Sketchfab · CC Attribution',
   },
 };
