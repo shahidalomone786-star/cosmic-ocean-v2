@@ -12,6 +12,8 @@ import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
 import CosmicNexus from './components/CosmicNexus';
 import SimulationSearch from './components/SimulationSearch';
+import BiologyHub from './components/biology-hub/BiologyHub';
+import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -2005,6 +2007,7 @@ export default function App() {
   const [masterpieceModal, setMasterpieceModal] = useState<MasterpieceItem | null>(null);
   const [showProfile,      setShowProfile]      = useState(false);
   const [showNexus,        setShowNexus]        = useState(false);
+  const [showBiologyHub,   setShowBiologyHub]   = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
@@ -2757,6 +2760,9 @@ export default function App() {
               {/* ── Simulation Search ── */}
               <SimulationSearch lm={lm} />
 
+              {/* ── Biology Hub Hero Card ── */}
+              <BioHeroCard lm={lm} onOpen={() => setShowBiologyHub(true)} />
+
               {/* ── Quantum Lab ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -3094,6 +3100,17 @@ export default function App() {
       {/* ── z-[150]  Cosmic Nexus Social Hub ── */}
       <AnimatePresence>
         {showNexus && <CosmicNexus onClose={() => setShowNexus(false)} lm={lm} />}
+      </AnimatePresence>
+
+      {/* ── z-[160]  Biology Hub ── */}
+      <AnimatePresence>
+        {showBiologyHub && (
+          <BiologyHub
+            lm={lm}
+            onToggleLm={() => setIsLightMode((v) => !v)}
+            onClose={() => setShowBiologyHub(false)}
+          />
+        )}
       </AnimatePresence>
 
       {/* ── z-[300]  Grandmaster Chess Modal ── */}
