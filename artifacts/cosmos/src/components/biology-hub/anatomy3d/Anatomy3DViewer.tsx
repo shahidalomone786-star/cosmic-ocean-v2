@@ -127,7 +127,7 @@ function SketchfabViewer({
   }, []);
 
   const embedUrl = modelId
-    ? `https://sketchfab.com/models/${modelId}/embed?autostart=1&preload=1&ui_theme=dark`
+    ? `https://sketchfab.com/models/${modelId}/embed?autostart=1&preload=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_settings=0&ui_vr=0&ui_annotations=0`
     : null;
 
   if (state === 'unavailable' || state === 'error') {
@@ -334,20 +334,20 @@ function VariantSwitcher({
           <button
             key={model.id}
             onClick={() => onSelect(idx)}
-            className="relative flex-shrink-0 px-3 py-1 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-200 whitespace-nowrap"
+            className="relative flex-shrink-0 px-3 py-1 rounded-xl text-[11px] font-semibold tracking-tight transition-all duration-200 whitespace-nowrap cursor-pointer"
             style={{
               background: isActive
                 ? `rgba(${accentRgb},0.22)`
-                : 'transparent',
+                : 'rgba(255,255,255,0.06)',
               border: isActive
-                ? `1px solid rgba(${accentRgb},0.45)`
-                : '1px solid transparent',
+                ? `1px solid rgba(${accentRgb},0.5)`
+                : '1px solid rgba(255,255,255,0.14)',
               color: isActive
                 ? `rgb(${accentRgb})`
-                : 'rgba(255,255,255,0.45)',
+                : 'rgba(255,255,255,0.72)',
               boxShadow: isActive
-                ? `0 0 12px rgba(${accentRgb},0.2), inset 0 1px 0 rgba(${accentRgb},0.1)`
-                : 'none',
+                ? `0 0 14px rgba(${accentRgb},0.25), inset 0 1px 0 rgba(${accentRgb},0.12)`
+                : 'inset 0 1px 0 rgba(255,255,255,0.06)',
             }}
           >
             {isActive && (
@@ -464,9 +464,9 @@ function OrganModal({
           {/* ── Body ── */}
           <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
             {/* 3D viewer pane */}
-            <div className="flex-1 min-h-0 p-4 lg:p-5" style={{ minHeight: '260px' }}>
+            <div className="flex-1 p-4 lg:p-5 min-h-[350px] md:min-h-[500px]">
               {/* Relative wrapper so the variant switcher can overlay the bottom */}
-              <div className="relative w-full h-full" style={{ minHeight: '240px' }}>
+              <div className="relative w-full h-full min-h-[320px] md:min-h-[470px]">
                 <SketchfabViewer
                   modelId={activeModelId}
                   organName={activeModel?.name ?? organ.name}
