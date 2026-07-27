@@ -8,9 +8,14 @@ import {
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
 import BioDNAIcon from './BioDNAIcon';
 import Anatomy3DViewer from './anatomy3d/Anatomy3DViewer';
+import ResearchSection from './sections/ResearchSection';
+import SimulationsSection from './sections/SimulationsSection';
+import VideosSection from './sections/VideosSection';
+import TopicSection from './sections/TopicSection';
+import BioSearchResults from './sections/BioSearchResults';
 
 // ─── Biology Hub — Main Content Area ─────────────────────────────────────────
-// Phase 1: Premium placeholder sections with clear extension points for Phase 2.
+// Phase 3: Intelligence & Data Layer — all sections wired to live APIs.
 
 interface BioMainContentProps {
   lm: boolean;
@@ -19,7 +24,7 @@ interface BioMainContentProps {
 }
 
 // ── Shared card styles ────────────────────────────────────────────────────────
-const glassCard = (lm: boolean, accent = 'emerald') => ({
+const glassCard = (lm: boolean) => ({
   background: lm
     ? `rgba(240,253,244,0.85)`
     : `rgba(3,12,8,0.75)`,
@@ -100,22 +105,6 @@ function PlaceholderCard({
         />
       </div>
     </motion.div>
-  );
-}
-
-// ── Coming Soon badge ─────────────────────────────────────────────────────────
-function ComingSoonBadge() {
-  return (
-    <span
-      className="text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider"
-      style={{
-        background: 'rgba(167,139,250,0.15)',
-        border: '1px solid rgba(167,139,250,0.25)',
-        color: '#a78bfa',
-      }}
-    >
-      Phase 2
-    </span>
   );
 }
 
@@ -235,7 +224,7 @@ function OverviewSection({ lm }: { lm: boolean }) {
                 Biology Hub
               </span>
               <span style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(52,211,153,0.4)' }} className="text-[9px]">
-                v1.0 — Phase 1
+                v3.0 — Intelligence Layer
               </span>
             </div>
             <h1
@@ -257,7 +246,8 @@ function OverviewSection({ lm }: { lm: boolean }) {
               style={{ color: lm ? 'rgba(6,78,59,0.6)' : 'rgba(255,255,255,0.45)' }}
             >
               From the double helix of DNA to the vast neural networks of the
-              human brain — Biology Hub brings life's complexity to your screen.
+              human brain — Biology Hub brings life's complexity to your screen,
+              powered by Wikipedia, OpenAlex, and PhET simulations.
             </p>
             <div className="flex flex-wrap gap-2">
               <StatChip lm={lm} icon={BookOpen} value="16" label="sections" />
@@ -428,112 +418,35 @@ function BrainSection({ lm }: { lm: boolean }) {
   );
 }
 
-function GenericSection({ lm, sectionId }: { lm: boolean; sectionId: BioSectionId }) {
-  const item = BIO_NAV_ITEMS.find((n) => n.id === sectionId);
-  if (!item) return null;
-
-  const comingSoon = ['organs', 'body-systems', 'skeleton', 'muscles', 'microbiology',
-    'viruses', 'evolution', 'biochemistry', 'research', 'videos', 'simulations'];
-
-  return (
-    <div>
-      <SectionHeader lm={lm} title={item.label} subtitle={item.description} />
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl p-8 flex flex-col items-center justify-center text-center"
-        style={{
-          minHeight: 260,
-          background: lm
-            ? 'rgba(240,253,244,0.85)'
-            : 'rgba(3,12,8,0.8)',
-          border: lm
-            ? '1px solid rgba(52,211,153,0.2)'
-            : '1px solid rgba(52,211,153,0.1)',
-        }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 50% 40%, rgba(52,211,153,0.06) 0%, transparent 65%)' }}
-        />
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-          style={{
-            background: lm ? 'rgba(52,211,153,0.12)' : 'rgba(52,211,153,0.1)',
-            border: '1px solid rgba(52,211,153,0.2)',
-          }}
-        >
-          <Microscope size={24} strokeWidth={1.5} className="text-emerald-400" />
-        </div>
-        <p
-          className="text-[17px] font-bold mb-2 tracking-tight"
-          style={{ fontFamily: 'var(--app-font-heading)', color: lm ? '#065f46' : 'rgba(255,255,255,0.88)' }}
-        >
-          {item.label} — Coming in Phase 2
-        </p>
-        <p
-          className="text-[12px] max-w-xs leading-relaxed mb-4"
-          style={{ color: lm ? 'rgba(6,78,59,0.55)' : 'rgba(255,255,255,0.38)' }}
-        >
-          {item.description}. Full interactive content, simulations, and expert explanations
-          are being built for Phase 2.
-        </p>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{
-          background: 'rgba(167,139,250,0.12)',
-          border: '1px solid rgba(167,139,250,0.22)',
-        }}>
-          <Lock size={11} className="text-violet-400" />
-          <span className="text-[11px] text-violet-400 font-medium">Phase 2 — extension point ready</span>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
+// ── Sections that need TopicSection (Wikipedia + OpenAlex) ───────────────────
+const TOPIC_SECTION_IDS: BioSectionId[] = [
+  'organs', 'body-systems', 'skeleton', 'muscles',
+  'genetics', 'microbiology', 'viruses', 'evolution', 'biochemistry',
+];
 
 // ─── Main switcher ────────────────────────────────────────────────────────────
 
 const BioMainContent = memo(({ lm, activeSection, searchQuery }: BioMainContentProps) => {
   const renderSection = () => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matches = BIO_NAV_ITEMS.filter(
-        (item) =>
-          item.label.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q)
-      );
-      return (
-        <div>
-          <SectionHeader lm={lm} title={`Results for "${searchQuery}"`} subtitle={`${matches.length} sections`} />
-          <div className="grid grid-cols-1 gap-3">
-            {matches.map((item, i) => (
-              <PlaceholderCard
-                key={item.id}
-                lm={lm}
-                title={item.label}
-                subtitle={item.description}
-                icon={Microscope}
-                color={item.color}
-                delay={i * 0.05}
-              />
-            ))}
-            {matches.length === 0 && (
-              <p className="text-center py-12 text-[13px]" style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(255,255,255,0.25)' }}>
-                No sections matched your search.
-              </p>
-            )}
-          </div>
-        </div>
-      );
+    // ── Global search results (≥ 2 chars) ──
+    if (searchQuery.trim().length >= 2) {
+      return <BioSearchResults lm={lm} searchQuery={searchQuery} />;
     }
 
+    // ── Section switch ──
     switch (activeSection) {
-      case '3d-anatomy':    return <AnatomySection lm={lm} />;
-      case 'cells':         return <CellsSection lm={lm} />;
-      case 'dna':           return <DNASection lm={lm} />;
-      case 'brain':         return <BrainSection lm={lm} />;
-      default:              return <GenericSection lm={lm} sectionId={activeSection} />;
+      case '3d-anatomy':  return <AnatomySection lm={lm} />;
+      case 'cells':       return <CellsSection lm={lm} />;
+      case 'dna':         return <DNASection lm={lm} />;
+      case 'brain':       return <BrainSection lm={lm} />;
+      case 'research':    return <ResearchSection lm={lm} searchQuery={searchQuery} />;
+      case 'videos':      return <VideosSection lm={lm} />;
+      case 'simulations': return <SimulationsSection lm={lm} />;
+      default:
+        if ((TOPIC_SECTION_IDS as string[]).includes(activeSection)) {
+          return <TopicSection lm={lm} sectionId={activeSection} />;
+        }
+        return <OverviewSection lm={lm} />;
     }
   };
 

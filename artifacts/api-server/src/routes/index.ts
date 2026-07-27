@@ -7,6 +7,7 @@ import unifiedSearchRouter from "./unified-search";
 import authRouter from "./auth";
 import postsRouter from "./posts";
 import cosmicRouter from "./cosmic";
+import biologyRouter from "./biology";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(unifiedSearchRouter);
 router.use(authRouter);
 router.use(postsRouter);
 router.use(cosmicRouter);
+router.use(biologyRouter);
 
 export default router;

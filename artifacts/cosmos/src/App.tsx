@@ -1010,6 +1010,7 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
 // ─── PhET Simulation Card ────────────────────────────────────────────────────
 // ─── Premium icon-cover design system (shared by Quantum Lab, Advanced Sandbox, Arcade Zone) ───
 type CoverTheme = 'blue' | 'purple' | 'cyan' | 'amber' | 'emerald';
+type IconComponent = React.FC<{ size?: number; strokeWidth?: number; className?: string; style?: React.CSSProperties }>;
 
 const COVER_PALETTE: Record<CoverTheme, { primary: string; glow: string; bgFrom: string; bgTo: string }> = {
   blue:    { primary: '#38bdf8', glow: 'rgba(56,189,248,0.52)',  bgFrom: 'rgba(2,24,54,0.82)',  bgTo: 'rgba(3,10,28,0.92)'  },
@@ -1020,7 +1021,7 @@ const COVER_PALETTE: Record<CoverTheme, { primary: string; glow: string; bgFrom:
 };
 
 /** Lucide icon + colour keyed by PhET slug — every simulation gets a distinct icon */
-const SIM_SLUG_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+const SIM_SLUG_COVER: Record<string, { Icon: IconComponent; theme: CoverTheme }> = {
   'wave-on-a-string':            { Icon: Waves,        theme: 'cyan'    },
   'pendulum-lab':                { Icon: Timer,        theme: 'amber'   },
   'projectile-motion':           { Icon: Rocket,       theme: 'blue'    },
@@ -1059,7 +1060,7 @@ const SIM_SLUG_COVER: Record<string, { Icon: React.ElementType; theme: CoverThem
 };
 
 /** Lucide icon + colour keyed by Advanced Sandbox id — every simulation gets a distinct icon */
-const ADV_SIM_ID_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+const ADV_SIM_ID_COVER: Record<string, { Icon: IconComponent; theme: CoverTheme }> = {
   'mpl-double-pendulum':  { Icon: RotateCw,     theme: 'purple'  },
   'mpl-pendulum':         { Icon: Timer,        theme: 'amber'   },
   'mpl-driven-pendulum':  { Icon: Flame,        theme: 'amber'   },
@@ -1113,7 +1114,7 @@ const ADV_SIM_ID_COVER: Record<string, { Icon: React.ElementType; theme: CoverTh
 };
 
 /** Lucide icon + colour for each Arcade game id */
-const GAME_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }> = {
+const GAME_COVER: Record<string, { Icon: IconComponent; theme: CoverTheme }> = {
   'game-2048':        { Icon: Brain,    theme: 'purple'  },
   'game-tetris':      { Icon: Layers3,  theme: 'cyan'    },
   'game-flappy':      { Icon: Wind,     theme: 'blue'    },
@@ -1134,7 +1135,7 @@ const GAME_COVER: Record<string, { Icon: React.ElementType; theme: CoverTheme }>
 function PremiumCover({
   Icon, theme, uid, index = 0, lm,
 }: {
-  Icon: React.ElementType;
+  Icon: IconComponent;
   theme: CoverTheme;
   uid: string;
   index?: number;
@@ -1507,7 +1508,7 @@ const MP_CARD_THEME: Record<string, {
 };
 
 // ─── Lucide icon map for Masterpiece cards ───────────────────────────────────
-const MP_PIECE_ICONS: Record<string, React.ElementType> = {
+const MP_PIECE_ICONS: Record<string, IconComponent> = {
   'blue-dot':        Globe,
   'solar-system':    Orbit,
   'deep-space':      Telescope,
