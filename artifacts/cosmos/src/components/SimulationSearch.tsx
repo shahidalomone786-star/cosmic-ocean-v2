@@ -131,6 +131,69 @@ const SIM_DATABASE: SimEntry[] = [
   { id: 'cp-chaos',             source: 'ComPADRE', title: "Newton's Cradle",               subject: 'Mechanics',  description: 'Momentum transfer through suspended steel balls — impulse and bounce.',       tags: ['momentum','newton','cradle','elastic'],  iframeUrl: 'https://www.myphysicslab.com/engine2D/newtons-cradle-en.html' },
 ];
 
+// ─── PhET Live API ────────────────────────────────────────────────────────────
+const PHET_API_URL =
+  'https://phet.colorado.edu/services/metadata/1.2/simulations?format=json&type=html';
+
+// Maps title+description keywords → a human-readable subject label.
+const SUBJECT_MAP: Array<[RegExp, string]> = [
+  [/calculus|derivative|integral|fourier|algebra|quadratic|linear.*equat|proportion|fraction|number.*line|area.*model|trig(?:onometry)?|sine|cosine|statistic|probability|regression|arithmetic|geometry|number.*sense/i, 'Mathematics'],
+  [/acid|base|\bph\b|solution|concentrat|molarity|molec|reaction|stoichiometry|bond|periodic|element|compound|chemical|polarity|intermolecular|sugar|salt|dissolv|beer.*law|absorption/i, 'Chemistry'],
+  [/\bdna\b|gene|protein|\bcell\b|evolution|natural.selection|neuron|membrane|photosyn|respirat|organism|ecosystem|heredit/i, 'Biology'],
+  [/\bwave\b|sound|frequency|amplitude|interference|diffraction|resonan|ripple|doppler|wave.*string|string.*wave|normal.mode/i, 'Waves'],
+  [/electric|circuit|current|voltage|ohm|capacitor|resistor|static.*electric|charge|magnet|induction|faraday|lorentz|electromagnet/i, 'Electricity & Magnetism'],
+  [/gravity|orbit|planet|solar.system|kepler|gravitation|\bspace\b/i, 'Astronomy'],
+  [/heat|thermal|temperature|conduction|convection|thermo|gas.*law|states.*matter|phase.*change|entropy|blackbody|kinetic.*theory/i, 'Thermodynamics'],
+  [/quantum|nuclear|\bproton\b|\bneutron\b|isotope|rutherford|bohr|wavefunction|tunneling|fission|radioactiv|discharge.*lamp/i, 'Atomic & Quantum'],
+  [/light|optic|lens|refract|reflect|color|vision|spectrum|laser|polariz|bending.*light/i, 'Optics'],
+  [/earth|climate|greenhouse|atmospher|weather|plate.*tectonic/i, 'Earth Science'],
+  [/fluid|buoyan|archimed|viscosity|pressure.*depth|under.*pressure/i, 'Fluids'],
+];
+
+const STOP = new Set([
+  'and','or','the','of','a','an','in','on','to','with','for','at','by',
+  'from','how','what','use','can','do','be','is','are','its','it','my',
+]);
+
+function inferSubject(title: string, desc: string): string {
+  const text = `${title} ${desc}`;
+  for (const [re, subject] of SUBJECT_MAP) if (re.test(text)) return subject;
+  return 'Physics';
+}
+
+function inferTags(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP.has(w))
+    .slice(0, 6);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parsePhetApi(data: any): SimEntry[] {
+  return (data.projects as any[]).flatMap((proj: any): SimEntry[] => {
+    const sim = proj.simulations?.[0];
+    if (!sim) return [];
+    const en = (sim.localizedSimulations as any[])?.find((l: any) => l.locale === 'en');
+    if (!en?.runUrl || !en?.title) return [];
+    const description: string =
+      typeof sim.description?.en === 'string'
+        ? (sim.description.en as string).slice(0, 200)
+        : '';
+    const slug: string = (proj.name as string).replace('html/', '');
+    return [{
+      id: `phet-${slug}`,
+      source: 'PhET',
+      title: en.title as string,
+      description,
+      subject: inferSubject(en.title as string, description),
+      tags: inferTags(en.title as string),
+      iframeUrl: en.runUrl as string,
+    }];
+  });
+}
+
 // ─── Source Configuration ─────────────────────────────────────────────────────
 const SOURCE_CONFIG: Record<SimSource, { label: string; color: string; darkBg: string; lightBg: string; darkText: string; lightText: string; dot: string }> = {
   PhET:      { label: 'PhET',       color: '#7c3aed', darkBg: 'bg-violet-500/15', lightBg: 'bg-violet-50',  darkText: 'text-violet-300', lightText: 'text-violet-700', dot: 'bg-violet-400' },
@@ -139,15 +202,16 @@ const SOURCE_CONFIG: Record<SimSource, { label: string; color: string; darkBg: s
 };
 
 // ─── Result Cache ─────────────────────────────────────────────────────────────
+// Keyed by query|sources. Cleared whenever the live DB is swapped in.
 const resultCache = new Map<string, SimEntry[]>();
 
-function searchSims(query: string, sources: SimSource[]): SimEntry[] {
+function searchSims(query: string, sources: SimSource[], db: SimEntry[]): SimEntry[] {
   const cacheKey = `${query.toLowerCase()}|${sources.join(',')}`;
   if (resultCache.has(cacheKey)) return resultCache.get(cacheKey)!;
 
   const pool = sources.length > 0
-    ? SIM_DATABASE.filter(s => sources.includes(s.source))
-    : SIM_DATABASE;
+    ? db.filter(s => sources.includes(s.source))
+    : db;
 
   const q = query.toLowerCase().trim();
   let results: SimEntry[];
@@ -419,6 +483,30 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Live database ─────────────────────────────────────────────────────────
+  // Starts with curated fallback (instant), then silently enriched from API.
+  const [simDb,     setSimDb]     = useState<SimEntry[]>(SIM_DATABASE);
+  const [apiStatus, setApiStatus] = useState<'loading' | 'done' | 'error'>('loading');
+
+  // Fetch live PhET catalogue on mount.
+  // phet.colorado.edu returns access-control-allow-origin: * so no proxy needed.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(PHET_API_URL)
+      .then(r => r.json())
+      .then((data: unknown) => {
+        if (cancelled) return;
+        const phetSims = parsePhetApi(data);
+        // Curated Falstad / MyPhysicsLab entries are kept alongside live PhET data.
+        const curated = SIM_DATABASE.filter(s => s.source !== 'PhET');
+        resultCache.clear(); // invalidate stale cache before state update
+        setSimDb([...phetSims, ...curated]);
+        setApiStatus('done');
+      })
+      .catch(() => { if (!cancelled) setApiStatus('error'); });
+    return () => { cancelled = true; };
+  }, []);
+
   // Debounce query
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -434,18 +522,18 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, hasSearched]);
 
-  // Run search
+  // Run search — re-runs when live DB is swapped in so results expand silently
   useEffect(() => {
     if (!hasSearched) return;
     setIsSearching(true);
     // Micro-task to allow React to render the loading state first
     const tid = setTimeout(() => {
-      const hits = searchSims(debouncedQuery, activeSources);
+      const hits = searchSims(debouncedQuery, activeSources, simDb);
       setResults(hits);
       setIsSearching(false);
     }, 10);
     return () => clearTimeout(tid);
-  }, [debouncedQuery, activeSources, hasSearched]);
+  }, [debouncedQuery, activeSources, hasSearched, simDb]);
 
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -458,7 +546,7 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
       setHasSearched(true);
       setIsSearching(true);
       setTimeout(() => {
-        const hits = searchSims('', activeSources);
+        const hits = searchSims('', activeSources, simDb);
         setResults(hits);
         setIsSearching(false);
       }, 10);
@@ -511,10 +599,17 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
           <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
             Find & Launch Interactive Experiments
           </span>
-          <span className={`ml-auto text-[9px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+          <span className={`ml-auto text-[9px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1.5 ${
             lm ? 'bg-sky-100 text-sky-600 border border-sky-200' : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
           }`}>
-            {SIM_DATABASE.length} sims
+            {apiStatus === 'loading' && (
+              <motion.span
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0"
+              />
+            )}
+            {simDb.length} sims
           </span>
         </div>
 
