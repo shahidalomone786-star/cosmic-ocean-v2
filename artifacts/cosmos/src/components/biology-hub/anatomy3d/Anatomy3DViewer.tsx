@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Brain, Wind, Bone, Dna, Microscope,
   X, ExternalLink, ChevronRight, AlertCircle, Loader2,
-  RotateCcw, Layers,
+  RotateCcw, Layers, Maximize2, ArrowLeft,
 } from 'lucide-react';
 import { ORGAN_DATA, ORGAN_LIST, type OrganId } from './organData';
 
@@ -376,18 +377,96 @@ function OrganModal({
 
   // Active model variant index — resets to 0 each time the modal opens for this organ
   const [activeModelIdx, setActiveModelIdx] = useState(0);
+  const [isFullscreen, setIsFullscreen]     = useState(false);
 
-  const activeModel = organ.models[activeModelIdx] ?? null;
+  const activeModel   = organ.models[activeModelIdx] ?? null;
   const activeModelId = activeModel?.id ?? null;
 
-  // Close on Escape
+  // Escape: exit fullscreen first, then close modal on second press
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isFullscreen) { setIsFullscreen(false); }
+      else { onClose(); }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [isFullscreen, onClose]);
+
+  // ── Immersive fullscreen overlay (portal — escapes modal stacking context) ──
+  const fullscreenPortal = isFullscreen
+    ? createPortal(
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-[9999] w-screen h-screen flex flex-col"
+          style={{ background: 'rgba(0,0,0,0.96)', backdropFilter: 'blur(32px)' }}
+        >
+          {/* Back button — top-left */}
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="absolute top-6 left-6 z-[10000] flex items-center gap-2 px-4 py-2.5 rounded-full transition-all duration-200 group"
+            style={{
+              background:     'rgba(255,255,255,0.1)',
+              border:         '1px solid rgba(255,255,255,0.18)',
+              backdropFilter: 'blur(16px)',
+              boxShadow:      '0 4px 24px rgba(0,0,0,0.4)',
+              color:          'rgba(255,255,255,0.9)',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.18)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; }}
+          >
+            <ArrowLeft size={15} strokeWidth={2.2} />
+            <span className="text-[13px] font-semibold tracking-tight">Back</span>
+          </button>
+
+          {/* Organ label — top-center */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-2 pointer-events-none">
+            <div
+              className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: `rgba(${rgb},0.18)`, border: `1px solid rgba(${rgb},0.35)` }}
+            >
+              <Icon size={12} style={{ color: `rgb(${rgb})` }} strokeWidth={1.8} />
+            </div>
+            <p className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              {organ.name}
+            </p>
+            <span
+              className="text-[9px] uppercase tracking-[0.18em] font-medium"
+              style={{ color: `rgba(${rgb},0.55)` }}
+            >
+              {organ.subtitle}
+            </span>
+          </div>
+
+          {/* Iframe — fills everything */}
+          <div className="relative w-full flex-1">
+            <SketchfabViewer
+              modelId={activeModelId}
+              organName={activeModel?.name ?? organ.name}
+              lm={false}
+            />
+
+            {/* Variant switcher — bottom of fullscreen */}
+            <VariantSwitcher
+              models={organ.models}
+              activeIdx={activeModelIdx}
+              onSelect={setActiveModelIdx}
+              accentRgb={rgb}
+            />
+          </div>
+        </motion.div>,
+        document.body
+      )
+    : null;
 
   return (
+    <>
+      {/* ── Fullscreen portal ── */}
+      {fullscreenPortal}
+
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -464,22 +543,43 @@ function OrganModal({
           {/* ── Body ── */}
           <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
             {/* 3D viewer pane */}
-            <div className="flex-1 p-4 lg:p-5 min-h-[350px] md:min-h-[500px]">
-              {/* Relative wrapper so the variant switcher can overlay the bottom */}
-              <div className="relative w-full h-full min-h-[320px] md:min-h-[470px]">
+            <div className="flex-1 p-4 lg:p-5">
+              {/* Aspect-ratio wrapper keeps the viewer balanced in the modal */}
+              <div className="relative w-full aspect-square md:aspect-video rounded-xl overflow-hidden">
                 <SketchfabViewer
                   modelId={activeModelId}
                   organName={activeModel?.name ?? organ.name}
                   lm={lm}
                 />
 
-                {/* ── Premium Variant Switcher (floats above iframe) ── */}
+                {/* ── Premium Variant Switcher ── */}
                 <VariantSwitcher
                   models={organ.models}
                   activeIdx={activeModelIdx}
                   onSelect={setActiveModelIdx}
                   accentRgb={rgb}
                 />
+
+                {/* ── Expand / Full-Screen button — bottom-right ── */}
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  onClick={() => setIsFullscreen(true)}
+                  className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
+                  style={{
+                    background:     'rgba(0,0,0,0.55)',
+                    backdropFilter: 'blur(16px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                    border:         `1px solid rgba(${rgb},0.3)`,
+                    boxShadow:      `0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(${rgb},0.1)`,
+                    color:          `rgba(${rgb},0.9)`,
+                  }}
+                  title="View full screen"
+                >
+                  <Maximize2 size={12} strokeWidth={2.2} />
+                  <span className="text-[11px] font-semibold tracking-tight">Full Screen</span>
+                </motion.button>
               </div>
             </div>
 
@@ -556,6 +656,7 @@ function OrganModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </>
   );
 }
 
