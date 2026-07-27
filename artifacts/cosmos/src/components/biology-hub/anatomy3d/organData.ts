@@ -1,16 +1,7 @@
 // ─── Biology Hub — Interactive 3D Anatomy Data ────────────────────────────────
-// All anatomy data is established medical reference knowledge.
-// No external APIs are used.
+// Core 5 organs shown in Phase 3. No emoji — Lucide icons only.
 
-export type OrganId = 'heart' | 'brain' | 'lungs' | 'skeleton' | 'kidney' | 'liver' | 'dna';
-
-export interface ModelProps {
-  autoRotate: boolean;
-  showLabels: boolean;
-  wireframe: boolean;
-  crossSection: boolean;
-  exploded: boolean;
-}
+export type OrganId = 'heart' | 'brain' | 'lungs' | 'skeleton' | 'dna';
 
 export interface OrganFact {
   label: string;
@@ -18,162 +9,122 @@ export interface OrganFact {
 }
 
 export interface OrganData {
-  id: OrganId;
-  name: string;
-  subtitle: string;
-  /** Tailwind-compatible hex for UI */
-  color: string;
-  accentRgb: string;    // "r,g,b" for rgba()
-  emissiveHex: string;
-  icon: string;         // emoji
-  description: string;
-  facts: OrganFact[];
-  supportsExplode: boolean;
-  /** Default camera Z distance */
-  cameraZ: number;
+  id:             OrganId;
+  name:           string;
+  subtitle:       string;
+  /** Hex color used for UI accents */
+  color:          string;
+  accentRgb:      string;   // "r,g,b" for rgba()
+  /** Lucide icon component name */
+  lucideIconName: string;
+  description:    string;
+  facts:          OrganFact[];
+  /**
+   * Sketchfab model ID for embed, or null → show polished "Model Unavailable" card.
+   * Format: 32-char hex (no dashes), e.g. "e410da98b1e5445eae2acafaaa53587d"
+   * The viewer automatically times out after 10 s and falls back gracefully.
+   */
+  sketchfabId:    string | null;
+  /** Credit line shown in viewer footer */
+  sketchfabCredit?: string;
 }
 
 export const ORGAN_DATA: Record<OrganId, OrganData> = {
   heart: {
-    id: 'heart',
-    name: 'Human Heart',
-    subtitle: 'Cardiac Anatomy',
-    color: '#e74c3c',
-    accentRgb: '231,76,60',
-    emissiveHex: '#5a0a0a',
-    icon: '🫀',
+    id:             'heart',
+    name:           'Human Heart',
+    subtitle:       'Cardiac Anatomy',
+    color:          '#e74c3c',
+    accentRgb:      '231,76,60',
+    lucideIconName: 'Heart',
     description:
       'A muscular organ weighing 250–350 g that pumps ~5 L of blood per minute through two circuits: pulmonary (to the lungs) and systemic (to the body). It beats ~100,000 times per day.',
     facts: [
-      { label: 'Weight',       value: '250–350 g'   },
-      { label: 'Beats / day',  value: '~100,000'     },
-      { label: 'Chambers',     value: '4'            },
-      { label: 'Output',       value: '~5 L/min'     },
-      { label: 'Valves',       value: '4 (mitral, tricuspid, aortic, pulmonic)' },
+      { label: 'Weight',      value: '250–350 g' },
+      { label: 'Beats / day', value: '~100,000'  },
+      { label: 'Chambers',    value: '4'          },
+      { label: 'Output',      value: '~5 L/min'   },
+      { label: 'Valves',      value: '4 (mitral, tricuspid, aortic, pulmonic)' },
     ],
-    supportsExplode: true,
-    cameraZ: 4.5,
+    sketchfabId:     '8f647a38fba44efcb6ab26ea3f86b04d',
+    sketchfabCredit: 'Sketchfab · CC Attribution',
   },
   brain: {
-    id: 'brain',
-    name: 'Human Brain',
-    subtitle: 'Neural Architecture',
-    color: '#e8a87c',
-    accentRgb: '232,168,124',
-    emissiveHex: '#5a2a10',
-    icon: '🧠',
+    id:             'brain',
+    name:           'Human Brain',
+    subtitle:       'Neural Architecture',
+    color:          '#e8a87c',
+    accentRgb:      '232,168,124',
+    lucideIconName: 'Brain',
     description:
-      'The most complex known structure in the universe — 86 billion neurons forming ~100 trillion synaptic connections, consuming 20% of the body\'s energy while accounting for only 2% of body weight.',
+      'The most complex known structure — 86 billion neurons forming ~100 trillion synaptic connections, consuming 20 % of the body\'s energy while accounting for only 2 % of its mass.',
     facts: [
-      { label: 'Weight',       value: '~1.4 kg'        },
-      { label: 'Neurons',      value: '86 billion'      },
-      { label: 'Synapses',     value: '~100 trillion'   },
-      { label: 'Energy use',   value: '20% of body total' },
-      { label: 'Lobes',        value: '4 (frontal, parietal, temporal, occipital)' },
+      { label: 'Weight',     value: '~1.4 kg'            },
+      { label: 'Neurons',    value: '86 billion'          },
+      { label: 'Synapses',   value: '~100 trillion'       },
+      { label: 'Energy use', value: '20 % of body total'  },
+      { label: 'Lobes',      value: '4 (frontal, parietal, temporal, occipital)' },
     ],
-    supportsExplode: true,
-    cameraZ: 5,
+    sketchfabId:     'a10a8dbce47c4a07959d0a871196fb63',
+    sketchfabCredit: 'Sketchfab · CC Attribution',
   },
   lungs: {
-    id: 'lungs',
-    name: 'Human Lungs',
-    subtitle: 'Respiratory System',
-    color: '#f4a9a8',
-    accentRgb: '244,169,168',
-    emissiveHex: '#5a1515',
-    icon: '🫁',
+    id:             'lungs',
+    name:           'Human Lungs',
+    subtitle:       'Respiratory System',
+    color:          '#f4a9a8',
+    accentRgb:      '244,169,168',
+    lucideIconName: 'Wind',
     description:
-      'The primary gas-exchange organs, with ~480 million alveoli providing ~70 m² of surface area — roughly the size of a tennis court — allowing oxygen and CO₂ to cross a membrane only 0.5 µm thick.',
+      'Primary gas-exchange organs with ~480 million alveoli providing ~70 m² of surface area — roughly the size of a tennis court — allowing O₂ and CO₂ to cross a membrane only 0.5 µm thick.',
     facts: [
-      { label: 'Total capacity', value: '~6 L'           },
-      { label: 'Surface area',   value: '~70 m²'          },
-      { label: 'Alveoli',        value: '~480 million'    },
-      { label: 'Breaths / day',  value: '~20,000'         },
+      { label: 'Total capacity', value: '~6 L'        },
+      { label: 'Surface area',   value: '~70 m²'       },
+      { label: 'Alveoli',        value: '~480 million' },
+      { label: 'Breaths / day',  value: '~20,000'      },
       { label: 'Lobes',          value: '5 (3 right, 2 left)' },
     ],
-    supportsExplode: true,
-    cameraZ: 5.5,
+    sketchfabId:     'f5d97e44b04e4a0da8e46e97fce83264',
+    sketchfabCredit: 'Sketchfab · CC Attribution',
   },
   skeleton: {
-    id: 'skeleton',
-    name: 'Human Skeleton',
-    subtitle: 'Skeletal System',
-    color: '#f0e8d0',
-    accentRgb: '240,232,208',
-    emissiveHex: '#3a3020',
-    icon: '💀',
+    id:             'skeleton',
+    name:           'Human Skeleton',
+    subtitle:       'Skeletal System',
+    color:          '#b8a98a',
+    accentRgb:      '184,169,138',
+    lucideIconName: 'Bone',
     description:
-      'The 206-bone framework that provides structural support, protects vital organs, enables movement via lever mechanics, manufactures blood cells in bone marrow, and stores 99% of the body\'s calcium.',
+      'The 206-bone framework providing structural support, organ protection, lever-based movement, blood-cell manufacturing in marrow, and storage of 99 % of the body\'s calcium.',
     facts: [
-      { label: 'Bones (adult)', value: '206'              },
-      { label: 'Longest bone',  value: 'Femur (~48 cm)'   },
-      { label: 'Smallest bone', value: 'Stapes (~3 mm)'   },
-      { label: 'Joints',        value: '360+'             },
-      { label: 'Marrow output', value: '2.4 M RBCs/sec'   },
+      { label: 'Bones (adult)', value: '206'                },
+      { label: 'Longest bone',  value: 'Femur (~48 cm)'     },
+      { label: 'Smallest bone', value: 'Stapes (~3 mm)'     },
+      { label: 'Joints',        value: '360+'               },
+      { label: 'Marrow output', value: '2.4 M red cells/s'  },
     ],
-    supportsExplode: false,
-    cameraZ: 9,
-  },
-  kidney: {
-    id: 'kidney',
-    name: 'Human Kidney',
-    subtitle: 'Urinary System',
-    color: '#c0392b',
-    accentRgb: '192,57,43',
-    emissiveHex: '#3a0808',
-    icon: '🫘',
-    description:
-      'Bean-shaped paired organs, each containing ~1 million nephrons, that filter 200 L of blood daily, regulate blood pressure via the renin–angiotensin system, and maintain electrolyte homeostasis.',
-    facts: [
-      { label: 'Weight each',   value: '125–175 g'      },
-      { label: 'Nephrons',      value: '~1 million each' },
-      { label: 'Blood filtered',value: '200 L / day'     },
-      { label: 'Urine output',  value: '~1.5 L / day'   },
-      { label: 'Hormones',      value: 'Renin, EPO, calcitriol' },
-    ],
-    supportsExplode: false,
-    cameraZ: 4,
-  },
-  liver: {
-    id: 'liver',
-    name: 'Human Liver',
-    subtitle: 'Hepatic System',
-    color: '#a0522d',
-    accentRgb: '160,82,45',
-    emissiveHex: '#2a1000',
-    icon: '🫀',
-    description:
-      'The largest internal organ (~1.5 kg), performing over 500 functions including detoxification of metabolic waste, synthesis of plasma proteins and clotting factors, bile production, and glycogen storage.',
-    facts: [
-      { label: 'Weight',       value: '~1.5 kg'              },
-      { label: 'Functions',    value: '500+'                  },
-      { label: 'Blood flow',   value: '~1.5 L / min'         },
-      { label: 'Bile output',  value: '700–1,000 mL / day'   },
-      { label: 'Regeneration', value: 'Can regrow to full size from 25%' },
-    ],
-    supportsExplode: false,
-    cameraZ: 5,
+    sketchfabId:     '4a43db1c4a8840e19a80d3e7c57e7a6e',
+    sketchfabCredit: 'Sketchfab · CC Attribution',
   },
   dna: {
-    id: 'dna',
-    name: 'DNA Double Helix',
-    subtitle: 'Molecular Biology',
-    color: '#34d399',
-    accentRgb: '52,211,153',
-    emissiveHex: '#064e3b',
-    icon: '🧬',
+    id:             'dna',
+    name:           'DNA Double Helix',
+    subtitle:       'Molecular Biology',
+    color:          '#34d399',
+    accentRgb:      '52,211,153',
+    lucideIconName: 'Dna',
     description:
-      'The molecule encoding life — a right-handed double helix where two antiparallel strands of nucleotides are held together by complementary base pairing (A–T, G–C) and stabilised by base-stacking interactions.',
+      'The molecule encoding life — a right-handed double helix where two antiparallel nucleotide strands are held by complementary base pairing (A–T, G–C) and stabilised by base-stacking interactions.',
     facts: [
-      { label: 'Base pairs',   value: '3.2 billion (human haploid)' },
-      { label: 'Genes',        value: '~20,000–25,000'              },
-      { label: 'Length (uncoiled)', value: '~2 m per cell'          },
-      { label: 'Diameter',     value: '~2 nm'                       },
-      { label: 'Chromosomes',  value: '23 pairs (human diploid)'    },
+      { label: 'Base pairs',        value: '3.2 billion (haploid)' },
+      { label: 'Genes',             value: '~20,000–25,000'        },
+      { label: 'Length (uncoiled)', value: '~2 m per cell'         },
+      { label: 'Diameter',          value: '~2 nm'                 },
+      { label: 'Chromosomes',       value: '23 pairs (diploid)'    },
     ],
-    supportsExplode: false,
-    cameraZ: 6,
+    sketchfabId:     'e7b35df75b7440118d3a3e23e4f898a1',
+    sketchfabCredit: 'Sketchfab · CC Attribution',
   },
 };
 
-export const ORGAN_LIST: OrganId[] = ['heart', 'brain', 'lungs', 'skeleton', 'kidney', 'liver', 'dna'];
+export const ORGAN_LIST: OrganId[] = ['heart', 'brain', 'lungs', 'skeleton', 'dna'];

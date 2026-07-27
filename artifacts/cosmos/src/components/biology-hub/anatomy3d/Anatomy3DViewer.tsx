@@ -1,72 +1,66 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Microscope } from 'lucide-react';
+import {
+  Heart, Brain, Wind, Bone, Dna, Microscope,
+  X, ExternalLink, ChevronRight, AlertCircle, Loader2,
+  RotateCcw,
+} from 'lucide-react';
 import { ORGAN_DATA, ORGAN_LIST, type OrganId } from './organData';
-import OrganViewer from './OrganViewer';
 
-// ─── Anatomy3DViewer — Organ selection grid + viewer launcher ─────────────────
-// Replaces the Phase 1 placeholder in BioMainContent's AnatomySection.
+// ─── Lucide icon lookup ───────────────────────────────────────────────────────
+type IconFC = React.FC<{ size?: number; strokeWidth?: number; className?: string; style?: React.CSSProperties }>;
 
-interface Anatomy3DViewerProps {
-  lm: boolean;
-}
+const ICON_MAP: Record<string, IconFC> = {
+  Heart, Brain, Wind, Bone, Dna, Microscope,
+};
 
-const CARD_ORDER: OrganId[] = ['heart', 'brain', 'lungs', 'skeleton', 'kidney', 'liver', 'dna'];
-
+// ─── Organ selection card ─────────────────────────────────────────────────────
 function OrganCard({
   organId, onClick, lm, index,
 }: { organId: OrganId; onClick: () => void; lm: boolean; index: number }) {
   const organ = ORGAN_DATA[organId];
-  const rgb = organ.accentRgb;
+  const rgb   = organ.accentRgb;
+  const Icon  = ICON_MAP[organ.lucideIconName] ?? Microscope;
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 16, scale: 0.96 }}
+      initial={{ opacity: 0, y: 16, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: index * 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -4, scale: 1.03 }}
+      transition={{ delay: index * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -5, scale: 1.03 }}
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="relative overflow-hidden rounded-2xl text-left group cursor-pointer"
+      className="relative overflow-hidden rounded-2xl text-left group cursor-pointer w-full"
       style={{
-        background: lm
-          ? `rgba(${rgb},0.08)`
-          : `rgba(${rgb},0.05)`,
-        border: lm
-          ? `1px solid rgba(${rgb},0.25)`
-          : `1px solid rgba(${rgb},0.15)`,
-        boxShadow: `0 4px 20px rgba(${rgb},0.08)`,
-        aspectRatio: '1 / 1.05',
+        background:   lm ? `rgba(${rgb},0.07)` : `rgba(${rgb},0.05)`,
+        border:       lm ? `1px solid rgba(${rgb},0.28)` : `1px solid rgba(${rgb},0.18)`,
+        boxShadow:    `0 4px 24px rgba(${rgb},0.08)`,
+        aspectRatio:  '1 / 1.1',
       }}
     >
       {/* Accent glow */}
       <div
-        className="absolute -top-4 -right-4 w-20 h-20 rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60"
-        style={{
-          background: `radial-gradient(circle, rgba(${rgb},0.22) 0%, transparent 70%)`,
-          filter: 'blur(12px)',
-        }}
+        className="absolute -top-6 -right-6 w-24 h-24 rounded-full pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-500"
+        style={{ background: `radial-gradient(circle, rgba(${rgb},0.24) 0%, transparent 70%)`, filter: 'blur(14px)' }}
       />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col h-full p-3.5">
-        {/* Icon */}
-        <div className="mb-2.5">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-            style={{
-              background: `rgba(${rgb},0.14)`,
-              border: `1px solid rgba(${rgb},0.25)`,
-              boxShadow: `0 0 16px rgba(${rgb},0.18)`,
-            }}
-          >
-            {organ.icon}
-          </div>
+      <div className="relative z-10 flex flex-col h-full p-3 sm:p-4">
+        {/* Icon bubble */}
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 flex-shrink-0"
+          style={{
+            background:  `rgba(${rgb},0.14)`,
+            border:      `1px solid rgba(${rgb},0.28)`,
+            boxShadow:   `0 0 18px rgba(${rgb},0.2)`,
+          }}
+        >
+          <Icon size={18} style={{ color: `rgb(${rgb})` }} strokeWidth={1.7} />
         </div>
 
         {/* Name */}
         <p
-          className="text-[12px] font-bold leading-tight mb-0.5 tracking-tight"
+          className="text-[12px] sm:text-[13px] font-bold leading-tight mb-0.5 tracking-tight"
           style={{ color: lm ? `rgb(${rgb})` : `rgba(${rgb},0.95)` }}
         >
           {organ.name.replace('Human ', '')}
@@ -74,38 +68,395 @@ function OrganCard({
 
         {/* Subtitle */}
         <p
-          className="text-[9px] uppercase tracking-[0.18em] font-medium mb-auto"
-          style={{ color: lm ? `rgba(${rgb},0.55)` : `rgba(${rgb},0.40)` }}
+          className="text-[9px] uppercase tracking-[0.16em] font-medium mb-auto"
+          style={{ color: lm ? `rgba(${rgb},0.55)` : `rgba(${rgb},0.42)` }}
         >
           {organ.subtitle}
         </p>
 
-        {/* Fact */}
+        {/* Bottom row */}
         <div
-          className="mt-2.5 pt-2 flex items-center justify-between"
-          style={{ borderTop: `1px solid rgba(${rgb},0.12)` }}
+          className="mt-3 pt-2.5 flex items-center justify-between"
+          style={{ borderTop: `1px solid rgba(${rgb},0.14)` }}
         >
           <p className="text-[9px]" style={{ color: lm ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.28)' }}>
-            {organ.facts[0].label}: <span style={{ color: `rgba(${rgb},0.75)` }}>{organ.facts[0].value}</span>
+            <span style={{ color: `rgba(${rgb},0.75)` }}>{organ.facts[0].value}</span>
+            {' '}{organ.facts[0].label}
           </p>
-          <motion.div
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 }}
-            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: `rgba(${rgb},0.15)`, border: `1px solid rgba(${rgb},0.30)` }}
-          >
-            <Maximize2 size={9} style={{ color: `rgba(${rgb},0.8)` }} strokeWidth={2.5} />
-          </motion.div>
+          <ChevronRight size={11} style={{ color: `rgba(${rgb},0.6)` }} strokeWidth={2.5} />
         </div>
       </div>
 
       {/* Hover shimmer */}
-      <motion.div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none rounded-2xl"
-        style={{ background: `linear-gradient(135deg, rgba(${rgb},0.05) 0%, rgba(${rgb},0.02) 100%)` }}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+        style={{ background: `linear-gradient(135deg, rgba(${rgb},0.06) 0%, transparent 70%)` }}
       />
     </motion.button>
   );
+}
+
+// ─── Sketchfab iframe viewer ──────────────────────────────────────────────────
+type ViewerState = 'loading' | 'ready' | 'error' | 'unavailable';
+
+function SketchfabViewer({
+  sketchfabId, organName, lm,
+}: { sketchfabId: string | null; organName: string; lm: boolean }) {
+  const [state, setState] = useState<ViewerState>(sketchfabId ? 'loading' : 'unavailable');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!sketchfabId) { setState('unavailable'); return; }
+    setState('loading');
+    timerRef.current = setTimeout(() => setState('error'), 10_000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [sketchfabId]);
+
+  const handleLoad  = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setState('ready');
+  }, []);
+  const handleError = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setState('error');
+  }, []);
+
+  const embedUrl = sketchfabId
+    ? `https://sketchfab.com/models/${sketchfabId}/embed?autostart=1&ui_infos=0&ui_controls=1&ui_watermark=0&preload=1`
+    : null;
+
+  if (state === 'unavailable' || state === 'error') {
+    return (
+      <UnavailableModel
+        lm={lm}
+        organName={organName}
+        canRetry={state === 'error'}
+        onRetry={() => {
+          if (sketchfabId) {
+            setState('loading');
+            timerRef.current = setTimeout(() => setState('error'), 10_000);
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full">
+      {/* Loading overlay */}
+      <AnimatePresence>
+        {state === 'loading' && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-xl"
+            style={{
+              background: lm
+                ? 'rgba(236,253,245,0.97)'
+                : 'rgba(2,12,8,0.97)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+            >
+              <Loader2 size={28} className="text-emerald-400" strokeWidth={1.6} />
+            </motion.div>
+            <div className="text-center">
+              <p
+                className="text-[13px] font-semibold mb-1"
+                style={{ color: lm ? '#065f46' : 'rgba(255,255,255,0.85)' }}
+              >
+                Loading 3D model…
+              </p>
+              <p className="text-[10px]" style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.32)' }}>
+                Powered by Sketchfab
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Iframe */}
+      {embedUrl && (
+        <iframe
+          src={embedUrl}
+          title={`3D model of ${organName}`}
+          className="w-full h-full rounded-xl border-0"
+          allow="autoplay; fullscreen; xr-spatial-tracking"
+          onLoad={handleLoad}
+          onError={handleError}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Polished "Model Unavailable" card ────────────────────────────────────────
+function UnavailableModel({
+  lm, organName, canRetry, onRetry,
+}: { lm: boolean; organName: string; canRetry: boolean; onRetry: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="w-full h-full flex flex-col items-center justify-center gap-5 rounded-xl p-8 text-center"
+      style={{
+        background: lm
+          ? 'linear-gradient(160deg, rgba(236,253,245,0.96) 0%, rgba(224,252,255,0.96) 100%)'
+          : 'linear-gradient(160deg, rgba(2,14,10,0.97) 0%, rgba(2,10,20,0.97) 100%)',
+        border: lm
+          ? '1px solid rgba(52,211,153,0.2)'
+          : '1px solid rgba(52,211,153,0.12)',
+      }}
+    >
+      {/* Icon */}
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center"
+        style={{
+          background:  lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)',
+          border:      '1px solid rgba(52,211,153,0.2)',
+          boxShadow:   '0 0 32px rgba(52,211,153,0.1)',
+        }}
+      >
+        <AlertCircle size={28} className="text-emerald-400" strokeWidth={1.4} />
+      </div>
+
+      <div>
+        <p
+          className="text-[15px] font-semibold mb-1.5 tracking-tight"
+          style={{ color: lm ? '#065f46' : 'rgba(255,255,255,0.88)' }}
+        >
+          3D Model Unavailable
+        </p>
+        <p
+          className="text-[11px] leading-relaxed max-w-[240px] mx-auto"
+          style={{ color: lm ? 'rgba(6,78,59,0.55)' : 'rgba(255,255,255,0.38)' }}
+        >
+          A premium interactive model for <strong>{organName}</strong> is being
+          curated. Explore the anatomy data in the panel below.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap justify-center">
+        {canRetry && (
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200"
+            style={{
+              background: 'rgba(52,211,153,0.14)',
+              border:     '1px solid rgba(52,211,153,0.28)',
+              color:      '#34d399',
+            }}
+          >
+            <RotateCcw size={11} strokeWidth={2.2} />
+            Retry
+          </button>
+        )}
+        <a
+          href={`https://sketchfab.com/search?q=${encodeURIComponent(organName + ' anatomy')}&type=models`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-all duration-200"
+          style={{
+            background: lm ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+            border:     lm ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+            color:      lm ? 'rgba(6,78,59,0.7)' : 'rgba(255,255,255,0.5)',
+          }}
+        >
+          <ExternalLink size={11} strokeWidth={2} />
+          Browse Sketchfab
+        </a>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Organ detail modal ───────────────────────────────────────────────────────
+function OrganModal({
+  organId, onClose, lm,
+}: { organId: OrganId; onClose: () => void; lm: boolean }) {
+  const organ = ORGAN_DATA[organId];
+  const rgb   = organ.accentRgb;
+  const Icon  = ICON_MAP[organ.lucideIconName] ?? Microscope;
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 20 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-5xl rounded-3xl overflow-hidden flex flex-col"
+          style={{
+            maxHeight: '90vh',
+            background: lm
+              ? 'rgba(240,253,244,0.98)'
+              : 'rgba(3,12,8,0.98)',
+            border: lm
+              ? '1px solid rgba(52,211,153,0.25)'
+              : '1px solid rgba(52,211,153,0.15)',
+            boxShadow: `0 32px 80px rgba(${rgb},0.12), 0 0 0 1px rgba(${rgb},0.08)`,
+          }}
+        >
+          {/* ── Modal header ── */}
+          <div
+            className="flex items-center gap-3 px-5 py-4 flex-shrink-0"
+            style={{
+              borderBottom: lm
+                ? '1px solid rgba(52,211,153,0.15)'
+                : '1px solid rgba(52,211,153,0.1)',
+            }}
+          >
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: `rgba(${rgb},0.14)`,
+                border:     `1px solid rgba(${rgb},0.28)`,
+                boxShadow:  `0 0 16px rgba(${rgb},0.2)`,
+              }}
+            >
+              <Icon size={17} style={{ color: `rgb(${rgb})` }} strokeWidth={1.7} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-[14px] font-bold tracking-tight truncate"
+                style={{ color: lm ? '#065f46' : 'rgba(255,255,255,0.92)' }}
+              >
+                {organ.name}
+              </p>
+              <p
+                className="text-[10px] uppercase tracking-[0.18em]"
+                style={{ color: lm ? 'rgba(6,78,59,0.45)' : `rgba(${rgb},0.5)` }}
+              >
+                {organ.subtitle}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200"
+              style={{
+                background: lm ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                border:     lm ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+              }}
+              aria-label="Close"
+            >
+              <X size={14} style={{ color: lm ? 'rgba(6,78,59,0.7)' : 'rgba(255,255,255,0.6)' }} strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* ── Body ── */}
+          <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+            {/* 3D viewer pane */}
+            <div className="flex-1 min-h-0 p-4 lg:p-5" style={{ minHeight: '260px' }}>
+              <div className="w-full h-full" style={{ minHeight: '240px' }}>
+                <SketchfabViewer
+                  sketchfabId={organ.sketchfabId}
+                  organName={organ.name}
+                  lm={lm}
+                />
+              </div>
+            </div>
+
+            {/* Info panel */}
+            <div
+              className="w-full lg:w-72 xl:w-80 flex-shrink-0 overflow-y-auto p-4 lg:p-5 flex flex-col gap-4"
+              style={{
+                borderTop:  'none',
+                borderLeft: lm ? '1px solid rgba(52,211,153,0.12)' : '1px solid rgba(52,211,153,0.08)',
+              }}
+            >
+              {/* Description */}
+              <div>
+                <p
+                  className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-2"
+                  style={{ color: `rgba(${rgb},0.55)` }}
+                >
+                  Overview
+                </p>
+                <p
+                  className="text-[12px] leading-relaxed"
+                  style={{ color: lm ? 'rgba(6,78,59,0.7)' : 'rgba(255,255,255,0.55)' }}
+                >
+                  {organ.description}
+                </p>
+              </div>
+
+              {/* Facts */}
+              <div>
+                <p
+                  className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-2.5"
+                  style={{ color: `rgba(${rgb},0.55)` }}
+                >
+                  Key Facts
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {organ.facts.map((fact) => (
+                    <div
+                      key={fact.label}
+                      className="flex items-start justify-between gap-3 px-3 py-2 rounded-xl"
+                      style={{
+                        background: lm ? `rgba(${rgb},0.06)` : `rgba(${rgb},0.05)`,
+                        border:     `1px solid rgba(${rgb},0.12)`,
+                      }}
+                    >
+                      <span
+                        className="text-[10px] font-medium flex-shrink-0"
+                        style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.35)' }}
+                      >
+                        {fact.label}
+                      </span>
+                      <span
+                        className="text-[10px] font-semibold text-right"
+                        style={{ color: lm ? `rgb(${rgb})` : `rgba(${rgb},0.9)` }}
+                      >
+                        {fact.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sketchfab credit */}
+              {organ.sketchfabCredit && organ.sketchfabId && (
+                <p
+                  className="text-[9px] mt-auto pt-2"
+                  style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.2)' }}
+                >
+                  {organ.sketchfabCredit}
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Main Anatomy3DViewer component ──────────────────────────────────────────
+interface Anatomy3DViewerProps {
+  lm: boolean;
 }
 
 const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
@@ -114,27 +465,25 @@ const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
   return (
     <div>
       {/* ── Section header ── */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(52,211,153,0.22), rgba(34,211,238,0.22))',
-              border: '1px solid rgba(52,211,153,0.35)',
-            }}
-          >
-            <Microscope size={13} strokeWidth={1.8} className="text-emerald-400" />
-          </div>
-          <h2
-            className="text-[15px] font-semibold tracking-tight"
-            style={{
-              fontFamily: 'var(--app-font-heading)',
-              color: lm ? '#065f46' : 'rgba(255,255,255,0.92)',
-            }}
-          >
-            Interactive 3D Anatomy
-          </h2>
+      <div className="flex items-center gap-3 mb-5">
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, rgba(52,211,153,0.22), rgba(34,211,238,0.22))',
+            border:     '1px solid rgba(52,211,153,0.35)',
+          }}
+        >
+          <Microscope size={13} strokeWidth={1.8} className="text-emerald-400" />
         </div>
+        <h2
+          className="text-[15px] font-semibold tracking-tight"
+          style={{
+            fontFamily: 'var(--app-font-heading)',
+            color:      lm ? '#065f46' : 'rgba(255,255,255,0.92)',
+          }}
+        >
+          Interactive 3D Anatomy
+        </h2>
         <span
           className="text-[10px] uppercase tracking-[0.18em] font-medium"
           style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(52,211,153,0.35)' }}
@@ -142,20 +491,20 @@ const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
           Click to explore
         </span>
         <span
-          className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-semibold"
+          className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0"
           style={{
-            background: 'rgba(52,211,153,0.12)',
-            border: '1px solid rgba(52,211,153,0.25)',
-            color: '#34d399',
+            background: 'rgba(52,211,153,0.1)',
+            border:     '1px solid rgba(52,211,153,0.22)',
+            color:      '#34d399',
           }}
         >
-          WebGL · 60fps
+          Core 5
         </span>
       </div>
 
-      {/* ── Organ grid (4 + 3 layout) ── */}
-      <div className="grid grid-cols-4 gap-2.5 mb-2.5">
-        {CARD_ORDER.slice(0, 4).map((id, i) => (
+      {/* ── Organ grid — 2 cols mobile · 3 cols sm · 5 cols lg ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {ORGAN_LIST.map((id, i) => (
           <OrganCard
             key={id}
             organId={id}
@@ -165,37 +514,29 @@ const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
           />
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2.5">
-        {CARD_ORDER.slice(4).map((id, i) => (
-          <OrganCard
-            key={id}
-            organId={id}
-            onClick={() => setActiveOrgan(id)}
-            lm={lm}
-            index={i + 4}
-          />
-        ))}
-      </div>
 
-      {/* ── Usage hint ── */}
+      {/* ── Hint ── */}
       <div
-        className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl"
+        className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-xl"
         style={{
-          background: lm ? 'rgba(52,211,153,0.06)' : 'rgba(52,211,153,0.04)',
-          border: lm ? '1px solid rgba(52,211,153,0.15)' : '1px solid rgba(52,211,153,0.08)',
+          background: lm ? 'rgba(52,211,153,0.05)' : 'rgba(52,211,153,0.04)',
+          border:     lm ? '1px solid rgba(52,211,153,0.14)' : '1px solid rgba(52,211,153,0.08)',
         }}
       >
+        <Microscope size={11} className="text-emerald-400 flex-shrink-0" strokeWidth={1.8} />
         <span className="text-[10px]" style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.28)' }}>
-          🖱 Drag to rotate · Scroll to zoom · Right-drag to pan · All models are 60fps procedural WebGL
+          Select an organ to open the interactive 3D viewer with anatomy facts.
         </span>
       </div>
 
-      {/* ── Full-screen Organ Viewer ── */}
-      <OrganViewer
-        organId={activeOrgan}
-        onClose={() => setActiveOrgan(null)}
-        lm={lm}
-      />
+      {/* ── Modal — rendered lazily on click ── */}
+      {activeOrgan && (
+        <OrganModal
+          organId={activeOrgan}
+          onClose={() => setActiveOrgan(null)}
+          lm={lm}
+        />
+      )}
     </div>
   );
 });

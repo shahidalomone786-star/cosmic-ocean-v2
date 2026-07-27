@@ -131,7 +131,7 @@ export const BIO_NAV_ITEMS: BioNavItem[] = [
   {
     id: 'biochemistry',
     label: 'Biochemistry',
-    iconName: 'Beaker',
+    iconName: 'FlaskConical',
     color: 'text-indigo-400',
     glow: 'rgba(129,140,248,0.3)',
     description: 'Proteins, enzymes, metabolism',
