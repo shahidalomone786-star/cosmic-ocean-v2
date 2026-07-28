@@ -280,7 +280,14 @@ function OverviewSection({ lm }: { lm: boolean }) {
 }
 
 function AnatomySection({ lm }: { lm: boolean }) {
-  return <Anatomy3DViewer lm={lm} />;
+  return (
+    <div>
+      <Anatomy3DViewer lm={lm} />
+      <div className="mt-12">
+        <FeelNatureSection lm={lm} />
+      </div>
+    </div>
+  );
 }
 
 function DNASection({ lm }: { lm: boolean }) {
