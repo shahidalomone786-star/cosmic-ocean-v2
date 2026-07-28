@@ -1,6 +1,7 @@
-// ─── Biology Hub — Feel Nature Discovery Gallery (v3) ────────────────────────
+// ─── Biology Hub — Feel Nature Discovery Gallery (v4) ────────────────────────
 // Perf: hardware-accelerated scroll, memoised cards, minimal Framer re-renders
 // Portal: blurred-bg + object-contain so no image is ever cropped
+// v4: Pure Visuals toggle + pure-black letterbox fix + 34 specimens
 import {
   useState, useRef, useCallback, useEffect, memo,
 } from 'react';
@@ -8,11 +9,13 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Leaf, Dna, ChevronDown, ChevronUp,
-  Maximize2, X, ArrowUp, ArrowDown, Sparkles,
+  Maximize2, X, ArrowUp, ArrowDown, Sparkles, Eye, AlignLeft,
 } from 'lucide-react';
 import { natureGalleryData, type NatureCard } from './natureGalleryData';
 
-// ─── Accent palette — 25 entries ────────────────────────────────────────────
+type ViewMode = 'detailed' | 'pure';
+
+// ─── Accent palette — 34 entries ────────────────────────────────────────────
 const ACCENTS = [
   { rgb: '217,119,87',  hex: '#d97757' }, //  1 terra-cotta
   { rgb: '99,179,221',  hex: '#63b3dd' }, //  2 clinical blue
@@ -39,6 +42,15 @@ const ACCENTS = [
   { rgb: '45,212,191',  hex: '#2dd4bf' }, // 23 teal-light
   { rgb: '250,189,0',   hex: '#fabd00' }, // 24 golden
   { rgb: '100,210,255', hex: '#64d2ff' }, // 25 aqua
+  { rgb: '192,132,252', hex: '#c084fc' }, // 26 lavender
+  { rgb: '134,239,172', hex: '#86efac' }, // 27 mint
+  { rgb: '253,186,116', hex: '#fdba74' }, // 28 peach
+  { rgb: '147,197,253', hex: '#93c5fd' }, // 29 powder blue
+  { rgb: '216,180,254', hex: '#d8b4fe' }, // 30 wisteria
+  { rgb: '110,231,183', hex: '#6ee7b7' }, // 31 seafoam
+  { rgb: '253,224,71',  hex: '#fde047' }, // 32 sunflower
+  { rgb: '252,165,165', hex: '#fca5a5' }, // 33 blush
+  { rgb: '125,211,252', hex: '#7dd3fc' }, // 34 ice blue
 ] as const;
 
 const ac = (id: number) => ACCENTS[(id - 1) % ACCENTS.length];
@@ -52,19 +64,22 @@ function shuffleWithFirst(data: NatureCard[], firstId: number): NatureCard[] {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Full-Screen Reels Portal — blurred bg + object-contain (no cropping)
+// pureMode: image-only, no text panel
 // ─────────────────────────────────────────────────────────────────────────────
 const ReelsPortal = memo(function ReelsPortal({
   data,
   onClose,
+  pureMode,
 }: {
   data: NatureCard[];
   onClose: () => void;
+  pureMode: boolean;
 }) {
-  const [idx, setIdx]       = useState(0);
-  const [dir, setDir]       = useState<1 | -1>(1);
-  const [expanded, setExp]  = useState(false);
-  const touchY              = useRef<number | null>(null);
-  const total               = data.length;
+  const [idx, setIdx]      = useState(0);
+  const [dir, setDir]      = useState<1 | -1>(1);
+  const [expanded, setExp] = useState(false);
+  const touchY             = useRef<number | null>(null);
+  const total              = data.length;
 
   const go = useCallback((d: 1 | -1) => {
     setDir(d);
@@ -108,14 +123,16 @@ const ReelsPortal = memo(function ReelsPortal({
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Ambient glow — accent colour radiates from centre */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `radial-gradient(ellipse 70% 55% at 50% 38%, rgba(${accent.rgb},0.18) 0%, transparent 70%)`,
-          transition: 'background 0.55s ease',
-        }}
-      />
+      {/* Ambient glow — only in detailed mode */}
+      {!pureMode && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 70% 55% at 50% 38%, rgba(${accent.rgb},0.18) 0%, transparent 70%)`,
+            transition: 'background 0.55s ease',
+          }}
+        />
+      )}
 
       {/* ── Top bar ── */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-safe-top pt-5 pb-2 flex-shrink-0">
@@ -132,7 +149,7 @@ const ReelsPortal = memo(function ReelsPortal({
           <X size={13} strokeWidth={2.2} /> Exit
         </button>
 
-        {/* Progress pills — max 25, compact */}
+        {/* Progress pills */}
         <div className="flex items-center gap-[3px] flex-wrap justify-center max-w-[200px]">
           {data.map((_, i) => (
             <button
@@ -164,17 +181,26 @@ const ReelsPortal = memo(function ReelsPortal({
             exit={{ opacity: 0, y: (dir as number) * -55 }}
             transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
             className="flex-1 flex flex-col min-h-0 rounded-3xl overflow-hidden"
-            style={{
+            style={pureMode ? {
+              border: 'none',
+              background: '#000',
+            } : {
               border: `1px solid rgba(${accent.rgb},0.22)`,
               boxShadow: `0 0 55px rgba(${accent.rgb},0.12)`,
             }}
           >
-            {/* ── Image area: blurred background + contained foreground ── */}
+            {/* ── Image area ── */}
             <div
-              className="relative flex-1 min-h-0 overflow-hidden"
-              style={{ background: '#050505' }}
+              className="relative min-h-0 overflow-hidden"
+              style={{
+                background: '#000',
+                flex: pureMode ? '1' : undefined,
+                flexShrink: pureMode ? undefined : 0,
+                // In detailed mode the image is flex-1; in pure it fills everything
+                flexGrow: pureMode ? 1 : 1,
+              }}
             >
-              {/* Blurred fill layer — prevents letterbox black bars looking empty */}
+              {/* Blurred fill layer — pure black bg eliminates any tinted letterbox */}
               <img
                 src={card.image}
                 alt=""
@@ -182,89 +208,115 @@ const ReelsPortal = memo(function ReelsPortal({
                 className="absolute inset-0 w-full h-full"
                 style={{
                   objectFit: 'cover',
-                  filter: 'blur(24px) brightness(0.35) saturate(1.6)',
-                  transform: 'scale(1.1)',
+                  filter: 'blur(28px) brightness(0.25) saturate(1.4)',
+                  transform: 'scale(1.12)',
+                  background: '#000',
                 }}
               />
-              {/* Sharp contained layer — no cropping */}
+              {/* Sharp contained layer — no cropping ever */}
               <img
                 src={card.image}
                 alt={card.title}
                 className="absolute inset-0 w-full h-full"
-                style={{ objectFit: 'contain' }}
+                style={{ objectFit: 'contain', background: 'transparent' }}
                 loading="eager"
                 onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.15'; }}
               />
-              {/* Bottom gradient into text panel */}
-              <div
-                className="absolute inset-x-0 bottom-0 h-28 pointer-events-none"
-                style={{ background: 'linear-gradient(to top, #080808 0%, transparent 100%)' }}
-              />
-              {/* Subtitle pill */}
-              <div className="absolute bottom-3 left-4">
-                <span
-                  className="text-[9px] uppercase tracking-[0.2em] font-bold px-2.5 py-1 rounded-full"
+
+              {/* Bottom gradient into text panel — only in detailed mode */}
+              {!pureMode && (
+                <div
+                  className="absolute inset-x-0 bottom-0 h-28 pointer-events-none"
+                  style={{ background: 'linear-gradient(to top, #080808 0%, transparent 100%)' }}
+                />
+              )}
+
+              {/* Subtitle pill — only in detailed mode */}
+              {!pureMode && (
+                <div className="absolute bottom-3 left-4">
+                  <span
+                    className="text-[9px] uppercase tracking-[0.2em] font-bold px-2.5 py-1 rounded-full"
+                    style={{
+                      background: `rgba(${accent.rgb},0.22)`,
+                      border: `1px solid rgba(${accent.rgb},0.4)`,
+                      color: accent.hex,
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    {card.subtitle}
+                  </span>
+                </div>
+              )}
+
+              {/* Pure mode: faint counter badge only */}
+              {pureMode && (
+                <div className="absolute top-3 right-3">
+                  <span
+                    className="text-[10px] font-mono px-2 py-0.5 rounded-full"
+                    style={{
+                      background: 'rgba(0,0,0,0.45)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.35)',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    {String(card.id).padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Text panel — only in detailed mode ── */}
+            {!pureMode && (
+              <div className="flex-shrink-0 px-5 pt-3.5 pb-4" style={{ background: '#080808' }}>
+                <h2
+                  className="text-[19px] font-bold tracking-tight mb-1.5 leading-tight"
+                  style={{ color: 'rgba(255,255,255,0.95)', fontFamily: 'var(--app-font-heading)' }}
+                >
+                  {card.title}
+                </h2>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: 'rgba(255,255,255,0.42)' }}>
+                  {card.description}
+                </p>
+
+                {/* Evolution insight */}
+                <div
+                  className="rounded-xl overflow-hidden"
                   style={{
-                    background: `rgba(${accent.rgb},0.22)`,
-                    border: `1px solid rgba(${accent.rgb},0.4)`,
-                    color: accent.hex,
-                    backdropFilter: 'blur(10px)',
+                    background: `rgba(${accent.rgb},0.07)`,
+                    border: `1px solid rgba(${accent.rgb},0.18)`,
                   }}
                 >
-                  {card.subtitle}
-                </span>
+                  <button
+                    onClick={() => setExp(p => !p)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
+                  >
+                    <Dna size={11} style={{ color: accent.hex, flexShrink: 0 }} strokeWidth={2} />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] flex-1" style={{ color: accent.hex }}>
+                      Evolution Insight
+                    </span>
+                    {expanded
+                      ? <ChevronUp   size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />
+                      : <ChevronDown size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />}
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {expanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <p className="px-3 pb-3.5 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                          {card.evolution}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
-
-            {/* ── Text panel ── */}
-            <div className="flex-shrink-0 px-5 pt-3.5 pb-4" style={{ background: '#080808' }}>
-              <h2
-                className="text-[19px] font-bold tracking-tight mb-1.5 leading-tight"
-                style={{ color: 'rgba(255,255,255,0.95)', fontFamily: 'var(--app-font-heading)' }}
-              >
-                {card.title}
-              </h2>
-              <p className="text-[11px] leading-relaxed mb-3" style={{ color: 'rgba(255,255,255,0.42)' }}>
-                {card.description}
-              </p>
-
-              {/* Evolution insight */}
-              <div
-                className="rounded-xl overflow-hidden"
-                style={{
-                  background: `rgba(${accent.rgb},0.07)`,
-                  border: `1px solid rgba(${accent.rgb},0.18)`,
-                }}
-              >
-                <button
-                  onClick={() => setExp(p => !p)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
-                >
-                  <Dna size={11} style={{ color: accent.hex, flexShrink: 0 }} strokeWidth={2} />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] flex-1" style={{ color: accent.hex }}>
-                    Evolution Insight
-                  </span>
-                  {expanded
-                    ? <ChevronUp   size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />
-                    : <ChevronDown size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />}
-                </button>
-                <AnimatePresence initial={false}>
-                  {expanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <p className="px-3 pb-3.5 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                        {card.evolution}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
+            )}
           </motion.div>
         </AnimatePresence>
 
@@ -288,12 +340,16 @@ const ReelsPortal = memo(function ReelsPortal({
               onClick={() => go(1)}
               className="w-9 h-9 rounded-full flex items-center justify-center"
               style={{
-                background: `rgba(${accent.rgb},0.16)`,
-                border: `1px solid rgba(${accent.rgb},0.32)`,
+                background: pureMode
+                  ? 'rgba(255,255,255,0.08)'
+                  : `rgba(${accent.rgb},0.16)`,
+                border: pureMode
+                  ? '1px solid rgba(255,255,255,0.15)'
+                  : `1px solid rgba(${accent.rgb},0.32)`,
                 backdropFilter: 'blur(12px)',
               }}
             >
-              <ArrowDown size={15} style={{ color: accent.hex }} strokeWidth={2} />
+              <ArrowDown size={15} style={{ color: pureMode ? 'rgba(255,255,255,0.6)' : accent.hex }} strokeWidth={2} />
             </button>
           )}
         </div>
@@ -309,10 +365,9 @@ const ReelsPortal = memo(function ReelsPortal({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Single card (horizontal scroll gallery)
-// Wrapped in memo — re-renders only when card/lm changes
+// Single card — Detailed View
 // ─────────────────────────────────────────────────────────────────────────────
-const NatureCardView = memo(function NatureCardView({
+const DetailedCard = memo(function DetailedCard({
   card, accentIdx, lm, onImmersive,
 }: {
   card: NatureCard;
@@ -327,18 +382,20 @@ const NatureCardView = memo(function NatureCardView({
     <div
       className="relative flex-shrink-0 w-72 sm:w-80 snap-start rounded-3xl overflow-hidden flex flex-col"
       style={{
-        background: lm ? 'rgba(255,252,248,0.95)' : 'rgba(10,8,4,0.95)',
+        background: lm ? 'rgba(255,252,248,0.95)' : '#000',
         border:  lm ? `1px solid rgba(${accent.rgb},0.28)` : `1px solid rgba(${accent.rgb},0.16)`,
         boxShadow: lm
           ? `0 6px 28px rgba(${accent.rgb},0.1), 0 2px 6px rgba(0,0,0,0.05)`
-          : `0 6px 36px rgba(${accent.rgb},0.09), 0 2px 10px rgba(0,0,0,0.45)`,
-        // Hint the browser this element will transform → own compositor layer
+          : `0 6px 36px rgba(${accent.rgb},0.09), 0 2px 10px rgba(0,0,0,0.55)`,
         willChange: 'transform',
         contain: 'content',
       }}
     >
       {/* Image */}
-      <div className="relative w-full h-56 sm:h-60 flex-shrink-0 overflow-hidden">
+      <div
+        className="relative w-full h-56 sm:h-60 flex-shrink-0 overflow-hidden"
+        style={{ background: '#000' }}
+      >
         <img
           src={card.image}
           alt={card.title}
@@ -353,7 +410,7 @@ const NatureCardView = memo(function NatureCardView({
           style={{
             background: lm
               ? 'linear-gradient(to top, rgba(255,252,248,1) 0%, transparent 100%)'
-              : 'linear-gradient(to top, rgba(10,8,4,1) 0%, transparent 100%)',
+              : 'linear-gradient(to top, #000 0%, transparent 100%)',
           }}
         />
         <div
@@ -457,10 +514,127 @@ const NatureCardView = memo(function NatureCardView({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Single card — Pure Visuals (image only, click = immersive)
+// ─────────────────────────────────────────────────────────────────────────────
+const PureCard = memo(function PureCard({
+  card, accentIdx, onImmersive,
+}: {
+  card: NatureCard;
+  accentIdx: number;
+  onImmersive: (id: number) => void;
+}) {
+  const accent = ACCENTS[accentIdx % ACCENTS.length];
+
+  return (
+    <div
+      onClick={() => onImmersive(card.id)}
+      className="relative flex-shrink-0 w-52 sm:w-60 snap-start rounded-3xl overflow-hidden cursor-pointer"
+      style={{
+        background: '#000',
+        border: `1px solid rgba(${accent.rgb},0.12)`,
+        aspectRatio: '9 / 16',
+        willChange: 'transform',
+        contain: 'content',
+      }}
+    >
+      {/* Blurred fill layer for letterbox */}
+      <img
+        src={card.image}
+        alt=""
+        aria-hidden
+        className="absolute inset-0 w-full h-full"
+        style={{
+          objectFit: 'cover',
+          filter: 'blur(20px) brightness(0.3) saturate(1.3)',
+          transform: 'scale(1.1)',
+          background: '#000',
+        }}
+        loading="lazy"
+        decoding="async"
+      />
+      {/* Sharp contained image — full, no crop */}
+      <img
+        src={card.image}
+        alt={card.title}
+        className="absolute inset-0 w-full h-full"
+        style={{ objectFit: 'contain', background: 'transparent' }}
+        loading="lazy"
+        decoding="async"
+        onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.2'; }}
+      />
+      {/* Counter badge */}
+      <div
+        className="absolute top-2.5 left-2.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+        style={{
+          background: `rgba(${accent.rgb},0.75)`,
+          color: '#fff',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        {String(card.id).padStart(2, '0')}
+      </div>
+      {/* Tap hint on hover/focus — subtle bottom glow */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-16 pointer-events-none"
+        style={{ background: `linear-gradient(to top, rgba(${accent.rgb},0.14) 0%, transparent 100%)` }}
+      />
+    </div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Segmented View-Mode Toggle
+// ─────────────────────────────────────────────────────────────────────────────
+const ViewModeToggle = memo(function ViewModeToggle({
+  mode, onChange, lm,
+}: {
+  mode: ViewMode;
+  onChange: (m: ViewMode) => void;
+  lm: boolean;
+}) {
+  return (
+    <div
+      className="flex rounded-xl p-0.5 gap-0.5 flex-shrink-0"
+      style={{
+        background: lm ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+        border: lm ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
+      {(['detailed', 'pure'] as ViewMode[]).map(m => {
+        const active = mode === m;
+        const Icon = m === 'detailed' ? AlignLeft : Eye;
+        const label = m === 'detailed' ? 'Detailed View' : 'Pure Visuals';
+        return (
+          <button
+            key={m}
+            onClick={() => onChange(m)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[10px] font-semibold tracking-wide transition-all duration-200"
+            style={{
+              background: active
+                ? lm ? '#fff' : 'rgba(255,255,255,0.12)'
+                : 'transparent',
+              color: active
+                ? lm ? '#92400e' : 'rgba(255,255,255,0.88)'
+                : lm ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.32)',
+              boxShadow: active
+                ? lm ? '0 1px 4px rgba(0,0,0,0.1)' : '0 1px 4px rgba(0,0,0,0.4)'
+                : 'none',
+            }}
+          >
+            <Icon size={11} strokeWidth={2.2} />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Infinite-loop scroll gallery
 // ─────────────────────────────────────────────────────────────────────────────
 const CLONE_COUNT = 5;
-const REAL_COUNT  = natureGalleryData.length; // 25
+const REAL_COUNT  = natureGalleryData.length; // 34
 const loopData    = [
   ...natureGalleryData.slice(-CLONE_COUNT),
   ...natureGalleryData,
@@ -473,6 +647,8 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
   const [activeIdx, setActiveIdx] = useState(0);
   const isJumping  = useRef(false);
 
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+
   // Reels portal state
   const [reelsData,    setReelsData]    = useState<NatureCard[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -482,7 +658,7 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
     setIsFullscreen(true);
   }, []);
 
-  // Card width helper
+  // Card width helper — pure cards are narrower
   const cardWidth = useCallback((): number => {
     const el = scrollRef.current;
     if (!el) return 0;
@@ -490,24 +666,34 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
     return first ? first.offsetWidth + 16 : 0; // gap-4 = 16px
   }, []);
 
-  // Scroll to a loop index (instant or smooth)
+  // Scroll to a loop index
   const scrollToLoop = useCallback((loopIdx: number, instant = false) => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ left: cardWidth() * loopIdx, behavior: instant ? 'instant' as ScrollBehavior : 'smooth' });
   }, [cardWidth]);
 
-  // Init: jump to first real card without animation
+  // Init: jump to first real card
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // Small rAF delay so the browser has laid out the cards
     requestAnimationFrame(() => {
       const cw = cardWidth();
       if (cw > 0) el.scrollLeft = cw * CLONE_COUNT;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-init when view mode changes (card widths change)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const cw = cardWidth();
+      if (cw > 0) el.scrollLeft = cw * (CLONE_COUNT + activeRef.current);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -525,7 +711,7 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
       }
     }
 
-    // Seamless loop: jump when inside clone zone
+    // Seamless loop
     if (loopIdx < CLONE_COUNT) {
       isJumping.current = true;
       const target = loopIdx + REAL_COUNT;
@@ -567,7 +753,7 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
           style={{
@@ -590,7 +776,7 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
           Evolutionary Discovery
         </span>
         <span
-          className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0"
+          className="text-[9px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0"
           style={{
             background: 'rgba(245,158,11,0.12)',
             border: '1px solid rgba(245,158,11,0.28)',
@@ -599,30 +785,49 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
         >
           {REAL_COUNT} Specimens
         </span>
+
+        {/* Toggle — pushed to right on larger screens */}
+        <div className="ml-auto">
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} lm={lm} />
+        </div>
       </div>
 
-      {/* Hero banner */}
-      <div
-        className="relative overflow-hidden rounded-2xl mb-5 px-5 py-3.5 flex items-center gap-3"
-        style={{
-          background: lm
-            ? 'linear-gradient(135deg, rgba(254,243,199,0.7), rgba(255,247,237,0.7))'
-            : 'linear-gradient(135deg, rgba(14,10,2,0.9), rgba(10,8,2,0.9))',
-          border: lm ? '1px solid rgba(245,158,11,0.28)' : '1px solid rgba(245,158,11,0.14)',
-        }}
-      >
+      {/* Hero banner — only in Detailed view */}
+      {viewMode === 'detailed' && (
         <div
-          className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.16) 0%, transparent 70%)', filter: 'blur(18px)' }}
-        />
-        <Leaf size={18} style={{ color: '#f59e0b', flexShrink: 0 }} strokeWidth={1.6} />
-        <p className="text-[11px] leading-relaxed relative z-10" style={{ color: lm ? 'rgba(120,53,15,0.65)' : 'rgba(255,255,255,0.38)' }}>
-          <strong style={{ color: lm ? '#92400e' : 'rgba(245,158,11,0.8)' }}>Scroll horizontally</strong>{' '}
-          — the gallery loops endlessly across {REAL_COUNT} specimens. Tap{' '}
-          <strong style={{ color: lm ? '#92400e' : 'rgba(245,158,11,0.8)' }}>Immersive View</strong>{' '}
-          for a randomized full-screen Reels experience.
-        </p>
-      </div>
+          className="relative overflow-hidden rounded-2xl mb-5 px-5 py-3.5 flex items-center gap-3"
+          style={{
+            background: lm
+              ? 'linear-gradient(135deg, rgba(254,243,199,0.7), rgba(255,247,237,0.7))'
+              : 'linear-gradient(135deg, rgba(14,10,2,0.9), rgba(10,8,2,0.9))',
+            border: lm ? '1px solid rgba(245,158,11,0.28)' : '1px solid rgba(245,158,11,0.14)',
+          }}
+        >
+          <div
+            className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.16) 0%, transparent 70%)', filter: 'blur(18px)' }}
+          />
+          <Leaf size={18} style={{ color: '#f59e0b', flexShrink: 0 }} strokeWidth={1.6} />
+          <p className="text-[11px] leading-relaxed relative z-10" style={{ color: lm ? 'rgba(120,53,15,0.65)' : 'rgba(255,255,255,0.38)' }}>
+            <strong style={{ color: lm ? '#92400e' : 'rgba(245,158,11,0.8)' }}>Scroll horizontally</strong>{' '}
+            — the gallery loops endlessly. Tap{' '}
+            <strong style={{ color: lm ? '#92400e' : 'rgba(245,158,11,0.8)' }}>Immersive View</strong>{' '}
+            for a randomized full-screen Reels experience.
+          </p>
+        </div>
+      )}
+
+      {/* Pure Visuals hint */}
+      {viewMode === 'pure' && (
+        <div className="mb-4">
+          <p
+            className="text-[10px] uppercase tracking-[0.18em]"
+            style={{ color: lm ? 'rgba(120,53,15,0.38)' : 'rgba(255,255,255,0.22)' }}
+          >
+            Tap any image to open Immersive View
+          </p>
+        </div>
+      )}
 
       {/* Gallery container */}
       <div className="relative">
@@ -665,15 +870,24 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {loopData.map((card, i) => (
-            <NatureCardView
-              key={`${i}-${card.id}`}
-              card={card}
-              accentIdx={card.id - 1}
-              lm={lm}
-              onImmersive={openImmersive}
-            />
-          ))}
+          {loopData.map((card, i) =>
+            viewMode === 'pure' ? (
+              <PureCard
+                key={`pure-${i}-${card.id}`}
+                card={card}
+                accentIdx={card.id - 1}
+                onImmersive={openImmersive}
+              />
+            ) : (
+              <DetailedCard
+                key={`det-${i}-${card.id}`}
+                card={card}
+                accentIdx={card.id - 1}
+                lm={lm}
+                onImmersive={openImmersive}
+              />
+            )
+          )}
         </div>
       </div>
 
@@ -707,7 +921,11 @@ const FeelNatureSection = memo(function FeelNatureSection({ lm }: { lm: boolean 
       {/* Portal */}
       <AnimatePresence>
         {isFullscreen && (
-          <ReelsPortal data={reelsData} onClose={() => setIsFullscreen(false)} />
+          <ReelsPortal
+            data={reelsData}
+            onClose={() => setIsFullscreen(false)}
+            pureMode={viewMode === 'pure'}
+          />
         )}
       </AnimatePresence>
     </div>

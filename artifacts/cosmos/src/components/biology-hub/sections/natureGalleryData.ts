@@ -260,4 +260,94 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'Water is the absolute prerequisite for life. Its unique chemical ability to dissolve more substances than any other liquid makes it the perfect medium for the complex chemical reactions required to build DNA and sustain cellular life.',
   },
+  {
+    id: 26,
+    image: '/nature-gallery/1000012207.jpg',
+    title: 'The Sacred Coil',
+    subtitle: 'Chromatin & Histones',
+    description:
+      'Over 2 meters of DNA is packed inside a single microscopic cell nucleus by wrapping tightly around protein spools called histones.',
+    evolution:
+      'Epigenetic controls evolved to turn genes on and off without altering the core code, allowing a single set of DNA instructions to build both a beating heart cell and a thinking neuron.',
+  },
+  {
+    id: 27,
+    image: '/nature-gallery/1000012208.jpg',
+    title: 'The Great Tapestry',
+    subtitle: 'Phylogenetic Tree of Life',
+    description:
+      'Every living organism on Earth—from ancient bacteria to giant redwoods and blue whales—stems from a single common aquatic ancestor.',
+    evolution:
+      'LUCA (Last Universal Common Ancestor) emerged over 3.5 billion years ago. The universal genetic code shared by all living things is absolute proof of our common origin.',
+  },
+  {
+    id: 28,
+    image: '/nature-gallery/1000012209.jpg',
+    title: 'The Classical Dissection',
+    subtitle: 'Vintage Anatomical Illustration',
+    description:
+      'Historical paper cut-out anatomy models allowed early medical scholars to study human inner structure layer-by-layer before modern imaging existed.',
+    evolution:
+      'Human curiosity and systematic anatomical study sparked medical breakthroughs that doubled the average human lifespan in less than two centuries.',
+  },
+  {
+    id: 29,
+    image: '/nature-gallery/1000012210.jpg',
+    title: 'The Command Center',
+    subtitle: 'Cranial Sagittal View',
+    description:
+      'A cross-section of human cognition: cerebrum for high thought, cerebellum for motor control, and brainstem governing involuntary survival functions.',
+    evolution:
+      'The massive enlargement of our cerebral cortex forced human infants to be born far less physically independent than other primates, forging deep parental care and strong social tribes.',
+  },
+  {
+    id: 30,
+    image: '/nature-gallery/1000012211.jpg',
+    title: 'The Ghost in the Machine',
+    subtitle: 'Isolated Human Nervous System',
+    description:
+      'Stripped of skin, muscle, and bone, this is what actually feels, thinks, and perceives reality—a tree of electrical wiring weighing under 2 kg.',
+    evolution:
+      'Nerve impulses transmit signals at speeds up to 120 meters per second using rapid sodium-potassium ion exchanges across cell membranes—an evolutionary high-speed fiber-optic network.',
+  },
+  {
+    id: 31,
+    image: '/nature-gallery/1000012212.jpg',
+    title: 'Microscopic Powerhouses',
+    subtitle: 'Photosynthetic Microalgae',
+    description:
+      'Spherical green cells packed with chlorophyll, swimming in water and turning solar radiation and carbon dioxide into oxygen.',
+    evolution:
+      'Endosymbiosis: Billions of years ago, an ancient single cell engulfed a photosynthetic bacterium instead of digesting it, giving birth to the ancestors of all plant life.',
+  },
+  {
+    id: 32,
+    image: '/nature-gallery/1000012213.jpg',
+    title: 'Architectural Resilience',
+    subtitle: 'Female Internal Systems',
+    description:
+      'A comprehensive view showing how the respiratory, cardiovascular, and digestive tracts interact in harmony within the female frame.',
+    evolution:
+      'The internal placement of reproductive organs within the protective ring of the bony pelvis provides maximum shielding against physical impact, ensuring species survival.',
+  },
+  {
+    id: 33,
+    image: '/nature-gallery/1000012214.jpg',
+    title: 'The Visual Highway',
+    subtitle: 'Optic Chiasm & Neural Pathway',
+    description:
+      'Optic nerves from both eyes cross at the Optic Chiasm, sending left and right field visuals to opposite brain hemispheres to compute 3D depth perception.',
+    evolution:
+      'Binocular overlapping vision evolved in tree-dwelling primates to accurately judge leap distances between branches, later adapting for precision tool manipulation.',
+  },
+  {
+    id: 34,
+    image: '/nature-gallery/1000012215.jpg',
+    title: 'The Great Conduit',
+    subtitle: 'Abdominal Aorta & Renal System',
+    description:
+      'The massive aortic arch branching down into the kidneys and abdominal organs under intense hydraulic pressure.',
+    evolution:
+      'The high-pressure mammalian vascular system requires thick, elastic arterial walls that stretch and recoil, maintaining continuous blood flow even between heartbeats.',
+  },
 ];
