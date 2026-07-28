@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone, ScanLine,
+  Dna, Bone, ScanLine, Leaf,
 } from 'lucide-react';
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
 
@@ -19,7 +19,7 @@ interface BioSidebarProps {
 const ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone, ScanLine,
+  Dna, Bone, ScanLine, Leaf,
 };
 
 const SECTION_GROUPS = [
@@ -33,7 +33,7 @@ const SECTION_GROUPS = [
   },
   {
     label: 'Life Science',
-    ids: ['evolution', 'biochemistry'],
+    ids: ['evolution', 'biochemistry', 'feel-nature'],
   },
   {
     label: 'Resources',

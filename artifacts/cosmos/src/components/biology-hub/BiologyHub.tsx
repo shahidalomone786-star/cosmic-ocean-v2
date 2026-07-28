@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Layers3, Heart, Network, Zap, Brain, Microscope,
   GitBranch, FlaskConical, Atom, TreePine, BookOpen, Play, Gauge,
-  Dna, Bone, ScanLine,
+  Dna, Bone, ScanLine, Leaf,
 } from 'lucide-react';
 import BioHeader from './BioHeader';
 import BioSidebar from './BioSidebar';

@@ -15,6 +15,7 @@ export type BioSectionId =
   | 'viruses'
   | 'evolution'
   | 'biochemistry'
+  | 'feel-nature'
   | 'research'
   | 'videos'
   | 'simulations';
@@ -145,6 +146,15 @@ export const BIO_NAV_ITEMS: BioNavItem[] = [
     color: 'text-indigo-400',
     glow: 'rgba(129,140,248,0.3)',
     description: 'Proteins, enzymes, metabolism',
+  },
+  {
+    id: 'feel-nature',
+    label: 'Feel Nature',
+    iconName: 'Leaf',
+    color: 'text-amber-400',
+    glow: 'rgba(245,158,11,0.3)',
+    description: 'Evolutionary discovery gallery',
+    badge: 'New',
   },
   {
     id: 'research',
