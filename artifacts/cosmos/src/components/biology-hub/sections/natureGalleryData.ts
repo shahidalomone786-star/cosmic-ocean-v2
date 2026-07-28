@@ -90,4 +90,84 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'The four-chambered heart was a massive evolutionary leap. By completely separating oxygen-rich blood from oxygen-poor blood, it gave mammals the immense stamina and warm-blooded metabolism needed to survive the ice ages.',
   },
+  {
+    id: 9,
+    image: '/nature-gallery/1000012186.jpg',
+    title: 'The Blueprint of Man',
+    subtitle: 'Systemic Deconstruction',
+    description:
+      'From the integumentary system down to the nervous and circulatory networks, a human is a composite of overlapping biological engines working in absolute synchronization.',
+    evolution:
+      'This layered architecture allowed early hominids to adapt to extreme environments. Skin protects, bones support, muscles move, and nerves command — a masterpiece of natural engineering.',
+  },
+  {
+    id: 10,
+    image: '/nature-gallery/1000012187.jpg',
+    title: 'The Duality of Form',
+    subtitle: 'Superficial & Deep Anatomy',
+    description:
+      'Beneath the seamless protective layer of skin lies a violently complex network of striated muscle and high-speed vascular highways.',
+    evolution:
+      'Human skin evolved to be highly elastic and sweat-gland rich. This gave us the unique ability to thermoregulate during persistence hunting, chasing prey under the scorching sun until it collapsed.',
+  },
+  {
+    id: 11,
+    image: '/nature-gallery/1000012188.jpg',
+    title: 'The Biomechanical Core',
+    subtitle: 'Kinetic Architecture',
+    description:
+      'Viewed from above, the broad shoulders and narrow hips of the human body are specifically optimized for balance, rotation, and bipedal locomotion.',
+    evolution:
+      'The ability to rotate the torso independently from the hips allowed early humans to store and release massive kinetic energy, making us the most lethal and accurate throwers in the animal kingdom.',
+  },
+  {
+    id: 12,
+    image: '/nature-gallery/1000012189.jpg',
+    title: "The Alchemist's Engine",
+    subtitle: 'Visceral Anatomy',
+    description:
+      'A masterclass in spatial packaging. The liver processes toxins, the lungs exchange gases, and the intestines extract energy, all tightly packed within the ribcage and pelvis.',
+    evolution:
+      'The human gut actually shrank as we learned to control fire and cook food. Less energy spent on digesting raw plants meant more energy could be redirected to power our massive, demanding brains.',
+  },
+  {
+    id: 13,
+    image: '/nature-gallery/1000012190.jpg',
+    title: 'The Symphony of Systems',
+    subtitle: 'Neuro-Vascular Network',
+    description:
+      'Every millimeter of the human body is wired. Miles of blood vessels and nerve fibers ensure instant communication and nutrient delivery to billions of individual cells.',
+    evolution:
+      'The incredibly high density of nerve endings in our extremities, particularly the hands and lips, drove the evolution of fine motor skills, tool making, and complex speech.',
+  },
+  {
+    id: 14,
+    image: '/nature-gallery/1000012191.jpg',
+    title: 'The Primordial Soup',
+    subtitle: 'Origins of Life',
+    description:
+      'The vast, restless ocean. Billions of years ago, in hydrothermal vents deep beneath these waves, the very first single-celled organisms sparked into existence.',
+    evolution:
+      'We still carry the ocean within us. The salinity of human blood, sweat, and tears is remarkably similar to the ancient oceans where our earliest microscopic ancestors first evolved.',
+  },
+  {
+    id: 15,
+    image: '/nature-gallery/1000012192.jpg',
+    title: 'The Solar Harvesters',
+    subtitle: 'Photosynthetic Life',
+    description:
+      'Plants are the silent architects of our atmosphere. Through photosynthesis, they capture solar radiation and convert it into the chemical energy that sustains almost all life.',
+    evolution:
+      "Without the 'Great Oxidation Event' caused by ancient cyanobacteria and later complex plants, the oxygen-heavy atmosphere required to support large, warm-blooded mammals like humans would simply not exist.",
+  },
+  {
+    id: 16,
+    image: '/nature-gallery/1000012193.jpg',
+    title: 'The Conscious Observer',
+    subtitle: 'Human Cognition',
+    description:
+      'A biological machine capable of standing on a mountain and contemplating its own existence. Through us, the universe has developed a way to experience itself.',
+    evolution:
+      'Our ancestors climbed mountains not just for survival, but driven by an innate curiosity. The evolution of the prefrontal cortex gave us imagination, philosophy, and the relentless drive to explore the unknown.',
+  },
 ];
