@@ -170,4 +170,94 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'Our ancestors climbed mountains not just for survival, but driven by an innate curiosity. The evolution of the prefrontal cortex gave us imagination, philosophy, and the relentless drive to explore the unknown.',
   },
+  {
+    id: 17,
+    image: '/nature-gallery/1000012197.jpg',
+    title: 'The Cradle of Biodiversity',
+    subtitle: 'Coral Reef Ecosystems',
+    description:
+      'Reefs cover less than 1% of the ocean floor but support over 25% of all marine life. They are bustling underwater megacities driven by sunlight and symbiotic relationships.',
+    evolution:
+      'Life on Earth originated in the oceans. The complex visual patterns and vibrant colors of reef fish evolved for species recognition, camouflage, and mating displays in the crystal-clear, sunlit shallows.',
+  },
+  {
+    id: 18,
+    image: '/nature-gallery/1000012198.jpg',
+    title: 'The Living Canvas',
+    subtitle: 'Selective Adaptation',
+    description:
+      'The striking blue and white patterns of this aquatic specimen showcase how genetic mutations can rapidly alter the physical appearance of a species.',
+    evolution:
+      'While natural selection favors camouflage for survival, human-driven artificial selection (like breeding Koi) isolates specific genetic anomalies for aesthetic beauty, bypassing the harsh rules of the wild.',
+  },
+  {
+    id: 19,
+    image: '/nature-gallery/1000012199.jpg',
+    title: 'The Metabolic Engine',
+    subtitle: 'Gastrointestinal Tract',
+    description:
+      'An incredibly efficient chemical processing plant. From the liver (the body\'s primary detoxifier) down through meters of coiled intestines, every inch is designed for nutrient extraction.',
+    evolution:
+      'The human digestive tract is surprisingly short compared to other primates. Cooking our food pre-digested it externally, allowing us to evolve smaller stomachs and redirect that saved energy to power our rapidly expanding brains.',
+  },
+  {
+    id: 20,
+    image: '/nature-gallery/1000012200.jpg',
+    title: 'The Armored Core',
+    subtitle: 'Thoracic & Abdominal Cavity',
+    description:
+      'Observe how the most vital organs — the heart and lungs — are heavily shielded by the ribcage, while the digestive organs sit in the flexible abdominal cavity to allow for expansion.',
+    evolution:
+      'This structural divide is evolutionary genius. The rigid ribcage protects against lethal chest trauma, while the unprotected abdomen allows humans to bend, twist, and consume large amounts of food or carry growing fetuses.',
+  },
+  {
+    id: 21,
+    image: '/nature-gallery/1000012201.jpg',
+    title: 'Biomechanics of Bipedalism',
+    subtitle: 'Female Lateral Anatomy',
+    description:
+      'A lateral view reveals the distinct curvature of the spine and the precise positioning of the internal organs relative to the pelvic girdle.',
+    evolution:
+      'To walk upright on two legs, the human spine had to evolve an S-curve to act as a shock absorber. The female pelvis adapted to be wider to balance the extreme biomechanical demands of bipedal walking with the ability to birth large-brained infants.',
+  },
+  {
+    id: 22,
+    image: '/nature-gallery/1000012202.jpg',
+    title: 'The Crimson River',
+    subtitle: 'Vascular Architecture',
+    description:
+      'If you removed everything except the blood vessels, you would still perfectly see the shape of the human body. It is a closed-loop system spanning over 60,000 miles.',
+    evolution:
+      'Angiogenesis (the growth of new blood vessels) evolved to ensure no cell in a complex multicellular organism is ever more than a hair\'s width away from a nutrient supply. It is the ultimate biological delivery network.',
+  },
+  {
+    id: 23,
+    image: '/nature-gallery/1000012203.jpg',
+    title: 'The Chemical Breakdown',
+    subtitle: 'Oral Cavity & Glands',
+    description:
+      'Digestion doesn\'t start in the stomach; it starts here. The submandibular and parotid glands pump out saliva rich in amylase enzymes the second you smell food.',
+    evolution:
+      'Teeth are actually an evolutionary modification of ancient fish scales. The specialized shapes (incisors for cutting, molars for grinding) allowed mammals to extract maximum calories from a wide variety of food sources.',
+  },
+  {
+    id: 24,
+    image: '/nature-gallery/1000012204.jpg',
+    title: 'The Floral Explosion',
+    subtitle: 'Angiosperm Dominance',
+    description:
+      'For billions of years, the Earth was mostly green and brown. Flowers are a relatively recent, massive biological revolution that transformed the planet.',
+    evolution:
+      'Flowers (Angiosperms) hacked the animal kingdom. Instead of relying on wind to scatter pollen, they evolved bright colors and sweet nectar to trick insects and birds into doing their reproductive labor, conquering the globe in record time.',
+  },
+  {
+    id: 25,
+    image: '/nature-gallery/1000012205.jpg',
+    title: 'The Universal Solvent',
+    subtitle: 'Geological vs Biological Time',
+    description:
+      'Water carves through solid rock over millions of years, creating deep, glowing subterranean ecosystems untouched by the outside world.',
+    evolution:
+      'Water is the absolute prerequisite for life. Its unique chemical ability to dissolve more substances than any other liquid makes it the perfect medium for the complex chemical reactions required to build DNA and sustain cellular life.',
+  },
 ];
