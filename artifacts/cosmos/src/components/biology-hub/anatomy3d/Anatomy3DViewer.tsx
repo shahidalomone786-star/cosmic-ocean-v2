@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Brain, Wind, Bone, Dna, Microscope,
   X, ExternalLink, ChevronRight, AlertCircle, Loader2,
-  RotateCcw, Layers, Maximize2, ArrowLeft,
+  RotateCcw, Layers, Maximize2, ArrowLeft, Crown,
 } from 'lucide-react';
 import { ORGAN_DATA, ORGAN_LIST, type OrganId } from './organData';
+import PremiumLibrary from './PremiumLibrary';
 
 // ─── Lucide icon lookup ───────────────────────────────────────────────────────
 type IconFC = React.FC<{ size?: number; strokeWidth?: number; className?: string; style?: React.CSSProperties }>;
@@ -560,13 +561,13 @@ function OrganModal({
                   accentRgb={rgb}
                 />
 
-                {/* ── Expand / Full-Screen button — bottom-right ── */}
+                {/* ── Expand / Full-Screen button — bottom-left ── */}
                 <motion.button
                   initial={{ opacity: 0, scale: 0.85 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                   onClick={() => setIsFullscreen(true)}
-                  className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
+                  className="absolute bottom-4 left-4 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
                   style={{
                     background:     'rgba(0,0,0,0.55)',
                     backdropFilter: 'blur(16px) saturate(180%)',
@@ -666,7 +667,13 @@ interface Anatomy3DViewerProps {
 }
 
 const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
-  const [activeOrgan, setActiveOrgan] = useState<OrganId | null>(null);
+  const [activeOrgan,         setActiveOrgan        ] = useState<OrganId | null>(null);
+  const [showPremiumLibrary,  setShowPremiumLibrary  ] = useState(false);
+
+  // ── Show Premium Library ──
+  if (showPremiumLibrary) {
+    return <PremiumLibrary lm={lm} onBack={() => setShowPremiumLibrary(false)} />;
+  }
 
   return (
     <div>
@@ -721,9 +728,100 @@ const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
         ))}
       </div>
 
+      {/* ── Premium Library CTA — appears right after DNA card ── */}
+      <motion.button
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        whileHover={{ y: -3, scale: 1.012 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => setShowPremiumLibrary(true)}
+        className="mt-3 w-full relative overflow-hidden rounded-2xl text-left group cursor-pointer"
+        style={{
+          background: lm
+            ? 'linear-gradient(135deg, rgba(254,243,199,0.75) 0%, rgba(253,230,138,0.45) 100%)'
+            : 'linear-gradient(135deg, rgba(16,11,2,0.88) 0%, rgba(10,8,2,0.88) 100%)',
+          border: lm
+            ? '1px solid rgba(251,191,36,0.45)'
+            : '1px solid rgba(251,191,36,0.25)',
+          boxShadow: lm
+            ? '0 4px 24px rgba(251,191,36,0.12)'
+            : '0 4px 24px rgba(251,191,36,0.07)',
+        }}
+      >
+        {/* Ambient gold glow */}
+        <div
+          className="absolute -top-8 -right-8 w-40 h-40 rounded-full pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-500"
+          style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.22) 0%, transparent 70%)', filter: 'blur(20px)' }}
+        />
+
+        <div className="relative z-10 flex items-center gap-4 px-5 py-4">
+          {/* Crown icon bubble */}
+          <div
+            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: 'rgba(251,191,36,0.15)',
+              border:     '1px solid rgba(251,191,36,0.35)',
+              boxShadow:  '0 0 20px rgba(251,191,36,0.18)',
+            }}
+          >
+            <Crown size={19} style={{ color: 'rgb(251,191,36)' }} strokeWidth={1.7} />
+          </div>
+
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <p
+                className="text-[13px] font-bold tracking-tight"
+                style={{ color: lm ? '#78350f' : 'rgb(251,191,36)' }}
+              >
+                Premium Library
+              </p>
+              <span
+                className="text-[8px] font-bold uppercase tracking-[0.14em] px-1.5 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  background: 'rgba(251,191,36,0.15)',
+                  border:     '1px solid rgba(251,191,36,0.3)',
+                  color:      'rgb(251,191,36)',
+                }}
+              >
+                19 Models
+              </span>
+            </div>
+            <p
+              className="text-[10px] uppercase tracking-[0.16em] font-medium"
+              style={{ color: lm ? 'rgba(120,53,15,0.5)' : 'rgba(251,191,36,0.4)' }}
+            >
+              Advanced 3D Models
+            </p>
+          </div>
+
+          {/* Subtitle */}
+          <p
+            className="hidden sm:block text-[11px] max-w-[180px] text-right leading-relaxed flex-shrink-0"
+            style={{ color: lm ? 'rgba(120,53,15,0.45)' : 'rgba(255,255,255,0.3)' }}
+          >
+            Full body, head, cellular &amp; evolution models
+          </p>
+
+          <ChevronRight
+            size={16}
+            style={{ color: 'rgba(251,191,36,0.55)', flexShrink: 0 }}
+            strokeWidth={2.2}
+            className="group-hover:translate-x-1 transition-transform duration-200"
+          />
+        </div>
+
+        {/* Hover shimmer */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+          style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.07) 0%, transparent 70%)' }}
+        />
+      </motion.button>
+
       {/* ── Hint ── */}
       <div
-        className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-xl"
+        className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl"
         style={{
           background: lm ? 'rgba(52,211,153,0.05)' : 'rgba(52,211,153,0.04)',
           border:     lm ? '1px solid rgba(52,211,153,0.14)' : '1px solid rgba(52,211,153,0.08)',
@@ -731,7 +829,7 @@ const Anatomy3DViewer = memo(({ lm }: Anatomy3DViewerProps) => {
       >
         <Microscope size={11} className="text-emerald-400 flex-shrink-0" strokeWidth={1.8} />
         <span className="text-[10px]" style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.28)' }}>
-          Select an organ to open the interactive 3D viewer with anatomy facts.
+          Select an organ above to explore with anatomy facts, or open the Premium Library for 19 advanced models.
         </span>
       </div>
 
