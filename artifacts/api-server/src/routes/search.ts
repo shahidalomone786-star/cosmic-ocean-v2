@@ -20,7 +20,8 @@ router.get("/search/arxiv", async (req, res) => {
       signal: AbortSignal.timeout(30_000), // 30 s — arXiv can be slow
     });
     if (!resp.ok) {
-      res.status(502).json({ error: "arXiv upstream error", items: [], total: 0 });
+      // Always HTTP 200 — upstream failure is not a client error
+      res.json({ error: "arXiv upstream error", items: [], total: 0 });
       return;
     }
     const xml   = await resp.text();
@@ -31,11 +32,11 @@ router.get("/search/arxiv", async (req, res) => {
     const isTimeout =
       err instanceof Error &&
       (err.name === "TimeoutError" || err.message.includes("timed out"));
-    if (isTimeout) {
-      res.status(504).json({ error: "Timeout", items: [], total: 0 });
-    } else {
-      res.status(502).json({ error: "arXiv fetch failed", items: [], total: 0 });
+    // Always HTTP 200 — log in dev, return empty payload to client
+    if (process.env["NODE_ENV"] !== "production") {
+      console.error("[search/arxiv]", isTimeout ? "timeout" : "fetch failed", err);
     }
+    res.json({ error: isTimeout ? "Timeout" : "arXiv unavailable", items: [], total: 0 });
   }
 });
 

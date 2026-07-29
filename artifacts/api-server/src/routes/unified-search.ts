@@ -245,7 +245,7 @@ async function fetchArXiv(query: string, page: number): Promise<SectionItem[]> {
     `&max_results=15&start=${start}&sortBy=relevance`;
   const resp = await fetch(url, {
     headers: { Accept: "application/atom+xml" },
-    signal: timeout(22_000), // arXiv is slow
+    signal: timeout(8_000), // cap at 8 s to prevent proxy-level 502
   });
   if (!resp.ok) return [];
 

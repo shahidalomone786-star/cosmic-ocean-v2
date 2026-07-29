@@ -2099,15 +2099,32 @@ export default function App() {
       const resp = await fetch(
         `/api/search/unified?q=${encodeURIComponent(actualQuery)}&page=1`
       );
-      if (!resp.ok) throw new Error(`Search failed (${resp.status})`);
-      const data = await resp.json() as SearchSections;
+      // Non-2xx: try to parse body anyway; if that fails fall back to empty sections
+      let data: SearchSections;
+      try {
+        data = await resp.json() as SearchSections;
+      } catch {
+        data = {
+          query: actualQuery, page: 1,
+          videos: [], wikipedia: [], research: [], nasa: [], esa: [], books: [],
+          relatedTopics: [], hasMore: false,
+        } as SearchSections;
+      }
       setSearchSections(data);
       setVideoResults(data.videos ?? []);
       setVideoStatus('done');
       setSearchStatus('done');
     } catch (err: unknown) {
-      setSearchError((err as Error)?.message ?? String(err));
-      setSearchStatus('error');
+      if (import.meta.env.DEV) console.error('[searchAll]', err);
+      // Degrade gracefully: show empty results, never crash
+      setSearchSections({
+        query: actualQuery, page: 1,
+        videos: [], wikipedia: [], research: [], nasa: [], esa: [], books: [],
+        relatedTopics: [], hasMore: false,
+      } as SearchSections);
+      setVideoResults([]);
+      setVideoStatus('done');
+      setSearchStatus('done');
     }
   }, []);
 

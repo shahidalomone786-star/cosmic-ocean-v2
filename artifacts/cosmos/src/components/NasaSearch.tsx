@@ -1507,9 +1507,9 @@ export default function NasaSearch({
             {/* Error */}
             {status === 'error' && (
               <div className={`flex flex-col items-center gap-3 py-14 ${lm ? 'text-gray-400' : 'text-white/35'}`}>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/10 border-red-500/20'}`}><X size={18} strokeWidth={1.5} className={lm ? 'text-red-400' : 'text-red-400/70'} /></div>
-                <p className={`text-[11px] uppercase tracking-[0.22em]`}>Transmission interrupted</p>
-                <p className={`text-[12px]`}>{errMsg}</p>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${lm ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.05] border-white/[0.10]'}`}><Search size={18} strokeWidth={1.5} className={lm ? 'text-gray-400' : 'text-white/40'} /></div>
+                <p className={`text-[11px] uppercase tracking-[0.22em]`}>No results found</p>
+                <p className={`text-[12px]`}>Try a different search term</p>
               </div>
             )}
 
@@ -1701,9 +1701,9 @@ export default function NasaSearch({
 
         {status === 'error' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`flex flex-col items-center gap-3 py-14 ${lm ? 'text-gray-400' : 'text-white/35'}`}>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/10 border-red-500/20'}`}><X size={18} strokeWidth={1.5} className={lm ? 'text-red-400' : 'text-red-400/70'} /></div>
-            <p className="text-[11px] uppercase tracking-[0.22em]">Transmission interrupted</p>
-            <p className="text-[12px]">{errMsg}</p>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${lm ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.05] border-white/[0.10]'}`}><Search size={18} strokeWidth={1.5} className={lm ? 'text-gray-400' : 'text-white/40'} /></div>
+            <p className="text-[11px] uppercase tracking-[0.22em]">No results found</p>
+            <p className="text-[12px]">Try a different search term</p>
           </motion.div>
         )}
 
