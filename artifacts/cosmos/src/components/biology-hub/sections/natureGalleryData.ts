@@ -450,4 +450,94 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'Spiral growth patterns follow the Golden Ratio (Fibonacci sequence). This allows developing plant shoots and leaves to pack tightly without shading each other from sunlight.',
   },
+  {
+    id: 45,
+    image: '/nature-gallery/1000012244.jpg',
+    title: 'The Fantasy Biosphere',
+    subtitle: 'Atmospheric Equilibrium',
+    description:
+      'A lush, vibrant landscape where immense cloud formations, clean water bodies, and sprawling forests generate endless atmospheric cycles.',
+    evolution:
+      'Dense plant foliage acts as the planet\'s primary carbon sink, absorbing vast amounts of CO2 and pumping pure oxygen into the troposphere to sustain complex air-breathing life.',
+  },
+  {
+    id: 46,
+    image: '/nature-gallery/1000012245.jpg',
+    title: 'The Meadow Matrix',
+    subtitle: 'Floral Co-Evolution',
+    description:
+      'A dense carpet of blooming wild chamomile blossoms competing for sunlight and insect pollinators in a sunlit meadow.',
+    evolution:
+      'Flowering plants evolved bright yellow centers and white petals specifically to create high-contrast UV targets visible to the compound eyes of bees and butterflies.',
+  },
+  {
+    id: 47,
+    image: '/nature-gallery/1000012246.jpg',
+    title: 'The Cycle of Creation',
+    subtitle: 'Classical Macroevolution',
+    description:
+      'A vintage scientific diagram tracing the grand trajectory of terrestrial life from single-celled protozoa, marine invertebrates, and reptiles to modern humans.',
+    evolution:
+      'Over 99% of all species that ever lived on Earth are now extinct. Evolutionary adaptation is an unbroken chain of survival amidst constant mass extinction events.',
+  },
+  {
+    id: 48,
+    image: '/nature-gallery/1000012247.jpg',
+    title: 'The Mesozoic Titans',
+    subtitle: 'Sauropod Gigantism',
+    description:
+      'A massive Brachiosaurus towering above a misty conifer forest, utilizing its long neck to reach high-canopy vegetation untouched by smaller herbivores.',
+    evolution:
+      'Sauropods evolved bird-like air sacs within their hollow bones (pneumatization), allowing them to dissipate internal heat and grow to lengths exceeding 30 meters.',
+  },
+  {
+    id: 49,
+    image: '/nature-gallery/1000012248.jpg',
+    title: 'The Primeval Dawn',
+    subtitle: 'Jurassic Ecosystems',
+    description:
+      'A breathtaking prehistoric valley bathed in golden sunset, showcasing the rich vegetation that supported Earth\'s largest land animals.',
+    evolution:
+      'High atmospheric carbon dioxide levels during the Mesozoic Era fueled hyper-vegetation growth, creating the dense calorific forests required to sustain giant dinosaurs.',
+  },
+  {
+    id: 50,
+    image: '/nature-gallery/1000012249.jpg',
+    title: 'The Connectome',
+    subtitle: 'Neural Web Architecture',
+    description:
+      'An artistic rendering mapping the complex, interlocking pathways of electrical signals firing across the human brain.',
+    evolution:
+      'The human brain contains roughly 86 billion neurons forming over 100 trillion synaptic connections, giving rise to self-awareness, language, and abstract thought.',
+  },
+  {
+    id: 51,
+    image: '/nature-gallery/1000012250.jpg',
+    title: 'The Spark of Thought',
+    subtitle: 'Synaptic Transmission',
+    description:
+      'Glowing neurons sending electrical impulses across microscopic synaptic gaps using chemical neurotransmitters.',
+    evolution:
+      'Action potentials travel via rapid sodium-potassium ion exchanges along myelin-sheathed axons—a biological mechanism that processes thoughts in milliseconds.',
+  },
+  {
+    id: 52,
+    image: '/nature-gallery/1000012251.jpg',
+    title: 'Our Face from Fish to Man',
+    subtitle: 'Cranial Morphology',
+    description:
+      'Historical scientific illustration documenting the step-by-step evolutionary restructuring of the vertebrate skull from ancient Devonian fish to modern humans.',
+    evolution:
+      'The bones forming your jaw and inner ear (malleus and incus) originally evolved from the gill arch cartilage of ancient jawless fish over 400 million years ago.',
+  },
+  {
+    id: 53,
+    image: '/nature-gallery/1000012252.jpg',
+    title: 'The Perch of Solitude',
+    subtitle: 'Cognitive Transcendence',
+    description:
+      'A human observer perched at the edge of a massive monolithic structure, gazing out over an endless ocean of clouds.',
+    evolution:
+      'Human consciousness uniquely grants us the ability to experience \'awe\'—a psychological state that encourages social bonding, humility, and deep philosophical inquiry.',
+  },
 ];

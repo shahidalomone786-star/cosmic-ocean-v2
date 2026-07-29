@@ -61,6 +61,15 @@ const ACCENTS = [
   { rgb: '20,184,166',  hex: '#14b8a6' }, // 42 turquoise
   { rgb: '234,179,8',   hex: '#eab308' }, // 43 harvest gold
   { rgb: '132,204,22',  hex: '#84cc16' }, // 44 chartreuse
+  { rgb: '56,189,248',  hex: '#38bdf8' }, // 45 sky blue
+  { rgb: '250,204,21',  hex: '#facc15' }, // 46 dandelion
+  { rgb: '180,83,9',    hex: '#b45309' }, // 47 amber brown
+  { rgb: '15,118,110',  hex: '#0f766e' }, // 48 deep teal
+  { rgb: '217,119,6',   hex: '#d97706' }, // 49 warm amber
+  { rgb: '124,58,237',  hex: '#7c3aed' }, // 50 deep violet
+  { rgb: '6,182,212',   hex: '#06b6d4' }, // 51 electric cyan
+  { rgb: '239,68,68',   hex: '#ef4444' }, // 52 vivid red
+  { rgb: '168,162,158', hex: '#a8a29e' }, // 53 warm stone
 ] as const;
 
 const ac = (id: number) => ACCENTS[(id - 1) % ACCENTS.length];
@@ -72,9 +81,28 @@ function shuffleWithFirst(data: NatureCard[], firstId: number): NatureCard[] {
   return first ? [first, ...rest] : rest;
 }
 
+// ─── Scroll click sound ──────────────────────────────────────────────────────
+function playScrollSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.04);
+  } catch (_) { /* silent fallback */ }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Full-Screen Reels Portal — blurred bg + object-contain (no cropping)
-// pureMode: image-only, no text panel
+// Full-Screen Reels Portal — edge-to-edge object-cover, overlay UI
+// pureMode: image only, no text overlay
 // ─────────────────────────────────────────────────────────────────────────────
 const ReelsPortal = memo(function ReelsPortal({
   data,
@@ -92,25 +120,23 @@ const ReelsPortal = memo(function ReelsPortal({
   const total              = data.length;
 
   const go = useCallback((d: 1 | -1) => {
+    playScrollSound();
     setDir(d);
     setIdx(p => Math.max(0, Math.min(total - 1, p + d)));
   }, [total]);
 
-  // Reset accordion when card changes
   useEffect(() => { setExp(false); }, [idx]);
 
-  // Keyboard
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') go(1);
-      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft')  go(-1);
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') go(-1);
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [go, onClose]);
 
-  // Touch
   const onTouchStart = (e: React.TouchEvent) => { touchY.current = e.touches[0].clientY; };
   const onTouchEnd   = (e: React.TouchEvent) => {
     if (touchY.current === null) return;
@@ -127,40 +153,63 @@ const ReelsPortal = memo(function ReelsPortal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[9999] flex flex-col overflow-hidden"
-      style={{ background: '#000', touchAction: 'none' }}
+      transition={{ duration: 0.22 }}
+      className="fixed inset-0 z-[9999] overflow-hidden"
+      style={{ background: '#000', touchAction: 'none', margin: 0, padding: 0 }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Ambient glow — only in detailed mode */}
+      {/* ── Full-bleed image layer — edge-to-edge, object-cover ── */}
+      <AnimatePresence mode="wait" custom={dir}>
+        <motion.img
+          key={card.id}
+          src={card.image}
+          alt={card.title}
+          custom={dir}
+          initial={{ opacity: 0, scale: 1.06 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-0 w-full h-full"
+          style={{ objectFit: 'cover', display: 'block', margin: 0, padding: 0 }}
+          loading="eager"
+          onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.12'; }}
+        />
+      </AnimatePresence>
+
+      {/* ── Top scrim — darkens sky so exit/progress UI reads ── */}
+      <div
+        className="absolute inset-x-0 top-0 h-40 pointer-events-none z-10"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, transparent 100%)' }}
+      />
+
+      {/* ── Bottom scrim — detailed mode only ── */}
       {!pureMode && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-x-0 bottom-0 pointer-events-none z-10"
           style={{
-            background: `radial-gradient(ellipse 70% 55% at 50% 38%, rgba(${accent.rgb},0.18) 0%, transparent 70%)`,
-            transition: 'background 0.55s ease',
+            height: '65%',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.93) 0%, rgba(0,0,0,0.72) 35%, rgba(0,0,0,0.3) 65%, transparent 100%)',
           }}
         />
       )}
 
-      {/* ── Top bar ── */}
-      <div className="relative z-10 flex items-center justify-between px-4 pt-safe-top pt-5 pb-2 flex-shrink-0">
+      {/* ── Top bar (exit + progress + counter) ── */}
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-12 pb-3">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold"
           style={{
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            color: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(14px)',
+            background: 'rgba(0,0,0,0.38)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            color: 'rgba(255,255,255,0.88)',
+            backdropFilter: 'blur(16px)',
           }}
         >
           <X size={13} strokeWidth={2.2} /> Exit
         </button>
 
-        {/* Progress pills */}
-        <div className="flex items-center gap-[3px] flex-wrap justify-center max-w-[200px]">
+        <div className="flex items-center gap-[3px] flex-wrap justify-center max-w-[180px]">
           {data.map((_, i) => (
             <button
               key={i}
@@ -169,205 +218,138 @@ const ReelsPortal = memo(function ReelsPortal({
               style={{
                 width:      i === idx ? '16px' : '4px',
                 height:     '4px',
-                background: i === idx ? accent.hex : 'rgba(255,255,255,0.18)',
+                background: i === idx ? accent.hex : 'rgba(255,255,255,0.22)',
               }}
             />
           ))}
         </div>
 
-        <span className="text-[11px] font-mono" style={{ color: 'rgba(255,255,255,0.35)' }}>
+        <span className="text-[11px] font-mono tabular-nums" style={{ color: 'rgba(255,255,255,0.4)' }}>
           {idx + 1}/{total}
         </span>
       </div>
 
-      {/* ── Card area ── */}
-      <div className="relative flex-1 flex flex-col min-h-0 px-3 pb-3">
-        <AnimatePresence mode="wait" custom={dir}>
-          <motion.div
-            key={card.id}
-            custom={dir}
-            initial={{ opacity: 0, y: (dir as number) * 55 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: (dir as number) * -55 }}
-            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col min-h-0 rounded-3xl overflow-hidden"
-            style={pureMode ? {
-              border: 'none',
-              background: '#000',
-            } : {
-              border: `1px solid rgba(${accent.rgb},0.22)`,
-              boxShadow: `0 0 55px rgba(${accent.rgb},0.12)`,
+      {/* ── Nav arrows — float over image, right edge ── */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30">
+        {idx > 0 && (
+          <button
+            onClick={() => go(-1)}
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{
+              background: 'rgba(0,0,0,0.32)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              backdropFilter: 'blur(14px)',
             }}
           >
-            {/* ── Image area ── */}
-            <div
-              className="relative min-h-0 overflow-hidden"
-              style={{
-                background: '#000',
-                flex: pureMode ? '1' : undefined,
-                flexShrink: pureMode ? undefined : 0,
-                // In detailed mode the image is flex-1; in pure it fills everything
-                flexGrow: pureMode ? 1 : 1,
-              }}
-            >
-              {/* Blurred fill layer — near-zero brightness = pure black letterbox */}
-              <img
-                src={card.image}
-                alt=""
-                aria-hidden
-                className="absolute inset-0 w-full h-full"
-                style={{
-                  objectFit: 'cover',
-                  filter: 'blur(32px) brightness(0.06)',
-                  transform: 'scale(1.12)',
-                  background: '#000',
-                }}
-              />
-              {/* Sharp contained layer — no cropping ever */}
-              <img
-                src={card.image}
-                alt={card.title}
-                className="absolute inset-0 w-full h-full"
-                style={{ objectFit: 'contain', background: 'transparent' }}
-                loading="eager"
-                onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0.15'; }}
-              />
-
-              {/* Bottom gradient into text panel — only in detailed mode */}
-              {!pureMode && (
-                <div
-                  className="absolute inset-x-0 bottom-0 h-28 pointer-events-none"
-                  style={{ background: 'linear-gradient(to top, #080808 0%, transparent 100%)' }}
-                />
-              )}
-
-              {/* Subtitle pill — only in detailed mode */}
-              {!pureMode && (
-                <div className="absolute bottom-3 left-4">
-                  <span
-                    className="text-[9px] uppercase tracking-[0.2em] font-bold px-2.5 py-1 rounded-full"
-                    style={{
-                      background: `rgba(${accent.rgb},0.22)`,
-                      border: `1px solid rgba(${accent.rgb},0.4)`,
-                      color: accent.hex,
-                      backdropFilter: 'blur(10px)',
-                    }}
-                  >
-                    {card.subtitle}
-                  </span>
-                </div>
-              )}
-
-              {/* Pure mode: faint counter badge only */}
-              {pureMode && (
-                <div className="absolute top-3 right-3">
-                  <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-                    style={{
-                      background: 'rgba(0,0,0,0.45)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.35)',
-                      backdropFilter: 'blur(10px)',
-                    }}
-                  >
-                    {String(card.id).padStart(2, '0')}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* ── Text panel — only in detailed mode ── */}
-            {!pureMode && (
-              <div className="flex-shrink-0 px-5 pt-3.5 pb-4" style={{ background: '#080808' }}>
-                <h2
-                  className="text-[19px] font-bold tracking-tight mb-1.5 leading-tight"
-                  style={{ color: 'rgba(255,255,255,0.95)', fontFamily: 'var(--app-font-heading)' }}
-                >
-                  {card.title}
-                </h2>
-                <p className="text-[11px] leading-relaxed mb-3" style={{ color: 'rgba(255,255,255,0.42)' }}>
-                  {card.description}
-                </p>
-
-                {/* Evolution insight */}
-                <div
-                  className="rounded-xl overflow-hidden"
-                  style={{
-                    background: `rgba(${accent.rgb},0.07)`,
-                    border: `1px solid rgba(${accent.rgb},0.18)`,
-                  }}
-                >
-                  <button
-                    onClick={() => setExp(p => !p)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
-                  >
-                    <Dna size={11} style={{ color: accent.hex, flexShrink: 0 }} strokeWidth={2} />
-                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] flex-1" style={{ color: accent.hex }}>
-                      Evolution Insight
-                    </span>
-                    {expanded
-                      ? <ChevronUp   size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />
-                      : <ChevronDown size={12} style={{ color: `rgba(${accent.rgb},0.6)`, flexShrink: 0 }} />}
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {expanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-                        style={{ overflow: 'hidden' }}
-                      >
-                        <p className="px-3 pb-3.5 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                          {card.evolution}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Prev / Next buttons — right edge */}
-        <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
-          {idx > 0 && (
-            <button
-              onClick={() => go(-1)}
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.13)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <ArrowUp size={15} style={{ color: 'rgba(255,255,255,0.65)' }} strokeWidth={2} />
-            </button>
-          )}
-          {idx < total - 1 && (
-            <button
-              onClick={() => go(1)}
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{
-                background: pureMode
-                  ? 'rgba(255,255,255,0.08)'
-                  : `rgba(${accent.rgb},0.16)`,
-                border: pureMode
-                  ? '1px solid rgba(255,255,255,0.15)'
-                  : `1px solid rgba(${accent.rgb},0.32)`,
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <ArrowDown size={15} style={{ color: pureMode ? 'rgba(255,255,255,0.6)' : accent.hex }} strokeWidth={2} />
-            </button>
-          )}
-        </div>
+            <ArrowUp size={16} style={{ color: 'rgba(255,255,255,0.72)' }} strokeWidth={2} />
+          </button>
+        )}
+        {idx < total - 1 && (
+          <button
+            onClick={() => go(1)}
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{
+              background: `rgba(${accent.rgb},0.22)`,
+              border: `1px solid rgba(${accent.rgb},0.4)`,
+              backdropFilter: 'blur(14px)',
+            }}
+          >
+            <ArrowDown size={16} style={{ color: accent.hex }} strokeWidth={2} />
+          </button>
+        )}
       </div>
 
-      <p className="text-center text-[9px] pb-4 flex-shrink-0 uppercase tracking-[0.2em]"
-        style={{ color: 'rgba(255,255,255,0.18)' }}>
-        Swipe up / down · Esc to exit
+      {/* ── Bottom text overlay — detailed mode only ── */}
+      {!pureMode && (
+        <div className="absolute bottom-0 left-0 right-0 z-30 px-5 pb-8">
+          {/* Subtitle pill */}
+          <div className="mb-2.5">
+            <span
+              className="text-[9px] uppercase tracking-[0.22em] font-bold px-2.5 py-1 rounded-full"
+              style={{
+                background: `rgba(${accent.rgb},0.25)`,
+                border: `1px solid rgba(${accent.rgb},0.45)`,
+                color: accent.hex,
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              {card.subtitle}
+            </span>
+          </div>
+
+          <h2
+            className="text-[22px] font-bold tracking-tight mb-1.5 leading-tight"
+            style={{ color: '#fff', fontFamily: 'var(--app-font-heading)', textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}
+          >
+            {card.title}
+          </h2>
+          <p className="text-[12px] leading-relaxed mb-3" style={{ color: 'rgba(255,255,255,0.52)' }}>
+            {card.description}
+          </p>
+
+          {/* Evolution insight accordion */}
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: `rgba(${accent.rgb},0.1)`,
+              border: `1px solid rgba(${accent.rgb},0.22)`,
+              backdropFilter: 'blur(16px)',
+            }}
+          >
+            <button
+              onClick={() => setExp(p => !p)}
+              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left"
+            >
+              <Dna size={11} style={{ color: accent.hex, flexShrink: 0 }} strokeWidth={2} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] flex-1" style={{ color: accent.hex }}>
+                Evolution Insight
+              </span>
+              {expanded
+                ? <ChevronUp   size={12} style={{ color: `rgba(${accent.rgb},0.65)`, flexShrink: 0 }} />
+                : <ChevronDown size={12} style={{ color: `rgba(${accent.rgb},0.65)`, flexShrink: 0 }} />}
+            </button>
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <p className="px-3.5 pb-3.5 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.48)' }}>
+                    {card.evolution}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pure mode: minimal counter at bottom ── */}
+      {pureMode && (
+        <div className="absolute bottom-8 right-5 z-30">
+          <span
+            className="text-[10px] font-mono px-2 py-1 rounded-full"
+            style={{
+              background: 'rgba(0,0,0,0.4)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.38)',
+              backdropFilter: 'blur(12px)',
+            }}
+          >
+            {String(card.id).padStart(2, '0')} / {total}
+          </span>
+        </div>
+      )}
+
+      {/* ── Hint ── */}
+      <p
+        className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 text-[9px] uppercase tracking-[0.22em] whitespace-nowrap"
+        style={{ color: 'rgba(255,255,255,0.16)' }}
+      >
+        Swipe · Esc to exit
       </p>
     </motion.div>,
     document.body,
