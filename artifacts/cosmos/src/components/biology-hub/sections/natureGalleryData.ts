@@ -350,4 +350,104 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'The high-pressure mammalian vascular system requires thick, elastic arterial walls that stretch and recoil, maintaining continuous blood flow even between heartbeats.',
   },
+  {
+    id: 35,
+    image: '/nature-gallery/1000012216.jpg',
+    title: 'The Pelvic Foundation',
+    subtitle: 'Deep Perineal Architecture',
+    description:
+      'A deep anatomical breakdown of the pelvic floor and lower spine muscles in a deep squat position, illustrating how gravity and muscle tension stabilize the human core.',
+    evolution:
+      'Deep squatting was the natural resting and birthing posture for early hominids for millions of years before chairs were invented. This posture naturally aligns the colon and strengthens pelvic floor ligaments.',
+  },
+  {
+    id: 36,
+    image: '/nature-gallery/1000012217.jpg',
+    title: 'The Genesis of Form',
+    subtitle: 'Embryonic Development',
+    description:
+      'A week-by-week progression from a single fertilized cell to a fully formed human fetus, echoing millions of years of evolutionary history in just 40 weeks.',
+    evolution:
+      'Ontogeny recapitulates phylogeny: early human embryos transiently develop pharyngeal arches (gill-like slits) and a tailbone, reflecting our deep ancestral aquatic ties.',
+  },
+  {
+    id: 37,
+    image: '/nature-gallery/1000012218.jpg',
+    title: 'The Neuro-Vascular Web',
+    subtitle: 'Cervical & Facial Plexus',
+    description:
+      'A classical scientific tracing mapping the intricate superficial nerve network and vascular supply feeding the brain, scalp, and upper chest.',
+    evolution:
+      'The high metabolic demands of the expanding human brain required over 20% of total oxygenated cardiac output, delivered rapidly through the carotid and vertebral artery networks.',
+  },
+  {
+    id: 38,
+    image: '/nature-gallery/1000012219.jpg',
+    title: 'The Reproductive Crucible',
+    subtitle: 'Pelvic Viscera Sagittal View',
+    description:
+      'Detailed sagittal cross-sections illustrating the urinary bladder, rectum, and reproductive organs protected within the bony pelvic bowl.',
+    evolution:
+      'Internal fertilization and internal gestation evolved in terrestrial mammals to shield delicate embryos from dehydration and land predators.',
+  },
+  {
+    id: 39,
+    image: '/nature-gallery/1000012220.jpg',
+    title: 'The Pillar of Balance',
+    subtitle: 'Cervical Musculature',
+    description:
+      'Thick muscle bands like the sternocleidomastoid and trapezius supporting the heavy human skull over a slender spinal column.',
+    evolution:
+      'As ancestors shifted to bipedalism, the skull\'s balance point moved directly over the spine, requiring specialized neck muscles to balance the head effortlessly.',
+  },
+  {
+    id: 40,
+    image: '/nature-gallery/1000012221.jpg',
+    title: 'Internal Equilibrium',
+    subtitle: 'Visceral Organs Assembly',
+    description:
+      'An intact front view of the liver, lungs, stomach, and intestines enclosed within the abdominal cavity and skeletal cage.',
+    evolution:
+      'The human liver is uniquely capable of regenerating lost tissue. This evolved as a survival mechanism against plant toxins consumed by foraging ancestors.',
+  },
+  {
+    id: 41,
+    image: '/nature-gallery/1000012222.jpg',
+    title: 'The Sculpted Forearm',
+    subtitle: 'Upper Limb Myology',
+    description:
+      '18th-century engraving detailing the complex flexor and extensor muscle bellies that govern finger dexterity and grip precision.',
+    evolution:
+      'Opposable thumbs paired with specialized forearm tendon control freed upper limbs from walking duties, enabling early humans to craft fine stone tools.',
+  },
+  {
+    id: 42,
+    image: '/nature-gallery/1000012223.jpg',
+    title: 'The Filtration System',
+    subtitle: 'Renaissance Urogenital Plates',
+    description:
+      'Historical Renaissance engraving depicting the kidneys, renal arteries, and lower abdominal blood vessels.',
+    evolution:
+      'Human kidneys contain roughly 1 million filtering nephrons each, constantly regulating blood pressure and fluid balance—an essential adaptation for terrestrial life.',
+  },
+  {
+    id: 43,
+    image: '/nature-gallery/1000012224.jpg',
+    title: 'The Alpine Sanctuary',
+    subtitle: 'Montane Ecosystem',
+    description:
+      'Horses grazing peacefully in a misty mountain valley surrounded by conifer forests and pristine glacier-fed streams.',
+    evolution:
+      'Conifer trees evolved needle-like leaves coated in thick wax to prevent water loss during freezing alpine winters, creating enduring biomes for terrestrial herbivores.',
+  },
+  {
+    id: 44,
+    image: '/nature-gallery/1000012225.jpg',
+    title: 'The Fibonacci Spiral',
+    subtitle: 'Botanical Geometry',
+    description:
+      'Dewdrops clinging to an unfurling fern spiral, revealing the natural mathematical symmetry embedded in plant growth.',
+    evolution:
+      'Spiral growth patterns follow the Golden Ratio (Fibonacci sequence). This allows developing plant shoots and leaves to pack tightly without shading each other from sunlight.',
+  },
 ];

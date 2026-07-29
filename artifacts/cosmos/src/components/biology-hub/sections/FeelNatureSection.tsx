@@ -15,7 +15,7 @@ import { natureGalleryData, type NatureCard } from './natureGalleryData';
 
 type ViewMode = 'detailed' | 'pure';
 
-// ─── Accent palette — 34 entries ────────────────────────────────────────────
+// ─── Accent palette — 44 entries ────────────────────────────────────────────
 const ACCENTS = [
   { rgb: '217,119,87',  hex: '#d97757' }, //  1 terra-cotta
   { rgb: '99,179,221',  hex: '#63b3dd' }, //  2 clinical blue
@@ -51,6 +51,16 @@ const ACCENTS = [
   { rgb: '253,224,71',  hex: '#fde047' }, // 32 sunflower
   { rgb: '252,165,165', hex: '#fca5a5' }, // 33 blush
   { rgb: '125,211,252', hex: '#7dd3fc' }, // 34 ice blue
+  { rgb: '217,70,239',  hex: '#d946ef' }, // 35 fuchsia
+  { rgb: '251,191,36',  hex: '#fbbf24' }, // 36 marigold
+  { rgb: '52,144,220',  hex: '#3490dc' }, // 37 cerulean
+  { rgb: '16,185,129',  hex: '#10b981' }, // 38 jade
+  { rgb: '239,155,68',  hex: '#ef9b44' }, // 39 saffron
+  { rgb: '139,92,246',  hex: '#8b5cf6' }, // 40 amethyst
+  { rgb: '236,72,153',  hex: '#ec4899' }, // 41 hot pink
+  { rgb: '20,184,166',  hex: '#14b8a6' }, // 42 turquoise
+  { rgb: '234,179,8',   hex: '#eab308' }, // 43 harvest gold
+  { rgb: '132,204,22',  hex: '#84cc16' }, // 44 chartreuse
 ] as const;
 
 const ac = (id: number) => ACCENTS[(id - 1) % ACCENTS.length];
@@ -200,7 +210,7 @@ const ReelsPortal = memo(function ReelsPortal({
                 flexGrow: pureMode ? 1 : 1,
               }}
             >
-              {/* Blurred fill layer — pure black bg eliminates any tinted letterbox */}
+              {/* Blurred fill layer — near-zero brightness = pure black letterbox */}
               <img
                 src={card.image}
                 alt=""
@@ -208,7 +218,7 @@ const ReelsPortal = memo(function ReelsPortal({
                 className="absolute inset-0 w-full h-full"
                 style={{
                   objectFit: 'cover',
-                  filter: 'blur(28px) brightness(0.25) saturate(1.4)',
+                  filter: 'blur(32px) brightness(0.06)',
                   transform: 'scale(1.12)',
                   background: '#000',
                 }}
@@ -545,7 +555,7 @@ const PureCard = memo(function PureCard({
         className="absolute inset-0 w-full h-full"
         style={{
           objectFit: 'cover',
-          filter: 'blur(20px) brightness(0.3) saturate(1.3)',
+          filter: 'blur(24px) brightness(0.06)',
           transform: 'scale(1.1)',
           background: '#000',
         }}
