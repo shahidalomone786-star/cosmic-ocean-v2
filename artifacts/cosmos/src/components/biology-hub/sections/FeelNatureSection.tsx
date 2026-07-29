@@ -1,7 +1,7 @@
-// ─── Biology Hub — Feel Nature Discovery Gallery (v4) ────────────────────────
+// ─── Biology Hub — Feel Nature Discovery Gallery (v5) ────────────────────────
 // Perf: hardware-accelerated scroll, memoised cards, minimal Framer re-renders
-// Portal: blurred-bg + object-contain so no image is ever cropped
-// v4: Pure Visuals toggle + pure-black letterbox fix + 34 specimens
+// Portal: pure #000 background, fixed inset-0, object-cover — zero black bars
+// v5: 79 specimens · Pure Visuals toggle · synthesized scroll sound
 import {
   useState, useRef, useCallback, useEffect, memo,
 } from 'react';
@@ -86,6 +86,16 @@ const ACCENTS = [
   { rgb: '192,132,252', hex: '#c084fc' }, // 67 violet
   { rgb: '20,184,166',  hex: '#14b8a6' }, // 68 teal
   { rgb: '252,165,165', hex: '#fca5a5' }, // 69 blush
+  { rgb: '217,119,87',  hex: '#d97757' }, // 70 tiger terra
+  { rgb: '74,222,128',  hex: '#4ade80' }, // 71 chameleon green
+  { rgb: '56,189,248',  hex: '#38bdf8' }, // 72 jellyfish blue
+  { rgb: '251,146,60',  hex: '#fb923c' }, // 73 savannah amber
+  { rgb: '34,211,238',  hex: '#22d3ee' }, // 74 photic cyan
+  { rgb: '99,179,221',  hex: '#63b3dd' }, // 75 cave blue
+  { rgb: '147,197,253', hex: '#93c5fd' }, // 76 whale sky
+  { rgb: '125,211,252', hex: '#7dd3fc' }, // 77 baleen ice
+  { rgb: '163,230,53',  hex: '#a3e635' }, // 78 canopy lime
+  { rgb: '52,211,153',  hex: '#34d399' }, // 79 oasis emerald
 ] as const;
 
 const ac = (id: number) => ACCENTS[(id - 1) % ACCENTS.length];
@@ -642,7 +652,7 @@ const ViewModeToggle = memo(function ViewModeToggle({
 // Infinite-loop scroll gallery
 // ─────────────────────────────────────────────────────────────────────────────
 const CLONE_COUNT = 5;
-const REAL_COUNT  = natureGalleryData.length; // 34
+const REAL_COUNT  = natureGalleryData.length; // 79
 const loopData    = [
   ...natureGalleryData.slice(-CLONE_COUNT),
   ...natureGalleryData,

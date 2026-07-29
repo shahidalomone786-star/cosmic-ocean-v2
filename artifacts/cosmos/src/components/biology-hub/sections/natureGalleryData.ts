@@ -700,4 +700,104 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'The human uterus features a thick muscular wall (myometrium) capable of expanding over 500 times its normal volume to nurture embryos throughout pregnancy.',
   },
+  {
+    id: 70,
+    image: '/nature-gallery/1000012272.jpg',
+    title: "The Predator's Focus",
+    subtitle: 'Panthera Tigris Morphology',
+    description:
+      'An ultra close-up perspective highlighting the moisture-rich rhinarium (nose) and forward-facing binocular eyes of a Bengal tiger.',
+    evolution:
+      "The tiger's nose contains over 200 million olfactory receptors. Combined with binocular depth perception, it creates a lethal hunting radar for dense jungle canopies.",
+  },
+  {
+    id: 71,
+    image: '/nature-gallery/1000012273.jpg',
+    title: 'The Master of Disguise',
+    subtitle: 'Chromatophore Physiology',
+    description:
+      'A Panther Chameleon anchored to a branch with a coiled prehensile tail and independently mobile stereoscopic eyes.',
+    evolution:
+      'Chameleons change color not just for camouflage, but for thermoregulation and social communication using nanocrystals embedded inside specialized skin cells called iridophores.',
+  },
+  {
+    id: 72,
+    image: '/nature-gallery/1000012274.jpg',
+    title: "The Ocean's Pulse",
+    subtitle: 'Cnidarian Bioluminescence',
+    description:
+      'A translucent jellyfish drifting through abyssal dark waters, trailing delicate stinging tentacles that glow with biological light.',
+    evolution:
+      "Jellyfish have drifted through Earth's oceans for over 500 million years without a centralized brain, relying on a decentralized nerve net to navigate and catch prey.",
+  },
+  {
+    id: 73,
+    image: '/nature-gallery/1000012275.jpg',
+    title: 'The Savannah Sentinel',
+    subtitle: 'Felid Maternal Bonding',
+    description:
+      'A mother leopard and her cub resting amidst tall golden grasses during an African sunset.',
+    evolution:
+      'Leopard mothers keep cubs hidden in dense thickets for the first three months. Extended parental care allows young felids to learn stealth stalking techniques crucial for survival.',
+  },
+  {
+    id: 74,
+    image: '/nature-gallery/1000012276.jpg',
+    title: 'The Sunlit Abyss',
+    subtitle: 'Photic Zone Penetration',
+    description:
+      'Rays of sunlight piercing deep into the blue ocean cavern, illuminating submerged rock formations.',
+    evolution:
+      'Sunlight can only penetrate up to 200 meters into the ocean (the photic zone). Over 90% of all marine life inhabits this sunlit upper layer where photosynthesis is possible.',
+  },
+  {
+    id: 75,
+    image: '/nature-gallery/1000012277.jpg',
+    title: 'The Submerged Citadel',
+    subtitle: 'Pelagic Cave Ecosystems',
+    description:
+      'Schools of fish navigating an ancient underwater limestone cave bathed in ethereal blue light.',
+    evolution:
+      'Submerged marine caves shelter relict species—living fossils that have remained morphologically unchanged for tens of millions of years due to stable environmental conditions.',
+  },
+  {
+    id: 76,
+    image: '/nature-gallery/1000012278.jpg',
+    title: 'Ascent of the Leviathan',
+    subtitle: 'Cetacean Respiration',
+    description:
+      'A massive Humpback whale ascending vertically towards the sunlit ocean surface from the deep blue.',
+    evolution:
+      'Whales evolved from land-dwelling four-legged ancestors (like Pakicetus). Over 50 million years, their nostrils migrated to the top of the skull to become efficient blowholes.',
+  },
+  {
+    id: 77,
+    image: '/nature-gallery/1000012279.jpg',
+    title: 'The Gentle Giant',
+    subtitle: 'Baleen Filtration',
+    description:
+      'A Humpback whale gliding horizontally through sunlit waters, displaying its long pectoral flippers.',
+    evolution:
+      'Instead of teeth, humpbacks possess baleen plates made of keratin to filter thousands of gallons of water, trapping tons of tiny krill and small fish in a single gulp.',
+  },
+  {
+    id: 78,
+    image: '/nature-gallery/1000012280.jpg',
+    title: 'The Emerald Canopy',
+    subtitle: 'Tropical Rainforest Stratification',
+    description:
+      'A dense jungle trail flanked by giant Monstera leaves and fan palms bathed in soft canopy sunlight.',
+    evolution:
+      'Tropical rainforest leaves evolved natural split patterns (fenestrations) like those in Monstera to allow sunlight and heavy rain to pass through to lower foliage without tearing the leaf.',
+  },
+  {
+    id: 79,
+    image: '/nature-gallery/1000012281.jpg',
+    title: 'The Hidden Oasis',
+    subtitle: 'Riparian Avian Habitats',
+    description:
+      'Exotic tropical birds flying over a lush jungle gorge with a cascading waterfall.',
+    evolution:
+      'Avian species in dense rainforests evolved brilliant iridescent plumage and high-pitched calls to locate mates across vast, noisy forest canopies.',
+  },
 ];
