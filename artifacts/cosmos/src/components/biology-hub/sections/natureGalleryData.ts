@@ -540,4 +540,164 @@ export const natureGalleryData: NatureCard[] = [
     evolution:
       'Human consciousness uniquely grants us the ability to experience \'awe\'—a psychological state that encourages social bonding, humility, and deep philosophical inquiry.',
   },
+  {
+    id: 54,
+    image: '/nature-gallery/1000012253.jpg',
+    title: 'Unmasking Consciousness',
+    subtitle: 'Transhuman & Spatial Perception',
+    description:
+      'An evocative depiction of peeling back physical biological skin to reveal a vast, wireframe mind connected directly to the starry cosmos.',
+    evolution:
+      'The human mind evolved beyond basic reflex loops into metacognition—the ability to think about our own thinking. We are literally the universe\'s way of observing itself.',
+  },
+  {
+    id: 55,
+    image: '/nature-gallery/1000012254.jpg',
+    title: 'The Coastal Ridge',
+    subtitle: 'Littoral Ecosystems',
+    description:
+      'A cliffside carpet of blooming coastal wildflowers overlooking a turbulent, wave-swept tropical coastline.',
+    evolution:
+      'Coastal flora evolved specialized salt-tolerant cell walls and deep root systems to anchor against hurricane-force winds and salty oceanic spray.',
+  },
+  {
+    id: 56,
+    image: '/nature-gallery/1000012255.jpg',
+    title: 'The Forest Monk',
+    subtitle: 'Mindful Equilibrium',
+    description:
+      'A serene statue resting against an ancient moss-covered tree trunk in a dense tropical rainforest.',
+    evolution:
+      'Exposure to natural green forest environments triggers immediate parasympathetic nervous system activation in humans, lowering cortisol levels and heart rate.',
+  },
+  {
+    id: 57,
+    image: '/nature-gallery/1000012256.jpg',
+    title: 'The Caustic Reflection',
+    subtitle: 'Hydrodynamics & Light',
+    description:
+      'Golden Koi swimming through crystal-clear water with dancing light caustics and white water lilies along the shoreline.',
+    evolution:
+      'Light caustics created by water surface ripples provide aquatic species with natural dappled camouflage, disrupting the sightlines of overhead avian predators.',
+  },
+  {
+    id: 58,
+    image: '/nature-gallery/1000012257.jpg',
+    title: 'The Crystal Shore',
+    subtitle: 'Tropical Marine Margin',
+    description:
+      'Pristine turquoise water gently washing over smooth granite rocks on a secluded tropical beach surrounded by palm foliage.',
+    evolution:
+      'Shallow, warm marine waters were the incubators of complex multicellular life, where abundant sunlight driven by coral ecosystems catalyzed rapid species diversification.',
+  },
+  {
+    id: 59,
+    image: '/nature-gallery/1000012258.jpg',
+    title: 'The Emotional Spectrum',
+    subtitle: 'Evolutionary Psychology',
+    description:
+      'A vibrant collage of human expressions ranging from euphoria and laughter to grief, fear, and silent contemplation.',
+    evolution:
+      'Complex facial expressions evolved alongside social brain structures, allowing instant non-verbal communication of danger, trust, or empathy across human tribes.',
+  },
+  {
+    id: 60,
+    image: '/nature-gallery/1000012259.jpg',
+    title: 'The Gaze of Sorrow',
+    subtitle: 'Lacrimal Signaling',
+    description:
+      'A detailed classical painting of tear-filled eyes looking upward in intense emotional distress.',
+    evolution:
+      'Humans are the only species that shed emotional tears. Emotional crying releases stress hormones (like ACTH and leucine enkephalin) while signaling vulnerability to summon social aid.',
+  },
+  {
+    id: 61,
+    image: '/nature-gallery/1000012260.jpg',
+    title: 'The Primal Scream',
+    subtitle: 'Amygdala Distress Response',
+    description:
+      'An expressionist, motion-blurred artwork capturing a raw vocal scream of sheer visceral emotion.',
+    evolution:
+      'Screaming triggers a specific acoustic frequency range (30 to 150 Hz rough modulation) that directly activates the human amygdala, triggering instantaneous fear and alarm in nearby listeners.',
+  },
+  {
+    id: 62,
+    image: '/nature-gallery/1000012261.jpg',
+    title: 'The Tangled Mind',
+    subtitle: 'Synaptic Complexity',
+    description:
+      'A wireframe profile of a human head filled with chaotic, multicolored neural threadwork representing complex cognitive processing.',
+    evolution:
+      'The human brain consumes 20% of the body\'s daily metabolic energy despite making up only 2% of body mass—a massive evolutionary tradeoff in favor of raw computing intelligence.',
+  },
+  {
+    id: 63,
+    image: '/nature-gallery/1000012262.jpg',
+    title: 'The Solitary Observer',
+    subtitle: 'Existential Awareness',
+    description:
+      'A dramatic silhouette standing atop a windswept peak with outstretched arms into the golden mist.',
+    evolution:
+      'Human consciousness evolved beyond survival reflexes into existential contemplation—seeking meaning, beauty, and connection with the greater environment.',
+  },
+  {
+    id: 64,
+    image: '/nature-gallery/1000012263.jpg',
+    title: 'The Vitruvian Canon',
+    subtitle: 'Biomechanical Proportions',
+    description:
+      'Leonardo da Vinci\'s iconic 1490 illustration demonstrating the divine mathematical proportions of the human body inscribed within a circle and square.',
+    evolution:
+      'The bilateral symmetry and golden ratio proportions of human limbs evolved to optimize physical balance, stride efficiency, and reach dexterity during upright locomotion.',
+  },
+  {
+    id: 65,
+    image: '/nature-gallery/1000012264.jpg',
+    title: 'The Lineage of Man',
+    subtitle: 'Hominid Bipedalism',
+    description:
+      'A vintage sketch depicting the evolutionary transition from knuckle-walking quadrupeds to tool-bearing, fully upright bipedal Homo sapiens.',
+    evolution:
+      'Bipedalism evolved around 4 million years ago in African savannahs. Walking on two legs consumed 75% less energy than quadrupeds, freeing hands for carrying tools and offspring.',
+  },
+  {
+    id: 66,
+    image: '/nature-gallery/1000012265.jpg',
+    title: 'The Spermatogenic Factory',
+    subtitle: 'Male Reproductive System',
+    description:
+      'A comprehensive anatomical chart mapping testosterone production, testicular tubules, and the helical structure of human spermatozoa.',
+    evolution:
+      'Human sperm cells utilize a flagellum powered by a dense mitochondrial midpiece, swimming up to 3 millimeters per minute in a corkscrew propulsion motion.',
+  },
+  {
+    id: 67,
+    image: '/nature-gallery/1000012267.png',
+    title: 'External Genitalia Architecture',
+    subtitle: 'Penile Morphology',
+    description:
+      'Anatomical mapping of the penile shaft, foreskin, and glans penis showing the specialized cutaneous and erectile tissues.',
+    evolution:
+      'The human penis evolved to be larger relative to body size than in any other primate, an adaptation driven by sexual selection and the mechanics of internal fertilization.',
+  },
+  {
+    id: 68,
+    image: '/nature-gallery/1000012269.jpg',
+    title: 'Thermoregulatory Precision',
+    subtitle: 'Scrotal & Spermatogenic Layers',
+    description:
+      'Cross-sectional dissection of the testes, epididymis, and the pampiniform venous plexus surrounding the spermatic cord.',
+    evolution:
+      'Spermatogenesis requires temperatures 2 to 3°C lower than core body temperature. The external scrotum and dartos muscles dynamically contract or relax to maintain ideal thermal balance.',
+  },
+  {
+    id: 69,
+    image: '/nature-gallery/1000012270.jpg',
+    title: 'The Sanctuary of Life',
+    subtitle: 'Female Reproductive System',
+    description:
+      'Internal and external anatomical diagram depicting the ovaries, Fallopian tubes, uterine cavity, cervix, and vulvar structures.',
+    evolution:
+      'The human uterus features a thick muscular wall (myometrium) capable of expanding over 500 times its normal volume to nurture embryos throughout pregnancy.',
+  },
 ];

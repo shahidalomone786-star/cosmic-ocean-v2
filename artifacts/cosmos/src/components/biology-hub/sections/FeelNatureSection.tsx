@@ -70,6 +70,22 @@ const ACCENTS = [
   { rgb: '6,182,212',   hex: '#06b6d4' }, // 51 electric cyan
   { rgb: '239,68,68',   hex: '#ef4444' }, // 52 vivid red
   { rgb: '168,162,158', hex: '#a8a29e' }, // 53 warm stone
+  { rgb: '99,102,241',  hex: '#6366f1' }, // 54 indigo
+  { rgb: '244,114,182', hex: '#f472b6' }, // 55 rose pink
+  { rgb: '110,231,183', hex: '#6ee7b7' }, // 56 seafoam
+  { rgb: '253,224,71',  hex: '#fde047' }, // 57 sunlit
+  { rgb: '56,189,248',  hex: '#38bdf8' }, // 58 aqua sky
+  { rgb: '251,146,60',  hex: '#fb923c' }, // 59 sunset orange
+  { rgb: '216,180,254', hex: '#d8b4fe' }, // 60 soft lavender
+  { rgb: '239,68,68',   hex: '#ef4444' }, // 61 vivid red
+  { rgb: '129,140,248', hex: '#818cf8' }, // 62 periwinkle
+  { rgb: '250,204,21',  hex: '#facc15' }, // 63 golden
+  { rgb: '147,197,253', hex: '#93c5fd' }, // 64 powder blue
+  { rgb: '163,230,53',  hex: '#a3e635' }, // 65 lime
+  { rgb: '217,119,87',  hex: '#d97757' }, // 66 terra
+  { rgb: '192,132,252', hex: '#c084fc' }, // 67 violet
+  { rgb: '20,184,166',  hex: '#14b8a6' }, // 68 teal
+  { rgb: '252,165,165', hex: '#fca5a5' }, // 69 blush
 ] as const;
 
 const ac = (id: number) => ACCENTS[(id - 1) % ACCENTS.length];
