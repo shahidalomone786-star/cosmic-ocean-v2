@@ -1725,7 +1725,7 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh, onViewUser }: {
   return (
     <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
       {/* Sticky controls */}
-      <div className={`sticky top-0 z-10 px-4 pt-4 pb-3 border-b ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
+      <div className={`px-4 pt-4 pb-3 border-b ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
         {/* Search input */}
         <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${lm ? 'bg-white border-gray-200 shadow-sm focus-within:border-purple-300 focus-within:shadow-md' : 'bg-white/[0.06] border-white/[0.10] focus-within:border-white/[0.22] focus-within:bg-white/[0.09]'}`}>
           <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2.5}>

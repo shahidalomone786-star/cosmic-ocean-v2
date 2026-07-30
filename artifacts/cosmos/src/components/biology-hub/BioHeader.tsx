@@ -51,7 +51,7 @@ const BioHeader = memo(({
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="sticky top-0 z-50 flex-shrink-0"
+      className="flex-shrink-0"
       style={{
         background: lm
           ? 'rgba(240,253,244,0.92)'

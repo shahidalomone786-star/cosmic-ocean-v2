@@ -69,9 +69,8 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
 
       {/* Outer container: glassmorphism card, 16:9 locked */}
       <div
-        className="relative w-full overflow-hidden rounded-2xl gpu-layer"
+        className="relative w-full aspect-video overflow-hidden rounded-2xl gpu-layer flex items-center justify-center"
         style={{
-          aspectRatio: '16 / 9',
           background: '#03030e',
           boxShadow: lm
             ? '0 4px 28px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.07)'
@@ -84,7 +83,7 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
         }}
       >
         {/* ── Base layer ── current image, always at opacity 1, no animation */}
-        {/* Images are 9:16 portrait — rotate 90° + scale up to fill the 16:9 container */}
+        {/* Images are 9:16 portrait — rotate 90° + scale to fill the 16:9 container */}
         <img
           src={IMAGES[current]}
           alt=""
@@ -92,17 +91,9 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
           draggable={false}
           loading="eager"
           decoding="async"
-          className="absolute object-cover banner-ken-burns"
+          className="absolute w-[178%] h-[178%] max-w-none object-cover rotate-90 banner-ken-burns"
           key={`base-${current}`}
-          style={{
-            width: '177.78%',
-            height: '177.78%',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%) rotate(90deg)',
-            willChange: 'transform',
-            maxWidth: 'none',
-          }}
+          style={{ willChange: 'transform' }}
         />
 
         {/* ── Incoming layer ── fades in over the base, then unmounts */}
@@ -115,14 +106,8 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
             draggable={false}
             loading="eager"
             decoding="async"
-            className="absolute object-cover"
+            className="absolute w-[178%] h-[178%] max-w-none object-cover rotate-90"
             style={{
-              width: '177.78%',
-              height: '177.78%',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%) rotate(90deg)',
-              maxWidth: 'none',
               animation: `banner-fade-in ${FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
               willChange: 'opacity',
             }}
