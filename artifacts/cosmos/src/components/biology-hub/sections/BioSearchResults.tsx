@@ -62,18 +62,28 @@ function HighlightText({ text, query, lm }: { text: string; query: string; lm: b
 }
 
 // ── Source badge ──────────────────────────────────────────────────────────────
+const SOURCE_META: Record<string, { label: string; emoji: string; bg: string; border: string; color: string; colorLm: string }> = {
+  wikipedia:  { label: 'Wikipedia',   emoji: '📖', bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.22)',  color: 'rgba(56,189,248,0.75)',  colorLm: '#0369a1' },
+  wikidata:   { label: 'Wikidata',    emoji: '🔗', bg: 'rgba(20,184,166,0.12)',  border: 'rgba(20,184,166,0.22)',  color: 'rgba(20,184,166,0.75)',  colorLm: '#0f766e' },
+  pubmed:     { label: 'PubMed',      emoji: '🔬', bg: 'rgba(244,63,94,0.12)',   border: 'rgba(244,63,94,0.22)',   color: 'rgba(244,63,94,0.75)',   colorLm: '#be123c' },
+  europepmc:  { label: 'Europe PMC',  emoji: '📄', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.22)',  color: 'rgba(251,146,60,0.75)',  colorLm: '#c2410c' },
+  openalex:   { label: 'OpenAlex',    emoji: '🌿', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.22)',  color: 'rgba(52,211,153,0.75)',  colorLm: '#065f46' },
+};
+
 function SourceBadge({ source, lm }: { source: string; lm: boolean }) {
-  const isWiki = source === 'wikipedia';
+  const meta = SOURCE_META[source] ?? {
+    label: source, emoji: '📄',
+    bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.18)',
+    color: 'rgba(255,255,255,0.3)', colorLm: 'rgba(6,78,59,0.5)',
+  };
   return (
     <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
       style={{
-        background: isWiki ? 'rgba(56,189,248,0.12)' : 'rgba(148,163,184,0.12)',
-        border: isWiki ? '1px solid rgba(56,189,248,0.2)' : '1px solid rgba(148,163,184,0.18)',
-        color: isWiki
-          ? lm ? '#0369a1' : 'rgba(56,189,248,0.7)'
-          : lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.3)',
+        background: meta.bg,
+        border: `1px solid ${meta.border}`,
+        color: lm ? meta.colorLm : meta.color,
       }}>
-      {isWiki ? '📖 Wikipedia' : 'OpenAlex'}
+      {meta.emoji} {meta.label}
     </span>
   );
 }

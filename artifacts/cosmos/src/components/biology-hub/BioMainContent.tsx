@@ -420,12 +420,12 @@ function DNASection({ lm }: { lm: boolean }) {
         )}
         {activeTab === 'articles' && (
           <motion.div key="articles" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="DNA genetics genome replication transcription" showKind="article" />
+            <LiveResultsFeed lm={lm} searchQuery="DNA replication transcription mutation genes chromosome RNA protein synthesis" showKind="article" />
           </motion.div>
         )}
         {activeTab === 'research' && (
           <motion.div key="research" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="DNA genetics genome replication transcription" showKind="research" />
+            <LiveResultsFeed lm={lm} searchQuery="DNA replication transcription mutation genes chromosome RNA protein synthesis" showKind="research" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -496,12 +496,12 @@ function CellsSection({ lm }: { lm: boolean }) {
         )}
         {activeTab === 'articles' && (
           <motion.div key="articles" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="cell biology eukaryotic organelles membrane mitochondria" showKind="article" />
+            <LiveResultsFeed lm={lm} searchQuery="animal cell plant cell cell membrane nucleus mitochondria mitosis meiosis cell division" showKind="article" />
           </motion.div>
         )}
         {activeTab === 'research' && (
           <motion.div key="research" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="cell biology eukaryotic organelles membrane mitochondria" showKind="research" />
+            <LiveResultsFeed lm={lm} searchQuery="animal cell plant cell cell membrane nucleus mitochondria mitosis meiosis cell division" showKind="research" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -559,12 +559,12 @@ function BrainSection({ lm }: { lm: boolean }) {
         )}
         {activeTab === 'articles' && (
           <motion.div key="articles" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="human brain neuroscience cognition neural cortex neurons" showKind="article" />
+            <LiveResultsFeed lm={lm} searchQuery="neuron synapse cortex hippocampus cerebellum brainstem nervous system cognition brain disease" showKind="article" />
           </motion.div>
         )}
         {activeTab === 'research' && (
           <motion.div key="research" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            <LiveResultsFeed lm={lm} searchQuery="human brain neuroscience cognition neural cortex neurons" showKind="research" />
+            <LiveResultsFeed lm={lm} searchQuery="neuron synapse cortex hippocampus cerebellum brainstem nervous system cognition brain disease" showKind="research" />
           </motion.div>
         )}
       </AnimatePresence>
