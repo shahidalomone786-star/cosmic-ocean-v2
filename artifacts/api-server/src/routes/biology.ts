@@ -184,12 +184,12 @@ async function fetchWikipedia(
   limit: number
 ): Promise<{ items: BioItem[] }> {
   const expanded = expandQuery(q);
-  const url =
+  const searchUrl =
     `https://en.wikipedia.org/w/api.php` +
     `?action=query&list=search&srsearch=${encodeURIComponent(expanded)}` +
     `&format=json&srlimit=${limit}&srprop=snippet|titlesnippet|sectiontitle&origin=*`;
 
-  const resp = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!resp.ok) throw new Error(`Wikipedia ${resp.status}`);
 
   type WikiHit = {
@@ -201,12 +201,37 @@ async function fetchWikipedia(
   const data = (await resp.json()) as { query?: { search?: WikiHit[] } };
   const hits = data.query?.search ?? [];
 
+  if (hits.length === 0) return { items: [] };
+
+  // Batch-fetch page thumbnails for all returned pageids in a single request
+  const pageids = hits.map((h) => h.pageid).join("|");
+  const thumbUrl =
+    `https://en.wikipedia.org/w/api.php` +
+    `?action=query&pageids=${pageids}&prop=pageimages&pithumbsize=400` +
+    `&format=json&origin=*`;
+
+  type ThumbPage = { thumbnail?: { source: string } };
+  type ThumbData = { query?: { pages?: Record<string, ThumbPage> } };
+  let thumbMap: Record<string, string> = {};
+  try {
+    const thumbResp = await fetch(thumbUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (thumbResp.ok) {
+      const td = (await thumbResp.json()) as ThumbData;
+      const pages = td.query?.pages ?? {};
+      for (const [id, page] of Object.entries(pages)) {
+        if (page.thumbnail?.source) thumbMap[id] = page.thumbnail.source;
+      }
+    }
+  } catch {
+    // Thumbnail fetch is non-critical — continue without images
+  }
+
   const items: BioItem[] = hits.map((h) => ({
     id: `wiki-${h.pageid}`,
     title: h.title,
     description: stripHtml(h.snippet) || `Wikipedia article about ${h.title}.`,
     url: `https://en.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, "_"))}`,
-    imageUrl: null,
+    imageUrl: thumbMap[String(h.pageid)] ?? null,
     source: "wikipedia",
     kind: "article",
     date: h.timestamp?.slice(0, 10) ?? null,

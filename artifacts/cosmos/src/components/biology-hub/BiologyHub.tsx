@@ -260,6 +260,7 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
           lm={lm}
           activeSection={activeSection}
           searchQuery={debouncedQuery}
+          onClearSearch={() => { setInputQuery(''); setDebouncedQuery(''); }}
         />
       </div>
     </motion.div>

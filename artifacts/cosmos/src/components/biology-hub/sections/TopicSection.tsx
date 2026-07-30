@@ -124,6 +124,146 @@ function highlight(text: string, query: string): string {
   return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
 }
 
+// ── Multi-item organs grid ────────────────────────────────────────────────────
+// Fetches individual Wikipedia summaries for multiple organs in parallel and
+// displays them as a visually-rich 2-column card grid with thumbnails.
+
+interface OrganCard {
+  wikiTitle: string;
+  label: string;
+  emoji: string;
+}
+
+const ORGAN_ITEMS: OrganCard[] = [
+  { wikiTitle: 'Heart', label: 'Heart', emoji: '❤️' },
+  { wikiTitle: 'Lung', label: 'Lungs', emoji: '🫁' },
+  { wikiTitle: 'Liver', label: 'Liver', emoji: '🩺' },
+  { wikiTitle: 'Kidney', label: 'Kidneys', emoji: '🫘' },
+  { wikiTitle: 'Brain', label: 'Brain', emoji: '🧠' },
+  { wikiTitle: 'Skin', label: 'Skin', emoji: '🦠' },
+  { wikiTitle: 'Stomach', label: 'Stomach', emoji: '🫃' },
+  { wikiTitle: 'Pancreas', label: 'Pancreas', emoji: '🔬' },
+  { wikiTitle: 'Spleen', label: 'Spleen', emoji: '🫀' },
+  { wikiTitle: 'Intestine', label: 'Intestines', emoji: '🧬' },
+];
+
+interface OrganData {
+  title: string;
+  extract: string;
+  thumbnail?: { source: string };
+  content_urls?: { desktop?: { page?: string } };
+}
+
+function SingleOrganCard({
+  lm, organ, accentBg, accentBorder, delay,
+}: {
+  lm: boolean; organ: OrganCard; accentBg: string; accentBorder: string; delay: number;
+}) {
+  const [data, setData] = useState<OrganData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(organ.wikiTitle)}`,
+      { signal: ctrl.signal, headers: { Accept: 'application/json' } }
+    )
+      .then((r) => r.ok ? r.json() as Promise<OrganData> : Promise.reject(r.status))
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => { setLoading(false); });
+    return () => ctrl.abort();
+  }, [organ.wikiTitle]);
+
+  const wikiUrl = data?.content_urls?.desktop?.page
+    ?? `https://en.wikipedia.org/wiki/${organ.wikiTitle}`;
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl overflow-hidden animate-pulse"
+        style={{ background: lm ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', height: 180 }} />
+    );
+  }
+
+  return (
+    <motion.a
+      href={wikiUrl} target="_blank" rel="noopener noreferrer"
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -3, scale: 1.02 }}
+      className="block rounded-2xl overflow-hidden no-underline"
+      style={{
+        ...glassCard(lm),
+        boxShadow: lm ? '0 2px 14px rgba(52,211,153,0.07)' : '0 2px 14px rgba(0,0,0,0.3)',
+      }}
+    >
+      {/* Thumbnail */}
+      {data?.thumbnail?.source ? (
+        <div className="relative h-28 overflow-hidden">
+          <img
+            src={data.thumbnail.source} alt={organ.label}
+            className="w-full h-full object-cover"
+            style={{ filter: lm ? 'none' : 'brightness(0.72) saturate(0.85)' }}
+          />
+          <div className="absolute inset-0" style={{
+            background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)',
+          }} />
+          <span className="absolute bottom-2 left-2.5 text-[13px] font-bold text-white drop-shadow">
+            {organ.label}
+          </span>
+        </div>
+      ) : (
+        <div className="h-16 flex items-center justify-center text-3xl"
+          style={{ background: lm ? 'rgba(52,211,153,0.08)' : 'rgba(52,211,153,0.07)' }}>
+          {organ.emoji}
+        </div>
+      )}
+
+      {/* Body */}
+      <div className="p-3">
+        {!data?.thumbnail?.source && (
+          <p className="text-[12px] font-semibold mb-1"
+            style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}>
+            {organ.label}
+          </p>
+        )}
+        <p className="text-[10px] leading-relaxed line-clamp-3"
+          style={{ color: lm ? 'rgba(6,78,59,0.6)' : 'rgba(255,255,255,0.4)' }}>
+          {data?.extract ? data.extract.slice(0, 160) + (data.extract.length > 160 ? '…' : '') : 'Loading…'}
+        </p>
+        <div className="mt-2 flex items-center gap-1">
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+            style={{ background: accentBg, border: `1px solid ${accentBorder}`, color: lm ? '#065f46' : '#f87171' }}>
+            Wikipedia
+          </span>
+        </div>
+      </div>
+    </motion.a>
+  );
+}
+
+function OrgansOverviewGrid({ lm, accentBg, accentBorder }: {
+  lm: boolean; accentBg: string; accentBorder: string;
+}) {
+  return (
+    <div>
+      <p className="text-[9px] uppercase tracking-[0.2em] mb-3 font-semibold"
+        style={{ color: lm ? 'rgba(6,78,59,0.38)' : 'rgba(255,255,255,0.28)' }}>
+        Human Organs — Click any card to explore on Wikipedia
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {ORGAN_ITEMS.map((organ, i) => (
+          <SingleOrganCard
+            key={organ.wikiTitle}
+            lm={lm} organ={organ}
+            accentBg={accentBg} accentBorder={accentBorder}
+            delay={i * 0.06}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Wikipedia overview ────────────────────────────────────────────────────────
 function WikiOverview({
   lm, wikiTitle, accentColor, accentBg, accentBorder,
@@ -577,8 +717,13 @@ export default function TopicSection({ lm, sectionId }: TopicSectionProps) {
         {tab === 'overview' ? (
           <motion.div key="overview" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-            <WikiOverview lm={lm} wikiTitle={cfg.wikiTitle}
-              accentColor={cfg.accentColor} accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
+            {/* Organs gets a rich multi-card gallery instead of a single article */}
+            {sectionId === 'organs' ? (
+              <OrgansOverviewGrid lm={lm} accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
+            ) : (
+              <WikiOverview lm={lm} wikiTitle={cfg.wikiTitle}
+                accentColor={cfg.accentColor} accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
+            )}
             {cfg.relatedTopics && (
               <RelatedTopics
                 lm={lm} topics={cfg.relatedTopics}

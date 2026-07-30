@@ -84,6 +84,7 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
         }}
       >
         {/* ── Base layer ── current image, always at opacity 1, no animation */}
+        {/* Images are 9:16 portrait — rotate 90° + scale up to fill the 16:9 container */}
         <img
           src={IMAGES[current]}
           alt=""
@@ -91,10 +92,17 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
           draggable={false}
           loading="eager"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover banner-ken-burns"
-          /* Ken Burns subtle scale — GPU-only (transform) */
+          className="absolute object-cover banner-ken-burns"
           key={`base-${current}`}
-          style={{ willChange: 'transform' }}
+          style={{
+            width: '177.78%',
+            height: '177.78%',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%) rotate(90deg)',
+            willChange: 'transform',
+            maxWidth: 'none',
+          }}
         />
 
         {/* ── Incoming layer ── fades in over the base, then unmounts */}
@@ -107,8 +115,14 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
             draggable={false}
             loading="eager"
             decoding="async"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute object-cover"
             style={{
+              width: '177.78%',
+              height: '177.78%',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(90deg)',
+              maxWidth: 'none',
               animation: `banner-fade-in ${FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
               willChange: 'opacity',
             }}

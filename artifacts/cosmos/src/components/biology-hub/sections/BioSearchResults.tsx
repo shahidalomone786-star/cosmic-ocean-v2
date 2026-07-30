@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, FlaskConical, ExternalLink, Loader2,
   Award, Users, Clock, Unlock, AlertCircle, ChevronDown, Search,
-  SlidersHorizontal, ArrowUpDown,
+  SlidersHorizontal, ArrowUpDown, ArrowLeft,
 } from 'lucide-react';
 import { useBiologySearch, getBiologySearchQueryKey } from '@workspace/api-client-react';
 import type { BiologySearchItem } from '@workspace/api-client-react';
@@ -14,6 +14,7 @@ import type { BiologySearchItem } from '@workspace/api-client-react';
 interface BioSearchResultsProps {
   lm: boolean;
   searchQuery: string;
+  onClearSearch?: () => void;
 }
 
 type FilterMode = 'all' | 'articles' | 'research' | 'most-cited' | 'open-access' | 'newest';
@@ -117,65 +118,74 @@ function ResultCard({ item, lm, delay, searchQuery }: {
             className="block rounded-2xl p-4 no-underline"
             style={{ ...glassCard(lm), boxShadow: lm ? '0 2px 14px rgba(52,211,153,0.05)' : '0 2px 14px rgba(0,0,0,0.25)' }}>
 
-            {/* Top row */}
-            <div className="flex items-start gap-2 mb-2">
-              <div className="flex-shrink-0 mt-0.5">
-                {item.kind === 'article'
-                  ? <BookOpen size={13} className="text-sky-400" />
-                  : <FlaskConical size={13} className="text-emerald-400" />
-                }
-              </div>
+            <div className="flex gap-3">
+              {/* Thumbnail (Wikipedia articles may have images) */}
+              {item.imageUrl && (
+                <ResultCardImage src={item.imageUrl} alt={item.title} />
+              )}
+
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold leading-snug line-clamp-2"
-                  style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}>
-                  <HighlightText text={item.title} query={searchQuery} lm={lm} />
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <SourceBadge source={item.source} lm={lm} />
-                <ExternalLink size={11} style={{ color: lm ? 'rgba(52,211,153,0.45)' : 'rgba(52,211,153,0.35)' }} />
-              </div>
-            </div>
+                {/* Top row */}
+                <div className="flex items-start gap-2 mb-1.5">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {item.kind === 'article'
+                      ? <BookOpen size={13} className="text-sky-400" />
+                      : <FlaskConical size={13} className="text-emerald-400" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold leading-snug line-clamp-2"
+                      style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}>
+                      <HighlightText text={item.title} query={searchQuery} lm={lm} />
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <SourceBadge source={item.source} lm={lm} />
+                    <ExternalLink size={11} style={{ color: lm ? 'rgba(52,211,153,0.45)' : 'rgba(52,211,153,0.35)' }} />
+                  </div>
+                </div>
 
-            {/* Description with highlight */}
-            {item.description && (
-              <p className="text-[11px] leading-relaxed mb-2.5 line-clamp-2"
-                style={{ color: lm ? 'rgba(6,78,59,0.52)' : 'rgba(255,255,255,0.35)' }}>
-                <HighlightText text={item.description} query={searchQuery} lm={lm} />
-              </p>
-            )}
+                {/* Description with highlight */}
+                {item.description && (
+                  <p className="text-[11px] leading-relaxed mb-2 line-clamp-2 ml-[19px]"
+                    style={{ color: lm ? 'rgba(6,78,59,0.52)' : 'rgba(255,255,255,0.35)' }}>
+                    <HighlightText text={item.description} query={searchQuery} lm={lm} />
+                  </p>
+                )}
 
-            {/* Meta */}
-            <div className="flex flex-wrap items-center gap-3">
-              {item.authors.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Users size={9} style={{ color: lm ? 'rgba(6,78,59,0.35)' : 'rgba(255,255,255,0.25)' }} />
-                  <span className="text-[9px]" style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(255,255,255,0.28)' }}>
-                    {item.authors.slice(0, 2).join(', ')}
-                    {item.authors.length > 2 ? ` +${item.authors.length - 2}` : ''}
-                  </span>
+                {/* Meta */}
+                <div className="flex flex-wrap items-center gap-3 ml-[19px]">
+                  {item.authors.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Users size={9} style={{ color: lm ? 'rgba(6,78,59,0.35)' : 'rgba(255,255,255,0.25)' }} />
+                      <span className="text-[9px]" style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(255,255,255,0.28)' }}>
+                        {item.authors.slice(0, 2).join(', ')}
+                        {item.authors.length > 2 ? ` +${item.authors.length - 2}` : ''}
+                      </span>
+                    </div>
+                  )}
+                  {item.citationCount != null && item.citationCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Award size={9} className="text-amber-400" />
+                      <span className="text-[9px] text-amber-400">{item.citationCount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {item.date && (
+                    <div className="flex items-center gap-1">
+                      <Clock size={9} style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.22)' }} />
+                      <span className="text-[9px]" style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.22)' }}>
+                        {item.date.slice(0, 7)}
+                      </span>
+                    </div>
+                  )}
+                  {item.openAccess && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Unlock size={9} className="text-emerald-400" />
+                      <span className="text-[9px] text-emerald-400">Open</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {item.citationCount != null && item.citationCount > 0 && (
-                <div className="flex items-center gap-1">
-                  <Award size={9} className="text-amber-400" />
-                  <span className="text-[9px] text-amber-400">{item.citationCount.toLocaleString()}</span>
-                </div>
-              )}
-              {item.date && (
-                <div className="flex items-center gap-1">
-                  <Clock size={9} style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.22)' }} />
-                  <span className="text-[9px]" style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.22)' }}>
-                    {item.date.slice(0, 7)}
-                  </span>
-                </div>
-              )}
-              {item.openAccess && (
-                <div className="flex items-center gap-1 ml-auto">
-                  <Unlock size={9} className="text-emerald-400" />
-                  <span className="text-[9px] text-emerald-400">Open</span>
-                </div>
-              )}
+              </div>
             </div>
           </motion.a>
         )}
@@ -185,8 +195,21 @@ function ResultCard({ item, lm, delay, searchQuery }: {
   );
 }
 
+// ── Result card with optional image ──────────────────────────────────────────
+function ResultCardImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden"
+      style={{ border: '1px solid rgba(52,211,153,0.12)' }}>
+      <img src={src} alt={alt} className="w-full h-full object-cover"
+        onError={() => setFailed(true)} loading="lazy" />
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsProps) {
+export default function BioSearchResults({ lm, searchQuery, onClearSearch }: BioSearchResultsProps) {
   const [filter, setFilter] = useState<FilterMode>('all');
   const [sort, setSort]   = useState<SortMode>('relevant');
   const [showSort, setShowSort] = useState(false);
@@ -258,6 +281,22 @@ export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsPr
 
   return (
     <div>
+      {/* Back button */}
+      {onClearSearch && (
+        <button
+          onClick={onClearSearch}
+          className="flex items-center gap-1.5 mb-3 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all duration-150 hover:scale-105 active:scale-95"
+          style={{
+            background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)',
+            border: '1px solid rgba(52,211,153,0.22)',
+            color: lm ? '#065f46' : '#34d399',
+          }}
+        >
+          <ArrowLeft size={12} />
+          Back to Biology Hub
+        </button>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"

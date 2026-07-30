@@ -25,6 +25,7 @@ interface BioMainContentProps {
   lm: boolean;
   activeSection: BioSectionId;
   searchQuery: string;
+  onClearSearch?: () => void;
 }
 
 const glassCard = (lm: boolean) => ({
@@ -580,11 +581,11 @@ const TOPIC_SECTION_IDS: BioSectionId[] = [
 
 // ─── Main switcher ────────────────────────────────────────────────────────────
 
-const BioMainContent = memo(({ lm, activeSection, searchQuery }: BioMainContentProps) => {
+const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: BioMainContentProps) => {
   const renderSection = () => {
     // ── Global search results (≥ 2 chars) ──
     if (searchQuery.trim().length >= 2) {
-      return <BioSearchResults lm={lm} searchQuery={searchQuery} />;
+      return <BioSearchResults lm={lm} searchQuery={searchQuery} onClearSearch={onClearSearch} />;
     }
 
     switch (activeSection) {
