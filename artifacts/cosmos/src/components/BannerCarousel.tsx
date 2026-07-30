@@ -1,0 +1,158 @@
+/**
+ * BannerCarousel — Premium cinematic full-width 16:9 image carousel.
+ *
+ * Strategy: two stacked layers.
+ *   - Base layer:     always shows the CURRENT image at opacity 1. No transition.
+ *   - Incoming layer: keyed per transition. Fades in from 0 → 1 with a CSS
+ *                     keyframe animation, then unmounts once it's fully opaque.
+ *
+ * Handoff is seamless: at the exact moment the incoming layer reaches opacity 1,
+ * we swap the base layer's src to the same image and remove the incoming layer.
+ * Both show identical pixels at that moment → zero visible flash.
+ *
+ * Only two images are ever in DOM (current + next-incoming).
+ * The image AFTER next is preloaded via a hidden <link rel="prefetch"> so the
+ * very next transition is always instant.
+ */
+
+import { useState, useEffect, useRef, memo } from 'react';
+
+// ── Image list ────────────────────────────────────────────────────────────────
+const IMAGES = Array.from(
+  { length: 20 },
+  (_, i) => `/banner/b${String(i + 1).padStart(2, '0')}.jpg`
+);
+
+const SHOW_MS = 3000; // ms each slide stays fully visible before transition
+const FADE_MS = 950;  // ms for the crossfade itself
+
+// ── Component ─────────────────────────────────────────────────────────────────
+function BannerCarousel({ lm }: { lm?: boolean }) {
+  const total = IMAGES.length;
+
+  // `current`  — index of the image rendered in the always-visible base layer
+  // `incoming` — index of the image fading in (null when idle)
+  const [current,  setCurrent]  = useState(0);
+  const [incoming, setIncoming] = useState<number | null>(null);
+
+  const t1 = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const t2 = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Drive the slide cycle whenever `current` changes
+  useEffect(() => {
+    const nextIdx = (current + 1) % total;
+
+    t1.current = setTimeout(() => {
+      // Start the fade-in of the next image
+      setIncoming(nextIdx);
+
+      // After the fade completes, snap the base layer forward
+      t2.current = setTimeout(() => {
+        setCurrent(nextIdx);
+        setIncoming(null);
+      }, FADE_MS);
+    }, SHOW_MS);
+
+    return () => {
+      clearTimeout(t1.current);
+      clearTimeout(t2.current);
+    };
+  }, [current, total]);
+
+  // Prefetch the slide AFTER the incoming one so it's ready when its turn comes
+  const prefetchSrc = IMAGES[(current + 2) % total];
+
+  return (
+    <div className="mb-6">
+      {/* Invisible prefetch trigger — keeps the *next* next image warm in cache */}
+      <link rel="prefetch" href={prefetchSrc} as="image" />
+
+      {/* Outer container: glassmorphism card, 16:9 locked */}
+      <div
+        className="relative w-full overflow-hidden rounded-2xl gpu-layer"
+        style={{
+          aspectRatio: '16 / 9',
+          background: '#03030e',
+          boxShadow: lm
+            ? '0 4px 28px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.07)'
+            : [
+                '0 0 0 1px rgba(255,255,255,0.07)',
+                'inset 0 1px 0 rgba(255,255,255,0.05)',
+                '0 8px 48px rgba(0,0,0,0.88)',
+                '0 24px 80px rgba(0,0,0,0.60)',
+              ].join(', '),
+        }}
+      >
+        {/* ── Base layer ── current image, always at opacity 1, no animation */}
+        <img
+          src={IMAGES[current]}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover banner-ken-burns"
+          /* Ken Burns subtle scale — GPU-only (transform) */
+          key={`base-${current}`}
+          style={{ willChange: 'transform' }}
+        />
+
+        {/* ── Incoming layer ── fades in over the base, then unmounts */}
+        {incoming !== null && (
+          <img
+            key={`in-${incoming}`}
+            src={IMAGES[incoming]}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            loading="eager"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              animation: `banner-fade-in ${FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+              willChange: 'opacity',
+            }}
+          />
+        )}
+
+        {/* ── Cinematic top + bottom vignette ── */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: [
+              'linear-gradient(to bottom,',
+              '  rgba(0,0,0,0.22) 0%,',
+              '  transparent 18%,',
+              '  transparent 72%,',
+              '  rgba(0,0,0,0.35) 100%)',
+            ].join(' '),
+            zIndex: 10,
+          }}
+        />
+
+        {/* ── Radial edge vignette for cinematic depth ── */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.46) 100%)',
+            zIndex: 11,
+          }}
+        />
+
+        {/* ── Ultra-thin glass border inner highlight ── */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none rounded-2xl"
+          style={{
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09)',
+            zIndex: 12,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default memo(BannerCarousel);

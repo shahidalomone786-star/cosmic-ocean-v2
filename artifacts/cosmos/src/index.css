@@ -520,6 +520,31 @@ body {
   transition-duration: 200ms;
 }
 
+/* ── BannerCarousel ────────────────────────────────────────────────────────── */
+
+/**
+ * Crossfade: incoming image fades from opacity 0 to 1.
+ * CSS animation so the transition lives entirely on the GPU compositor.
+ */
+@keyframes banner-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/**
+ * Ken Burns: subtle, slow zoom on the base layer image.
+ * Pure transform — zero layout cost, stays on GPU.
+ * Duration is SHOW_MS (3s) + FADE_MS (0.95s) ≈ 4s so it never loops mid-slide.
+ */
+@keyframes banner-ken-burns {
+  from { transform: scale(1.00); }
+  to   { transform: scale(1.045); }
+}
+
+.banner-ken-burns {
+  animation: banner-ken-burns 4s ease-out forwards;
+}
+
 /* ── Cosmos video loading spinner ─────────────────────────────────────────── */
 @keyframes cosmos-spin {
   to { transform: rotate(360deg); }

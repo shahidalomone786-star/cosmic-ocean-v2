@@ -16,6 +16,7 @@ import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal'
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
 import SimulationSearch from './components/SimulationSearch';
+import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
@@ -2777,6 +2778,9 @@ export default function App() {
                       ))}
                 </div>
               </div>
+
+              {/* ── Banner Carousel ── */}
+              <BannerCarousel lm={lm} />
 
               {/* ── Simulation Search ── */}
               <SimulationSearch lm={lm} />
