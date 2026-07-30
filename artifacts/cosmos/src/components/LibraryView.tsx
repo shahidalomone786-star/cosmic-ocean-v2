@@ -148,10 +148,11 @@ function PaperCard({
       <AnimatePresence>
         {isDiscussOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, scaleY: 0 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0 }}
             transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            style={{ originY: 0, transformOrigin: 'top' }}
             className="overflow-hidden"
           >
             <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.06]'}`}>

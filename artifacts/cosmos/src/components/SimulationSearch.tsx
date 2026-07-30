@@ -471,7 +471,7 @@ interface SimulationSearchProps {
 
 const ALL_SOURCES: SimSource[] = ['PhET', 'GoLab', 'ComPADRE'];
 
-export default function SimulationSearch({ lm }: SimulationSearchProps) {
+function SimulationSearch({ lm }: SimulationSearchProps) {
   const [query,           setQuery]           = useState('');
   const [debouncedQuery,  setDebouncedQuery]  = useState('');
   const [activeSources,   setActiveSources]   = useState<SimSource[]>([]);
@@ -700,10 +700,11 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
             {showResults && (
               <motion.div
                 key="results"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: 1, opacity: 1 }}
+                exit={{ scaleY: 0, opacity: 0 }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
+                style={{ transformOrigin: 'top' }}
                 className="overflow-hidden"
               >
                 <div className={`border-t ${lm ? 'border-slate-100' : 'border-white/[0.06]'}`}>
@@ -771,3 +772,5 @@ export default function SimulationSearch({ lm }: SimulationSearchProps) {
     </>
   );
 }
+
+export default memo(SimulationSearch);

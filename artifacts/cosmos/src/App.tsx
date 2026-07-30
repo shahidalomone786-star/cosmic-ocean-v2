@@ -1,18 +1,21 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
+// NasaSearch has runtime named exports used throughout — keep as static import
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
-import GrandmasterChessModal from './components/GrandmasterChess';
-import CosmicCarromModal from './components/CosmicCarrom';
-import Cosmic3DViewerModal, { type MasterpieceItem } from './components/Cosmic3DViewerModal';
+// Heavy modals — code-split so they don't bloat the initial bundle
+const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
+const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
+const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModal'));
+const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
+const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
+import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 import ProfileModal from './components/ProfileModal';
-import CosmicNexus from './components/CosmicNexus';
 import SimulationSearch from './components/SimulationSearch';
-import BiologyHub from './components/biology-hub/BiologyHub';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
@@ -816,7 +819,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 sm:px-7 py-3 sm:py-4 border-b border-white/[0.06] flex-shrink-0 bg-gradient-to-r from-white/[0.03] to-transparent">
           <div className="flex items-center gap-4">
-            <img src={avatar.image} alt={avatar.name}
+            <img src={avatar.image} alt={avatar.name} loading="lazy" decoding="async"
               className="w-11 h-11 rounded-full object-cover border border-white/[0.18] shadow-[0_0_20px_rgba(0,0,0,0.7),0_0_0_2px_rgba(255,255,255,0.04)]" />
             <div>
               <p className="text-white text-[15px] font-semibold tracking-[-0.01em] leading-tight" style={{ fontFamily: 'var(--app-font-heading)' }}>{avatar.name}</p>
@@ -849,7 +852,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           {/* Auto-analyse loading state */}
           {isLoading && messages.length === 0 && (
             <div className="flex items-start gap-3">
-              <img src={avatar.image} alt={avatar.name}
+              <img src={avatar.image} alt={avatar.name} loading="lazy" decoding="async"
                 className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
               <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[4px]">
                 <ThinkingDots />
@@ -867,7 +870,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
             ) : (
               <div key={idx} className="flex flex-col gap-1.5">
                 <div className="flex items-start gap-3">
-                  <img src={avatar.image} alt={avatar.name}
+                  <img src={avatar.image} alt={avatar.name} loading="lazy" decoding="async"
                     className="w-8 h-8 rounded-full object-cover border border-white/[0.18] flex-shrink-0 mt-0.5 shadow-[0_0_16px_rgba(0,0,0,0.6)]" />
                   <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl rounded-tl-[5px] px-5 py-4 max-w-[85%] shadow-[0_2px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <TypewriterText
@@ -893,7 +896,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
 
           {isLoading && messages.length > 0 && (
             <div className="flex items-start gap-3">
-              <img src={avatar.image} alt={avatar.name}
+              <img src={avatar.image} alt={avatar.name} loading="lazy" decoding="async"
                 className="w-7 h-7 rounded-full object-cover border border-white/[0.15] flex-shrink-0 mt-0.5 shadow-[0_0_12px_rgba(0,0,0,0.5)]" />
               <div className="bg-white/[0.05] border border-white/[0.07] rounded-2xl rounded-tl-[5px]">
                 <ThinkingDots />
@@ -978,7 +981,7 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out ${
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-[transform,box-shadow,border-color] duration-300 ease-out ${
         lm
           ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
           : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
@@ -986,7 +989,7 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
     >
       {imgSrc ? (
         <div className={`w-full h-28 overflow-hidden ${lm ? 'bg-slate-100' : 'bg-black/20'}`}>
-          <img src={imgSrc} alt={item.title} loading="lazy"
+          <img src={imgSrc} alt={item.title} loading="lazy" decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         </div>
       ) : (
@@ -1225,7 +1228,7 @@ function PortalSimCard({ sim, index = 0, onSelect, lm }: { sim: SimItem; index?:
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
-      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 ease-out group ${
+      className={`flex-shrink-0 w-52 rounded-xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-[transform,box-shadow,border-color] duration-300 ease-out group ${
         lm
           ? 'border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:border-slate-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.14)]'
           : 'border border-white/[0.08] bg-white/[0.04] backdrop-blur-[16px] hover:border-white/[0.20] hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
@@ -2782,12 +2785,12 @@ export default function App() {
               <BioHeroCard lm={lm} onOpen={() => setShowBiologyHub(true)} />
 
               {/* ── Quantum Lab ── */}
-              <div className="mb-6">
+              <div className="mb-6 cv-section">
                 <div className="flex items-baseline gap-3 mb-3">
                   <h2 className={`text-[15px] font-medium tracking-wide flex items-center gap-1.5 ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}><Atom size={15} strokeWidth={1.6} className="flex-shrink-0" />Quantum Lab</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Interactive Science Simulations</span>
                 </div>
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 perf-scroll">
                   {PHET_SIMULATIONS.map((sim, idx) => (
                     <PortalSimCard
                       key={sim.slug}
@@ -2801,12 +2804,12 @@ export default function App() {
               </div>
 
               {/* ── Advanced Sandbox ── */}
-              <div className="mb-6">
+              <div className="mb-6 cv-section">
                 <div className="flex items-baseline gap-3 mb-3">
                   <h2 className={`text-[15px] font-medium tracking-wide flex items-center gap-1.5 ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}><Settings2 size={15} strokeWidth={1.6} className="flex-shrink-0" />Advanced Sandbox</h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>Next-Gen STEM Simulations</span>
                 </div>
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 perf-scroll">
                   {ADVANCED_SIMS.map((sim, idx) => (
                     <AdvSimCard
                       key={sim.id}
@@ -3117,38 +3120,48 @@ export default function App() {
 
       {/* ── z-[150]  Cosmic Nexus Social Hub ── */}
       <AnimatePresence>
-        {showNexus && <CosmicNexus onClose={() => setShowNexus(false)} lm={lm} />}
+        {showNexus && (
+          <Suspense fallback={null}>
+            <CosmicNexus onClose={() => setShowNexus(false)} lm={lm} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       {/* ── z-[160]  Biology Hub ── */}
       <AnimatePresence>
         {showBiologyHub && (
-          <BiologyHub
-            lm={lm}
-            onToggleLm={() => setIsLightMode((v) => !v)}
-            onClose={() => setShowBiologyHub(false)}
-          />
+          <Suspense fallback={null}>
+            <BiologyHub
+              lm={lm}
+              onToggleLm={() => setIsLightMode((v) => !v)}
+              onClose={() => setShowBiologyHub(false)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       {/* ── z-[300]  Grandmaster Chess Modal ── */}
       <AnimatePresence>
         {showChess && (
-          <GrandmasterChessModal
-            onClose={() => setShowChess(false)}
-            lm={lm}
-            onGameEnd={recordChessResult}
-          />
+          <Suspense fallback={null}>
+            <GrandmasterChessModal
+              onClose={() => setShowChess(false)}
+              lm={lm}
+              onGameEnd={recordChessResult}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       {/* ── z-[300]  Cosmic Carrom Modal ── */}
       <AnimatePresence>
         {showCarrom && (
-          <CosmicCarromModal
-            onClose={() => setShowCarrom(false)}
-            lm={lm}
-          />
+          <Suspense fallback={null}>
+            <CosmicCarromModal
+              onClose={() => setShowCarrom(false)}
+              lm={lm}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
@@ -3183,10 +3196,12 @@ export default function App() {
       {/* ── z-[300]  Cosmic 3D Viewer Modal ── */}
       <AnimatePresence>
         {masterpieceModal && (
-          <Cosmic3DViewerModal
-            item={masterpieceModal}
-            onClose={() => setMasterpieceModal(null)}
-          />
+          <Suspense fallback={null}>
+            <Cosmic3DViewerModal
+              item={masterpieceModal}
+              onClose={() => setMasterpieceModal(null)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 

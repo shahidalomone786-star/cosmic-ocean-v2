@@ -118,7 +118,9 @@ function AvatarPicker({
       <AnimatePresence>
         {showCustom && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformOrigin: 'top' }}
             className="overflow-hidden"
           >
             <div className="flex gap-2">
@@ -267,7 +269,9 @@ export default function CosmicProfile({ lm }: { lm?: boolean }) {
           <AnimatePresence>
             {showPicker && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: 1, scaleY: 1 }} exit={{ opacity: 0, scaleY: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                style={{ originY: 0, transformOrigin: 'top' }}
                 className="overflow-hidden mb-6"
               >
                 <div className="rounded-xl p-4"

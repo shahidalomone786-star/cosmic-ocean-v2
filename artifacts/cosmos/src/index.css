@@ -468,6 +468,58 @@ body {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   PERFORMANCE UTILITIES — 60 FPS mobile optimisation
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * .gpu-layer
+ * Apply to any element that uses backdrop-filter / blur or carries a heavy
+ * paint cost (glassmorphism cards, sticky headers, modals).
+ * Forces the browser to promote it to its own GPU compositor layer so the
+ * blur is rasterised once and composited cheaply every frame.
+ */
+.gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* will-change is intentionally omitted at the class level to avoid
+     over-promotion; add it inline only when an animation is imminent */
+}
+
+/**
+ * .cv-section
+ * Apply to tall off-screen sections (simulation cards, gallery rows, etc.).
+ * The browser skips layout and paint for off-screen content and only renders
+ * it when it enters (or is close to) the viewport — huge scroll perf win.
+ * contain-intrinsic-size prevents layout shift when content pops in.
+ */
+.cv-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px; /* rough section height estimate */
+}
+
+/**
+ * .perf-scroll
+ * Horizontal or vertical scroll containers that must hit 60 FPS.
+ * overflow-anchor: none prevents scroll-anchoring reflows on append.
+ */
+.perf-scroll {
+  will-change: scroll-position;
+  overflow-anchor: none;
+  -webkit-overflow-scrolling: touch; /* momentum scroll on iOS */
+}
+
+/**
+ * Replace costly transition-all (which watches every CSS property and forces
+ * style recalc on change) with targeted, compositor-only transitions.
+ * Use this on buttons, chips, and interactive elements throughout the app.
+ */
+.transition-gpu {
+  transition-property: opacity, transform, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
 /* ── Cosmos video loading spinner ─────────────────────────────────────────── */
 @keyframes cosmos-spin {
   to { transform: rotate(360deg); }

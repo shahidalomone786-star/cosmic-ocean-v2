@@ -387,8 +387,9 @@ function EditView({ onCancel, onSaved, lm }: { onCancel: () => void; onSaved: ()
           <AnimatePresence>
             {showPresets && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: 1, scaleY: 1 }}
+                exit={{ opacity: 0, scaleY: 0 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={{ transformOrigin: 'top' }}
                 className="overflow-hidden w-full"
               >
                 <div className="grid grid-cols-4 gap-3 pt-2">

@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, memo, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
-  Film, LayoutGrid, Telescope, X, Sparkles,
+  Film, LayoutGrid, Telescope, X, Sparkles, Search,
   FlaskConical, Database, Library, Tags, Satellite,
   ExternalLink, ChevronRight, ChevronLeft, ChevronDown,
   type LucideIcon,
@@ -1383,7 +1383,7 @@ interface Props {
 }
 
 // ─── Main NasaSearch component ────────────────────────────────────────────────
-export default function NasaSearch({
+function NasaSearch({
   results, status, errMsg, onClear, onCardClick, sentinelRef,
   isEverythingMode, isLoadingMore,
   videoResults = [], videoStatus = 'idle', onVideoClick,
@@ -1761,3 +1761,5 @@ export default function NasaSearch({
     </AnimatePresence>
   );
 }
+
+export default memo(NasaSearch);

@@ -337,11 +337,11 @@ const ReelsPortal = memo(function ReelsPortal({
             <AnimatePresence initial={false}>
               {expanded && (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
+                  initial={{ scaleY: 0, opacity: 0 }}
+                  animate={{ scaleY: 1, opacity: 1 }}
+                  exit={{ scaleY: 0, opacity: 0 }}
                   transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ overflow: 'hidden' }}
+                  style={{ overflow: 'hidden', transformOrigin: 'top' }}
                 >
                   <p className="px-3.5 pb-3.5 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.48)' }}>
                     {card.evolution}
@@ -492,11 +492,11 @@ const DetailedCard = memo(function DetailedCard({
           <AnimatePresence initial={false}>
             {expanded && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
+                initial={{ scaleY: 0, opacity: 0 }}
+                animate={{ scaleY: 1, opacity: 1 }}
+                exit={{ scaleY: 0, opacity: 0 }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                style={{ overflow: 'hidden' }}
+                style={{ overflow: 'hidden', transformOrigin: 'top' }}
               >
                 <p
                   className="px-3 pb-3 text-[11px] leading-relaxed"

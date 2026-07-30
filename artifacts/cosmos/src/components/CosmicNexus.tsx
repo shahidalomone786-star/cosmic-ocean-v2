@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { CosmicFeedCard } from './CosmicCards';
@@ -629,10 +629,12 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
         <AnimatePresence>
           {error && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{    opacity: 0, height: 0 }}
-              className={`mx-4 rounded-xl px-4 py-2 text-[12px] text-red-400 border flex-shrink-0 ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/[0.07] border-red-500/20'}`}
+              initial={{ opacity: 0, scaleY: 0 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{    opacity: 0, scaleY: 0 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              style={{ originY: 0, transformOrigin: 'top' }}
+              className={`mx-4 rounded-xl px-4 py-2 text-[12px] text-red-400 border flex-shrink-0 overflow-hidden ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/[0.07] border-red-500/20'}`}
             >
               {error}
             </motion.div>
@@ -928,10 +930,12 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
           <AnimatePresence>
             {error && (
               <motion.div
-                initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginTop: 0 }}
-                exit={{    opacity: 0, height: 0 }}
-                className={`rounded-xl px-4 py-2.5 text-[12.5px] text-red-400 border ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/[0.07] border-red-500/20'}`}
+                initial={{ opacity: 0, scaleY: 0 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                exit={{    opacity: 0, scaleY: 0 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                style={{ originY: 0, transformOrigin: 'top' }}
+                className={`rounded-xl px-4 py-2.5 text-[12.5px] text-red-400 border overflow-hidden ${lm ? 'bg-red-50 border-red-100' : 'bg-red-500/[0.07] border-red-500/20'}`}
               >
                 {error}
               </motion.div>
@@ -2662,7 +2666,7 @@ function BottomNav({ active, onSelect, lm }: { active: Tab; onSelect: (t: Tab) =
 // ─────────────────────────────────────────────────────────────────────────────
 const TAB_ORDER: Tab[] = ['shorts', 'home', 'search', 'chat', 'profile'];
 
-export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?: boolean }) {
+function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?: boolean }) {
   const [activeTab,      setActiveTab]      = useState<Tab>('home');
   const [direction,      setDirection]      = useState(0);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -2820,3 +2824,5 @@ export default function CosmicNexus({ onClose, lm }: { onClose: () => void; lm?:
     </>
   );
 }
+
+export default memo(CosmicNexus);
