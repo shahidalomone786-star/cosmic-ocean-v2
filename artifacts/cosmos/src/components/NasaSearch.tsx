@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, memo, type RefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, memo, useCallback, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, BookOpen, FileText, Rocket, Atom,
@@ -218,18 +218,33 @@ function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
 }
 
 // ─── CoverImage — real image only, skeleton while loading ────────────────────
-// Only called when item.imageUrl is confirmed present. No wiki fetch, no logo.
+// Bug #6 fix: guard against empty src — an empty string causes some browsers to
+// never fire onLoad/onError, leaving the shimmer skeleton permanently visible.
 function CoverImage({ src, alt, lm }: { src: string; alt: string; lm?: boolean }) {
+  // Treat empty / whitespace-only src as an immediate failure so the skeleton
+  // resolves right away instead of hanging.
+  const hasValidSrc = src.trim().length > 0;
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
+  const [imgFailed, setImgFailed] = useState(!hasValidSrc);
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Skeleton base — shown while loading or if image URL is broken */}
-      {(!imgLoaded || imgFailed) && (
+      {/* Skeleton base — shown while loading; hidden once loaded or failed */}
+      {!imgLoaded && !imgFailed && (
+        <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`}>
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: lm ? 'linear-gradient(90deg,transparent,rgba(0,0,0,0.04),transparent)' : 'linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)' }}
+            animate={{ x: ['-100%', '200%'] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+      )}
+      {/* Dark placeholder when image is absent or failed */}
+      {imgFailed && (
         <div className={`absolute inset-0 ${lm ? 'bg-gray-100' : 'bg-[#09090f]'}`} />
       )}
-      {!imgFailed && (
+      {hasValidSrc && !imgFailed && (
         <img
           src={src}
           alt={alt}
@@ -362,7 +377,7 @@ function SkeletonTextRow({ idx, lm }: { idx: number; lm?: boolean }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay, ease: [0.16, 1, 0.3, 1] }}
-      className={`rounded-xl border px-5 py-4 flex flex-col gap-2.5 relative overflow-hidden ${lm ? 'bg-white border-gray-200' : 'bg-white/[0.025] border-white/[0.06]'}`}
+      className={`rounded-2xl border px-5 py-4 flex flex-col gap-2.5 relative overflow-hidden ${lm ? 'bg-white border-gray-200' : 'bg-white/[0.025] border-white/[0.06]'}`}
     >
       <motion.div className="absolute inset-0" style={{ background: lm ? 'linear-gradient(90deg,transparent,rgba(0,0,0,0.025),transparent)' : 'linear-gradient(90deg,transparent,rgba(255,255,255,0.025),transparent)' }} animate={{ x: ['-100%', '200%'] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: delay * 0.4 }} />
       <motion.div className={`h-3 rounded-full ${lm ? 'bg-gray-200' : 'bg-white/[0.07]'}`} style={{ width: `${55 + (idx % 4) * 8}%` }} animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.8, repeat: Infinity, delay }} />
@@ -999,7 +1014,8 @@ interface FilterCounts {
   esa: number; books: number; aiSummary: number;
 }
 
-function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
+// Feature #8/9: per-source empty state with a descriptive hint line
+function FilterEmptyState({ label, hint, lm }: { label: string; hint?: string; lm?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -1008,9 +1024,13 @@ function FilterEmptyState({ label, lm }: { label: string; lm?: boolean }) {
       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${lm ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.04] border-white/[0.08]'}`}>
         <Telescope size={24} strokeWidth={1.2} className={lm ? 'text-gray-400' : 'text-white/35'} />
       </div>
-      <div className="flex flex-col items-center gap-1.5 text-center">
+      <div className="flex flex-col items-center gap-2 text-center max-w-[280px]">
         <p className={`text-[13px] font-medium ${lm ? 'text-gray-600' : 'text-white/50'}`}>No {label} found</p>
-        <p className={`text-[11px] uppercase tracking-[0.22em]`}>Try a broader search term</p>
+        {hint ? (
+          <p className={`text-[11px] leading-relaxed ${lm ? 'text-gray-400' : 'text-white/28'}`}>{hint}</p>
+        ) : (
+          <p className={`text-[11px] uppercase tracking-[0.22em] ${lm ? 'text-gray-400' : 'text-white/28'}`}>Try a broader search term</p>
+        )}
       </div>
     </motion.div>
   );
@@ -1393,9 +1413,24 @@ function NasaSearch({
 }: Props) {
   const [selectedSectionItem, setSelectedSectionItem] = useState<SectionItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
+  // Feature #11: back-to-top — show after 2× viewport height of scrolling
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Reset filter whenever the search query changes
   useEffect(() => { setActiveFilter('all'); }, [sections?.query]);
+
+  // Track window scroll for back-to-top visibility
+  useEffect(() => {
+    const threshold = () => window.innerHeight * 2;
+    const handler = () => setShowBackToTop(window.scrollY > threshold());
+    window.addEventListener('scroll', handler, { passive: true });
+    handler(); // evaluate immediately
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Classify videos into shorts / long for instant client-side filtering
   const classifiedVideos = useMemo(() => {
@@ -1435,7 +1470,9 @@ function NasaSearch({
       (sections.esa?.length ?? 0) > 0 ||
       (sections.books?.length ?? 0) > 0;
 
+    // Bug #1 fix: include videos in the total so the header count is accurate
     const totalCount =
+      (sections.videos?.length ?? 0) +
       (sections.wikipedia?.length ?? 0) +
       (sections.research?.length ?? 0) +
       (sections.nasa?.length ?? 0) +
@@ -1570,53 +1607,73 @@ function NasaSearch({
                 )}
 
                 {/* 3. Wikipedia */}
-                {(activeFilter === 'all' || activeFilter === 'wikipedia') && sections.wikipedia.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                      {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
-                    </div>
-                  </motion.div>
+                {(activeFilter === 'all' || activeFilter === 'wikipedia') && (
+                  sections.wikipedia.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                        {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                      </div>
+                    </motion.div>
+                  ) : activeFilter === 'wikipedia' ? (
+                    <FilterEmptyState label="Wikipedia articles" hint="This topic may be too niche for an encyclopedic entry — try a broader term." lm={lm} />
+                  ) : null
                 )}
 
                 {/* 4. Research Papers */}
-                {(activeFilter === 'all' || activeFilter === 'research') && sections.research.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
-                    <div className="flex flex-col gap-3">
-                      {sections.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
-                    </div>
-                  </motion.div>
+                {(activeFilter === 'all' || activeFilter === 'research') && (
+                  sections.research.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
+                      <div className="flex flex-col gap-3">
+                        {sections.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                      </div>
+                    </motion.div>
+                  ) : activeFilter === 'research' ? (
+                    <FilterEmptyState label="research papers" hint="No papers indexed for this query yet — try alternate keywords or a related concept." lm={lm} />
+                  ) : null
                 )}
 
                 {/* 5. NASA */}
-                {(activeFilter === 'all' || activeFilter === 'nasa') && sections.nasa.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                      {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
-                    </div>
-                  </motion.div>
+                {(activeFilter === 'all' || activeFilter === 'nasa') && (
+                  sections.nasa.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                        {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                      </div>
+                    </motion.div>
+                  ) : activeFilter === 'nasa' ? (
+                    <FilterEmptyState label="NASA imagery" hint="The NASA Image & Video Library doesn't have a match for this specific query." lm={lm} />
+                  ) : null
                 )}
 
                 {/* 6. ESA */}
-                {(activeFilter === 'all' || activeFilter === 'esa') && sections.esa.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                      {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
-                    </div>
-                  </motion.div>
+                {(activeFilter === 'all' || activeFilter === 'esa') && (
+                  sections.esa.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                        {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                      </div>
+                    </motion.div>
+                  ) : activeFilter === 'esa' ? (
+                    <FilterEmptyState label="ESA Hubble content" hint="ESA's Hubble image library may not have imagery for this particular subject." lm={lm} />
+                  ) : null
                 )}
 
                 {/* 7. Books */}
-                {(activeFilter === 'all' || activeFilter === 'books') && sections.books.length > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
-                    <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
-                    <div className="flex flex-col gap-3">
-                      {sections.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
-                    </div>
-                  </motion.div>
+                {(activeFilter === 'all' || activeFilter === 'books') && (
+                  sections.books.length > 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
+                      <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
+                      <div className="flex flex-col gap-3">
+                        {sections.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                      </div>
+                    </motion.div>
+                  ) : activeFilter === 'books' ? (
+                    <FilterEmptyState label="books" hint="No academic books indexed for this query — the topic may be covered in journals instead." lm={lm} />
+                  ) : null
                 )}
 
                 {/* 8. Related Topics — All mode only */}
@@ -1658,6 +1715,31 @@ function NasaSearch({
               onShareToChat={onSectionItemShare}
               lm={lm}
             />
+          )}
+        </AnimatePresence>
+
+        {/* Feature #11: Back to top — floating button after 2× viewport scroll */}
+        <AnimatePresence>
+          {showBackToTop && (
+            <motion.button
+              key="back-to-top"
+              initial={{ opacity: 0, scale: 0.85, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 12 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              onClick={scrollToTop}
+              aria-label="Back to top"
+              className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-2.5 rounded-full border shadow-lg transition-colors duration-200 ${
+                lm
+                  ? 'bg-white border-gray-200 text-gray-600 hover:bg-gray-900 hover:border-gray-900 hover:text-white shadow-black/10'
+                  : 'bg-[#0d0d1e]/90 border-white/[0.14] text-white/65 hover:border-white/[0.28] hover:text-white backdrop-blur-md shadow-black/30'
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M6 10V2M6 2L2 6M6 2l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">Top</span>
+            </motion.button>
           )}
         </AnimatePresence>
       </>

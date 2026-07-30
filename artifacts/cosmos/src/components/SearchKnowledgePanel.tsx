@@ -36,10 +36,10 @@ function CompactResearchRow({ item, idx, lm }: { item: SectionItem; idx: number;
       href={item.url ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25, delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className={`group flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: idx * 0.04, ease: [0.16, 1, 0.3, 1] }}
+      className={`group flex items-start gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 cursor-pointer ${
         lm
           ? 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]'
           : 'bg-white/[0.025] border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.045] backdrop-blur-sm'
@@ -85,17 +85,17 @@ function CompactNasaRow({ item, idx, lm }: { item: SectionItem; idx: number; lm?
       href={item.url ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25, delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, delay: idx * 0.04, ease: [0.16, 1, 0.3, 1] }}
+      className={`group flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 cursor-pointer ${
         lm
           ? 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]'
           : 'bg-white/[0.025] border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.045] backdrop-blur-sm'
       }`}
     >
       {/* Thumbnail */}
-      <div className={`flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border ${lm ? 'border-gray-200 bg-sky-50' : 'border-white/[0.08] bg-sky-950/40'}`}>
+      <div className={`flex-shrink-0 w-10 h-10 rounded-xl overflow-hidden border ${lm ? 'border-gray-200 bg-sky-50' : 'border-white/[0.08] bg-sky-950/40'}`}>
         {item.imageUrl ? (
           <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" loading="lazy"
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
@@ -231,6 +231,11 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
     },
   ], [sections]);
 
+  // Bug #2 fix: hide zero-count badges entirely — showing "0" reads as broken
+  const visibleItems = useMemo(() => items.filter(item => item.count > 0), [items]);
+
+  if (visibleItems.length === 0) return null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -246,16 +251,15 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
         <div className="flex-1 h-px" style={{ background: lm ? 'linear-gradient(90deg,#e5e7eb,transparent)' : 'linear-gradient(90deg,rgba(255,255,255,0.07),transparent)' }} />
       </div>
 
-      {/* Pill grid — horizontal scroll on mobile */}
+      {/* Pill grid — horizontal scroll on mobile, only non-zero sources */}
       <div className="flex gap-2 flex-wrap">
-        {items.map((item, i) => {
+        {visibleItems.map((item, i) => {
           const Icon = item.icon;
-          const isZero = item.count === 0;
           return (
             <motion.div
               key={item.label}
               initial={{ opacity: 0, scale: 0.88 }}
-              animate={{ opacity: isZero ? 0.4 : 1, scale: 1 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.25, delay: i * 0.03, ease: [0.16, 1, 0.3, 1] }}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200"
               style={{
@@ -316,38 +320,71 @@ export function InlineRelatedTopics({ topics, onSearch, lm }: {
 }
 
 // ─── 3. Suggested Searches ────────────────────────────────────────────────────
+// Bug #4: use current year dynamically (or year-agnostic phrasing)
+// Bug #5: never concat a topic with itself; use natural follow-up phrasing
+const CURRENT_YEAR = new Date().getFullYear();
+
+// Natural, human-sounding follow-up phrasing templates
+const TOPIC_TEMPLATES: ReadonlyArray<(t: string) => string> = [
+  t => `How does ${t} work`,
+  t => `${t} explained simply`,
+  t => `Latest ${t} discoveries`,
+  t => `${t} breakthroughs ${CURRENT_YEAR}`,
+  t => `${t} for beginners`,
+  t => `${t} vs quantum mechanics`,
+  t => `The future of ${t}`,
+  t => `${t} real-world applications`,
+];
+
+const QUERY_TEMPLATES: ReadonlyArray<(q: string) => string> = [
+  q => `Latest ${q} discoveries`,
+  q => `${q} research ${CURRENT_YEAR}`,
+  q => `How does ${q} work`,
+  q => `${q} explained simply`,
+  q => `${q} future breakthroughs`,
+  q => `${q} for beginners`,
+  q => `${q} open questions`,
+];
+
 export function SuggestedSearches({ query, relatedTopics, onSearch, lm }: {
   query: string; relatedTopics: string[]; onSearch?: (q: string) => void; lm?: boolean;
 }) {
   const suggestions = useMemo(() => {
-    const base = relatedTopics.slice(0, 4);
-    const derived: string[] = [];
-
-    if (base.length > 0) {
-      derived.push(`Latest ${base[0]} research`);
-      if (base[1]) derived.push(`${base[1]} explained`);
-      if (base[2]) derived.push(`${base[2]} breakthrough`);
-    }
-
-    // Add query-based suggestions
     const q = query.trim();
+    const qLower = q.toLowerCase();
+
+    // Bug #5 fix: only use topics that are NOT the same as (or a substring of) the query
+    const distinctTopics = relatedTopics.filter(t => {
+      const tLower = t.toLowerCase();
+      return tLower !== qLower && !tLower.includes(qLower) && !qLower.includes(tLower);
+    }).slice(0, 4);
+
+    const candidates: string[] = [];
+
+    // Generate phrased suggestions from distinct related topics
+    distinctTopics.forEach((t, i) => {
+      const template = TOPIC_TEMPLATES[i % TOPIC_TEMPLATES.length];
+      candidates.push(template(t));
+    });
+
+    // Generate phrased suggestions from the query itself (year-agnostic)
     if (q) {
-      derived.push(`${q} discoveries 2024`);
-      derived.push(`${q} future research`);
+      QUERY_TEMPLATES.slice(0, 3).forEach(fn => candidates.push(fn(q)));
     }
 
-    // Dedupe + trim
-    const seen = new Set<string>();
-    const all: string[] = [];
-    for (const s of [...base.map(t => `${t} ${query}`).filter(Boolean), ...derived]) {
-      const normalized = s.trim();
-      if (normalized && !seen.has(normalized.toLowerCase())) {
-        seen.add(normalized.toLowerCase());
-        all.push(normalized);
-        if (all.length >= 8) break;
+    // Dedupe case-insensitively, skip anything that exactly equals the current query
+    const seen = new Set<string>([qLower]);
+    const result: string[] = [];
+    for (const s of candidates) {
+      const norm = s.trim();
+      const normLower = norm.toLowerCase();
+      if (norm && !seen.has(normLower)) {
+        seen.add(normLower);
+        result.push(norm);
+        if (result.length >= 7) break;
       }
     }
-    return all;
+    return result;
   }, [query, relatedTopics]);
 
   if (suggestions.length === 0) return null;
@@ -368,7 +405,7 @@ export function SuggestedSearches({ query, relatedTopics, onSearch, lm }: {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2, delay: i * 0.03 }}
             onClick={() => onSearch?.(s)}
-            className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-left transition-all duration-200 ${
+            className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border text-left transition-all duration-200 ${
               lm
                 ? 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-[0_2px_10px_rgba(0,0,0,0.07)] text-gray-700 hover:text-gray-900'
                 : 'bg-white/[0.02] border-white/[0.05] hover:border-white/[0.13] hover:bg-white/[0.04] text-white/55 hover:text-white/80'
@@ -413,16 +450,29 @@ export function LatestResearch({ research, lm }: { research: SectionItem[]; lm?:
   );
 }
 
-// ─── 5. Trending Research ─────────────────────────────────────────────────────
+// ─── 5. Trending Research (genuinely different from Popular Papers) ────────────
+// Bug #3 fix: show papers published in the last 12 months only, sorted by citations.
+// This makes it distinct from PopularPapers (which shows all-time highest citations).
 export function TrendingResearch({ research, lm }: { research: SectionItem[]; lm?: boolean }) {
-  const trending = useMemo(() =>
-    [...research]
-      .filter(r => (r.citationCount ?? 0) > 0)
-      .sort((a, b) => (b.citationCount ?? 0) - (a.citationCount ?? 0))
-      .slice(0, 4),
-    [research]
-  );
+  const trending = useMemo(() => {
+    // Compute the 12-month cutoff (YYYY or YYYY-MM prefix comparison)
+    const now = new Date();
+    const cutoffYear = now.getFullYear() - 1;
+    // "Recent" = published year >= cutoffYear, i.e. last ~12 months
+    const cutoffPrefix = String(cutoffYear);
 
+    return [...research]
+      .filter(r => {
+        if ((r.citationCount ?? 0) <= 0) return false;
+        if (!r.date) return false;
+        // Compare the first 4 chars (year) to the cutoff year
+        return r.date.slice(0, 4) >= cutoffPrefix;
+      })
+      .sort((a, b) => (b.citationCount ?? 0) - (a.citationCount ?? 0))
+      .slice(0, 4);
+  }, [research]);
+
+  // If no recent papers found, skip this section entirely — PopularPapers covers all-time
   if (trending.length === 0) return null;
 
   return (
@@ -432,7 +482,13 @@ export function TrendingResearch({ research, lm }: { research: SectionItem[]; lm
       transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
       className="mb-6"
     >
-      <MiniSectionHeader icon={TrendingUp} label="Trending Research" sub="by citations" count={trending.length} lm={lm} />
+      <MiniSectionHeader
+        icon={TrendingUp}
+        label="Recent Highlights"
+        sub={`last 12 months · by citations`}
+        count={trending.length}
+        lm={lm}
+      />
       <div className="flex flex-col gap-2">
         {trending.map((item, i) => (
           <CompactResearchRow key={item.id} item={item} idx={i} lm={lm} />
@@ -465,7 +521,9 @@ export function FeaturedNASA({ nasa, lm }: { nasa: SectionItem[]; lm?: boolean }
   );
 }
 
-// ─── 7. Popular Papers ────────────────────────────────────────────────────────
+// ─── 7. Popular Papers (all-time most cited) ──────────────────────────────────
+// Bug #3 fix: this section keeps its all-time ranking. TrendingResearch is now
+// time-filtered so the two sections show genuinely different results.
 export function PopularPapers({ research, books, lm }: {
   research: SectionItem[]; books: SectionItem[]; lm?: boolean;
 }) {
@@ -486,7 +544,7 @@ export function PopularPapers({ research, books, lm }: {
       transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
       className="mb-6"
     >
-      <MiniSectionHeader icon={Star} label="Popular Papers" sub="most cited" count={popular.length} lm={lm} />
+      <MiniSectionHeader icon={Star} label="Most Cited" sub="all-time" count={popular.length} lm={lm} />
       <div className="flex flex-col gap-2">
         {popular.map((item, i) => (
           <motion.a
@@ -494,10 +552,10 @@ export function PopularPapers({ research, books, lm }: {
             href={item.url ?? '#'}
             target="_blank"
             rel="noopener noreferrer"
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.25, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-            className={`group flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-200 ${
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
+            className={`group flex items-start gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 ${
               lm
                 ? 'bg-white border-gray-100 hover:border-gray-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]'
                 : 'bg-white/[0.025] border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.045] backdrop-blur-sm'
