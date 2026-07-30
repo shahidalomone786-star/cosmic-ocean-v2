@@ -19,12 +19,12 @@ import { useState, useEffect, useRef, memo } from 'react';
 
 // ── Image list ────────────────────────────────────────────────────────────────
 const IMAGES = Array.from(
-  { length: 20 },
+  { length: 19 },
   (_, i) => `/banner/b${String(i + 1).padStart(2, '0')}.jpg`
 );
 
 const SHOW_MS = 3000; // ms each slide stays fully visible before transition
-const FADE_MS = 950;  // ms for the crossfade itself
+const FADE_MS = 1000; // ms for the crossfade itself
 
 // ── Component ─────────────────────────────────────────────────────────────────
 function BannerCarousel({ lm }: { lm?: boolean }) {
@@ -67,33 +67,21 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
       {/* Invisible prefetch trigger — keeps the *next* next image warm in cache */}
       <link rel="prefetch" href={prefetchSrc} as="image" />
 
-      {/* Outer container: glassmorphism card, 16:9 locked */}
+      {/* Outer container: clean 16:9 card */}
       <div
-        className="relative w-full aspect-video overflow-hidden rounded-2xl gpu-layer flex items-center justify-center"
-        style={{
-          background: '#03030e',
-          boxShadow: lm
-            ? '0 4px 28px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.07)'
-            : [
-                '0 0 0 1px rgba(255,255,255,0.07)',
-                'inset 0 1px 0 rgba(255,255,255,0.05)',
-                '0 8px 48px rgba(0,0,0,0.88)',
-                '0 24px 80px rgba(0,0,0,0.60)',
-              ].join(', '),
-        }}
+        className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+        style={{ background: '#03030e' }}
       >
-        {/* ── Base layer ── current image, always at opacity 1, no animation */}
-        {/* Images are 9:16 portrait — rotate 90° + scale to fill the 16:9 container */}
+        {/* ── Base layer ── current image, always visible, no animation */}
         <img
+          key={`base-${current}`}
           src={IMAGES[current]}
           alt=""
           aria-hidden="true"
           draggable={false}
           loading="eager"
           decoding="async"
-          className="absolute w-[178%] h-[178%] max-w-none object-cover rotate-90 banner-ken-burns"
-          key={`base-${current}`}
-          style={{ willChange: 'transform' }}
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
         {/* ── Incoming layer ── fades in over the base, then unmounts */}
@@ -106,9 +94,9 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
             draggable={false}
             loading="eager"
             decoding="async"
-            className="absolute w-[178%] h-[178%] max-w-none object-cover rotate-90"
+            className="absolute inset-0 w-full h-full object-cover opacity-0"
             style={{
-              animation: `banner-fade-in ${FADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+              animation: `banner-fade-in ${FADE_MS}ms ease-in-out forwards`,
               willChange: 'opacity',
             }}
           />
