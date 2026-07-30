@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { memo, lazy, Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers3, Heart, Network, Activity, Zap, Brain, Microscope,
@@ -8,14 +8,16 @@ import {
 } from 'lucide-react';
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
 import BioDNAIcon from './BioDNAIcon';
-import Anatomy3DViewer from './anatomy3d/Anatomy3DViewer';
-import ResearchSection from './sections/ResearchSection';
-import SimulationsSection from './sections/SimulationsSection';
+// Heavy sections — code-split via React.lazy so only the active section is bundled on first load
+const Anatomy3DViewer  = lazy(() => import('./anatomy3d/Anatomy3DViewer'));
+const MicroscopeSection = lazy(() => import('./sections/MicroscopeSection'));
+const FeelNatureSection = lazy(() => import('./sections/FeelNatureSection'));
+const TopicSection      = lazy(() => import('./sections/TopicSection'));
+const ResearchSection   = lazy(() => import('./sections/ResearchSection'));
+const SimulationsSection = lazy(() => import('./sections/SimulationsSection'));
+const BioSearchResults  = lazy(() => import('./sections/BioSearchResults'));
+// Small/always-needed sections kept as static imports
 import VideosSection from './sections/VideosSection';
-import TopicSection from './sections/TopicSection';
-import BioSearchResults from './sections/BioSearchResults';
-import MicroscopeSection from './sections/MicroscopeSection';
-import FeelNatureSection from './sections/FeelNatureSection';
 import { useBiologySearch, getBiologySearchQueryKey } from '@workspace/api-client-react';
 import type { BiologySearchItem } from '@workspace/api-client-react';
 
@@ -257,18 +259,24 @@ function SubDivider({ lm, label }: { lm: boolean; label: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Static module-level data — defined once, never recreated on re-render
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OVERVIEW_QUICK_CARDS = [
+  { title: 'Human Anatomy 3D', subtitle: 'Explore all 78 organs in interactive 3D', icon: Layers3, color: 'text-emerald-400', tag: 'Interactive', delay: 0.05 },
+  { title: 'Cell Biology', subtitle: 'Mitochondria, nucleus, ER and 20+ organelles', icon: Microscope, color: 'text-teal-400', tag: undefined, delay: 0.1 },
+  { title: 'DNA & Genetics', subtitle: 'Base pairs, replication, mutation mechanisms', icon: Dna, color: 'text-lime-400', tag: 'New', delay: 0.15 },
+  { title: 'Brain & Neuroscience', subtitle: 'Neural pathways, consciousness, cognition', icon: Brain, color: 'text-violet-400', tag: 'Popular', delay: 0.2 },
+  { title: 'Evolution', subtitle: 'Natural selection, adaptation, phylogeny', icon: TreePine, color: 'text-yellow-400', tag: undefined, delay: 0.25 },
+  { title: 'Biochemistry', subtitle: 'Enzymes, ATP, metabolic pathways', icon: FlaskConical, color: 'text-indigo-400', tag: undefined, delay: 0.3 },
+] as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Section renderers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function OverviewSection({ lm }: { lm: boolean }) {
-  const quickCards = [
-    { title: 'Human Anatomy 3D', subtitle: 'Explore all 78 organs in interactive 3D', icon: Layers3, color: 'text-emerald-400', tag: 'Interactive', delay: 0.05 },
-    { title: 'Cell Biology', subtitle: 'Mitochondria, nucleus, ER and 20+ organelles', icon: Microscope, color: 'text-teal-400', tag: undefined, delay: 0.1 },
-    { title: 'DNA & Genetics', subtitle: 'Base pairs, replication, mutation mechanisms', icon: Dna, color: 'text-lime-400', tag: 'New', delay: 0.15 },
-    { title: 'Brain & Neuroscience', subtitle: 'Neural pathways, consciousness, cognition', icon: Brain, color: 'text-violet-400', tag: 'Popular', delay: 0.2 },
-    { title: 'Evolution', subtitle: 'Natural selection, adaptation, phylogeny', icon: TreePine, color: 'text-yellow-400', tag: undefined, delay: 0.25 },
-    { title: 'Biochemistry', subtitle: 'Enzymes, ATP, metabolic pathways', icon: FlaskConical, color: 'text-indigo-400', tag: undefined, delay: 0.3 },
-  ];
+  const quickCards = OVERVIEW_QUICK_CARDS;
 
   return (
     <div>
@@ -342,24 +350,28 @@ function AnatomySection({ lm }: { lm: boolean }) {
   );
 }
 
+// ── DNA Section static data ───────────────────────────────────────────────────
+const DNA_TOPICS = [
+  { title: 'Double Helix Structure', subtitle: 'Watson & Crick model, base pairing rules', tag: 'Foundational' },
+  { title: 'DNA Replication', subtitle: 'Semi-conservative replication, polymerase chain', tag: undefined },
+  { title: 'Transcription & Translation', subtitle: 'mRNA synthesis, ribosome assembly, codon table', tag: undefined },
+  { title: 'Gene Expression', subtitle: 'Promoters, operators, regulatory sequences', tag: undefined },
+  { title: 'Mutations & Repair', subtitle: 'Point mutations, frame shifts, DNA damage response', tag: undefined },
+  { title: 'CRISPR-Cas9', subtitle: 'Gene editing, guide RNA, molecular scissors', tag: 'Cutting Edge' },
+] as const;
+
+const DNA_TABS = [
+  { id: 'topics' as const,   label: 'Topics'   },
+  { id: 'articles' as const, label: 'Articles' },
+  { id: 'research' as const, label: 'Papers'   },
+] as const;
+
 // ── DNA Section — enhanced with live API data ─────────────────────────────────
 function DNASection({ lm }: { lm: boolean }) {
   const [activeTab, setActiveTab] = useState<'topics' | 'articles' | 'research'>('topics');
 
-  const topics = [
-    { title: 'Double Helix Structure', subtitle: 'Watson & Crick model, base pairing rules', tag: 'Foundational' },
-    { title: 'DNA Replication', subtitle: 'Semi-conservative replication, polymerase chain', tag: undefined },
-    { title: 'Transcription & Translation', subtitle: 'mRNA synthesis, ribosome assembly, codon table', tag: undefined },
-    { title: 'Gene Expression', subtitle: 'Promoters, operators, regulatory sequences', tag: undefined },
-    { title: 'Mutations & Repair', subtitle: 'Point mutations, frame shifts, DNA damage response', tag: undefined },
-    { title: 'CRISPR-Cas9', subtitle: 'Gene editing, guide RNA, molecular scissors', tag: 'Cutting Edge' },
-  ];
-
-  const TABS = [
-    { id: 'topics' as const,   label: 'Topics'   },
-    { id: 'articles' as const, label: 'Articles' },
-    { id: 'research' as const, label: 'Papers'   },
-  ];
+  const topics = DNA_TOPICS;
+  const TABS = DNA_TABS;
 
   return (
     <div>
@@ -434,28 +446,32 @@ function DNASection({ lm }: { lm: boolean }) {
   );
 }
 
+// ── Cells Section static data ─────────────────────────────────────────────────
+const CELL_ORGANELLES = [
+  { name: 'Nucleus', role: 'DNA storage & gene expression control', color: 'bg-violet-400' },
+  { name: 'Mitochondria', role: 'ATP production via cellular respiration', color: 'bg-red-400' },
+  { name: 'Ribosome', role: 'Protein synthesis from mRNA templates', color: 'bg-blue-400' },
+  { name: 'Endoplasmic Reticulum', role: 'Protein folding and lipid synthesis', color: 'bg-sky-400' },
+  { name: 'Golgi Apparatus', role: 'Protein sorting, packaging and secretion', color: 'bg-orange-400' },
+  { name: 'Lysosome', role: 'Cellular digestion and waste removal', color: 'bg-pink-400' },
+  { name: 'Chloroplast', role: 'Photosynthesis in plant cells', color: 'bg-green-400' },
+  { name: 'Cell Membrane', role: 'Selective permeability and cell boundary', color: 'bg-teal-400' },
+  { name: 'Cytoskeleton', role: 'Cell shape, movement, and internal transport', color: 'bg-cyan-400' },
+  { name: 'Vacuole', role: 'Storage, waste disposal, and turgor pressure', color: 'bg-purple-400' },
+] as const;
+
+const CELLS_TABS = [
+  { id: 'organelles' as const, label: 'Organelles' },
+  { id: 'articles' as const,   label: 'Articles'   },
+  { id: 'research' as const,   label: 'Papers'     },
+] as const;
+
 // ── Cells Section — enhanced with live API data ───────────────────────────────
 function CellsSection({ lm }: { lm: boolean }) {
   const [activeTab, setActiveTab] = useState<'organelles' | 'articles' | 'research'>('organelles');
 
-  const organelles = [
-    { name: 'Nucleus', role: 'DNA storage & gene expression control', color: 'bg-violet-400' },
-    { name: 'Mitochondria', role: 'ATP production via cellular respiration', color: 'bg-red-400' },
-    { name: 'Ribosome', role: 'Protein synthesis from mRNA templates', color: 'bg-blue-400' },
-    { name: 'Endoplasmic Reticulum', role: 'Protein folding and lipid synthesis', color: 'bg-sky-400' },
-    { name: 'Golgi Apparatus', role: 'Protein sorting, packaging and secretion', color: 'bg-orange-400' },
-    { name: 'Lysosome', role: 'Cellular digestion and waste removal', color: 'bg-pink-400' },
-    { name: 'Chloroplast', role: 'Photosynthesis in plant cells', color: 'bg-green-400' },
-    { name: 'Cell Membrane', role: 'Selective permeability and cell boundary', color: 'bg-teal-400' },
-    { name: 'Cytoskeleton', role: 'Cell shape, movement, and internal transport', color: 'bg-cyan-400' },
-    { name: 'Vacuole', role: 'Storage, waste disposal, and turgor pressure', color: 'bg-purple-400' },
-  ];
-
-  const TABS = [
-    { id: 'organelles' as const, label: 'Organelles' },
-    { id: 'articles' as const,   label: 'Articles'   },
-    { id: 'research' as const,   label: 'Papers'     },
-  ];
+  const organelles = CELL_ORGANELLES;
+  const TABS = CELLS_TABS;
 
   return (
     <div>
@@ -510,24 +526,28 @@ function CellsSection({ lm }: { lm: boolean }) {
   );
 }
 
+// ── Brain Section static data ─────────────────────────────────────────────────
+const BRAIN_TOPICS = [
+  { title: 'Cerebral Cortex', subtitle: 'Higher cognition, language, consciousness', icon: Brain, color: 'text-violet-400' },
+  { title: 'Neurons & Synapses', subtitle: 'Electrical signals, neurotransmitters, plasticity', icon: Zap, color: 'text-amber-400' },
+  { title: 'Memory Formation', subtitle: 'Hippocampus, LTP, short & long-term memory', icon: Brain, color: 'text-indigo-400' },
+  { title: 'Nervous System Divisions', subtitle: 'CNS vs PNS, autonomic, somatic', icon: Network, color: 'text-sky-400' },
+  { title: 'Neurological Disorders', subtitle: 'Alzheimer, Parkinson, epilepsy', icon: Activity, color: 'text-rose-400' },
+  { title: 'Brain Plasticity', subtitle: 'Neurogenesis, learning-induced remodeling', icon: Brain, color: 'text-purple-400' },
+] as const;
+
+const BRAIN_TABS = [
+  { id: 'overview' as const,  label: 'Overview'  },
+  { id: 'articles' as const,  label: 'Articles'  },
+  { id: 'research' as const,  label: 'Papers'    },
+] as const;
+
 // ── Brain Section — enhanced with live API data ───────────────────────────────
 function BrainSection({ lm }: { lm: boolean }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'articles' | 'research'>('overview');
 
-  const topics = [
-    { title: 'Cerebral Cortex', subtitle: 'Higher cognition, language, consciousness', icon: Brain, color: 'text-violet-400' },
-    { title: 'Neurons & Synapses', subtitle: 'Electrical signals, neurotransmitters, plasticity', icon: Zap, color: 'text-amber-400' },
-    { title: 'Memory Formation', subtitle: 'Hippocampus, LTP, short & long-term memory', icon: Brain, color: 'text-indigo-400' },
-    { title: 'Nervous System Divisions', subtitle: 'CNS vs PNS, autonomic, somatic', icon: Network, color: 'text-sky-400' },
-    { title: 'Neurological Disorders', subtitle: 'Alzheimer, Parkinson, epilepsy', icon: Activity, color: 'text-rose-400' },
-    { title: 'Brain Plasticity', subtitle: 'Neurogenesis, learning-induced remodeling', icon: Brain, color: 'text-purple-400' },
-  ];
-
-  const TABS = [
-    { id: 'overview' as const,  label: 'Overview'  },
-    { id: 'articles' as const,  label: 'Articles'  },
-    { id: 'research' as const,  label: 'Papers'    },
-  ];
+  const topics = BRAIN_TOPICS;
+  const TABS = BRAIN_TABS;
 
   return (
     <div>
@@ -582,7 +602,9 @@ const TOPIC_SECTION_IDS: BioSectionId[] = [
 // ─── Main switcher ────────────────────────────────────────────────────────────
 
 const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: BioMainContentProps) => {
-  const renderSection = () => {
+  // useMemo so the section JSX is only recomputed when the relevant inputs change,
+  // not on every parent re-render that passes the same props through.
+  const sectionNode = useMemo(() => {
     // ── Global search results (≥ 2 chars) ──
     if (searchQuery.trim().length >= 2) {
       return <BioSearchResults lm={lm} searchQuery={searchQuery} onClearSearch={onClearSearch} />;
@@ -604,7 +626,7 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: 
         }
         return <OverviewSection lm={lm} />;
     }
-  };
+  }, [lm, activeSection, searchQuery, onClearSearch]);
 
   return (
     <motion.main
@@ -616,7 +638,7 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: 
           key={searchQuery || activeSection}
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
-          {renderSection()}
+          {sectionNode}
         </motion.div>
       </AnimatePresence>
       <div className="h-8" />

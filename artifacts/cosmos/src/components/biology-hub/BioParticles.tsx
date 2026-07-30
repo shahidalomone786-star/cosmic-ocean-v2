@@ -3,6 +3,7 @@ import { useEffect, useRef, memo } from 'react';
 // ─── Biology Hub — Floating Particle Field ─────────────────────────────────────
 // Canvas-based particles: DNA dots, helices, and organic shapes
 // Runs at ~60 FPS using requestAnimationFrame
+// Pauses automatically via IntersectionObserver when scrolled out of view
 
 interface Particle {
   x: number;
@@ -81,9 +82,11 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 const BioParticles = memo(({ count = 60, className = '' }: BioParticlesProps) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef    = useRef<number>(0);
-  const particles = useRef<Particle[]>([]);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const rafRef      = useRef<number>(0);
+  const particles   = useRef<Particle[]>([]);
+  const isVisible   = useRef(true);   // tracks IntersectionObserver state
+  const isRunning   = useRef(false);  // guards against double-starting the loop
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,6 +94,7 @@ const BioParticles = memo(({ count = 60, className = '' }: BioParticlesProps) =>
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // ── Resize handler ───────────────────────────────────────────────────────
     const resize = () => {
       canvas.width  = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
@@ -103,7 +107,14 @@ const BioParticles = memo(({ count = 60, className = '' }: BioParticlesProps) =>
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
+    // ── Animation loop ───────────────────────────────────────────────────────
     const tick = () => {
+      // Stop loop if no longer visible
+      if (!isVisible.current) {
+        isRunning.current = false;
+        return;
+      }
+
       const { width: w, height: h } = canvas;
       ctx.clearRect(0, 0, w, h);
 
@@ -150,11 +161,30 @@ const BioParticles = memo(({ count = 60, className = '' }: BioParticlesProps) =>
       rafRef.current = requestAnimationFrame(tick);
     };
 
+    // ── IntersectionObserver — pause when off-screen ─────────────────────────
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        isVisible.current = entry.isIntersecting;
+        if (entry.isIntersecting && !isRunning.current) {
+          // Canvas came back into view — restart the loop
+          isRunning.current = true;
+          rafRef.current = requestAnimationFrame(tick);
+        }
+        // When not intersecting, `tick` stops itself on the next frame
+      },
+      { threshold: 0 }   // fires as soon as any pixel is visible/hidden
+    );
+    io.observe(canvas);
+
+    // Start the loop immediately (canvas starts visible)
+    isRunning.current = true;
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      isRunning.current = false;
       ro.disconnect();
+      io.disconnect();
     };
   }, [count]);
 
