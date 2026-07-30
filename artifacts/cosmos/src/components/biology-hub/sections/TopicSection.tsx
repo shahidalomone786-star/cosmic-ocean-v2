@@ -124,58 +124,133 @@ function highlight(text: string, query: string): string {
   return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
 }
 
-// ── Multi-item organs grid ────────────────────────────────────────────────────
-// Fetches individual Wikipedia summaries for multiple organs in parallel and
-// displays them as a visually-rich 2-column card grid with thumbnails.
+// ── Multi-item topic grid ─────────────────────────────────────────────────────
+// Fetches individual Wikipedia summaries for curated items and renders them as
+// a visually-rich 2-column card grid with thumbnails — used by ALL section tabs.
 
-interface OrganCard {
+interface GridItem {
   wikiTitle: string;
   label: string;
   emoji: string;
 }
 
-const ORGAN_ITEMS: OrganCard[] = [
-  { wikiTitle: 'Heart', label: 'Heart', emoji: '❤️' },
-  { wikiTitle: 'Lung', label: 'Lungs', emoji: '🫁' },
-  { wikiTitle: 'Liver', label: 'Liver', emoji: '🩺' },
-  { wikiTitle: 'Kidney', label: 'Kidneys', emoji: '🫘' },
-  { wikiTitle: 'Brain', label: 'Brain', emoji: '🧠' },
-  { wikiTitle: 'Skin', label: 'Skin', emoji: '🦠' },
-  { wikiTitle: 'Stomach', label: 'Stomach', emoji: '🫃' },
-  { wikiTitle: 'Pancreas', label: 'Pancreas', emoji: '🔬' },
-  { wikiTitle: 'Spleen', label: 'Spleen', emoji: '🫀' },
-  { wikiTitle: 'Intestine', label: 'Intestines', emoji: '🧬' },
-];
+const SECTION_GRID_ITEMS: Partial<Record<BioSectionId, GridItem[]>> = {
+  organs: [
+    { wikiTitle: 'Heart',      label: 'Heart',       emoji: '❤️' },
+    { wikiTitle: 'Lung',       label: 'Lungs',       emoji: '🫁' },
+    { wikiTitle: 'Liver',      label: 'Liver',       emoji: '🩺' },
+    { wikiTitle: 'Kidney',     label: 'Kidneys',     emoji: '🫘' },
+    { wikiTitle: 'Brain',      label: 'Brain',       emoji: '🧠' },
+    { wikiTitle: 'Skin',       label: 'Skin',        emoji: '🦠' },
+    { wikiTitle: 'Stomach',    label: 'Stomach',     emoji: '🫃' },
+    { wikiTitle: 'Pancreas',   label: 'Pancreas',    emoji: '🔬' },
+    { wikiTitle: 'Spleen',     label: 'Spleen',      emoji: '🫀' },
+    { wikiTitle: 'Intestine',  label: 'Intestines',  emoji: '🧬' },
+  ],
+  'body-systems': [
+    { wikiTitle: 'Circulatory_system',     label: 'Circulatory System',     emoji: '🫀' },
+    { wikiTitle: 'Respiratory_system',     label: 'Respiratory System',     emoji: '🫁' },
+    { wikiTitle: 'Human_digestive_system', label: 'Digestive System',       emoji: '🍽️' },
+    { wikiTitle: 'Nervous_system',         label: 'Nervous System',         emoji: '🧠' },
+    { wikiTitle: 'Endocrine_system',       label: 'Endocrine System',       emoji: '🔬' },
+    { wikiTitle: 'Immune_system',          label: 'Immune System',          emoji: '🛡️' },
+    { wikiTitle: 'Musculoskeletal_system', label: 'Musculoskeletal System', emoji: '💪' },
+  ],
+  skeleton: [
+    { wikiTitle: 'Skull',             label: 'Skull',            emoji: '💀' },
+    { wikiTitle: 'Vertebral_column',  label: 'Vertebral Column', emoji: '🦴' },
+    { wikiTitle: 'Rib_cage',          label: 'Ribcage',          emoji: '🫁' },
+    { wikiTitle: 'Femur',             label: 'Femur',            emoji: '🦵' },
+    { wikiTitle: 'Pelvis',            label: 'Pelvis',           emoji: '🦴' },
+    { wikiTitle: 'Joint',             label: 'Joints',           emoji: '🔗' },
+  ],
+  muscles: [
+    { wikiTitle: 'Skeletal_muscle',             label: 'Skeletal Muscle', emoji: '💪' },
+    { wikiTitle: 'Cardiac_muscle',              label: 'Cardiac Muscle',  emoji: '❤️' },
+    { wikiTitle: 'Smooth_muscle_tissue',        label: 'Smooth Muscle',   emoji: '〰️' },
+    { wikiTitle: 'Biceps',                      label: 'Biceps',          emoji: '💪' },
+    { wikiTitle: 'Quadriceps_femoris_muscle',   label: 'Quadriceps',      emoji: '🦵' },
+    { wikiTitle: 'Tendon',                      label: 'Tendons',         emoji: '🔗' },
+  ],
+  cells: [
+    { wikiTitle: 'Cell_(biology)',  label: 'Cell Biology',   emoji: '🔬' },
+    { wikiTitle: 'Stem_cell',       label: 'Stem Cells',     emoji: '🧬' },
+    { wikiTitle: 'Red_blood_cell',  label: 'Red Blood Cell', emoji: '🔴' },
+    { wikiTitle: 'Neuron',          label: 'Neurons',        emoji: '⚡' },
+    { wikiTitle: 'Mitochondrion',   label: 'Mitochondria',   emoji: '⚡' },
+    { wikiTitle: 'Cell_membrane',   label: 'Cell Membrane',  emoji: '🔵' },
+  ],
+  genetics: [
+    { wikiTitle: 'Gene',                   label: 'Genes',                 emoji: '🧬' },
+    { wikiTitle: 'Chromosome',             label: 'Chromosomes',           emoji: '🔬' },
+    { wikiTitle: 'Mutation',               label: 'Mutations',             emoji: '⚡' },
+    { wikiTitle: 'Epigenetics',            label: 'Epigenetics',           emoji: '🔑' },
+    { wikiTitle: 'Mendelian_inheritance',  label: 'Mendelian Inheritance', emoji: '📊' },
+    { wikiTitle: 'CRISPR',                 label: 'CRISPR',                emoji: '✂️' },
+  ],
+  microbiology: [
+    { wikiTitle: 'Bacteria',              label: 'Bacteria',              emoji: '🦠' },
+    { wikiTitle: 'Fungus',               label: 'Fungi',                 emoji: '🍄' },
+    { wikiTitle: 'Archaea',              label: 'Archaea',               emoji: '🔬' },
+    { wikiTitle: 'Microbiome',           label: 'Microbiome',            emoji: '🧫' },
+    { wikiTitle: 'Antimicrobial_resistance', label: 'Antibiotic Resistance', emoji: '💊' },
+    { wikiTitle: 'Biofilm',              label: 'Biofilms',              emoji: '🌊' },
+  ],
+  viruses: [
+    { wikiTitle: 'Virus',           label: 'Viruses',       emoji: '🦠' },
+    { wikiTitle: 'Bacteriophage',   label: 'Bacteriophage', emoji: '🔬' },
+    { wikiTitle: 'RNA_virus',       label: 'RNA Viruses',   emoji: '🧬' },
+    { wikiTitle: 'DNA_virus',       label: 'DNA Viruses',   emoji: '🔵' },
+    { wikiTitle: 'Coronavirus',     label: 'Coronavirus',   emoji: '⚡' },
+    { wikiTitle: 'Vaccine',         label: 'Vaccines',      emoji: '💉' },
+  ],
+  evolution: [
+    { wikiTitle: 'Natural_selection', label: 'Natural Selection', emoji: '🌿' },
+    { wikiTitle: 'Speciation',        label: 'Speciation',        emoji: '🌳' },
+    { wikiTitle: 'Genetic_drift',     label: 'Genetic Drift',     emoji: '〰️' },
+    { wikiTitle: 'Common_descent',    label: 'Common Descent',    emoji: '🦕' },
+    { wikiTitle: 'Adaptation',        label: 'Adaptation',        emoji: '🔄' },
+    { wikiTitle: 'Phylogenetics',     label: 'Phylogenetics',     emoji: '🌲' },
+  ],
+  biochemistry: [
+    { wikiTitle: 'Enzyme',                    label: 'Enzymes',            emoji: '⚗️' },
+    { wikiTitle: 'Protein',                   label: 'Proteins',           emoji: '🔬' },
+    { wikiTitle: 'Adenosine_triphosphate',    label: 'ATP',                emoji: '⚡' },
+    { wikiTitle: 'Metabolic_pathway',         label: 'Metabolic Pathways', emoji: '🔄' },
+    { wikiTitle: 'Lipid',                     label: 'Lipids',             emoji: '💧' },
+    { wikiTitle: 'Carbohydrate',              label: 'Carbohydrates',      emoji: '🌾' },
+  ],
+};
 
-interface OrganData {
+interface WikiItemData {
   title: string;
   extract: string;
   thumbnail?: { source: string };
   content_urls?: { desktop?: { page?: string } };
 }
 
-function SingleOrganCard({
-  lm, organ, accentBg, accentBorder, delay,
+function SingleTopicCard({
+  lm, item, accentBg, accentBorder, delay,
 }: {
-  lm: boolean; organ: OrganCard; accentBg: string; accentBorder: string; delay: number;
+  lm: boolean; item: GridItem; accentBg: string; accentBorder: string; delay: number;
 }) {
-  const [data, setData] = useState<OrganData | null>(null);
+  const [data, setData] = useState<WikiItemData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const ctrl = new AbortController();
     fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(organ.wikiTitle)}`,
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(item.wikiTitle)}`,
       { signal: ctrl.signal, headers: { Accept: 'application/json' } }
     )
-      .then((r) => r.ok ? r.json() as Promise<OrganData> : Promise.reject(r.status))
+      .then((r) => r.ok ? r.json() as Promise<WikiItemData> : Promise.reject(r.status))
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => { setLoading(false); });
     return () => ctrl.abort();
-  }, [organ.wikiTitle]);
+  }, [item.wikiTitle]);
 
   const wikiUrl = data?.content_urls?.desktop?.page
-    ?? `https://en.wikipedia.org/wiki/${organ.wikiTitle}`;
+    ?? `https://en.wikipedia.org/wiki/${item.wikiTitle}`;
 
   if (loading) {
     return (
@@ -200,7 +275,7 @@ function SingleOrganCard({
       {data?.thumbnail?.source ? (
         <div className="relative h-28 overflow-hidden">
           <img
-            src={data.thumbnail.source} alt={organ.label}
+            src={data.thumbnail.source} alt={item.label}
             className="w-full h-full object-cover"
             style={{ filter: lm ? 'none' : 'brightness(0.72) saturate(0.85)' }}
           />
@@ -208,13 +283,13 @@ function SingleOrganCard({
             background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)',
           }} />
           <span className="absolute bottom-2 left-2.5 text-[13px] font-bold text-white drop-shadow">
-            {organ.label}
+            {item.label}
           </span>
         </div>
       ) : (
         <div className="h-16 flex items-center justify-center text-3xl"
           style={{ background: lm ? 'rgba(52,211,153,0.08)' : 'rgba(52,211,153,0.07)' }}>
-          {organ.emoji}
+          {item.emoji}
         </div>
       )}
 
@@ -223,7 +298,7 @@ function SingleOrganCard({
         {!data?.thumbnail?.source && (
           <p className="text-[12px] font-semibold mb-1"
             style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}>
-            {organ.label}
+            {item.label}
           </p>
         )}
         <p className="text-[10px] leading-relaxed line-clamp-3"
@@ -232,7 +307,7 @@ function SingleOrganCard({
         </p>
         <div className="mt-2 flex items-center gap-1">
           <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
-            style={{ background: accentBg, border: `1px solid ${accentBorder}`, color: lm ? '#065f46' : '#f87171' }}>
+            style={{ background: accentBg, border: `1px solid ${accentBorder}`, color: lm ? '#065f46' : '#34d399' }}>
             Wikipedia
           </span>
         </div>
@@ -241,20 +316,20 @@ function SingleOrganCard({
   );
 }
 
-function OrgansOverviewGrid({ lm, accentBg, accentBorder }: {
-  lm: boolean; accentBg: string; accentBorder: string;
+function TopicOverviewGrid({ lm, items, label, accentBg, accentBorder }: {
+  lm: boolean; items: GridItem[]; label: string; accentBg: string; accentBorder: string;
 }) {
   return (
     <div>
       <p className="text-[9px] uppercase tracking-[0.2em] mb-3 font-semibold"
         style={{ color: lm ? 'rgba(6,78,59,0.38)' : 'rgba(255,255,255,0.28)' }}>
-        Human Organs — Click any card to explore on Wikipedia
+        {label} — Click any card to explore on Wikipedia
       </p>
       <div className="grid grid-cols-2 gap-3">
-        {ORGAN_ITEMS.map((organ, i) => (
-          <SingleOrganCard
-            key={organ.wikiTitle}
-            lm={lm} organ={organ}
+        {items.map((item, i) => (
+          <SingleTopicCard
+            key={item.wikiTitle}
+            lm={lm} item={item}
             accentBg={accentBg} accentBorder={accentBorder}
             delay={i * 0.06}
           />
@@ -673,7 +748,6 @@ function RelatedTopics({
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TopicSection({ lm, sectionId }: TopicSectionProps) {
   const [tab, setTab] = useState<TopicTab>('overview');
-  const [relatedQuery, setRelatedQuery] = useState<string | null>(null);
   const config = TOPIC_CONFIG[sectionId];
 
   const cfg: TopicConfig = config ?? {
@@ -684,7 +758,8 @@ export default function TopicSection({ lm, sectionId }: TopicSectionProps) {
     accentBorder: 'rgba(52,211,153,0.2)',
   };
 
-  const activeQuery = relatedQuery ?? cfg.searchQuery;
+  const activeQuery = cfg.searchQuery;
+  const gridItems = SECTION_GRID_ITEMS[sectionId];
 
   const TABS: { id: TopicTab; label: string }[] = [
     { id: 'overview',  label: 'Overview'  },
@@ -717,40 +792,21 @@ export default function TopicSection({ lm, sectionId }: TopicSectionProps) {
         {tab === 'overview' ? (
           <motion.div key="overview" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-            {/* Organs gets a rich multi-card gallery instead of a single article */}
-            {sectionId === 'organs' ? (
-              <OrgansOverviewGrid lm={lm} accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
+            {/* All sections get a rich multi-card grid when items are defined */}
+            {gridItems ? (
+              <TopicOverviewGrid
+                lm={lm} items={gridItems}
+                label={cfg.wikiTitle.replace(/_/g, ' ')}
+                accentBg={cfg.accentBg} accentBorder={cfg.accentBorder}
+              />
             ) : (
               <WikiOverview lm={lm} wikiTitle={cfg.wikiTitle}
                 accentColor={cfg.accentColor} accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
-            )}
-            {cfg.relatedTopics && (
-              <RelatedTopics
-                lm={lm} topics={cfg.relatedTopics}
-                accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} accentColor={cfg.accentColor}
-                onTopicClick={(t) => {
-                  setRelatedQuery(t);
-                  setTab('articles');
-                }}
-              />
             )}
           </motion.div>
         ) : tab === 'articles' ? (
           <motion.div key="articles" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-            {relatedQuery && (
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-[10px] px-2.5 py-1 rounded-full font-medium"
-                  style={{ background: cfg.accentBg, border: `1px solid ${cfg.accentBorder}`, color: lm ? '#065f46' : '#34d399' }}>
-                  {relatedQuery}
-                </span>
-                <button onClick={() => setRelatedQuery(null)}
-                  className="text-[9px] underline"
-                  style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(255,255,255,0.3)' }}>
-                  Reset
-                </button>
-              </div>
-            )}
             <ArticlesPanel lm={lm} searchQuery={activeQuery}
               accentBg={cfg.accentBg} accentBorder={cfg.accentBorder} />
           </motion.div>

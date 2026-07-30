@@ -526,23 +526,27 @@ body {
  * Crossfade: incoming image fades from opacity 0 to 1.
  * CSS animation so the transition lives entirely on the GPU compositor.
  */
+/**
+ * Crossfade + Ken Burns on the incoming layer: fades in while gently zooming.
+ * Pure opacity + transform — compositor-only, zero layout cost.
+ */
 @keyframes banner-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: scale(1.00); }
+  to   { opacity: 1; transform: scale(1.05); }
 }
 
 /**
- * Ken Burns: subtle, slow zoom on the base layer image.
- * Pure transform — zero layout cost, stays on GPU.
- * Duration is SHOW_MS (3s) + FADE_MS (0.95s) ≈ 4s so it never loops mid-slide.
+ * Ken Burns on the base (already-visible) layer: continues zooming slowly
+ * for the full slide duration so there is always motion even when idle.
  */
 @keyframes banner-ken-burns {
   from { transform: scale(1.00); }
-  to   { transform: scale(1.045); }
+  to   { transform: scale(1.05); }
 }
 
 .banner-ken-burns {
   animation: banner-ken-burns 4s ease-out forwards;
+  transform-origin: center center;
 }
 
 /* ── Cosmos video loading spinner ─────────────────────────────────────────── */

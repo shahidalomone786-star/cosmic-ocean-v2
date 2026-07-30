@@ -81,7 +81,7 @@ function BannerCarousel({ lm }: { lm?: boolean }) {
           draggable={false}
           loading="eager"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover banner-ken-burns"
         />
 
         {/* ── Incoming layer ── fades in over the base, then unmounts */}
