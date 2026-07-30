@@ -1998,6 +1998,20 @@ export default function App() {
   const [isLoadingMore,    setIsLoadingMore]    = useState(false);
   const [selectedCard,     setSelectedCard]     = useState<UnifiedItem | null>(null);
   const [searchSections,   setSearchSections]   = useState<SearchSections | null>(null);
+
+  // ── Recent searches (localStorage) ───────────────────────────────────────
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('cosmos_recent_searches') ?? '[]') as string[]; }
+    catch { return []; }
+  });
+
+  const saveRecentSearch = useCallback((term: string) => {
+    setRecentSearches(prev => {
+      const next = [term, ...prev.filter(s => s.toLowerCase() !== term.toLowerCase())].slice(0, 5);
+      try { localStorage.setItem('cosmos_recent_searches', JSON.stringify(next)); } catch { /* storage full */ }
+      return next;
+    });
+  }, []);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // ── Portal prefetch state ──────────────────────────────────────────────────
@@ -2118,6 +2132,7 @@ export default function App() {
       setVideoResults(data.videos ?? []);
       setVideoStatus('done');
       setSearchStatus('done');
+      saveRecentSearch(term);
     } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('[searchAll]', err);
       // Degrade gracefully: show empty results, never crash
@@ -2518,30 +2533,88 @@ export default function App() {
                 hasSearchResults ? 'max-w-2xl' : 'max-w-md'
               }`}
             >
-              <div className={`w-full backdrop-blur-[32px] rounded-full px-5 py-3.5 flex items-center gap-3 transition-all duration-300 ${
-                lm
-                  ? 'bg-white/[0.60] border border-black/[0.09] shadow-[0_0_0_1px_rgba(0,0,0,0.04),0_8px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] focus-within:border-black/[0.16] focus-within:bg-white/[0.74] focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_10px_48px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)]'
-                  : 'bg-white/[0.055] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_8px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-violet-400/[0.28] focus-within:bg-white/[0.075] focus-within:shadow-[0_0_0_1px_rgba(167,139,250,0.10),0_8px_48px_rgba(0,0,0,0.75),0_0_28px_rgba(139,92,246,0.09),inset_0_1px_0_rgba(255,255,255,0.12)]'
-              }`}>
-                <Search
-                  size={16}
-                  strokeWidth={2}
-                  className={`flex-shrink-0 transition-colors duration-200 ${
-                    lm ? 'text-slate-400' : 'text-white/30'
-                  }`}
-                />
-                <input
-                  type="text"
-                  value={nasaQuery}
-                  placeholder={typedPlaceholder || 'Search the cosmos…'}
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => setFocused(false)}
-                  onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
-                  onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
-                  className={`flex-1 bg-transparent outline-none text-[15px] tracking-wide font-light leading-relaxed ${
-                    lm ? 'text-slate-900 placeholder-slate-400/75' : 'text-white/95 placeholder-white/28'
-                  }`}
-                />
+              {/* Search pill + recent searches dropdown wrapper */}
+              <div className="relative w-full">
+                <div className={`w-full backdrop-blur-[32px] rounded-full px-5 py-3.5 flex items-center gap-3 transition-all duration-300 ${
+                  lm
+                    ? 'bg-white/[0.60] border border-black/[0.09] shadow-[0_0_0_1px_rgba(0,0,0,0.04),0_8px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] focus-within:border-black/[0.16] focus-within:bg-white/[0.74] focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_10px_48px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)]'
+                    : 'bg-white/[0.055] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_8px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-violet-400/[0.28] focus-within:bg-white/[0.075] focus-within:shadow-[0_0_0_1px_rgba(167,139,250,0.10),0_8px_48px_rgba(0,0,0,0.75),0_0_28px_rgba(139,92,246,0.09),inset_0_1px_0_rgba(255,255,255,0.12)]'
+                }`}>
+                  <Search
+                    size={16}
+                    strokeWidth={2}
+                    className={`flex-shrink-0 transition-colors duration-200 ${
+                      lm ? 'text-slate-400' : 'text-white/30'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    value={nasaQuery}
+                    placeholder={typedPlaceholder || 'Search the cosmos…'}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
+                    onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
+                    className={`flex-1 bg-transparent outline-none text-[15px] tracking-wide font-light leading-relaxed ${
+                      lm ? 'text-slate-900 placeholder-slate-400/75' : 'text-white/95 placeholder-white/28'
+                    }`}
+                  />
+                </div>
+
+                {/* Recent searches dropdown */}
+                <AnimatePresence>
+                  {focused && !nasaQuery.trim() && recentSearches.length > 0 && (
+                    <motion.div
+                      key="recent-searches"
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                      className={`absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl border overflow-hidden ${
+                        lm
+                          ? 'bg-white/90 border-black/[0.08] shadow-[0_12px_48px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.03)] backdrop-blur-xl'
+                          : 'bg-[#0d0d1e]/90 border-white/[0.09] shadow-[0_12px_48px_rgba(0,0,0,0.75)] backdrop-blur-xl'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className={`flex items-center justify-between px-4 pt-3 pb-2 ${lm ? 'border-b border-black/[0.06]' : 'border-b border-white/[0.06]'}`}>
+                        <span className={`text-[9px] uppercase tracking-[0.22em] font-semibold ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                          Recent Searches
+                        </span>
+                        <button
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setRecentSearches([]);
+                            try { localStorage.removeItem('cosmos_recent_searches'); } catch { /* noop */ }
+                          }}
+                          className={`text-[9px] uppercase tracking-[0.16em] transition-colors duration-150 ${lm ? 'text-gray-300 hover:text-gray-600' : 'text-white/20 hover:text-white/55'}`}
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      {/* Chips */}
+                      <div className="flex flex-col py-1.5">
+                        {recentSearches.map((s, i) => (
+                          <button
+                            key={s}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setNasaQuery(s); searchAll(s); setFocused(false); }}
+                            className={`group flex items-center gap-3 px-4 py-2.5 text-left transition-all duration-150 ${
+                              lm
+                                ? 'hover:bg-black/[0.04] text-gray-700 hover:text-gray-900'
+                                : 'hover:bg-white/[0.05] text-white/60 hover:text-white/90'
+                            }`}
+                          >
+                            <Search size={11} strokeWidth={2} className={`flex-shrink-0 ${lm ? 'text-gray-300 group-hover:text-gray-500' : 'text-white/18 group-hover:text-white/45'} transition-colors duration-150`} />
+                            <span className="flex-1 text-[13px] font-light tracking-wide truncate">{s}</span>
+                            <span className={`flex-shrink-0 text-[8.5px] uppercase tracking-[0.18em] ${lm ? 'text-gray-300' : 'text-white/18'}`}>#{i + 1}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="flex flex-wrap justify-center gap-2.5">

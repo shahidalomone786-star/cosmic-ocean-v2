@@ -5,6 +5,7 @@ import {
   Film, LayoutGrid, Telescope, X, Sparkles, Search,
   FlaskConical, Database, Library, Tags, Satellite,
   ExternalLink, ChevronRight, ChevronLeft, ChevronDown,
+  Copy, Check,
   type LucideIcon,
 } from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
@@ -132,6 +133,79 @@ function extSourceCfg(source: string) {
     darkCls: 'bg-white/[0.07] border-white/[0.12] text-white/60',
     lightCls: 'bg-gray-50 border-gray-200 text-gray-600',
   };
+}
+
+// ─── HighlightText — case-insensitive query keyword highlighting ───────────────
+function HighlightText({ text, query, className }: {
+  text: string; query?: string; className?: string;
+}) {
+  if (!query || !query.trim()) return <span className={className}>{text}</span>;
+
+  const words = query.trim().split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 0) return <span className={className}>{text}</span>;
+
+  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+
+  return (
+    <span className={className}>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark
+            key={i}
+            className="bg-transparent font-semibold"
+            style={{ color: 'rgb(196,181,253)', textShadow: '0 0 10px rgba(167,139,250,0.55)' }}
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+}
+
+// ─── CiteButton — BibTeX clipboard with "Copied!" micro-interaction ───────────
+function CiteButton({ item, lm }: { item: SectionItem; lm?: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCite = useCallback((e: { stopPropagation: () => void; preventDefault: () => void }) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const year = item.date ? item.date.slice(0, 4) : '';
+    const firstAuthor = (item.authors?.[0] ?? '').split(/\s+/).pop()?.toLowerCase() ?? 'unknown';
+    const titleWord = (item.title.split(/\s+/)[0] ?? '').toLowerCase().replace(/[^a-z]/g, '') || 'paper';
+    const key = `${firstAuthor}${year}${titleWord}`;
+    const authorStr = item.authors && item.authors.length > 0 ? item.authors.join(' and ') : 'Unknown';
+    const bibtex = `@article{${key},\n  title  = {${item.title}},\n  author = {${authorStr}},\n  year   = {${year}},\n  url    = {${item.url ?? ''}}\n}`;
+    navigator.clipboard.writeText(bibtex).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }).catch(() => {/* clipboard denied — silently skip */});
+  }, [item]);
+
+  return (
+    <button
+      onClick={handleCite}
+      aria-label="Copy BibTeX citation"
+      className={`flex-shrink-0 inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border transition-all duration-200 ${
+        copied
+          ? lm
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
+            : 'bg-emerald-500/20 border-emerald-400/35 text-emerald-300'
+          : lm
+            ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
+            : 'bg-white/[0.05] border-white/[0.10] text-white/40 hover:bg-violet-500/15 hover:border-violet-400/30 hover:text-violet-300'
+      }`}
+    >
+      {copied
+        ? <><Check size={7} strokeWidth={2.5} />Copied!</>
+        : <><Copy size={7} strokeWidth={2.5} />Cite</>
+      }
+    </button>
+  );
 }
 
 // ─── Topic cover illustrations (pure CSS — zero external deps) ────────────────
@@ -437,8 +511,8 @@ function AISummaryCard({ text, lm }: { text: string; lm?: boolean }) {
 }
 
 // ─── Section item card (Wikipedia / NASA / ESA) — premium Apple-quality ───────
-function SectionItemCard({ item, idx, onOpen, lm }: {
-  item: SectionItem; idx: number; onOpen: () => void; lm?: boolean;
+function SectionItemCard({ item, idx, onOpen, lm, query }: {
+  item: SectionItem; idx: number; onOpen: () => void; lm?: boolean; query?: string;
 }) {
   const statusBadges = getStatusBadges(item.source);
   const cfg = extSourceCfg(item.source);
@@ -498,9 +572,11 @@ function SectionItemCard({ item, idx, onOpen, lm }: {
         </p>
         {/* Description */}
         {item.description && (
-          <p className={`text-[11.5px] leading-relaxed line-clamp-3 flex-1 ${lm ? 'text-gray-500' : 'text-white/40'}`}>
-            {item.description}
-          </p>
+          <HighlightText
+            text={item.description}
+            query={query}
+            className={`text-[11.5px] leading-relaxed line-clamp-3 flex-1 ${lm ? 'text-gray-500' : 'text-white/40'}`}
+          />
         )}
         {/* Footer — source label + Open button */}
         <div className="flex items-center justify-between mt-3 pt-2.5 gap-2"
@@ -542,8 +618,8 @@ function ResearchThumb({ source, lm }: { source: string; lm?: boolean }) {
 }
 
 // ─── Research / Book row card ──────────────────────────────────────────────────
-function ResearchRowCard({ item, idx, onOpen, lm }: {
-  item: SectionItem; idx: number; onOpen: () => void; lm?: boolean;
+function ResearchRowCard({ item, idx, onOpen, lm, query }: {
+  item: SectionItem; idx: number; onOpen: () => void; lm?: boolean; query?: string;
 }) {
   const statusBadges = getStatusBadges(item.source);
 
@@ -581,7 +657,11 @@ function ResearchRowCard({ item, idx, onOpen, lm }: {
         </p>
         {/* Description */}
         {item.description && (
-          <p className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/35'}`}>{item.description}</p>
+          <HighlightText
+            text={item.description}
+            query={query}
+            className={`text-[11px] leading-relaxed line-clamp-2 ${lm ? 'text-gray-500' : 'text-white/35'}`}
+          />
         )}
         {/* Meta row */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -600,21 +680,24 @@ function ResearchRowCard({ item, idx, onOpen, lm }: {
               {item.citationCount.toLocaleString()} citations
             </span>
           )}
-          {/* Open button — pushed right */}
-          <a
-            href={item.url ?? '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            aria-label={`Open ${item.title}`}
-            className={`ml-auto flex-shrink-0 inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border transition-all duration-200 ${
-              lm
-                ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
-                : 'bg-white/[0.05] border-white/[0.10] text-white/40 hover:bg-white/[0.12] hover:border-white/[0.22] hover:text-white/85'
-            }`}
-          >
-            Open <ExternalLink size={7} strokeWidth={2.5} />
-          </a>
+          {/* Action buttons — pushed right */}
+          <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+            <CiteButton item={item} lm={lm} />
+            <a
+              href={item.url ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              aria-label={`Open ${item.title}`}
+              className={`flex-shrink-0 inline-flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border transition-all duration-200 ${
+                lm
+                  ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
+                  : 'bg-white/[0.05] border-white/[0.10] text-white/40 hover:bg-white/[0.12] hover:border-white/[0.22] hover:text-white/85'
+              }`}
+            >
+              Open <ExternalLink size={7} strokeWidth={2.5} />
+            </a>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -1612,7 +1695,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'wikipedia' ? (
@@ -1626,7 +1709,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {sections.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {sections.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'research' ? (
@@ -1640,7 +1723,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'nasa' ? (
@@ -1654,7 +1737,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'esa' ? (
@@ -1668,7 +1751,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {sections.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {sections.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'books' ? (

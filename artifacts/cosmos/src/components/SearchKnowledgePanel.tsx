@@ -137,6 +137,7 @@ interface CovItem {
   bgLight: string;
   borderDark: string;
   borderLight: string;
+  tooltip: string;
 }
 
 export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
@@ -151,6 +152,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(254,242,242)',
       borderDark: 'rgba(239,68,68,0.16)',
       borderLight: 'rgb(254,202,202)',
+      tooltip: 'YouTube science videos from curated channels',
     },
     {
       icon: BookOpen,
@@ -162,6 +164,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(255,251,235)',
       borderDark: 'rgba(251,191,36,0.14)',
       borderLight: 'rgb(253,230,138)',
+      tooltip: 'Wikipedia: Community-built free encyclopedia',
     },
     {
       icon: FileText,
@@ -173,6 +176,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(236,253,245)',
       borderDark: 'rgba(52,211,153,0.14)',
       borderLight: 'rgb(167,243,208)',
+      tooltip: 'arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP',
     },
     {
       icon: Globe,
@@ -184,6 +188,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(240,249,255)',
       borderDark: 'rgba(56,189,248,0.14)',
       borderLight: 'rgb(186,230,253)',
+      tooltip: 'NASA: Official space imagery and mission data',
     },
     {
       icon: Satellite,
@@ -195,6 +200,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(238,242,255)',
       borderDark: 'rgba(129,140,248,0.14)',
       borderLight: 'rgb(199,210,254)',
+      tooltip: 'ESA Hubble: European Space Agency telescope imagery',
     },
     {
       icon: Library,
@@ -206,6 +212,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(253,242,248)',
       borderDark: 'rgba(244,114,182,0.14)',
       borderLight: 'rgb(251,207,232)',
+      tooltip: 'OpenAlex: Academic books and peer-reviewed works',
     },
     {
       icon: Sparkles,
@@ -217,6 +224,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(245,243,255)',
       borderDark: 'rgba(167,139,250,0.16)',
       borderLight: 'rgb(221,214,254)',
+      tooltip: 'Groq AI: Synthesized overview from all sources',
     },
     {
       icon: Tags,
@@ -228,6 +236,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
       bgLight: 'rgb(248,250,252)',
       borderDark: 'rgba(148,163,184,0.12)',
       borderLight: 'rgb(226,232,240)',
+      tooltip: 'Related topics extracted from research metadata',
     },
   ], [sections]);
 
@@ -261,7 +270,7 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
               initial={{ opacity: 0, scale: 0.88 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.25, delay: i * 0.03, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200"
+              className="group relative flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-default"
               style={{
                 background: lm ? item.bgLight : item.bgDark,
                 borderColor: lm ? item.borderLight : item.borderDark,
@@ -275,6 +284,29 @@ export function KnowledgeCoverage({ sections, lm }: KnowledgeCoverageProps) {
               >
                 {item.count}
               </span>
+
+              {/* Tooltip */}
+              <div
+                className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-50
+                  opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap"
+                role="tooltip"
+              >
+                <div className={`text-[10.5px] leading-snug px-2.5 py-1.5 rounded-lg border shadow-xl ${
+                  lm
+                    ? 'bg-white border-gray-200/80 text-gray-700 shadow-black/[0.10]'
+                    : 'bg-[#0e0e1f] border-white/[0.13] text-white/80 shadow-black/70'
+                }`}>
+                  {item.tooltip}
+                </div>
+                {/* Arrow */}
+                <div className="flex justify-center">
+                  <div className={`w-2 h-1 overflow-hidden`}>
+                    <div className={`w-2 h-2 rotate-45 -translate-y-1 border-r border-b ${
+                      lm ? 'bg-white border-gray-200/80' : 'bg-[#0e0e1f] border-white/[0.13]'
+                    }`} />
+                  </div>
+                </div>
+              </div>
             </motion.div>
           );
         })}
