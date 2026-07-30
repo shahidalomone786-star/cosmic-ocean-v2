@@ -1,4 +1,4 @@
-import { useState, useRef, memo } from 'react';
+import { useState, useRef, memo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Layers3, Heart, Network, Zap, Brain, Microscope,
@@ -17,6 +17,25 @@ interface BiologyHubProps {
   onToggleLm: () => void;
   onClose: () => void;
 }
+
+const DEBOUNCE_MS = 350;
+const MAX_RECENT = 8;
+
+// Suggested biology searches shown in dropdown
+const SUGGESTED_SEARCHES = [
+  'DNA replication',
+  'cell membrane',
+  'human organs',
+  'neural pathways',
+  'protein synthesis',
+  'evolution natural selection',
+  'mitochondria function',
+  'CRISPR gene editing',
+  'immune response',
+  'photosynthesis',
+  'cancer biology',
+  'neurotransmitters',
+];
 
 // Icon lookup for mobile nav chips
 const MOBILE_ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
@@ -60,7 +79,6 @@ function MobileNav({
               key={item.id}
               onClick={() => {
                 onSelect(item.id);
-                // Scroll active chip into view
                 const btn = document.getElementById(`mob-nav-${item.id}`);
                 btn?.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' });
               }}
@@ -122,12 +140,52 @@ function MobileNav({
 // ─── Main component ────────────────────────────────────────────────────────────
 const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
   const [activeSection, setActiveSection] = useState<BioSectionId>('3d-anatomy');
-  const [searchQuery,   setSearchQuery]   = useState('');
 
-  const handleSelect = (id: BioSectionId) => {
+  // Raw input value (what the user sees in the box — updated immediately)
+  const [inputQuery, setInputQuery] = useState('');
+  // Debounced value (used to trigger API calls — lags behind by DEBOUNCE_MS)
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  // Recent searches list
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce the input query
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(inputQuery);
+    }, DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [inputQuery]);
+
+  // When debounced query settles to a meaningful value, record it in recent searches
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (q.length >= 3) {
+      setRecentSearches((prev) => {
+        const deduped = [q, ...prev.filter((r) => r.toLowerCase() !== q.toLowerCase())];
+        return deduped.slice(0, MAX_RECENT);
+      });
+    }
+  }, [debouncedQuery]);
+
+  const handleSearchChange = useCallback((q: string) => {
+    setInputQuery(q);
+  }, []);
+
+  const handleSearchSelect = useCallback((q: string) => {
+    setInputQuery(q);
+    setDebouncedQuery(q);
+  }, []);
+
+  const handleSelect = useCallback((id: BioSectionId) => {
     setActiveSection(id);
-    setSearchQuery('');
-  };
+    setInputQuery('');
+    setDebouncedQuery('');
+  }, []);
 
   return (
     <motion.div
@@ -172,8 +230,11 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
         lm={lm}
         onToggleLm={onToggleLm}
         onClose={onClose}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchQuery={inputQuery}
+        onSearchChange={handleSearchChange}
+        onSearchSelect={handleSearchSelect}
+        recentSearches={recentSearches}
+        suggestedSearches={SUGGESTED_SEARCHES}
       />
 
       {/* ── Mobile horizontal scroll nav (hidden sm+) ── */}
@@ -198,7 +259,7 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
         <BioMainContent
           lm={lm}
           activeSection={activeSection}
-          searchQuery={searchQuery}
+          searchQuery={debouncedQuery}
         />
       </div>
     </motion.div>

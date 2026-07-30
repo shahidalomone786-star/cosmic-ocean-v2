@@ -2,7 +2,7 @@ import { Router } from "express";
 
 const router = Router();
 
-const TIMEOUT_MS = 8_000;
+const TIMEOUT_MS = 10_000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ function stripHtml(s: string): string {
 
 function reconstructAbstract(
   invIdx: Record<string, number[]> | null | undefined,
-  maxLen = 450
+  maxLen = 500
 ): string {
   if (!invIdx) return "";
   const positions: [number, string][] = [];
@@ -33,6 +33,36 @@ function reconstructAbstract(
   return abstract.length > maxLen
     ? abstract.slice(0, maxLen) + "…"
     : abstract;
+}
+
+// ── Synonym / expansion map ───────────────────────────────────────────────────
+// Enrich short queries so Wikipedia and OpenAlex return richer result sets.
+
+const SYNONYM_MAP: Record<string, string> = {
+  organs: "human organs anatomy physiology heart lung kidney liver",
+  organ: "human organ anatomy physiology function",
+  brain: "human brain neuroscience cognition neural cortex",
+  neurons: "neurons synapses neurotransmitters neural signaling",
+  neuron: "neuron synapse action potential neurotransmitter",
+  cells: "cell biology eukaryotic cell organelles membrane",
+  cell: "cell biology organelle membrane mitochondria",
+  dna: "DNA genetics genome replication transcription",
+  genetics: "genetics heredity gene expression mutation inheritance",
+  microbiology: "microbiology bacteria microorganism prokaryote pathogen",
+  evolution: "evolution natural selection adaptation speciation phylogeny",
+  biochemistry: "biochemistry enzyme metabolism protein ATP",
+  viruses: "virology virus infection replication immune response",
+  virus: "virus virology viral replication pathogen",
+  skeleton: "human skeleton bone anatomy skeletal system",
+  muscles: "muscle anatomy skeletal smooth cardiac myocyte",
+  muscle: "muscle fiber contraction myosin actin",
+  "body-systems": "human body systems physiology homeostasis",
+  "body systems": "human body systems physiology circulatory respiratory",
+};
+
+function expandQuery(q: string): string {
+  const lower = q.toLowerCase().trim();
+  return SYNONYM_MAP[lower] ?? q;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,10 +93,11 @@ async function fetchWikipedia(
   q: string,
   limit: number
 ): Promise<{ items: BioItem[] }> {
+  const expanded = expandQuery(q);
   const url =
     `https://en.wikipedia.org/w/api.php` +
-    `?action=query&list=search&srsearch=${encodeURIComponent(q)}` +
-    `&format=json&srlimit=${limit}&srprop=snippet&origin=*`;
+    `?action=query&list=search&srsearch=${encodeURIComponent(expanded)}` +
+    `&format=json&srlimit=${limit}&srprop=snippet|titlesnippet|sectiontitle&origin=*`;
 
   const resp = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!resp.ok) throw new Error(`Wikipedia ${resp.status}`);
@@ -99,18 +130,29 @@ async function fetchWikipedia(
 
 // ── OpenAlex ──────────────────────────────────────────────────────────────────
 
+type OASort = "relevance" | "date" | "cited";
+
 async function fetchOpenAlex(
   q: string,
   perPage: number,
-  page: number
+  page: number,
+  sortBy: OASort = "cited"
 ): Promise<{ items: BioItem[]; hasMore: boolean }> {
+  const sortParam =
+    sortBy === "date"
+      ? "publication_date:desc"
+      : sortBy === "relevance"
+      ? "relevance_score:desc"
+      : "cited_by_count:desc";
+
+  const expanded = expandQuery(q);
   const url =
     `https://api.openalex.org/works` +
-    `?search=${encodeURIComponent(q)}` +
+    `?search=${encodeURIComponent(expanded)}` +
     `&filter=type:article` +
     `&per-page=${perPage}` +
     `&page=${page}` +
-    `&sort=cited_by_count:desc` +
+    `&sort=${sortParam}` +
     `&mailto=cosmos@biohub.app`;
 
   const resp = await fetch(url, {
@@ -145,8 +187,7 @@ async function fetchOpenAlex(
     .map((w) => {
       const rawId = w.id ?? `oa-${Math.random().toString(36).slice(2)}`;
       const doi = w.doi;
-      const landingUrl =
-        w.primary_location?.landing_page_url ?? null;
+      const landingUrl = w.primary_location?.landing_page_url ?? null;
       const fallbackUrl = rawId.startsWith("https://")
         ? rawId
         : `https://openalex.org/${rawId.split("/").pop() ?? ""}`;
@@ -181,6 +222,7 @@ async function fetchOpenAlex(
 router.get("/biology/search", async (req, res) => {
   const q = ((req.query.q as string) ?? "").trim();
   const page = Math.max(Number(req.query.page ?? 1), 1);
+  const sort = (req.query.sort as OASort | undefined) ?? "cited";
 
   if (q.length < 2) {
     res.status(400).json({ error: "Query must be at least 2 characters" });
@@ -188,8 +230,8 @@ router.get("/biology/search", async (req, res) => {
   }
 
   const [wikiResult, openAlexResult] = await Promise.allSettled([
-    fetchWikipedia(q, 5),
-    fetchOpenAlex(q, 8, page),
+    fetchWikipedia(q, 10),               // increased from 5 → 10
+    fetchOpenAlex(q, 12, page, sort),    // increased from 8 → 12
   ]);
 
   const items: BioItem[] = [];

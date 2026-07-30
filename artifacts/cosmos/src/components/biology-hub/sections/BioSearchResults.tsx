@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, FlaskConical, ExternalLink, Loader2,
   Award, Users, Clock, Unlock, AlertCircle, ChevronDown, Search,
+  SlidersHorizontal, ArrowUpDown,
 } from 'lucide-react';
 import { useBiologySearch, getBiologySearchQueryKey } from '@workspace/api-client-react';
 import type { BiologySearchItem } from '@workspace/api-client-react';
@@ -15,12 +16,23 @@ interface BioSearchResultsProps {
   searchQuery: string;
 }
 
-type ResultsTab = 'all' | 'articles' | 'research';
+type FilterMode = 'all' | 'articles' | 'research' | 'most-cited' | 'open-access' | 'newest';
+type SortMode   = 'relevant' | 'newest' | 'most-cited' | 'alphabetical';
 
-const TABS: { id: ResultsTab; label: string }[] = [
-  { id: 'all',      label: 'All'      },
-  { id: 'articles', label: 'Articles' },
-  { id: 'research', label: 'Research' },
+const FILTER_TABS: { id: FilterMode; label: string }[] = [
+  { id: 'all',         label: 'All'         },
+  { id: 'articles',    label: 'Wikipedia'   },
+  { id: 'research',    label: 'Papers'      },
+  { id: 'open-access', label: 'Open Access' },
+  { id: 'most-cited',  label: 'Most Cited'  },
+  { id: 'newest',      label: 'Newest'      },
+];
+
+const SORT_OPTIONS: { id: SortMode; label: string }[] = [
+  { id: 'relevant',    label: 'Most Relevant' },
+  { id: 'newest',      label: 'Newest'        },
+  { id: 'most-cited',  label: 'Most Cited'    },
+  { id: 'alphabetical',label: 'Alphabetical'  },
 ];
 
 const glassCard = (lm: boolean) => ({
@@ -29,29 +41,47 @@ const glassCard = (lm: boolean) => ({
   backdropFilter: 'blur(18px)',
 });
 
+// ── Text highlight helper ─────────────────────────────────────────────────────
+function HighlightText({ text, query, lm }: { text: string; query: string; lm: boolean }) {
+  if (!query.trim()) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark key={i} style={{
+            background: lm ? 'rgba(52,211,153,0.25)' : 'rgba(52,211,153,0.2)',
+            color: 'inherit',
+            borderRadius: '2px',
+            padding: '0 1px',
+          }}>{part}</mark>
+        ) : part
+      )}
+    </>
+  );
+}
+
 // ── Source badge ──────────────────────────────────────────────────────────────
 function SourceBadge({ source, lm }: { source: string; lm: boolean }) {
   const isWiki = source === 'wikipedia';
   return (
-    <span
-      className="text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
+    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
       style={{
         background: isWiki ? 'rgba(56,189,248,0.12)' : 'rgba(148,163,184,0.12)',
         border: isWiki ? '1px solid rgba(56,189,248,0.2)' : '1px solid rgba(148,163,184,0.18)',
         color: isWiki
           ? lm ? '#0369a1' : 'rgba(56,189,248,0.7)'
           : lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.3)',
-      }}
-    >
+      }}>
       {isWiki ? '📖 Wikipedia' : 'OpenAlex'}
     </span>
   );
 }
 
 // ── Result card ───────────────────────────────────────────────────────────────
-function ResultCard({
-  item, lm, delay,
-}: { item: BiologySearchItem; lm: boolean; delay: number }) {
+function ResultCard({ item, lm, delay, searchQuery }: {
+  item: BiologySearchItem; lm: boolean; delay: number; searchQuery: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -70,53 +100,38 @@ function ResultCard({
     <div ref={ref}>
       <AnimatePresence>
         {visible && (
-          <motion.a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+          <motion.a href={item.url} target="_blank" rel="noopener noreferrer"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             whileHover={{ y: -2, scale: 1.007 }}
             className="block rounded-2xl p-4 no-underline"
-            style={{
-              ...glassCard(lm),
-              boxShadow: lm ? '0 2px 14px rgba(52,211,153,0.05)' : '0 2px 14px rgba(0,0,0,0.25)',
-            }}
-          >
+            style={{ ...glassCard(lm), boxShadow: lm ? '0 2px 14px rgba(52,211,153,0.05)' : '0 2px 14px rgba(0,0,0,0.25)' }}>
+
             {/* Top row */}
             <div className="flex items-start gap-2 mb-2">
               <div className="flex-shrink-0 mt-0.5">
-                {item.kind === 'article' ? (
-                  <BookOpen size={13} className="text-sky-400" />
-                ) : (
-                  <FlaskConical size={13} className="text-emerald-400" />
-                )}
+                {item.kind === 'article'
+                  ? <BookOpen size={13} className="text-sky-400" />
+                  : <FlaskConical size={13} className="text-emerald-400" />
+                }
               </div>
               <div className="flex-1 min-w-0">
-                <p
-                  className="text-[13px] font-semibold leading-snug line-clamp-2"
-                  style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}
-                >
-                  {item.title}
+                <p className="text-[13px] font-semibold leading-snug line-clamp-2"
+                  style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.9)' }}>
+                  <HighlightText text={item.title} query={searchQuery} lm={lm} />
                 </p>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <SourceBadge source={item.source} lm={lm} />
-                <ExternalLink
-                  size={11}
-                  style={{ color: lm ? 'rgba(52,211,153,0.45)' : 'rgba(52,211,153,0.35)' }}
-                />
+                <ExternalLink size={11} style={{ color: lm ? 'rgba(52,211,153,0.45)' : 'rgba(52,211,153,0.35)' }} />
               </div>
             </div>
 
-            {/* Description */}
+            {/* Description with highlight */}
             {item.description && (
-              <p
-                className="text-[11px] leading-relaxed mb-2.5 line-clamp-2"
-                style={{ color: lm ? 'rgba(6,78,59,0.52)' : 'rgba(255,255,255,0.35)' }}
-              >
-                {item.description}
+              <p className="text-[11px] leading-relaxed mb-2.5 line-clamp-2"
+                style={{ color: lm ? 'rgba(6,78,59,0.52)' : 'rgba(255,255,255,0.35)' }}>
+                <HighlightText text={item.description} query={searchQuery} lm={lm} />
               </p>
             )}
 
@@ -162,8 +177,11 @@ function ResultCard({
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsProps) {
-  const [tab, setTab] = useState<ResultsTab>('all');
-  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<FilterMode>('all');
+  const [sort, setSort]   = useState<SortMode>('relevant');
+  const [showSort, setShowSort] = useState(false);
+  const [page, setPage]   = useState(1);
+  const [allItems, setAllItems] = useState<BiologySearchItem[]>([]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const q = searchQuery.trim();
 
@@ -173,13 +191,43 @@ export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsPr
     { query: { enabled: q.length >= 2, staleTime: 3 * 60 * 1000, queryKey: getBiologySearchQueryKey(queryParams) } }
   );
 
-  // Reset page when query changes
-  useEffect(() => { setPage(1); setTab('all'); }, [q]);
+  // Accumulate items across pages
+  useEffect(() => {
+    if (!data?.items) return;
+    if (page === 1) {
+      setAllItems(data.items);
+    } else {
+      setAllItems((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        return [...prev, ...data.items.filter((i: BiologySearchItem) => !ids.has(i.id))];
+      });
+    }
+  }, [data, page]);
 
-  const allItems = data?.items ?? [];
-  const filtered = tab === 'all'
-    ? allItems
-    : allItems.filter((i: BiologySearchItem) => i.kind === (tab === 'articles' ? 'article' : 'research'));
+  // Reset when query or filter changes
+  useEffect(() => { setPage(1); setAllItems([]); setFilter('all'); setSort('relevant'); }, [q]);
+
+  // Apply filter
+  const filtered = allItems.filter((i: BiologySearchItem) => {
+    switch (filter) {
+      case 'articles':    return i.kind === 'article';
+      case 'research':    return i.kind === 'research';
+      case 'open-access': return i.openAccess === true;
+      case 'most-cited':  return (i.citationCount ?? 0) > 0;
+      case 'newest':      return !!i.date;
+      default:            return true;
+    }
+  });
+
+  // Apply sort
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sort) {
+      case 'newest':      return (b.date ?? '').localeCompare(a.date ?? '');
+      case 'most-cited':  return (b.citationCount ?? 0) - (a.citationCount ?? 0);
+      case 'alphabetical':return a.title.localeCompare(b.title);
+      default:            return 0; // server order = relevance
+    }
+  });
 
   const articleCount  = allItems.filter((i: BiologySearchItem) => i.kind === 'article').length;
   const researchCount = allItems.filter((i: BiologySearchItem) => i.kind === 'research').length;
@@ -191,55 +239,84 @@ export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsPr
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMore(); },
-      { threshold: 0.1 }
-    );
+    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore(); }, { threshold: 0.1 });
     obs.observe(el);
     return () => obs.disconnect();
   }, [loadMore]);
 
+  const currentSortLabel = SORT_OPTIONS.find((s) => s.id === sort)?.label ?? 'Sort';
+
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}
-        >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
           <Search size={13} className="text-emerald-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2
-            className="text-[14px] font-semibold"
-            style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.92)' }}
-          >
+          <h2 className="text-[14px] font-semibold"
+            style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.92)' }}>
             Results for <span className="text-emerald-400">"{q}"</span>
           </h2>
-          {data && (
+          {allItems.length > 0 && (
             <p className="text-[10px]" style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(255,255,255,0.3)' }}>
               {articleCount} articles · {researchCount} papers
             </p>
           )}
         </div>
-        {(isLoading || isFetching) && (
-          <Loader2 size={14} className="animate-spin text-emerald-400 flex-shrink-0" />
-        )}
+        {(isLoading || isFetching) && <Loader2 size={14} className="animate-spin text-emerald-400 flex-shrink-0" />}
+
+        {/* Sort dropdown trigger */}
+        <div className="relative flex-shrink-0">
+          <button onClick={() => setShowSort((v) => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-medium transition-all duration-150"
+            style={{
+              background: showSort ? 'rgba(52,211,153,0.15)' : (lm ? 'rgba(52,211,153,0.08)' : 'rgba(52,211,153,0.07)'),
+              border: '1px solid rgba(52,211,153,0.18)',
+              color: lm ? '#065f46' : 'rgba(255,255,255,0.6)',
+            }}>
+            <ArrowUpDown size={10} />
+            <span className="hidden sm:inline">{currentSortLabel}</span>
+          </button>
+          <AnimatePresence>
+            {showSort && (
+              <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }}
+                className="absolute right-0 top-full mt-1.5 rounded-xl overflow-hidden z-30 w-40"
+                style={{
+                  background: lm ? 'rgba(240,253,244,0.97)' : 'rgba(3,12,8,0.97)',
+                  border: lm ? '1px solid rgba(52,211,153,0.2)' : '1px solid rgba(52,211,153,0.15)',
+                  backdropFilter: 'blur(20px)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                }}>
+                {SORT_OPTIONS.map((s) => (
+                  <button key={s.id} onClick={() => { setSort(s.id); setShowSort(false); }}
+                    className="w-full text-left px-3.5 py-2.5 text-[11px] font-medium transition-colors duration-100"
+                    style={{
+                      background: sort === s.id ? 'rgba(52,211,153,0.12)' : 'transparent',
+                      color: sort === s.id ? (lm ? '#065f46' : '#34d399') : (lm ? 'rgba(6,78,59,0.65)' : 'rgba(255,255,255,0.55)'),
+                    }}>
+                    {s.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Source status */}
+      {/* Source status pills */}
       {data?.sourceStatus && (
         <div className="flex gap-2 mb-3 flex-wrap">
           {data.sourceStatus.map((s) => (
-            <div
-              key={s.source}
+            <div key={s.source}
               className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px]"
               style={{
                 background: s.status === 'ready' ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
                 border: s.status === 'ready' ? '1px solid rgba(52,211,153,0.2)' : '1px solid rgba(239,68,68,0.2)',
                 color: s.status === 'ready' ? '#34d399' : '#f87171',
-              }}
-            >
+              }}>
               <span className="font-semibold capitalize">{s.source}</span>
               <span>{s.status === 'ready' ? '✓' : '✗'}</span>
             </div>
@@ -247,61 +324,47 @@ export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsPr
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-4">
-        <div
-          className="flex gap-1 p-1 rounded-xl w-full"
-          style={{
-            background: lm ? 'rgba(52,211,153,0.06)' : 'rgba(52,211,153,0.05)',
-            border: '1px solid rgba(52,211,153,0.12)',
-          }}
-        >
-          {TABS.map((t) => {
-            const count = t.id === 'all' ? allItems.length : t.id === 'articles' ? articleCount : researchCount;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-medium transition-all duration-200"
-                style={{
-                  background: tab === t.id
-                    ? lm ? 'rgba(52,211,153,0.2)' : 'rgba(52,211,153,0.15)'
-                    : 'transparent',
-                  color: tab === t.id
-                    ? lm ? '#065f46' : '#34d399'
-                    : lm ? 'rgba(6,78,59,0.45)' : 'rgba(255,255,255,0.35)',
-                  border: tab === t.id
-                    ? '1px solid rgba(52,211,153,0.3)'
-                    : '1px solid transparent',
-                }}
-              >
-                {t.label}
-                {count > 0 && (
-                  <span
-                    className="ml-1 font-bold"
-                    style={{ color: tab === t.id ? undefined : lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.25)' }}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* Filter chips */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        <SlidersHorizontal size={11} className="self-center flex-shrink-0"
+          style={{ color: lm ? 'rgba(6,78,59,0.35)' : 'rgba(255,255,255,0.25)' }} />
+        {FILTER_TABS.map((f) => {
+          const count = f.id === 'all' ? allItems.length
+            : f.id === 'articles' ? articleCount
+            : f.id === 'research' ? researchCount
+            : f.id === 'open-access' ? allItems.filter((i) => i.openAccess).length
+            : f.id === 'most-cited' ? allItems.filter((i) => (i.citationCount ?? 0) > 0).length
+            : allItems.filter((i) => !!i.date).length;
+          const active = filter === f.id;
+          return (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className="px-2.5 py-1 rounded-full text-[10px] font-medium transition-all duration-150"
+              style={{
+                background: active ? (lm ? 'rgba(52,211,153,0.2)' : 'rgba(52,211,153,0.15)') : 'transparent',
+                border: active ? '1px solid rgba(52,211,153,0.35)' : '1px solid rgba(52,211,153,0.1)',
+                color: active ? (lm ? '#065f46' : '#34d399') : (lm ? 'rgba(6,78,59,0.45)' : 'rgba(255,255,255,0.32)'),
+              }}>
+              {f.label}
+              {count > 0 && (
+                <span className="ml-1 font-bold"
+                  style={{ color: active ? undefined : (lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.22)') }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Results */}
-      {isLoading ? (
+      {isLoading && allItems.length === 0 ? (
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-24 rounded-2xl animate-pulse" style={glassCard(lm)} />
           ))}
         </div>
-      ) : isError ? (
-        <div
-          className="rounded-2xl p-8 flex flex-col items-center text-center"
-          style={glassCard(lm)}
-        >
+      ) : isError && allItems.length === 0 ? (
+        <div className="rounded-2xl p-8 flex flex-col items-center text-center" style={glassCard(lm)}>
           <AlertCircle size={26} className="text-rose-400 mb-3" />
           <p className="text-[13px] font-medium mb-1" style={{ color: lm ? '#064e3b' : 'rgba(255,255,255,0.8)' }}>
             Search unavailable
@@ -310,52 +373,43 @@ export default function BioSearchResults({ lm, searchQuery }: BioSearchResultsPr
             Could not reach biology data sources. Try again shortly.
           </p>
         </div>
-      ) : filtered.length === 0 ? (
-        <div
-          className="rounded-2xl p-8 flex flex-col items-center text-center"
-          style={glassCard(lm)}
-        >
+      ) : sorted.length === 0 && !isLoading ? (
+        <div className="rounded-2xl p-8 flex flex-col items-center text-center" style={glassCard(lm)}>
           <Search size={26} className="text-emerald-400 mb-3 opacity-50" />
           <p className="text-[13px]" style={{ color: lm ? 'rgba(6,78,59,0.55)' : 'rgba(255,255,255,0.38)' }}>
-            No {tab === 'all' ? 'results' : tab} found for "{q}".
+            No {filter === 'all' ? 'results' : filter.replace('-', ' ')} found for "{q}".
           </p>
         </div>
       ) : (
         <>
           <div className="space-y-3">
-            {filtered.map((item: BiologySearchItem, i: number) => (
-              <ResultCard
-                key={item.id}
-                item={item}
-                lm={lm}
-                delay={Math.min(i * 0.03, 0.25)}
-              />
+            {sorted.map((item: BiologySearchItem, i: number) => (
+              <ResultCard key={item.id} item={item} lm={lm}
+                delay={Math.min(i * 0.03, 0.25)} searchQuery={q} />
             ))}
           </div>
 
           {/* Load more */}
           <div ref={loadMoreRef} className="mt-4 flex justify-center">
             {isFetching ? (
-              <div className="flex items-center gap-2 py-3 text-[11px]" style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.3)' }}>
+              <div className="flex items-center gap-2 py-3 text-[11px]"
+                style={{ color: lm ? 'rgba(6,78,59,0.5)' : 'rgba(255,255,255,0.3)' }}>
                 <Loader2 size={13} className="animate-spin text-emerald-400" />
                 Loading more results…
               </div>
             ) : data?.hasMore ? (
-              <button
-                onClick={() => setPage((p) => p + 1)}
+              <button onClick={() => setPage((p) => p + 1)}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-medium"
                 style={{
                   background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)',
                   border: '1px solid rgba(52,211,153,0.2)',
                   color: lm ? '#065f46' : '#34d399',
-                }}
-              >
-                <ChevronDown size={13} />
-                Load more
+                }}>
+                <ChevronDown size={13} /> Load more
               </button>
             ) : allItems.length > 0 ? (
               <p className="text-[10px] py-3" style={{ color: lm ? 'rgba(6,78,59,0.3)' : 'rgba(255,255,255,0.2)' }}>
-                All results loaded
+                All {allItems.length} results loaded
               </p>
             ) : null}
           </div>
