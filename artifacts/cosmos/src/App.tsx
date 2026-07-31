@@ -1975,6 +1975,9 @@ export default function App() {
   const [focused,      setFocused]     = useState(false);
   const twTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [typedPlaceholder, setTypedPlaceholder] = useState('');
+  const searchInputRef  = useRef<HTMLInputElement>(null);
+  const [shareCopied,   setShareCopied]   = useState(false);
+  const shareCopyTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPortal,   setShowPortal]  = useState(false);
   const [showLibrary,  setShowLibrary] = useState(false);
   const [language,     setLanguage]    = useState('English');
@@ -2269,6 +2272,30 @@ export default function App() {
     }, 300);
     return () => clearTimeout(timer);
   }, [nasaQuery]);
+
+  // ── Share — copy ?q=… URL to clipboard ──────────────────────────────────
+  const handleShareSearch = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', nasaQuery.trim());
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      setShareCopied(true);
+      if (shareCopyTimer.current) clearTimeout(shareCopyTimer.current);
+      shareCopyTimer.current = setTimeout(() => setShareCopied(false), 2200);
+    }).catch(() => { /* clipboard denied */ });
+  }, [nasaQuery]);
+
+  // ── Keyboard shortcut: "/" focuses the search bar ────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== '/') return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // ── IntersectionObserver — infinite scroll ────────────────────────────────
   // Attaches for ALL search modes (specific filter or Everything).
@@ -2567,6 +2594,7 @@ export default function App() {
                     }`}
                   />
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={nasaQuery}
                     placeholder={typedPlaceholder || 'Search the cosmos…'}
@@ -2731,6 +2759,54 @@ export default function App() {
             {/* Results feed */}
             {hasSearchResults && (
               <div className="w-full max-w-2xl px-6 mt-8 pointer-events-auto">
+                {/* Share row */}
+                <div className="flex items-center justify-end mb-3">
+                  <AnimatePresence mode="wait">
+                    {shareCopied ? (
+                      <motion.span
+                        key="copied"
+                        initial={{ opacity: 0, scale: 0.88, y: 4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.88, y: -4 }}
+                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wide border ${
+                          lm
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-emerald-500/10 border-emerald-400/25 text-emerald-300'
+                        }`}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+                          <path d="M2 6.5l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Link Copied!
+                      </motion.span>
+                    ) : (
+                      <motion.button
+                        key="share"
+                        initial={{ opacity: 0, scale: 0.88, y: 4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.88, y: -4 }}
+                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleShareSearch}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wide border transition-all duration-150 ${
+                          lm
+                            ? 'bg-white/70 border-black/[0.08] text-slate-500 hover:text-slate-800 hover:border-black/[0.15] hover:bg-white'
+                            : 'bg-white/[0.05] border-white/[0.10] text-white/35 hover:text-white/70 hover:border-white/[0.20] hover:bg-white/[0.09]'
+                        }`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+                          <circle cx="13" cy="2.5" r="1.75" stroke="currentColor" strokeWidth="1.4"/>
+                          <circle cx="13" cy="13.5" r="1.75" stroke="currentColor" strokeWidth="1.4"/>
+                          <circle cx="3"  cy="8"    r="1.75" stroke="currentColor" strokeWidth="1.4"/>
+                          <path d="M4.7 7.1 11.3 3.4M4.7 8.9l6.6 3.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                        </svg>
+                        Share
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <NasaSearch
                   results={searchResults}
                   status={searchStatus}
