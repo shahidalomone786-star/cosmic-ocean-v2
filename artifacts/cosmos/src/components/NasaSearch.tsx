@@ -4,8 +4,8 @@ import {
   Globe, BookOpen, FileText, Rocket, Atom,
   Film, LayoutGrid, Telescope, X, Sparkles, Search,
   FlaskConical, Database, Library, Tags, Satellite,
-  ExternalLink, ChevronRight, ChevronLeft, ChevronDown,
-  Copy, Check,
+  ExternalLink, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
+  Bookmark, BookmarkCheck, Copy, Check,
   type LucideIcon,
 } from 'lucide-react';
 import type { VideoItem } from './VideoPlayerModal';
@@ -20,6 +20,8 @@ import {
   PopularPapers,
 } from './SearchKnowledgePanel';
 import AISummary from './AISummary';
+import SavedPapersDrawer from './SavedPapersDrawer';
+import { useSavedPapers, stableItemId } from '../hooks/useSavedPapers';
 
 // ─── Legacy types (unchanged — keep backward compat) ──────────────────────────
 export type { VideoItem };
@@ -639,9 +641,12 @@ function AISummaryCard({ text, lm }: { text: string; lm?: boolean }) {
 }
 
 // ─── Section item card (Wikipedia / NASA / ESA) — premium Apple-quality ───────
-function SectionItemCard({ item, idx, onOpen, lm, query }: {
+function SectionItemCard({ item, idx, onOpen, lm, query, savedIdSet, onToggleSave }: {
   item: SectionItem; idx: number; onOpen: () => void; lm?: boolean; query?: string;
+  savedIdSet?: ReadonlySet<string>; onToggleSave?: (item: SectionItem) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isBookmarked = savedIdSet?.has(stableItemId(item)) ?? false;
   const statusBadges = getStatusBadges(item.source);
   const cfg = extSourceCfg(item.source);
 
@@ -704,27 +709,96 @@ function SectionItemCard({ item, idx, onOpen, lm, query }: {
             className={`text-[11.5px] leading-relaxed line-clamp-3 flex-1 ${lm ? 'text-gray-500' : 'text-white/40'}`}
           />
         )}
-        {/* Footer — source label + Open button */}
+        {/* Footer — source label + actions */}
         <div className="flex items-center justify-between mt-3 pt-2.5 gap-2"
           style={{ borderTop: lm ? '1px solid rgba(0,0,0,0.07)' : '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-1.5 min-w-0">
             <cfg.icon size={10} strokeWidth={2} className={`flex-shrink-0 ${lm ? 'text-gray-400' : 'text-white/28'}`} />
             <span className={`text-[9.5px] uppercase tracking-[0.15em] truncate ${lm ? 'text-gray-400' : 'text-white/28'}`}>{cfg.label}</span>
           </div>
-          <a
-            href={item.url ?? '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            aria-label={`Open ${item.title}`}
-            className={`flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border transition-all duration-200 ${
-              lm
-                ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
-                : 'bg-white/[0.06] border-white/[0.12] text-white/55 hover:bg-white/[0.14] hover:border-white/[0.26] hover:text-white/90'
-            }`}
-          >
-            Open <ExternalLink size={8} strokeWidth={2.5} />
-          </a>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Bookmark */}
+            {onToggleSave && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleSave(item); }}
+                aria-label={isBookmarked ? `Remove "${item.title}" from reading list` : `Save "${item.title}" to reading list`}
+                aria-pressed={isBookmarked}
+                className={`p-1.5 rounded-full border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 ${
+                  isBookmarked
+                    ? lm ? 'bg-violet-100 border-violet-300 text-violet-600' : 'bg-violet-500/[0.18] border-violet-400/35 text-violet-300'
+                    : lm ? 'bg-gray-50 border-gray-200 text-gray-400 hover:border-violet-300 hover:text-violet-500' : 'bg-white/[0.04] border-white/[0.09] text-white/28 hover:border-violet-400/28 hover:text-violet-300/75'
+                }`}
+              >
+                {isBookmarked
+                  ? <BookmarkCheck size={10} strokeWidth={2.5} aria-hidden="true" />
+                  : <Bookmark size={10} strokeWidth={2} aria-hidden="true" />
+                }
+              </button>
+            )}
+            {/* Expand preview */}
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(p => !p); }}
+              aria-label={expanded ? 'Collapse preview' : 'Expand preview'}
+              aria-expanded={expanded}
+              className={`p-1.5 rounded-full border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 ${
+                lm
+                  ? 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700'
+                  : 'bg-white/[0.04] border-white/[0.09] text-white/28 hover:border-white/[0.20] hover:text-white/65'
+              }`}
+            >
+              {expanded
+                ? <ChevronUp size={10} strokeWidth={2.5} aria-hidden="true" />
+                : <ChevronDown size={10} strokeWidth={2} aria-hidden="true" />
+              }
+            </button>
+            {/* Open link */}
+            <a
+              href={item.url ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              aria-label={`Open ${item.title}`}
+              className={`inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full border transition-all duration-200 ${
+                lm
+                  ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-900 hover:border-gray-900 hover:text-white'
+                  : 'bg-white/[0.06] border-white/[0.12] text-white/55 hover:bg-white/[0.14] hover:border-white/[0.26] hover:text-white/90'
+              }`}
+            >
+              Open <ExternalLink size={8} strokeWidth={2.5} />
+            </a>
+          </div>
+        </div>
+
+        {/* Quick Preview panel — height-animated via CSS grid */}
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          aria-hidden={!expanded}
+        >
+          <div className="overflow-hidden min-h-0">
+            <div className={`pt-3 transition-opacity duration-200 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="pt-3" style={{ borderTop: lm ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.05)' }}>
+                {item.description ? (
+                  <p className={`text-[11.5px] leading-relaxed ${lm ? 'text-gray-600' : 'text-white/55'}`}>
+                    {item.description}
+                  </p>
+                ) : (
+                  <p className={`text-[11px] italic ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                    No preview available for this result.
+                  </p>
+                )}
+                {item.authors && item.authors.length > 0 && (
+                  <p className={`mt-2 text-[10px] ${lm ? 'text-gray-400' : 'text-white/28'}`}>
+                    {item.authors.slice(0, 5).join(', ')}{item.authors.length > 5 ? ' et al.' : ''}
+                  </p>
+                )}
+                {item.date && (
+                  <p className={`mt-1 text-[9.5px] tabular-nums ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+                    {item.date.length === 4 ? item.date : item.date.slice(0, 10)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -744,9 +818,12 @@ function ResearchThumb({ source, lm }: { source: string; lm?: boolean }) {
 }
 
 // ─── Research / Book row card ──────────────────────────────────────────────────
-function ResearchRowCard({ item, idx, onOpen, lm, query }: {
+function ResearchRowCard({ item, idx, onOpen, lm, query, savedIdSet, onToggleSave }: {
   item: SectionItem; idx: number; onOpen: () => void; lm?: boolean; query?: string;
+  savedIdSet?: ReadonlySet<string>; onToggleSave?: (item: SectionItem) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isBookmarked = savedIdSet?.has(stableItemId(item)) ?? false;
   const statusBadges = getStatusBadges(item.source);
 
   return (
@@ -809,6 +886,40 @@ function ResearchRowCard({ item, idx, onOpen, lm, query }: {
           {/* Action buttons — pushed right */}
           <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
             <CiteButton item={item} lm={lm} />
+            {/* Bookmark */}
+            {onToggleSave && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleSave(item); }}
+                aria-label={isBookmarked ? `Remove "${item.title}" from reading list` : `Save "${item.title}" to reading list`}
+                aria-pressed={isBookmarked}
+                className={`p-1 rounded-full border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 ${
+                  isBookmarked
+                    ? lm ? 'bg-violet-100 border-violet-300 text-violet-600' : 'bg-violet-500/[0.18] border-violet-400/35 text-violet-300'
+                    : lm ? 'bg-gray-50 border-gray-200 text-gray-400 hover:border-violet-300 hover:text-violet-500' : 'bg-white/[0.03] border-white/[0.08] text-white/25 hover:border-violet-400/25 hover:text-violet-300/70'
+                }`}
+              >
+                {isBookmarked
+                  ? <BookmarkCheck size={9} strokeWidth={2.5} aria-hidden="true" />
+                  : <Bookmark size={9} strokeWidth={2} aria-hidden="true" />
+                }
+              </button>
+            )}
+            {/* Expand preview */}
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(p => !p); }}
+              aria-label={expanded ? 'Collapse preview' : 'Expand preview'}
+              aria-expanded={expanded}
+              className={`p-1 rounded-full border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 ${
+                lm
+                  ? 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700'
+                  : 'bg-white/[0.03] border-white/[0.08] text-white/25 hover:border-white/[0.18] hover:text-white/60'
+              }`}
+            >
+              {expanded
+                ? <ChevronUp size={9} strokeWidth={2.5} aria-hidden="true" />
+                : <ChevronDown size={9} strokeWidth={2} aria-hidden="true" />
+              }
+            </button>
             <a
               href={item.url ?? '#'}
               target="_blank"
@@ -823,6 +934,43 @@ function ResearchRowCard({ item, idx, onOpen, lm, query }: {
             >
               Open <ExternalLink size={7} strokeWidth={2.5} />
             </a>
+          </div>
+        </div>
+
+        {/* Quick Preview panel — height-animated via CSS grid */}
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          aria-hidden={!expanded}
+        >
+          <div className="overflow-hidden min-h-0">
+            <div className={`pt-3 pb-1 transition-opacity duration-200 ${expanded ? 'opacity-100' : 'opacity-0'}`}>
+              <div className="pt-3" style={{ borderTop: lm ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.05)' }}>
+                {item.description ? (
+                  <p className={`text-[11.5px] leading-relaxed ${lm ? 'text-gray-600' : 'text-white/55'}`}>
+                    {item.description}
+                  </p>
+                ) : (
+                  <p className={`text-[11px] italic ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                    No preview available for this result.
+                  </p>
+                )}
+                {item.authors && item.authors.length > 0 && (
+                  <p className={`mt-2 text-[10px] ${lm ? 'text-gray-400' : 'text-white/28'}`}>
+                    {item.authors.slice(0, 5).join(', ')}{item.authors.length > 5 ? ' et al.' : ''}
+                  </p>
+                )}
+                {item.date && (
+                  <p className={`mt-1 text-[9.5px] tabular-nums ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+                    {item.date.length === 4 ? item.date : item.date.slice(0, 10)}
+                  </p>
+                )}
+                {item.citationCount !== undefined && item.citationCount > 0 && (
+                  <p className={`mt-1 text-[9.5px] ${lm ? 'text-gray-400' : 'text-white/25'}`}>
+                    {item.citationCount.toLocaleString()} citations
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1664,8 +1812,12 @@ function NasaSearch({
   }), [sections, classifiedVideos]);
 
   // ── Sort state (reset when query changes via the useEffect above) ──────────
-  const [sortOrder,   setSortOrder]   = useState<SortOrder>('relevance');
+  const [sortOrder,    setSortOrder]    = useState<SortOrder>('relevance');
   const [dismissedDym, setDismissedDym] = useState(false);
+
+  // ── Reading list (localStorage-backed) ──────────────────────────────────
+  const { saved, savedIdSet, toggleSave, remove, clearAll } = useSavedPapers();
+  const [showSavedDrawer, setShowSavedDrawer] = useState(false);
 
   // True when at least one research/book item carries a citation count
   const hasAnyCitations = useMemo(
@@ -1820,10 +1972,29 @@ function NasaSearch({
                         : `${totalCount} results · scroll to explore`}
                 </span>
               </div>
-              <button onClick={onClear} className={`flex-shrink-0 flex items-center gap-1.5 text-[10px] uppercase tracking-widest ml-4 transition-colors duration-200 ${lm ? 'text-gray-400 hover:text-gray-700' : 'text-white/28 hover:text-white/65'}`}>
-                <X size={10} strokeWidth={2.5} />
-                Clear
-              </button>
+              <div className="flex items-center gap-2.5 flex-shrink-0 ml-4">
+                {/* Reading List button */}
+                <button
+                  onClick={() => setShowSavedDrawer(true)}
+                  aria-label={`Open reading list — ${saved.length} saved`}
+                  className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 rounded ${
+                    lm ? 'text-gray-400 hover:text-violet-600' : 'text-white/28 hover:text-violet-300/80'
+                  }`}
+                >
+                  <Bookmark size={10} strokeWidth={2} aria-hidden="true" />
+                  Saved{saved.length > 0 && (
+                    <span className={`inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full text-[8px] font-bold ${
+                      lm ? 'bg-violet-100 text-violet-600' : 'bg-violet-500/20 text-violet-300'
+                    }`}>
+                      {saved.length}
+                    </span>
+                  )}
+                </button>
+                <button onClick={onClear} className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest transition-colors duration-200 ${lm ? 'text-gray-400 hover:text-gray-700' : 'text-white/28 hover:text-white/65'}`}>
+                  <X size={10} strokeWidth={2.5} />
+                  Clear
+                </button>
+              </div>
             </div>
 
             {/* Filter bar — client-side, instant, no new API calls */}
@@ -1920,7 +2091,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {ss.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} savedIdSet={savedIdSet} onToggleSave={toggleSave} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'wikipedia' ? (
@@ -1934,7 +2105,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {ss.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} savedIdSet={savedIdSet} onToggleSave={toggleSave} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'research' ? (
@@ -1948,7 +2119,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {ss.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} savedIdSet={savedIdSet} onToggleSave={toggleSave} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'nasa' ? (
@@ -1962,7 +2133,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {ss.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} savedIdSet={savedIdSet} onToggleSave={toggleSave} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'esa' ? (
@@ -1976,7 +2147,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {ss.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} savedIdSet={savedIdSet} onToggleSave={toggleSave} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'books' ? (
@@ -2025,6 +2196,16 @@ function NasaSearch({
             />
           )}
         </AnimatePresence>
+
+        {/* Reading List drawer */}
+        <SavedPapersDrawer
+          open={showSavedDrawer}
+          saved={saved}
+          onClose={() => setShowSavedDrawer(false)}
+          onRemove={remove}
+          onClear={clearAll}
+          lm={lm}
+        />
 
         {/* Feature #11: Back to top — floating button after 2× viewport scroll */}
         <AnimatePresence>
