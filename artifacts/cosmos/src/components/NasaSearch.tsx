@@ -658,31 +658,29 @@ function SectionItemCard({ item, idx, onOpen, lm, query }: {
           : 'bg-[#0b0b18]/70 border-white/[0.08] shadow-[0_2px_24px_rgba(0,0,0,0.6)] hover:border-white/[0.18] hover:-translate-y-1.5 hover:shadow-[0_20px_56px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-sm'
       }`}
     >
-      {/* Cover — fixed aspect, never empty */}
-      <div className="relative w-full aspect-[16/9] flex-shrink-0">
-        <CoverImage src={item.imageUrl ?? ''} alt={item.title ?? ''} lm={lm} />
-        {/* Scrim */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent pointer-events-none" />
-        {/* Hover shimmer */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.05) 0%,transparent 55%)' }} />
-        {/* Image zoom on hover */}
-        {item.imageUrl && (
-          <div className="absolute inset-0 transition-transform duration-700 ease-out group-hover:scale-[1.04] pointer-events-none" />
-        )}
-        {/* Top row badges */}
-        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            <ExtSourceBadge source={item.source} lm={lm} />
-            {statusBadges.slice(0, 1).map(b => <StatusBadge key={b} type={b} lm={lm} />)}
+      {/* Cover — only rendered when an image URL exists */}
+      {item.imageUrl && (
+        <div className="relative w-full aspect-[16/9] flex-shrink-0">
+          <CoverImage src={item.imageUrl} alt={item.title ?? ''} lm={lm} />
+          {/* Scrim */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent pointer-events-none" />
+          {/* Hover shimmer */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+            style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.05) 0%,transparent 55%)' }} />
+          {/* Top row badges */}
+          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1">
+              <ExtSourceBadge source={item.source} lm={lm} />
+              {statusBadges.slice(0, 1).map(b => <StatusBadge key={b} type={b} lm={lm} />)}
+            </div>
+            {item.date && (
+              <span className="flex-shrink-0 text-[8.5px] text-white/75 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest font-medium">
+                {item.date.length === 4 ? item.date : item.date.slice(0, 10)}
+              </span>
+            )}
           </div>
-          {item.date && (
-            <span className="flex-shrink-0 text-[8.5px] text-white/75 bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-full tracking-widest font-medium">
-              {item.date.length === 4 ? item.date : item.date.slice(0, 10)}
-            </span>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Body — grows to fill equal height */}
       <div className="flex flex-col flex-1 px-4 pt-3 pb-4">
@@ -1874,10 +1872,10 @@ function NasaSearch({
                     {sections.aiSummary?.text && <AISummaryCard text={sections.aiSummary.text} lm={lm} />}
                     <InlineRelatedTopics topics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />
                     <SuggestedSearches query={sections.query} relatedTopics={sections.relatedTopics} onSearch={onRelatedTopicSearch} lm={lm} />
-                    <LatestResearch research={sections.research ?? []} lm={lm} />
-                    <TrendingResearch research={sections.research ?? []} lm={lm} />
-                    <FeaturedNASA nasa={sections.nasa ?? []} lm={lm} />
-                    <PopularPapers research={sections.research ?? []} books={sections.books ?? []} lm={lm} />
+                    <LatestResearch research={ss.research ?? []} lm={lm} />
+                    <TrendingResearch research={ss.research ?? []} lm={lm} />
+                    <FeaturedNASA nasa={ss.nasa ?? []} lm={lm} />
+                    <PopularPapers research={ss.research ?? []} books={ss.books ?? []} lm={lm} />
                   </>
                 )}
 

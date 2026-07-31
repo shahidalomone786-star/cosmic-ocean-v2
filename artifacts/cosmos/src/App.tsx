@@ -2441,7 +2441,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.4, ease: 'easeInOut' }}
             className={`absolute inset-0 z-20 flex flex-col items-center pointer-events-none ${
-              hasSearchResults ? 'justify-start overflow-y-auto pt-10 pb-16' : 'justify-center'
+              hasSearchResults ? 'justify-start overflow-y-auto overflow-x-hidden pt-10 pb-16' : 'justify-center'
             }`}
           >
             {/* ── Premium floating pill nav — hidden in search-results view ── */}
