@@ -8,6 +8,7 @@ import authRouter from "./auth";
 import postsRouter from "./posts";
 import cosmicRouter from "./cosmic";
 import biologyRouter from "./biology";
+import aiSummaryRouter from "./ai-summary";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(authRouter);
 router.use(postsRouter);
 router.use(cosmicRouter);
 router.use(biologyRouter);
+router.use(aiSummaryRouter);
 
 export default router;
