@@ -19,6 +19,7 @@ import {
   FeaturedNASA,
   PopularPapers,
 } from './SearchKnowledgePanel';
+import AISummary from './AISummary';
 
 // ─── Legacy types (unchanged — keep backward compat) ──────────────────────────
 export type { VideoItem };
@@ -1762,6 +1763,11 @@ function NasaSearch({
             transition={{ duration: 0.35, ease: 'easeOut' }}
             className="w-full max-w-2xl pointer-events-auto"
           >
+            {/* AI Overview — streams independently, never blocks results */}
+            {sections?.query && (
+              <AISummary query={sections.query} sections={sections} lm={lm} />
+            )}
+
             {/* Knowledge Coverage — live counts, always above everything */}
             {status === 'done' && hasAny && (
               <KnowledgeCoverage sections={sections} lm={lm} />
