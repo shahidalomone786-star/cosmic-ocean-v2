@@ -22,6 +22,7 @@ import {
 import AISummary from './AISummary';
 import SavedPapersDrawer from './SavedPapersDrawer';
 import { useSavedPapers, stableItemId } from '../hooks/useSavedPapers';
+import DiscoveryPanel from './DiscoveryPanel';
 
 // ─── Legacy types (unchanged — keep backward compat) ──────────────────────────
 export type { VideoItem };
@@ -2053,6 +2054,12 @@ function NasaSearch({
                     <TrendingResearch research={ss.research ?? []} lm={lm} />
                     <FeaturedNASA nasa={ss.nasa ?? []} lm={lm} />
                     <PopularPapers research={ss.research ?? []} books={ss.books ?? []} lm={lm} />
+                    <DiscoveryPanel
+                      query={sections.query}
+                      sections={ss}
+                      onSearch={onRelatedTopicSearch}
+                      lm={lm}
+                    />
                   </>
                 )}
 
