@@ -71,25 +71,35 @@ function estimateConfidence(snippetCount: number, summaryLen: number): number {
   return 0.30;
 }
 
+// ── Confidence label ──────────────────────────────────────────────────────────
+type ConfidenceLabel = "High" | "Medium" | "Limited Evidence";
+
+function toConfidenceLabel(confidence: number, snippetCount: number): ConfidenceLabel {
+  if (confidence >= 0.88 && snippetCount >= 4) return "High";
+  if (confidence >= 0.60 || snippetCount >= 2) return "Medium";
+  return "Limited Evidence";
+}
+
 // ── System prompt ─────────────────────────────────────────────────────────────
 function buildSystemPrompt(language: string): string {
   const langNote = language && language !== "en"
     ? `\nRespond in the following language: ${language}.`
     : "";
-  return `You are a Scientific Research Assistant specialising in evidence-based summarisation.
+  return `You are a Scientific Research Assistant. Your sole task is to synthesise the numbered CONTEXT snippets provided into a concise, factually grounded overview for the QUERY.
 
 STRICT RULES — NEVER VIOLATE:
-1. Only use information explicitly present in the CONTEXT snippets provided.
-2. Never invent facts, statistics, dates, figures, or details absent from the context.
-3. Never fabricate citations, paper titles, authors, DOIs, or URLs.
-4. Never speculate about what might be true or what is likely.
-5. If the supplied context is insufficient to answer the query, say so plainly and briefly.
+1. Answer ONLY from the CONTEXT snippets below. Do not draw on any knowledge from your training data that is not present in the context.
+2. If the context is empty or contains insufficient information to answer, write exactly one sentence: "The retrieved sources provide limited information on this topic." Do not add anything beyond that sentence.
+3. Never invent, extrapolate, or speculate. Every claim must trace directly to a supplied snippet.
+4. Never fabricate citations, paper titles, author names, DOIs, dates, statistics, or URLs.
+5. Use precise, scientific language. Be objective and factual. No hype, no marketing language, no superlatives.
+6. Do not open with meta-commentary such as "Based on the context…", "According to the snippets…", or "It appears that…". State facts directly.
+7. If snippets contradict each other, note the disagreement neutrally in one clause.
 
 OUTPUT FORMAT:
-- Write 3 to 5 concise, factually grounded sentences.
+- 3 to 5 concise sentences.
 - Maximum 120 words total.
-- Flowing prose only — no bullet points, no headers, no numbered lists.
-- Begin directly with the information; do not open with meta-commentary such as "Based on the context…".${langNote}`;
+- Flowing prose only — no bullet points, no headers, no numbered lists.${langNote}`;
 }
 
 // ── POST /api/ai-summary ──────────────────────────────────────────────────────
@@ -140,10 +150,11 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
       });
       res.write(`data: ${JSON.stringify({ token: cached.summary })}\n\n`);
       res.write(`data: ${JSON.stringify({
-        done:        true,
-        cached:      true,
-        confidence:  cached.confidence,
-        sourcesUsed: cached.sourcesUsed,
+        done:            true,
+        cached:          true,
+        confidence:      cached.confidence,
+        confidenceLabel: toConfidenceLabel(cached.confidence, cached.sourcesUsed),
+        sourcesUsed:     cached.sourcesUsed,
       })}\n\n`);
       res.end();
     } else {
@@ -197,8 +208,8 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
         body: JSON.stringify({
           model:       GROQ_MODEL,
           messages,
-          temperature: 0.2,
-          max_tokens:  220,
+          temperature: 0.1,   // lower → more deterministic, less hallucination risk
+          max_tokens:  180,   // 120-word cap ≈ 160 tokens; 180 gives headroom
           stream:      wantStream,
         }),
         signal: AbortSignal.timeout(30_000),
@@ -280,10 +291,11 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
         });
 
         res.write(`data: ${JSON.stringify({
-          done:        true,
-          cached:      false,
+          done:            true,
+          cached:          false,
           confidence,
-          sourcesUsed: snippets.length,
+          confidenceLabel: toConfidenceLabel(confidence, snippets.length),
+          sourcesUsed:     snippets.length,
         })}\n\n`);
         res.end();
         return;
