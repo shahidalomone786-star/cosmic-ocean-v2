@@ -135,6 +135,93 @@ function extSourceCfg(source: string) {
   };
 }
 
+// ─── Sort order type ──────────────────────────────────────────────────────────
+type SortOrder = 'relevance' | 'recent' | 'cited';
+
+// ─── Science terms dictionary for "Did you mean?" ────────────────────────────
+const SCIENCE_TERMS: readonly string[] = [
+  'astrophysics','quantum mechanics','general relativity','special relativity',
+  'cosmology','particle physics','string theory','dark matter','dark energy',
+  'black hole','neutron star','supernova','galaxy','nebula','pulsar',
+  'quasar','gravitational waves','hawking radiation','event horizon',
+  'wormhole','singularity','spacetime','antimatter','neutrino',
+  'boson','fermion','lepton','quark','hadron','meson','baryon',
+  'photon','electron','proton','neutron','nucleus','atom','molecule',
+  'entropy','thermodynamics','quantum entanglement','superposition',
+  'wave function','schrodinger','uncertainty principle','planck constant',
+  'speed of light','electric field','magnetic field','electromagnetism',
+  'photoelectric effect','atomic orbital','nuclear fusion','nuclear fission',
+  'radioactivity','half life','isotope','periodic table','element',
+  'compound','chemical bond','catalyst','polymer','protein',
+  'dna','rna','chromosome','gene','evolution','natural selection',
+  'cell','mitosis','meiosis','enzyme','metabolism','photosynthesis',
+  'respiration','neuroscience','neuron','synapse','nervous system',
+  'ecology','ecosystem','atmosphere','greenhouse effect',
+  'geology','tectonic plates','volcano','earthquake','fossil',
+  'paleontology','archaeology','anthropology','psychology','cognitive science',
+  'artificial intelligence','machine learning','neural network','algorithm',
+  'mathematics','calculus','linear algebra','statistics','probability',
+  'topology','number theory','chaos theory','fractal',
+  'geometry','trigonometry','differential equation',
+  'fluid dynamics','aerodynamics','acoustics','optics','spectroscopy',
+  'nanotechnology','semiconductor','superconductor','laser','plasma',
+  'inflation','big bang','multiverse','parallel universe',
+  'exoplanet','solar system','planet','star','constellation',
+  'milky way','andromeda','telescope','space station',
+  'mars','jupiter','saturn','moon','comet','asteroid',
+  'aurora borealis','solar flare','cosmic ray','gamma ray',
+  'wavelength','frequency','spectrum','interference','diffraction',
+  'refraction','polarization','holography','microscopy',
+  'biotechnology','pharmacology','immunology','virology','bacteriology',
+  'epidemiology','pathology','anatomy','physiology','embryology',
+  'schwarzschild radius','einstein ring','dark nebula','baryon asymmetry',
+  'quantum chromodynamics','standard model','supersymmetry',
+  'loop quantum gravity','higgs boson','large hadron collider',
+  'redshift','blueshift','doppler effect','parallax','parsec',
+  'lightyear','astronomical unit','solar wind','magnetosphere',
+  'thermometer','barometer','spectrometer','oscilloscope',
+  'magnetism','capacitor','resistor','transistor','diode',
+];
+
+/** Levenshtein edit distance (O(m·n), short strings only) */
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  if (Math.abs(a.length - b.length) > 5) return 999;
+  const row: number[] = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i - 1;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j];
+      row[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, row[j], row[j - 1]);
+      prev = tmp;
+    }
+  }
+  return row[b.length];
+}
+
+/** Return closest SCIENCE_TERMS match if within typo threshold, else null */
+function findClosestMatch(query: string): string | null {
+  const q = query.toLowerCase().trim();
+  if (q.length < 4) return null;
+  if (SCIENCE_TERMS.some(t => t === q)) return null; // exact match — no suggestion
+  let bestTerm: string | null = null;
+  let bestDist = Infinity;
+  for (const term of SCIENCE_TERMS) {
+    // For multi-word terms also compare individual words
+    const wordDists = term.includes(' ')
+      ? term.split(' ').map(w => levenshtein(q, w))
+      : [];
+    const dist = wordDists.length
+      ? Math.min(levenshtein(q, term), ...wordDists)
+      : levenshtein(q, term);
+    if (dist > 0 && dist < bestDist) { bestDist = dist; bestTerm = term; }
+  }
+  const maxDist = q.length <= 5 ? 2 : q.length <= 9 ? 3 : 4;
+  return bestDist <= maxDist ? bestTerm : null;
+}
+
 // ─── HighlightText — case-insensitive query keyword highlighting ───────────────
 function HighlightText({ text, query, className }: {
   text: string; query?: string; className?: string;
@@ -288,6 +375,46 @@ function StatusBadge({ type, lm }: { type: StatusBadgeType; lm?: boolean }) {
       <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: dot }} />
       {type}
     </span>
+  );
+}
+
+// ─── Sort control bar ─────────────────────────────────────────────────────────
+function SortBar({
+  sort, onChange, hasCitations, lm,
+}: {
+  sort: SortOrder; onChange: (s: SortOrder) => void; hasCitations: boolean; lm?: boolean;
+}) {
+  const opts: { id: SortOrder; label: string }[] = [
+    { id: 'relevance', label: 'Relevance' },
+    { id: 'recent',    label: 'Most Recent' },
+    ...(hasCitations ? [{ id: 'cited' as SortOrder, label: 'Most Cited' }] : []),
+  ];
+  return (
+    <div className="flex items-center gap-2.5 mb-4 px-0.5">
+      <span className={`text-[9px] uppercase tracking-[0.22em] font-semibold flex-shrink-0 ${lm ? 'text-gray-400' : 'text-white/28'}`}>Sort</span>
+      <div className="flex items-center gap-1.5">
+        {opts.map(opt => {
+          const active = sort === opt.id;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => onChange(opt.id)}
+              className={`text-[9.5px] font-semibold tracking-[0.08em] uppercase px-2.5 py-1 rounded-full border whitespace-nowrap transition-all duration-200 ${
+                active
+                  ? lm
+                    ? 'bg-gray-900 border-gray-900 text-white shadow-[0_1px_6px_rgba(0,0,0,0.18)]'
+                    : 'bg-violet-500/20 border-violet-400/35 text-violet-200 shadow-[0_1px_8px_rgba(139,92,246,0.2)]'
+                  : lm
+                    ? 'bg-white border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+                    : 'bg-transparent border-white/[0.07] text-white/30 hover:border-white/[0.16] hover:text-white/55 hover:bg-white/[0.03]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1499,8 +1626,12 @@ function NasaSearch({
   // Feature #11: back-to-top — show after 2× viewport height of scrolling
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  // Reset filter whenever the search query changes
-  useEffect(() => { setActiveFilter('all'); }, [sections?.query]);
+  // Reset filter + sort + "did you mean" dismissed state whenever query changes
+  useEffect(() => {
+    setActiveFilter('all');
+    setSortOrder('relevance');
+    setDismissedDym(false);
+  }, [sections?.query]);
 
   // Track window scroll for back-to-top visibility
   useEffect(() => {
@@ -1533,12 +1664,59 @@ function NasaSearch({
     aiSummary:  sections?.aiSummary ? 1 : 0,
   }), [sections, classifiedVideos]);
 
+  // ── Sort state (reset when query changes via the useEffect above) ──────────
+  const [sortOrder,   setSortOrder]   = useState<SortOrder>('relevance');
+  const [dismissedDym, setDismissedDym] = useState(false);
+
+  // True when at least one research/book item carries a citation count
+  const hasAnyCitations = useMemo(
+    () => [...(sections?.research ?? []), ...(sections?.books ?? [])].some(i => (i.citationCount ?? 0) > 0),
+    [sections]
+  );
+
+  // Sorted copy of sections (no refetch — pure client-side)
+  const sortedSections = useMemo((): SearchSections | null => {
+    if (!sections) return null;
+    if (sortOrder === 'relevance') return sections;
+    const byDate   = (a: SectionItem, b: SectionItem) =>
+      (b.date ?? '').localeCompare(a.date ?? '');
+    const byCited  = (a: SectionItem, b: SectionItem) =>
+      (b.citationCount ?? 0) - (a.citationCount ?? 0) || byDate(a, b);
+    if (sortOrder === 'recent') {
+      return {
+        ...sections,
+        wikipedia: [...sections.wikipedia].sort(byDate),
+        research:  [...sections.research].sort(byDate),
+        nasa:      [...sections.nasa].sort(byDate),
+        esa:       [...sections.esa].sort(byDate),
+        books:     [...sections.books].sort(byDate),
+      };
+    }
+    // cited
+    return {
+      ...sections,
+      research:  [...sections.research].sort(byCited),
+      books:     [...sections.books].sort(byCited),
+      nasa:      [...sections.nasa].sort(byDate),
+      esa:       [...sections.esa].sort(byDate),
+      wikipedia: [...sections.wikipedia].sort(byDate),
+    };
+  }, [sections, sortOrder]);
+
+  // "Did you mean?" — only when done & query seems misspelled
+  const didYouMean = useMemo(
+    () => (status === 'done' && sections) ? findClosestMatch(sections.query) : null,
+    [sections, status]
+  );
+
   if (status === 'idle') return null;
 
   const isLoading = status === 'loading';
 
   // ── SECTIONED VIEW (new unified endpoint) ─────────────────────────────────
   if (sections !== undefined && sections !== null) {
+    // Sorted alias — pure client-side, zero refetch
+    const ss = sortedSections ?? sections;
     // Which videos to show depends on the active filter
     const videosToShow =
       activeFilter === 'shorts'     ? classifiedVideos.shorts :
@@ -1591,6 +1769,39 @@ function NasaSearch({
               <KnowledgeCoverage sections={sections} lm={lm} />
             )}
 
+            {/* ── "Did you mean?" typo correction ── */}
+            <AnimatePresence>
+              {!dismissedDym && didYouMean && status === 'done' && (
+                <motion.div
+                  key="did-you-mean"
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className={`flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl border ${
+                    lm
+                      ? 'bg-amber-50 border-amber-200/80 text-amber-700'
+                      : 'bg-amber-400/[0.06] border-amber-400/[0.14] text-amber-300/80'
+                  }`}
+                >
+                  <span className="text-[11.5px] flex-shrink-0">Did you mean:</span>
+                  <button
+                    onClick={() => onRelatedTopicSearch?.(didYouMean)}
+                    className={`text-[11.5px] font-semibold underline underline-offset-2 transition-colors duration-150 hover:opacity-80`}
+                  >
+                    {didYouMean}
+                  </button>
+                  <button
+                    onClick={() => setDismissedDym(true)}
+                    className="ml-auto flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity duration-150"
+                    aria-label="Dismiss"
+                  >
+                    <X size={11} strokeWidth={2} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Status bar */}
             <div className="flex items-center justify-between mb-5 px-0.5">
               <div className="flex items-center gap-2 min-w-0">
@@ -1618,6 +1829,16 @@ function NasaSearch({
                 counts={filterCounts}
                 lm={lm}
                 onChange={setActiveFilter}
+              />
+            )}
+
+            {/* Sort controls — client-side, no refetch */}
+            {!isLoading && hasAny && (
+              <SortBar
+                sort={sortOrder}
+                onChange={setSortOrder}
+                hasCitations={hasAnyCitations}
+                lm={lm}
               />
             )}
 
@@ -1695,7 +1916,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.04, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={BookOpen} label="Wikipedia" sub="Encyclopedia Articles" count={sections.wikipedia.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.wikipedia.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'wikipedia' ? (
@@ -1709,7 +1930,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.08, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={FileText} label="Research Papers" sub="arXiv · OpenAlex · Semantic Scholar · INSPIRE-HEP" count={sections.research.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {sections.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.research.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'research' ? (
@@ -1723,7 +1944,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.12, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Globe} label="NASA Images" sub="Image & Video Library" count={sections.nasa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.nasa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'nasa' ? (
@@ -1737,7 +1958,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.16, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Satellite} label="ESA Hubble" sub="European Space Agency" count={sections.esa.length} lm={lm} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                        {sections.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.esa.map((item, i) => <SectionItemCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'esa' ? (
@@ -1751,7 +1972,7 @@ function NasaSearch({
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="mb-8">
                       <SectionHeader icon={Library} label="Books" sub="OpenAlex Academic Books" count={sections.books.length} lm={lm} />
                       <div className="flex flex-col gap-3">
-                        {sections.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
+                        {ss.books.map((item, i) => <ResearchRowCard key={item.id} item={item} idx={i} lm={lm} query={sections.query} onOpen={() => setSelectedSectionItem(item)} />)}
                       </div>
                     </motion.div>
                   ) : activeFilter === 'books' ? (

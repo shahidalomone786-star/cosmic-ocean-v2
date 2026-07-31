@@ -1991,6 +1991,7 @@ export default function App() {
 
   // ── Unified search state ──────────────────────────────────────────────────
   const [nasaQuery,        setNasaQuery]        = useState('');
+  const [acSuggestions,   setAcSuggestions]   = useState<string[]>([]);
   const [searchResults,    setSearchResults]    = useState<UnifiedItem[]>([]);
   const [searchStatus,     setSearchStatus]     = useState<NasaStatus>('idle');
   const [searchError,      setSearchError]      = useState('');
@@ -2250,6 +2251,24 @@ export default function App() {
     twTimerRef.current = setTimeout(tick, 800);
     return () => { if (twTimerRef.current) clearTimeout(twTimerRef.current); };
   }, [focused, nasaQuery]);
+
+  // ── Autocomplete — Wikipedia OpenSearch (debounced 300 ms) ──────────────
+  useEffect(() => {
+    const q = nasaQuery.trim();
+    if (!q) { setAcSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const url =
+          `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}` +
+          `&limit=6&namespace=0&format=json&origin=*`;
+        const res  = await fetch(url);
+        const data = await res.json() as [string, string[]];
+        // data[1] is the array of suggestion titles
+        setAcSuggestions((data[1] ?? []).slice(0, 6));
+      } catch { setAcSuggestions([]); }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [nasaQuery]);
 
   // ── IntersectionObserver — infinite scroll ────────────────────────────────
   // Attaches for ALL search modes (specific filter or Everything).
@@ -2609,6 +2628,47 @@ export default function App() {
                             <Search size={11} strokeWidth={2} className={`flex-shrink-0 ${lm ? 'text-gray-300 group-hover:text-gray-500' : 'text-white/18 group-hover:text-white/45'} transition-colors duration-150`} />
                             <span className="flex-1 text-[13px] font-light tracking-wide truncate">{s}</span>
                             <span className={`flex-shrink-0 text-[8.5px] uppercase tracking-[0.18em] ${lm ? 'text-gray-300' : 'text-white/18'}`}>#{i + 1}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Autocomplete suggestions — Wikipedia OpenSearch */}
+                <AnimatePresence>
+                  {focused && nasaQuery.trim() && acSuggestions.length > 0 && (
+                    <motion.div
+                      key="autocomplete"
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                      className={`absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl border overflow-hidden ${
+                        lm
+                          ? 'bg-white/90 border-black/[0.08] shadow-[0_12px_48px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.03)] backdrop-blur-xl'
+                          : 'bg-[#0d0d1e]/90 border-white/[0.09] shadow-[0_12px_48px_rgba(0,0,0,0.75)] backdrop-blur-xl'
+                      }`}
+                    >
+                      <div className={`flex items-center px-4 pt-3 pb-2 ${lm ? 'border-b border-black/[0.06]' : 'border-b border-white/[0.06]'}`}>
+                        <span className={`text-[9px] uppercase tracking-[0.22em] font-semibold ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+                          Suggestions
+                        </span>
+                      </div>
+                      <div className="flex flex-col py-1.5">
+                        {acSuggestions.map((s) => (
+                          <button
+                            key={s}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setNasaQuery(s); setAcSuggestions([]); searchAll(s); setFocused(false); }}
+                            className={`group flex items-center gap-3 px-4 py-2.5 text-left transition-all duration-150 ${
+                              lm
+                                ? 'hover:bg-black/[0.04] text-gray-700 hover:text-gray-900'
+                                : 'hover:bg-white/[0.05] text-white/60 hover:text-white/90'
+                            }`}
+                          >
+                            <Search size={11} strokeWidth={2} className={`flex-shrink-0 ${lm ? 'text-gray-300 group-hover:text-gray-500' : 'text-white/18 group-hover:text-white/45'} transition-colors duration-150`} />
+                            <span className="flex-1 text-[13px] font-light tracking-wide truncate">{s}</span>
                           </button>
                         ))}
                       </div>
