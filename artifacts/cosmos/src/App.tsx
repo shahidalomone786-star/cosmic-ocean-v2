@@ -2047,6 +2047,20 @@ export default function App() {
     useAuthStore.getState().checkSession();
   }, []);
 
+  // ── Restore search query from URL on mount (?q=) ─────────────────────────
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q')?.trim();
+      if (q) {
+        setNasaQuery(q);
+        searchAll(q, 'specific');
+      }
+    } catch { /* noop */ }
+    // searchAll is stable (useCallback with [] deps) — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Track time spent on site; flush to Supabase every 60 s ───────────────
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -2104,6 +2118,13 @@ export default function App() {
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
     if (!term) return;
+    // ── Reflect query in URL for shareability / reload restore ──────────────
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('q', term);
+      url.searchParams.delete('tab'); // tab resets on new search
+      history.replaceState(null, '', url.toString());
+    } catch { /* noop */ }
     const everything = mode === 'everything';
     setIsEverythingMode(everything);
     setSearchStatus('loading');
@@ -2197,6 +2218,10 @@ export default function App() {
     setIsLoadingMore(false);
     setVideoResults([]);
     setVideoStatus('idle');
+    // ── Remove q/tab params from URL when clearing ───────────────────────
+    try {
+      history.replaceState(null, '', window.location.pathname);
+    } catch { /* noop */ }
   }, []);
 
   // ── Portal fetch ──────────────────────────────────────────────────────────

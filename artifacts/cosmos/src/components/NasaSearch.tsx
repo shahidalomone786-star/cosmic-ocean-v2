@@ -23,6 +23,7 @@ import AISummary from './AISummary';
 import SavedPapersDrawer from './SavedPapersDrawer';
 import { useSavedPapers, stableItemId } from '../hooks/useSavedPapers';
 import DiscoveryPanel from './DiscoveryPanel';
+import ExploreFurther from './ExploreFurther';
 
 // ─── Legacy types (unchanged — keep backward compat) ──────────────────────────
 export type { VideoItem };
@@ -1770,16 +1771,48 @@ function NasaSearch({
   onLoadMore, shortsHasMore = true,
 }: Props) {
   const [selectedSectionItem, setSelectedSectionItem] = useState<SectionItem | null>(null);
-  const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
+
+  // ── Init activeFilter from URL (?tab=) so shared/bookmarked links restore tab ──
+  const [activeFilter, setActiveFilter] = useState<SearchFilter>(() => {
+    try {
+      const tab = new URLSearchParams(window.location.search).get('tab') as SearchFilter | null;
+      const valid: SearchFilter[] = [
+        'all', 'videos', 'shorts', 'longVideos', 'wikipedia',
+        'research', 'nasa', 'esa', 'books', 'aiSummary',
+      ];
+      return (tab && (valid as string[]).includes(tab)) ? tab : 'all';
+    } catch { return 'all'; }
+  });
+
   // Feature #11: back-to-top — show after 2× viewport height of scrolling
   const [showBackToTop, setShowBackToTop] = useState(false);
 
+  // ── Skip reset on the very first query so URL-restored tab survives ──────
+  const isFirstQueryRef = useRef(true);
+
   // Reset filter + sort + "did you mean" dismissed state whenever query changes
   useEffect(() => {
+    if (isFirstQueryRef.current) {
+      isFirstQueryRef.current = false;
+      return; // preserve URL-restored tab on initial load
+    }
     setActiveFilter('all');
     setSortOrder('relevance');
     setDismissedDym(false);
   }, [sections?.query]);
+
+  // ── Sync activeFilter back to URL without page reload ────────────────────
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (activeFilter === 'all') {
+        url.searchParams.delete('tab');
+      } else {
+        url.searchParams.set('tab', activeFilter);
+      }
+      history.replaceState(null, '', url.toString());
+    } catch { /* noop */ }
+  }, [activeFilter]);
 
   // Track window scroll for back-to-top visibility
   useEffect(() => {
@@ -2058,6 +2091,12 @@ function NasaSearch({
                       query={sections.query}
                       sections={ss}
                       onSearch={onRelatedTopicSearch}
+                      lm={lm}
+                    />
+                    {/* Explore Further — context-aware research action chips */}
+                    <ExploreFurther
+                      query={sections.query}
+                      onSearch={q => onRelatedTopicSearch?.(q)}
                       lm={lm}
                     />
                   </>
