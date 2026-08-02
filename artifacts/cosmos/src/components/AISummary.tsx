@@ -1,18 +1,17 @@
 /**
- * AISummary — Premium AI Overview + Follow-Up Research Assistant
+ * AISummary — 3-D Glassmorphism AI Overview + Follow-Up Research Copilot
  *
- * Quality guarantees:
- *   • Confidence badge: High / Medium / Limited Evidence (from server heuristic)
- *   • Source attribution: compact chips, only sources that contributed
- *   • Grounding: server prompt strictly forbids model-memory answers
- *   • sessionStorage cache stores text + confidence + sources for instant replay
- *   • AbortController cancels stale requests on query change
- *   • SSE streaming — progressive token rendering, never blocks search results
- *   • React.memo / useMemo / useCallback — zero unnecessary re-renders
- *   • content-visibility:auto — paint skipped when off-screen
- *   • ARIA live region — accessible progressive announcement
- *   • prefers-reduced-motion — word-fade disabled when requested
- *   • FollowUpPanel — local state, never triggers parent re-renders
+ * Design:
+ *   • bg-[#0A0A10]/70 backdrop-blur-2xl animated-gradient-border card
+ *   • Premium chip / button system: bg-white/5 border border-white/10 backdrop-blur-md
+ *   • Working ElevenLabs TTS: fetch /api/tts → Blob → URL.createObjectURL → Audio.play()
+ *   • Follow-up responses: each in its own glassmorphism bubble + dedicated Listen button
+ *
+ * Performance:
+ *   • React.memo on every sub-component — FollowUpPanel never re-renders parent
+ *   • sessionStorage cache (30-min TTL)
+ *   • AbortController on every fetch
+ *   • content-visibility:auto
  */
 
 import {
@@ -26,79 +25,15 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Zap, ShieldCheck, ShieldAlert, ShieldOff,
-  Headphones, Copy, Check, MessageSquare, ArrowRight,
+  Headphones, Copy, Check, ArrowRight, Volume2,
 } from 'lucide-react';
 import type { SearchSections } from './NasaSearch';
 
-// ─── Confidence label type (mirrors server) ───────────────────────────────────
-type ConfidenceLabel = 'High' | 'Medium' | 'Limited Evidence';
-
-// ─── Session cache (30 min TTL) ───────────────────────────────────────────────
-const SESSION_CACHE_TTL_MS = 30 * 60 * 1000;
-
-interface CacheEntry {
-  text:            string;
-  confidenceLabel: ConfidenceLabel | null;
-  usedSources:     string[];
-  exp:             number;
-}
-
-function getCached(cacheKey: string): CacheEntry | null {
-  try {
-    const raw = sessionStorage.getItem(`ai-overview-v2:${cacheKey}`);
-    if (!raw) return null;
-    const entry = JSON.parse(raw) as CacheEntry;
-    if (Date.now() > entry.exp) {
-      sessionStorage.removeItem(`ai-overview-v2:${cacheKey}`);
-      return null;
-    }
-    return entry;
-  } catch { return null; }
-}
-
-function setCached(cacheKey: string, entry: Omit<CacheEntry, 'exp'>): void {
-  try {
-    sessionStorage.setItem(
-      `ai-overview-v2:${cacheKey}`,
-      JSON.stringify({ ...entry, exp: Date.now() + SESSION_CACHE_TTL_MS }),
-    );
-  } catch { /* quota exceeded */ }
-}
-
-// ─── Source label map ─────────────────────────────────────────────────────────
-const SOURCE_LABELS: Record<string, string> = {
-  wiki:            'Wikipedia',
-  arxiv:           'arXiv',
-  openalex:        'OpenAlex',
-  semanticscholar: 'Semantic Scholar',
-  inspirehep:      'INSPIRE-HEP',
-  nasa:            'NASA',
-  esa:             'ESA Hubble',
-  book:            'OpenAlex',
-};
-
-const SOURCE_CHIP_LABELS: Record<string, string> = {
-  'Wikipedia':        'Wikipedia',
-  'NASA':             'NASA',
-  'ESA Hubble':       'ESA',
-  'arXiv':            'arXiv',
-  'OpenAlex':         'OpenAlex',
-  'Semantic Scholar': 'S2',
-  'INSPIRE-HEP':      'INSPIRE',
-};
-
-// ─── Quick follow-up prompts ──────────────────────────────────────────────────
-const QUICK_PROMPTS = [
-  'Explain Simply',
-  'Give Examples',
-  'Compare Concepts',
-  'Latest Research',
-  'Real-world Applications',
-] as const;
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-type SummaryState  = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
-type FollowUpState = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
+type ConfidenceLabel = 'High' | 'Medium' | 'Limited Evidence';
+type SummaryState    = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
+type FollowUpState   = 'idle' | 'loading' | 'streaming' | 'done' | 'error';
+type ListenState     = 'idle' | 'loading' | 'playing' | 'error';
 
 interface Props {
   query:    string;
@@ -106,93 +41,257 @@ interface Props {
   lm?:      boolean;
 }
 
-// ─── Confidence badge config ──────────────────────────────────────────────────
-interface BadgeCfg {
-  label:    ConfidenceLabel;
-  icon:     typeof ShieldCheck;
-  darkCls:  string;
-  lightCls: string;
+// ─── Session cache (30-min TTL) ───────────────────────────────────────────────
+const CACHE_TTL = 30 * 60 * 1000;
+interface CacheEntry {
+  text:            string;
+  confidenceLabel: ConfidenceLabel | null;
+  usedSources:     string[];
+  exp:             number;
+}
+function getCached(key: string): CacheEntry | null {
+  try {
+    const raw = sessionStorage.getItem(`ai-v3:${key}`);
+    if (!raw) return null;
+    const e = JSON.parse(raw) as CacheEntry;
+    if (Date.now() > e.exp) { sessionStorage.removeItem(`ai-v3:${key}`); return null; }
+    return e;
+  } catch { return null; }
+}
+function setCached(key: string, e: Omit<CacheEntry, 'exp'>) {
+  try { sessionStorage.setItem(`ai-v3:${key}`, JSON.stringify({ ...e, exp: Date.now() + CACHE_TTL })); }
+  catch { /* quota */ }
 }
 
-const CONFIDENCE_CFG: Record<ConfidenceLabel, BadgeCfg> = {
-  High: {
-    label:    'High',
-    icon:     ShieldCheck,
-    darkCls:  'bg-emerald-500/[0.10] border-emerald-400/[0.20] text-emerald-300/90',
-    lightCls: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-  },
-  Medium: {
-    label:    'Medium',
-    icon:     ShieldAlert,
-    darkCls:  'bg-amber-500/[0.09] border-amber-400/[0.18] text-amber-300/85',
-    lightCls: 'bg-amber-50 border-amber-200 text-amber-700',
-  },
-  'Limited Evidence': {
-    label:    'Limited Evidence',
-    icon:     ShieldOff,
-    darkCls:  'bg-slate-500/[0.08] border-slate-400/[0.15] text-slate-300/70',
-    lightCls: 'bg-slate-50 border-slate-200 text-slate-600',
-  },
+// ─── Source constants ─────────────────────────────────────────────────────────
+const SOURCE_LABELS: Record<string, string> = {
+  wiki: 'Wikipedia', arxiv: 'arXiv', openalex: 'OpenAlex',
+  semanticscholar: 'Semantic Scholar', inspirehep: 'INSPIRE-HEP',
+  nasa: 'NASA', esa: 'ESA Hubble', book: 'OpenAlex',
+};
+const SOURCE_CHIP: Record<string, string> = {
+  'Wikipedia': 'Wikipedia', 'NASA': 'NASA', 'ESA Hubble': 'ESA',
+  'arXiv': 'arXiv', 'OpenAlex': 'OpenAlex',
+  'Semantic Scholar': 'S2', 'INSPIRE-HEP': 'INSPIRE',
+};
+const SOURCE_ORDER = ['Wikipedia','NASA','ESA Hubble','arXiv','OpenAlex','Semantic Scholar','INSPIRE-HEP'];
+
+const QUICK_PROMPTS = [
+  'Explain Simply', 'Give Examples', 'Compare Concepts',
+  'Latest Research', 'Real-world Applications',
+] as const;
+
+// ─── Confidence config ────────────────────────────────────────────────────────
+const CONF: Record<ConfidenceLabel, { icon: typeof ShieldCheck; cls: string }> = {
+  'High':             { icon: ShieldCheck, cls: 'text-emerald-400/80 border-emerald-400/20 bg-emerald-400/8'  },
+  'Medium':           { icon: ShieldAlert, cls: 'text-amber-400/80  border-amber-400/20  bg-amber-400/8'    },
+  'Limited Evidence': { icon: ShieldOff,   cls: 'text-slate-400/70  border-slate-400/15  bg-slate-400/6'    },
 };
 
-// ─── Skeleton shimmer bar ─────────────────────────────────────────────────────
-const SkeletonBar = memo(function SkeletonBar({ width, lm }: { width: string; lm?: boolean }) {
+// ─── Shared button/chip class ─────────────────────────────────────────────────
+// NOTE: the two `shadow-*` utilities requested (shadow-xl + shadow-[inset...]) both write to the
+// same --tw-shadow CSS variable, so stacking them as separate classes means only one survives —
+// merged into a single shadow-[...] with comma-separated layers (shadow-xl's real px values + inset).
+const CHIP = `bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] rounded-2xl px-4 py-2
+              transition-all duration-300 text-sm font-medium backdrop-blur-xl
+              shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.05)]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50
+              disabled:opacity-40 disabled:cursor-not-allowed`;
+
+// Small variant for badges inside the header
+const CHIP_SM = `bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] rounded-2xl px-3 py-1
+                transition-all duration-300 text-xs font-medium backdrop-blur-xl
+                shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.05)]
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50
+                disabled:opacity-40 disabled:cursor-not-allowed`;
+
+// ─── TTS helper ───────────────────────────────────────────────────────────────
+async function playTTS(text: string): Promise<void> {
+  const res = await fetch('/api/tts', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ text: text.slice(0, 2500) }),
+  });
+  if (!res.ok) throw new Error(`TTS ${res.status}`);
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(url);
+    audio.onended  = () => { URL.revokeObjectURL(url); resolve(); };
+    audio.onerror  = () => { URL.revokeObjectURL(url); reject(new Error('audio playback failed')); };
+    audio.play().catch(reject);
+  });
+}
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+const Spinner = memo(function Spinner({ size = 12, color = 'border-violet-400' }: { size?: number; color?: string }) {
   return (
-    <div
-      className={`h-2.5 rounded-full animate-pulse ${lm ? 'bg-violet-200/60' : 'bg-violet-500/[0.14]'}`}
-      style={{ width }}
+    <motion.span
+      className={`inline-block rounded-full border-2 border-t-transparent ${color}`}
+      style={{ width: size, height: size }}
+      animate={{ rotate: 360 }}
+      transition={{ duration: 0.65, repeat: Infinity, ease: 'linear' }}
       aria-hidden="true"
     />
   );
 });
 
-// ─── Premium loading skeleton ─────────────────────────────────────────────────
-const AISummarySkeleton = memo(function AISummarySkeleton({ lm }: { lm?: boolean }) {
+// ─── Listen button (shared, fully self-contained) ─────────────────────────────
+const ListenButton = memo(function ListenButton({ text, small }: { text: string; small?: boolean }) {
+  const [state, setState] = useState<ListenState>('idle');
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleClick = useCallback(async () => {
+    if (state !== 'idle' && state !== 'error') return;
+    setState('loading');
+    try {
+      await playTTS(text);
+      setState('idle');
+    } catch (e: unknown) {
+      if ((e as Error)?.name === 'AbortError') { setState('idle'); return; }
+      setState('error');
+      setTimeout(() => setState('idle'), 3000);
+    }
+  }, [state, text]);
+
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
+
+  const cls = small ? CHIP_SM : CHIP;
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={state === 'loading' || state === 'playing'}
+      className={`${cls} flex items-center gap-2 ${state === 'error' ? 'text-red-400/80' : 'text-white/90'}`}
+      aria-label={state === 'loading' ? 'Loading audio…' : state === 'playing' ? 'Playing…' : 'Listen'}
+    >
+      {state === 'loading' ? (
+        <>
+          <motion.span
+            className="inline-block w-3 h-3 rounded-full"
+            animate={{ boxShadow: ['0 0 4px 1px rgba(139,92,246,0.4)', '0 0 10px 3px rgba(139,92,246,0.8)', '0 0 4px 1px rgba(139,92,246,0.4)'] }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ background: 'rgba(139,92,246,0.6)' }}
+          />
+          <span>Loading…</span>
+        </>
+      ) : state === 'playing' ? (
+        <>
+          <Volume2 size={small ? 10 : 12} strokeWidth={2} aria-hidden="true" />
+          <span>Playing</span>
+        </>
+      ) : state === 'error' ? (
+        <>
+          <Headphones size={small ? 10 : 12} strokeWidth={2} aria-hidden="true" />
+          <span>Retry</span>
+        </>
+      ) : (
+        <>
+          <Headphones size={small ? 10 : 12} strokeWidth={2} aria-hidden="true" />
+          <span>Listen</span>
+        </>
+      )}
+    </button>
+  );
+});
+
+
+// ─── Copy button ──────────────────────────────────────────────────────────────
+const CopyButton = memo(function CopyButton({ text, small }: { text: string; small?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }).catch(() => {});
+  }, [text]);
+  const cls = small ? CHIP_SM : CHIP;
+  return (
+    <button onClick={handleCopy} className={`${cls} flex items-center gap-2 ${copied ? 'text-emerald-400' : 'text-white/90'}`} aria-label={copied ? 'Copied' : 'Copy'}>
+      {copied ? <Check size={small ? 10 : 12} strokeWidth={2.5} aria-hidden="true" /> : <Copy size={small ? 10 : 12} strokeWidth={2} aria-hidden="true" />}
+      <span>{copied ? 'Copied' : 'Copy'}</span>
+    </button>
+  );
+});
+
+// ─── Stream cursor ────────────────────────────────────────────────────────────
+const StreamCursor = memo(function StreamCursor() {
+  return (
+    <motion.span
+      animate={{ opacity: [1, 0, 1] }}
+      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+      aria-hidden="true"
+      className="inline-block w-[2px] h-[1em] ml-0.5 rounded-full bg-violet-400 align-middle"
+    />
+  );
+});
+
+// ─── Streaming text ───────────────────────────────────────────────────────────
+const StreamingText = memo(function StreamingText({ text, isStreaming }: { text: string; isStreaming: boolean }) {
+  const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cls = 'text-[14px] leading-relaxed tracking-[0.01em] text-white/85';
+
+  if (prefersReduced || !isStreaming) {
+    return <p className={cls}>{text}{isStreaming && <StreamCursor />}</p>;
+  }
+
+  const words = text.split(' ');
+  const TAIL  = 6;
+  return (
+    <p className={cls} aria-label={text}>
+      {words.map((w, i) =>
+        !isStreaming || i < words.length - TAIL
+          ? <span key={i} aria-hidden="true">{w}{' '}</span>
+          : <motion.span key={`${i}-${w}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }} aria-hidden="true">{w}{' '}</motion.span>
+      )}
+      {isStreaming && <StreamCursor />}
+    </p>
+  );
+});
+
+// ─── Source chips ─────────────────────────────────────────────────────────────
+const SourceChips = memo(function SourceChips({ sources }: { sources: string[] }) {
+  if (!sources.length) return null;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-      aria-hidden="true"
-      className="relative rounded-2xl p-[1px] mb-6 overflow-hidden"
+      transition={{ delay: 0.1, duration: 0.28 }}
+      className="flex items-center gap-2 flex-wrap"
+      aria-label={`Sources: ${sources.join(', ')}`}
     >
-      <div className="absolute inset-0 rounded-2xl" style={{
-        background: lm
-          ? 'linear-gradient(135deg, rgba(167,139,250,0.30), rgba(99,102,241,0.20), rgba(167,139,250,0.30))'
-          : 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.15), rgba(139,92,246,0.22))',
-      }} />
-      <div className={`relative rounded-[15px] px-6 py-5 overflow-hidden ${
-        lm ? 'bg-gradient-to-br from-violet-50/95 to-indigo-50/85'
-           : 'bg-gradient-to-br from-[#120d28]/95 to-[#0a0d22]/95'
-      }`}>
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: lm
-            ? 'radial-gradient(ellipse at 0% 0%, rgba(167,139,250,0.14), transparent 60%)'
-            : 'radial-gradient(ellipse at 0% 0%, rgba(139,92,246,0.09), transparent 60%)',
-        }} />
-        <div className="relative flex gap-4 items-start">
-          <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 animate-pulse ${
-            lm ? 'bg-violet-100 border border-violet-200' : 'bg-violet-500/15 border border-violet-400/20'
-          }`}>
-            <Sparkles size={14} strokeWidth={2} className={lm ? 'text-violet-400' : 'text-violet-400/50'} />
+      <span className="text-[9px] uppercase tracking-[0.18em] text-white/30 flex-shrink-0">Sources</span>
+      {sources.map(s => (
+        <span key={s} className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/55 backdrop-blur-md">
+          {SOURCE_CHIP[s] ?? s}
+        </span>
+      ))}
+    </motion.div>
+  );
+});
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+const Skeleton = memo(function Skeleton() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="relative overflow-hidden rounded-[2rem] bg-[#050505] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,1),inset_0_1px_1px_rgba(255,255,255,0.15)] p-6 z-10 mb-6"
+      aria-hidden="true"
+    >
+      <div className="flex gap-4">
+        <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-400/15 flex-shrink-0 mt-0.5 animate-pulse" />
+        <div className="flex-1 space-y-3 pt-1">
+          <div className="flex gap-2">
+            <div className="h-2 w-20 rounded-full bg-white/10 animate-pulse" />
+            <div className="h-2 w-14 rounded-full bg-white/6  animate-pulse" />
           </div>
-          <div className="flex-1 min-w-0 space-y-3 pt-0.5">
-            <div className="flex items-center gap-2">
-              <div className={`h-2 w-20 rounded-full animate-pulse ${lm ? 'bg-violet-200/70' : 'bg-violet-400/20'}`} />
-              <div className={`h-2 w-14 rounded-full animate-pulse ${lm ? 'bg-violet-100/70' : 'bg-violet-400/12'}`} />
-            </div>
-            <div className="space-y-2">
-              <SkeletonBar width="100%" lm={lm} />
-              <SkeletonBar width="94%"  lm={lm} />
-              <SkeletonBar width="97%"  lm={lm} />
-              <SkeletonBar width="78%"  lm={lm} />
-            </div>
-            <div className="flex gap-1.5 pt-1">
-              {['w-16','w-12','w-20','w-10'].map((w, i) => (
-                <div key={i} className={`h-5 ${w} rounded-full animate-pulse ${lm ? 'bg-violet-100/60' : 'bg-violet-400/10'}`} />
-              ))}
-            </div>
+          {['100%','94%','97%','78%'].map((w,i) => (
+            <div key={i} className="h-2.5 rounded-full bg-white/8 animate-pulse" style={{ width: w }} />
+          ))}
+          <div className="flex gap-2 pt-1">
+            {['w-20','w-24','w-20','w-16','w-24'].map((w,i) => (
+              <div key={i} className={`h-8 ${w} rounded-full bg-white/5 animate-pulse`} />
+            ))}
           </div>
         </div>
       </div>
@@ -200,333 +299,130 @@ const AISummarySkeleton = memo(function AISummarySkeleton({ lm }: { lm?: boolean
   );
 });
 
-// ─── Blinking stream cursor ───────────────────────────────────────────────────
-const StreamCursor = memo(function StreamCursor({ lm }: { lm?: boolean }) {
-  return (
-    <motion.span
-      animate={{ opacity: [1, 0, 1] }}
-      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-      aria-hidden="true"
-      className={`inline-block w-[2px] h-[1em] ml-0.5 rounded-full align-middle ${
-        lm ? 'bg-violet-500' : 'bg-violet-400'
-      }`}
-    />
-  );
-});
+// ─── Follow-up response bubble ────────────────────────────────────────────────
+interface BubbleProps { prompt: string; text: string; isStreaming: boolean; }
 
-// ─── Confidence badge ─────────────────────────────────────────────────────────
-const ConfidenceBadge = memo(function ConfidenceBadge({
-  label, lm,
-}: { label: ConfidenceLabel; lm?: boolean }) {
-  const cfg = CONFIDENCE_CFG[label];
-  const Icon = cfg.icon;
+const FollowUpBubble = memo(function FollowUpBubble({ prompt, text, isStreaming }: BubbleProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.85 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] font-semibold tracking-wide ${
-        lm ? cfg.lightCls : cfg.darkCls
-      }`}
-      aria-label={`Confidence: ${label}`}
-      title={`Evidence quality: ${label}`}
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] backdrop-blur-xl rounded-2xl shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.05)] text-white/90 transition-all duration-300 p-4 mt-3"
     >
-      <Icon size={9} strokeWidth={2.5} aria-hidden="true" />
-      <span>{label}</span>
-    </motion.div>
-  );
-});
+      {/* Prompt label */}
+      <p className="text-[9px] uppercase tracking-[0.18em] text-violet-400/50 mb-2">{prompt}</p>
 
-// ─── Source count badge ───────────────────────────────────────────────────────
-const SourceCountBadge = memo(function SourceCountBadge({
-  count, lm,
-}: { count: number; lm?: boolean }) {
-  if (count === 0) return null;
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.85 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.22, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-      className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-medium tracking-wide ${
-        lm
-          ? 'bg-violet-50 border-violet-200/70 text-violet-500'
-          : 'bg-violet-500/[0.08] border-violet-400/[0.15] text-violet-300/70'
-      }`}
-      title={`${count} sources contributed`}
-    >
-      <span>{count} source{count !== 1 ? 's' : ''}</span>
-    </motion.div>
-  );
-});
-
-// ─── Source chips ─────────────────────────────────────────────────────────────
-const SourceChips = memo(function SourceChips({
-  sources, lm,
-}: { sources: string[]; lm?: boolean }) {
-  if (sources.length === 0) return null;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.12, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      className="flex items-center gap-1.5 flex-wrap"
-      aria-label={`Summary based on: ${sources.join(', ')}`}
-    >
-      <span className={`text-[8.5px] uppercase tracking-[0.18em] flex-shrink-0 mr-0.5 ${
-        lm ? 'text-violet-400/70' : 'text-violet-400/40'
-      }`}>
-        Sources
-      </span>
-      {sources.map(src => (
-        <span
-          key={src}
-          className={`px-2 py-[3px] rounded-full border text-[9.5px] font-medium flex-shrink-0 ${
-            lm
-              ? 'bg-white border-violet-200/80 text-violet-600 shadow-sm'
-              : 'bg-violet-500/[0.08] border-violet-400/[0.16] text-violet-300/75'
-          }`}
-        >
-          {SOURCE_CHIP_LABELS[src] ?? src}
-        </span>
-      ))}
-    </motion.div>
-  );
-});
-
-// ─── Action buttons ───────────────────────────────────────────────────────────
-const ActionButtons = memo(function ActionButtons({
-  text, lm,
-}: { text: string; lm?: boolean }) {
-  const [copied,    setCopied]    = useState(false);
-  const [listening, setListening] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
-    }).catch(() => { /* clipboard denied */ });
-  }, [text]);
-
-  const handleListen = useCallback(() => {
-    if (listening) return;
-    setListening(true);
-    setTimeout(() => setListening(false), 1800);
-  }, [listening]);
-
-  const btnBase  = `flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10.5px] font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 select-none`;
-  const btnDark  = `bg-white/[0.04] border-white/[0.10] text-white/50 hover:bg-white/[0.09] hover:border-violet-400/[0.25] hover:text-violet-300/90`;
-  const btnLight = `bg-white border-violet-200/80 text-violet-600 hover:bg-violet-50 hover:border-violet-300 shadow-sm`;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.18, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-      className="flex items-center gap-2 flex-wrap"
-    >
-      <button
-        onClick={handleListen}
-        disabled={listening}
-        className={`${btnBase} ${lm ? btnLight : btnDark} disabled:opacity-60 disabled:cursor-not-allowed`}
-        aria-label="Listen to summary"
-      >
-        {listening ? (
-          <motion.span
-            className={`inline-block w-2.5 h-2.5 rounded-full border-2 border-t-transparent ${lm ? 'border-violet-400' : 'border-violet-400'}`}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 0.7, repeat: Infinity, ease: 'linear' }}
-            aria-hidden="true"
-          />
-        ) : (
-          <Headphones size={11} strokeWidth={2} aria-hidden="true" />
-        )}
-        {listening ? 'Loading…' : 'Listen'}
-      </button>
-
-      <button
-        onClick={handleCopy}
-        className={`${btnBase} ${lm ? btnLight : btnDark}`}
-        aria-label={copied ? 'Copied' : 'Copy summary to clipboard'}
-      >
-        {copied
-          ? <Check size={11} strokeWidth={2.5} className={lm ? 'text-emerald-600' : 'text-emerald-400'} aria-hidden="true" />
-          : <Copy size={11} strokeWidth={2} aria-hidden="true" />}
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-
-      <button
-        className={`${btnBase} ${lm ? btnLight : btnDark}`}
-        aria-label="Ask AI about this topic"
-        onClick={() => { /* UI only */ }}
-      >
-        <MessageSquare size={11} strokeWidth={2} aria-hidden="true" />
-        Ask AI
-      </button>
-    </motion.div>
-  );
-});
-
-// ─── StreamingText — progressive word fade ────────────────────────────────────
-const StreamingText = memo(function StreamingText({
-  text, isStreaming, lm,
-}: { text: string; isStreaming: boolean; lm?: boolean }) {
-  const prefersReduced =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const cls = `text-[14px] leading-[1.78] tracking-[0.01em] ${lm ? 'text-gray-700' : 'text-white/78'}`;
-
-  if (prefersReduced || !isStreaming) {
-    return (
-      <p className={cls}>
+      {/* Response text */}
+      <p className="text-[13.5px] leading-relaxed text-white/90">
         {text}
-        {isStreaming && <StreamCursor lm={lm} />}
+        {isStreaming && <StreamCursor />}
       </p>
-    );
-  }
 
-  const words = text.split(' ');
-  const TAIL = 6;
-
-  return (
-    <p className={cls} aria-label={text}>
-      {words.map((word, i) => {
-        if (!isStreaming || i < words.length - TAIL) {
-          return <span key={i} aria-hidden="true">{word}{' '}</span>;
-        }
-        return (
-          <motion.span
-            key={`${i}-${word}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            aria-hidden="true"
-          >
-            {word}{' '}
-          </motion.span>
-        );
-      })}
-      {isStreaming && <StreamCursor lm={lm} />}
-    </p>
+      {/* Listen + Copy — only when done */}
+      {!isStreaming && text && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+          className="flex items-center gap-2 mt-3 flex-wrap"
+        >
+          <ListenButton text={text} small />
+          <CopyButton   text={text} small />
+        </motion.div>
+      )}
+    </motion.div>
   );
 });
 
-// ─── Follow-Up Panel ─────────────────────────────────────────────────────────
-// Fully self-contained; never triggers a parent re-render.
+// ─── Follow-up panel ─────────────────────────────────────────────────────────
 interface FollowUpPanelProps {
   originalQuery:   string;
   contextSnippets: string[];
   originalSummary: string;
-  lm?:             boolean;
 }
 
-const FollowUpPanel = memo(function FollowUpPanel({
-  originalQuery, contextSnippets, originalSummary, lm,
-}: FollowUpPanelProps) {
-  const [input,           setInput]           = useState('');
-  const [fuState,         setFuState]         = useState<FollowUpState>('idle');
-  const [responseText,    setResponseText]    = useState('');
-  const [submittedPrompt, setSubmittedPrompt] = useState('');
-  const abortRef  = useRef<AbortController | null>(null);
-  const inputRef  = useRef<HTMLInputElement | null>(null);
+const FollowUpPanel = memo(function FollowUpPanel({ originalQuery, contextSnippets, originalSummary }: FollowUpPanelProps) {
+  const [input,    setInput]    = useState('');
+  const [fuState,  setFuState]  = useState<FollowUpState>('idle');
+  const [respText, setRespText] = useState('');
+  const [prompt,   setPrompt]   = useState('');
+  const abortRef = useRef<AbortController | null>(null);
 
   const isActive = fuState === 'loading' || fuState === 'streaming';
 
-  const submit = useCallback(async (prompt: string) => {
-    const q = prompt.trim();
-    if (!q || fuState === 'loading' || fuState === 'streaming') return;
+  const submit = useCallback(async (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed || isActive) return;
 
     abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
-    setSubmittedPrompt(q);
-    setResponseText('');
+    setPrompt(trimmed);
+    setRespText('');
     setFuState('loading');
 
-    // Pass original summary + original snippets as context
     const snippets = [
       ...(originalSummary ? [`Context: ${originalSummary.slice(0, 500)}`] : []),
       ...contextSnippets.slice(0, 5),
     ];
-    const followUpQuery = `${q} (about: ${originalQuery})`;
 
     try {
       const res = await fetch('/api/ai-summary', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ query: followUpQuery, contextSnippets: snippets, stream: true }),
-        signal:  controller.signal,
+        body:    JSON.stringify({ query: `${trimmed} (about: ${originalQuery})`, contextSnippets: snippets, stream: true }),
+        signal:  ctrl.signal,
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (!res.body) throw new Error('No body');
+      if (!res.body) throw new Error('no body');
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = '';
-
+      let acc = '';
       setFuState('streaming');
 
       outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           try {
             const msg = JSON.parse(raw) as { token?: string; done?: boolean };
-            if (msg.token) { accumulated += msg.token; setResponseText(accumulated); }
+            if (msg.token) { acc += msg.token; setRespText(acc); }
             if (msg.done)  { setFuState('done'); break outer; }
-          } catch { /* skip malformed */ }
+          } catch { /* skip */ }
         }
       }
-
-      setFuState(prev => (prev === 'streaming' ? 'done' : prev));
+      setFuState(p => p === 'streaming' ? 'done' : p);
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') return;
       setFuState('error');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fuState, originalQuery, originalSummary]);
+  }, [isActive, originalQuery, originalSummary]);
 
   const handleSubmit = useCallback(() => {
     const q = input.trim();
     if (q) { submit(q); setInput(''); }
   }, [input, submit]);
 
-  const handleChip = useCallback((chip: string) => {
-    setInput('');
-    submit(chip);
-  }, [submit]);
+  const handleChip = useCallback((chip: string) => { setInput(''); submit(chip); }, [submit]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
-  const inputCls = `flex-1 bg-transparent outline-none text-[13px] tracking-wide font-light leading-relaxed placeholder-opacity-50 ${
-    lm ? 'text-slate-800 placeholder-slate-400/60' : 'text-white/85 placeholder-white/28'
-  }`;
-
-  const chipBase = `px-2.5 py-1 rounded-full border text-[10.5px] font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 disabled:opacity-40 disabled:cursor-not-allowed`;
-  const chipDark = `bg-white/[0.04] border-white/[0.09] text-white/48 hover:bg-violet-500/[0.10] hover:border-violet-400/[0.22] hover:text-violet-300/85`;
-  const chipLight = `bg-white border-violet-200/70 text-violet-600 hover:bg-violet-50 hover:border-violet-300 shadow-sm`;
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className={`mt-4 pt-4 border-t ${lm ? 'border-violet-100' : 'border-violet-500/[0.10]'}`}
-    >
+    <div className="mt-5 pt-5 border-t border-white/8">
       {/* Quick prompt chips */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      <div className="flex flex-wrap gap-2 mb-3">
         {QUICK_PROMPTS.map(chip => (
           <button
             key={chip}
             onClick={() => handleChip(chip)}
             disabled={isActive}
-            className={`${chipBase} ${lm ? chipLight : chipDark}`}
+            className={`${CHIP_SM} text-white/90`}
           >
             {chip}
           </button>
@@ -534,151 +430,89 @@ const FollowUpPanel = memo(function FollowUpPanel({
       </div>
 
       {/* Input row */}
-      <div className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 transition-all duration-200 ${
-        lm
-          ? 'bg-white/60 border-violet-200/70 focus-within:border-violet-300 focus-within:bg-white/80'
-          : 'bg-white/[0.04] border-white/[0.09] focus-within:border-violet-400/[0.25] focus-within:bg-white/[0.06]'
-      }`}>
+      <div
+        className="flex items-center gap-2 rounded-2xl px-4 py-3 transition-all duration-200 focus-within:border-violet-400/30"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
         <input
-          ref={inputRef}
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           placeholder="Ask a follow-up…"
           disabled={isActive}
           maxLength={300}
-          className={inputCls}
+          className="flex-1 bg-transparent outline-none text-[13px] text-white/80 placeholder-white/25 leading-relaxed tracking-wide"
           aria-label="Ask a follow-up question"
         />
-
-        {/* Submit button */}
         <button
           onClick={handleSubmit}
           disabled={isActive || !input.trim()}
-          className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 disabled:opacity-30 disabled:cursor-not-allowed ${
-            lm
-              ? 'bg-violet-100 text-violet-600 hover:bg-violet-200 disabled:hover:bg-violet-100'
-              : 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 disabled:hover:bg-violet-500/15'
-          }`}
+          className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200
+                      bg-violet-500/20 border border-violet-400/20 text-violet-300
+                      hover:bg-violet-500/35 hover:border-violet-400/40
+                      disabled:opacity-30 disabled:cursor-not-allowed
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50`}
           aria-label="Submit follow-up"
         >
-          {isActive ? (
-            <motion.span
-              className={`inline-block w-3 h-3 rounded-full border-2 border-t-transparent ${
-                lm ? 'border-violet-500' : 'border-violet-400'
-              }`}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 0.65, repeat: Infinity, ease: 'linear' }}
-              aria-hidden="true"
-            />
-          ) : (
-            <ArrowRight size={13} strokeWidth={2} aria-hidden="true" />
-          )}
+          {isActive
+            ? <Spinner size={13} color="border-violet-400" />
+            : <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />}
         </button>
       </div>
 
-      {/* Follow-up response area */}
+      {/* Response area */}
       <AnimatePresence mode="wait">
-
-        {/* Loading placeholder before first token arrives */}
         {fuState === 'loading' && (
-          <motion.div
-            key="fu-loading"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="mt-3 space-y-2"
-            aria-hidden="true"
-          >
-            {['95%', '88%', '70%'].map((w, i) => (
-              <div
-                key={i}
-                className={`h-2.5 rounded-full animate-pulse ${
-                  lm ? 'bg-violet-100' : 'bg-violet-500/[0.12]'
-                }`}
-                style={{ width: w }}
-              />
+          <motion.div key="fu-skeleton" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="mt-3 space-y-2" aria-hidden="true">
+            {['95%','85%','65%'].map((w,i) => (
+              <div key={i} className="h-2.5 rounded-full bg-white/8 animate-pulse" style={{ width: w }} />
             ))}
           </motion.div>
         )}
 
-        {/* Streaming or done response */}
-        {(fuState === 'streaming' || fuState === 'done') && responseText && (
-          <motion.div
-            key="fu-response"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-3"
-            aria-live="polite"
-            aria-atomic="false"
-          >
-            {/* Prompt label */}
-            <p className={`text-[9px] uppercase tracking-[0.18em] mb-1.5 ${
-              lm ? 'text-violet-400/65' : 'text-violet-400/40'
-            }`}>
-              {submittedPrompt}
-            </p>
-
-            {/* Response text */}
-            <p className={`text-[13.5px] leading-[1.75] tracking-[0.01em] ${
-              lm ? 'text-gray-700' : 'text-white/72'
-            }`}>
-              {responseText}
-              {fuState === 'streaming' && <StreamCursor lm={lm} />}
-            </p>
-          </motion.div>
+        {(fuState === 'streaming' || fuState === 'done') && respText && (
+          <FollowUpBubble key="fu-bubble" prompt={prompt} text={respText} isStreaming={fuState === 'streaming'} />
         )}
 
-        {/* Error */}
         {fuState === 'error' && (
-          <motion.p
-            key="fu-error"
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={`mt-3 text-[12px] ${lm ? 'text-red-400' : 'text-red-400/70'}`}
-            role="alert"
-          >
+          <motion.p key="fu-error" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+            className="mt-3 text-[12px] text-red-400/70" role="alert">
             Couldn't generate a follow-up. Please try again.
           </motion.p>
         )}
-
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 });
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const AISummary = memo(function AISummary({ query, sections, lm }: Props) {
-  const [summaryState, setSummaryState]       = useState<SummaryState>('idle');
-  const [text, setText]                       = useState('');
+const AISummary = memo(function AISummary({ query, sections }: Props) {
+  const [summaryState,    setSummaryState]    = useState<SummaryState>('idle');
+  const [text,            setText]            = useState('');
   const [confidenceLabel, setConfidenceLabel] = useState<ConfidenceLabel | null>(null);
-  const usedSourcesRef = useRef<string[]>([]);
 
   const abortRef      = useRef<AbortController | null>(null);
   const fetchStateRef = useRef<{ query: string; hadContext: boolean } | null>(null);
+  const usedSourcesRef = useRef<string[]>([]);
   const containerRef  = useRef<HTMLDivElement | null>(null);
 
-  // ── Source labels derived from sections ──────────────────────────────────
+  // ── Derived sources ──────────────────────────────────────────────────────
   const usedSources = useMemo<string[]>(() => {
     if (!sections) return [];
     const seen = new Set<string>();
-    sections.wikipedia.slice(0, 3).forEach(it => { if (it.description) seen.add('Wikipedia'); });
-    sections.research.slice(0, 4).forEach(it => {
-      if (!it.description) return;
-      const label = SOURCE_LABELS[it.source];
-      if (label) seen.add(label);
+    sections.wikipedia.slice(0,3).forEach(it => { if (it.description) seen.add('Wikipedia'); });
+    sections.research.slice(0,4).forEach(it  => {
+      const l = SOURCE_LABELS[it.source]; if (it.description && l) seen.add(l);
     });
-    sections.nasa.slice(0, 2).forEach(it  => { if (it.description) seen.add('NASA'); });
-    sections.esa.slice(0, 2).forEach(it   => { if (it.description) seen.add('ESA Hubble'); });
-    sections.books?.slice(0, 2).forEach(it => { if (it.description) seen.add('OpenAlex'); });
-    const ORDER = ['Wikipedia', 'NASA', 'ESA Hubble', 'arXiv', 'OpenAlex', 'Semantic Scholar', 'INSPIRE-HEP'];
-    return ORDER.filter(s => seen.has(s));
+    sections.nasa.slice(0,2).forEach(it  => { if (it.description) seen.add('NASA'); });
+    sections.esa.slice(0,2).forEach(it   => { if (it.description) seen.add('ESA Hubble'); });
+    sections.books?.slice(0,2).forEach(it => { if (it.description) seen.add('OpenAlex'); });
+    return SOURCE_ORDER.filter(s => seen.has(s));
   }, [sections]);
 
   usedSourcesRef.current = usedSources;
@@ -687,71 +521,57 @@ const AISummary = memo(function AISummary({ query, sections, lm }: Props) {
   const contextSnippets = useMemo<string[]>(() => {
     if (!sections) return [];
     const out: string[] = [];
-    sections.wikipedia.slice(0, 3).forEach(it => it.description && out.push(it.description.slice(0, 380)));
-    sections.research.slice(0, 4).forEach(it  => it.description && out.push(it.description.slice(0, 380)));
-    sections.nasa.slice(0, 2).forEach(it      => it.description && out.push(it.description.slice(0, 240)));
-    sections.esa.slice(0, 2).forEach(it       => it.description && out.push(it.description.slice(0, 240)));
-    return out.slice(0, 8);
+    sections.wikipedia.slice(0,3).forEach(it => it.description && out.push(it.description.slice(0,380)));
+    sections.research.slice(0,4).forEach(it  => it.description && out.push(it.description.slice(0,380)));
+    sections.nasa.slice(0,2).forEach(it      => it.description && out.push(it.description.slice(0,240)));
+    sections.esa.slice(0,2).forEach(it       => it.description && out.push(it.description.slice(0,240)));
+    return out.slice(0,8);
   }, [sections]);
 
   // ── Core streaming fetch ─────────────────────────────────────────────────
   const doFetch = useCallback(async (q: string, snippets: string[]) => {
-    if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
-    setSummaryState('loading');
-    setText('');
-    setConfidenceLabel(null);
+    setSummaryState('loading'); setText(''); setConfidenceLabel(null);
 
     try {
       const res = await fetch('/api/ai-summary', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ query: q, contextSnippets: snippets, stream: true }),
-        signal:  controller.signal,
+        signal:  ctrl.signal,
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (!res.body) throw new Error('No response body');
+      if (!res.body) throw new Error('no body');
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = '';
-
+      let acc = '';
       setSummaryState('streaming');
 
       outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           try {
-            const msg = JSON.parse(raw) as {
-              token?:           string;
-              done?:            boolean;
-              confidenceLabel?: ConfidenceLabel;
-            };
-            if (msg.token) { accumulated += msg.token; setText(accumulated); }
+            const msg = JSON.parse(raw) as { token?: string; done?: boolean; confidenceLabel?: ConfidenceLabel };
+            if (msg.token) { acc += msg.token; setText(acc); }
             if (msg.done) {
-              const label = msg.confidenceLabel ?? null;
-              setConfidenceLabel(label);
+              const lbl = msg.confidenceLabel ?? null;
+              setConfidenceLabel(lbl);
               setSummaryState('done');
-              if (accumulated) {
-                setCached(q.toLowerCase().trim(), {
-                  text: accumulated, confidenceLabel: label, usedSources: usedSourcesRef.current,
-                });
-              }
+              if (acc) setCached(q.toLowerCase().trim(), { text: acc, confidenceLabel: lbl, usedSources: usedSourcesRef.current });
               break outer;
             }
           } catch { /* malformed SSE */ }
         }
       }
-
-      setSummaryState(prev => (prev === 'streaming' ? 'done' : prev));
+      setSummaryState(p => p === 'streaming' ? 'done' : p);
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') return;
       setSummaryState('error');
@@ -764,8 +584,7 @@ const AISummary = memo(function AISummary({ query, sections, lm }: Props) {
     if (!trimmed) {
       abortRef.current?.abort();
       setSummaryState('idle'); setText(''); setConfidenceLabel(null);
-      fetchStateRef.current = null;
-      return;
+      fetchStateRef.current = null; return;
     }
     if (fetchStateRef.current?.query === trimmed) return;
     abortRef.current?.abort();
@@ -778,36 +597,23 @@ const AISummary = memo(function AISummary({ query, sections, lm }: Props) {
       fetchStateRef.current = { query: trimmed, hadContext: true };
       return;
     }
-
-    setSummaryState('loading'); setText(''); setConfidenceLabel(null);
     fetchStateRef.current = { query: trimmed, hadContext: contextSnippets.length > 0 };
     doFetch(trimmed, contextSnippets);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  // ── Effect 2: sections loaded after zero-context initial fetch ───────────
+  // ── Effect 2: sections loaded after zero-context fetch ───────────────────
   useEffect(() => {
     if (contextSnippets.length === 0) return;
     const fs = fetchStateRef.current;
     if (!fs || fs.hadContext) return;
     if (summaryState === 'streaming') return;
     fetchStateRef.current = { query: fs.query, hadContext: true };
-    const cached = getCached(fs.query.toLowerCase());
-    if (cached) return;
+    if (getCached(fs.query.toLowerCase())) return;
     doFetch(fs.query, contextSnippets);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextSnippets.length]);
 
-  // ── IntersectionObserver ─────────────────────────────────────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(() => { /* visibility */ }, { threshold: 0.1 });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // ── Cleanup ──────────────────────────────────────────────────────────────
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   if (summaryState === 'idle') return null;
@@ -816,186 +622,136 @@ const AISummary = memo(function AISummary({ query, sections, lm }: Props) {
     <div ref={containerRef} style={{ contentVisibility: 'auto' }}>
       <AnimatePresence mode="wait">
 
-        {/* ── Loading skeleton ── */}
-        {summaryState === 'loading' && (
-          <AISummarySkeleton key="skeleton" lm={lm} />
-        )}
+        {summaryState === 'loading' && <Skeleton key="sk" />}
 
-        {/* ── Summary card ── */}
         {(summaryState === 'streaming' || summaryState === 'done') && text && (
           <motion.div
-            key="summary-card"
+            key="card"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-            className="relative rounded-2xl p-[1px] mb-6 overflow-hidden"
+            className="relative overflow-hidden rounded-[2rem] bg-[#050505] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,1),inset_0_1px_1px_rgba(255,255,255,0.15)] p-6 z-10 mb-6"
             role="region"
             aria-label="AI Overview"
           >
-            {/* Animated border gradient */}
+            {/* Ambient glow behind card — neutral white, not violet, so it can't bleed color onto the pure-dark card */}
             <motion.div
-              className="absolute inset-0 rounded-2xl pointer-events-none"
-              animate={{ opacity: [0.45, 1, 0.45] }}
-              transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
+              className="absolute -inset-px rounded-[2rem] pointer-events-none -z-10"
+              animate={{ opacity: [0.25, 0.5, 0.25] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               aria-hidden="true"
               style={{
-                background: lm
-                  ? 'linear-gradient(135deg, rgba(167,139,250,0.55), rgba(99,102,241,0.35), rgba(167,139,250,0.55))'
-                  : 'linear-gradient(135deg, rgba(139,92,246,0.50), rgba(59,130,246,0.28), rgba(139,92,246,0.50))',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04), rgba(255,255,255,0.18))',
+                filter: 'blur(1px)',
               }}
             />
 
-            {/* Card inner surface */}
-            <div className={`relative rounded-[15px] overflow-hidden ${
-              lm
-                ? 'bg-gradient-to-br from-violet-50/98 to-indigo-50/92'
-                : 'bg-gradient-to-br from-[#110c25]/97 to-[#0a0c20]/97'
-            }`}>
-              {/* Ambient radial glow */}
-              <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{
-                background: lm
-                  ? 'radial-gradient(ellipse at 8% 8%, rgba(167,139,250,0.22), transparent 60%)'
-                  : 'radial-gradient(ellipse at 8% 8%, rgba(139,92,246,0.14), transparent 60%)',
-              }} />
+            {/* Top-edge highlight */}
+            <div className="absolute top-0 left-12 right-12 h-px pointer-events-none" aria-hidden="true"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)' }} />
 
-              {/* Diagonal shimmer */}
-              <div className="absolute inset-0 rounded-[15px] pointer-events-none" aria-hidden="true" style={{
-                background: lm
-                  ? 'linear-gradient(135deg, rgba(167,139,250,0.14) 0%, transparent 50%, rgba(99,102,241,0.08) 100%)'
-                  : 'linear-gradient(135deg, rgba(139,92,246,0.09) 0%, transparent 50%, rgba(99,102,241,0.06) 100%)',
-              }} />
+            {/* Inner radial glow — neutral white */}
+            <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
+              style={{ background: 'radial-gradient(ellipse at 10% 5%, rgba(255,255,255,0.06), transparent 55%)' }} />
 
-              {/* Top-edge glow line */}
-              <div className="absolute top-0 left-10 right-10 h-px pointer-events-none" aria-hidden="true" style={{
-                background: lm
-                  ? 'linear-gradient(90deg, transparent, rgba(167,139,250,0.55), transparent)'
-                  : 'linear-gradient(90deg, transparent, rgba(139,92,246,0.35), transparent)',
-              }} />
-
-              {/* Content */}
-              <div className="relative px-6 py-5">
-                <div className="flex gap-4 items-start">
-                  {/* Sparkle icon */}
-                  <div aria-hidden="true" className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 ${
-                    lm
-                      ? 'bg-violet-100 border border-violet-200/90 shadow-[0_0_12px_rgba(139,92,246,0.18)]'
-                      : 'bg-violet-500/15 border border-violet-400/25 shadow-[0_0_16px_rgba(139,92,246,0.22)]'
-                  }`}>
-                    <Sparkles size={14} strokeWidth={2} className={lm ? 'text-violet-600' : 'text-violet-300'} />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    {/* Header row */}
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <p className={`text-[10px] uppercase tracking-[0.26em] font-semibold flex-shrink-0 ${
-                        lm ? 'text-violet-500' : 'text-violet-300/80'
-                      }`}>
-                        AI Overview
-                      </p>
-
-                      {summaryState === 'streaming' && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border flex-shrink-0 ${
-                            lm
-                              ? 'bg-violet-50 border-violet-200/80 text-violet-500'
-                              : 'bg-violet-500/[0.12] border-violet-400/[0.20] text-violet-300/80'
-                          }`}
-                        >
-                          <Zap size={8} strokeWidth={2.5} aria-hidden="true" />
-                          <span className="text-[8.5px] font-semibold tracking-widest uppercase">Live</span>
-                        </motion.div>
-                      )}
-
-                      {summaryState === 'done' && confidenceLabel && (
-                        <ConfidenceBadge label={confidenceLabel} lm={lm} />
-                      )}
-
-                      {summaryState === 'done' && usedSources.length > 0 && (
-                        <SourceCountBadge count={usedSources.length} lm={lm} />
-                      )}
-                    </div>
-
-                    {/* Summary text */}
-                    <StreamingText
-                      text={text}
-                      isStreaming={summaryState === 'streaming'}
-                      lm={lm}
-                    />
-                  </div>
+            {/* Content — padding now lives on the card wrapper itself (p-6), not here */}
+            <div className="relative">
+              <div className="flex gap-4 items-start">
+                {/* Icon */}
+                <div aria-hidden="true" className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center mt-0.5 bg-violet-500/15 border border-violet-400/20"
+                  style={{ boxShadow: '0 0 18px rgba(139,92,246,0.25)' }}>
+                  <Sparkles size={15} strokeWidth={2} className="text-violet-300" />
                 </div>
 
-                {/* Footer: sources + actions + model note */}
-                {summaryState === 'done' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                    className={`mt-4 pt-3.5 border-t flex flex-col gap-3 ${
-                      lm ? 'border-violet-100' : 'border-violet-500/[0.10]'
-                    }`}
-                  >
-                    <SourceChips sources={usedSources} lm={lm} />
-                    <ActionButtons text={text} lm={lm} />
-                    <span className={`text-[8.5px] uppercase tracking-[0.16em] ${
-                      lm ? 'text-violet-300/70' : 'text-violet-400/35'
-                    }`}>
-                      Groq · llama-3.3-70b · Verify with primary sources
-                    </span>
-                  </motion.div>
-                )}
+                <div className="flex-1 min-w-0">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <p className="text-[10px] uppercase tracking-[0.26em] font-semibold text-violet-300/80 flex-shrink-0">
+                      AI Overview
+                    </p>
 
-                {/* ── Follow-Up Panel — inside the card, below footer ── */}
-                {summaryState === 'done' && (
-                  <FollowUpPanel
-                    originalQuery={query}
-                    contextSnippets={contextSnippets}
-                    originalSummary={text}
-                    lm={lm}
-                  />
-                )}
+                    {summaryState === 'streaming' && (
+                      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-500/12 border border-violet-400/18 text-violet-300/80">
+                        <Zap size={8} strokeWidth={2.5} aria-hidden="true" />
+                        <span className="text-[8.5px] font-semibold tracking-widest uppercase">Live</span>
+                      </motion.div>
+                    )}
+
+                    {summaryState === 'done' && confidenceLabel && (() => {
+                      const cfg  = CONF[confidenceLabel];
+                      const Icon = cfg.icon;
+                      return (
+                        <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.22 }}
+                          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] font-semibold tracking-wide ${cfg.cls}`}>
+                          <Icon size={9} strokeWidth={2.5} aria-hidden="true" />
+                          <span>{confidenceLabel}</span>
+                        </motion.div>
+                      );
+                    })()}
+
+                    {summaryState === 'done' && usedSources.length > 0 && (
+                      <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.08, duration: 0.22 }}
+                        className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-white/45">
+                        {usedSources.length} source{usedSources.length !== 1 ? 's' : ''}
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Summary text */}
+                  <StreamingText text={text} isStreaming={summaryState === 'streaming'} />
+                </div>
               </div>
+
+              {/* Footer */}
+              {summaryState === 'done' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.18, duration: 0.3 }}
+                  className="mt-5 pt-4 border-t border-white/8 flex flex-col gap-3"
+                >
+                  <SourceChips sources={usedSources} />
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <ListenButton text={text} />
+                    <CopyButton   text={text} />
+                  </div>
+
+                  <span className="text-[8.5px] uppercase tracking-[0.16em] text-white/25">
+                    Groq · llama-3.3-70b · Verify with primary sources
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Follow-up panel */}
+              {summaryState === 'done' && (
+                <FollowUpPanel
+                  originalQuery={query}
+                  contextSnippets={contextSnippets}
+                  originalSummary={text}
+                />
+              )}
             </div>
           </motion.div>
         )}
 
-        {/* ── Empty state ── */}
         {summaryState === 'done' && !text && (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className={`flex items-center gap-2.5 px-4 py-3 mb-6 rounded-2xl border text-[11.5px] ${
-              lm
-                ? 'bg-violet-50/60 border-violet-100 text-violet-400'
-                : 'bg-violet-500/[0.05] border-violet-500/[0.10] text-violet-400/55'
-            }`}
-            role="status"
-          >
+          <motion.div key="empty" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex items-center gap-2.5 px-4 py-3 mb-6 rounded-2xl bg-white/4 border border-white/8 text-[11.5px] text-white/40"
+            role="status">
             <Sparkles size={12} strokeWidth={2} className="flex-shrink-0" aria-hidden="true" />
             AI summary unavailable.
           </motion.div>
         )}
 
-        {/* ── Error state ── */}
         {summaryState === 'error' && (
-          <motion.div
-            key="error"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className={`flex items-center gap-2.5 px-4 py-3 mb-6 rounded-2xl border text-[11.5px] ${
-              lm
-                ? 'bg-red-50/60 border-red-100 text-red-400'
-                : 'bg-red-500/[0.05] border-red-500/[0.12] text-red-400/60'
-            }`}
-            role="alert"
-          >
+          <motion.div key="err" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex items-center gap-2.5 px-4 py-3 mb-6 rounded-2xl bg-red-500/5 border border-red-500/12 text-[11.5px] text-red-400/60"
+            role="alert">
             <Sparkles size={12} strokeWidth={2} className="flex-shrink-0" aria-hidden="true" />
             AI Overview unavailable — search results are unaffected
           </motion.div>
