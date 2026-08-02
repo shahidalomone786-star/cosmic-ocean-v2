@@ -2031,15 +2031,6 @@ function NasaSearch({
               </div>
             </div>
 
-            {/* Filter bar — client-side, instant, no new API calls */}
-            {!isLoading && hasAny && (
-              <SearchFilterBar
-                active={activeFilter}
-                counts={filterCounts}
-                lm={lm}
-                onChange={setActiveFilter}
-              />
-            )}
 
             {/* Sort controls — client-side, no refetch */}
             {!isLoading && hasAny && (

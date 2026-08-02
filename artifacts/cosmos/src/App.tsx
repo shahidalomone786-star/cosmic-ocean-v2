@@ -2977,6 +2977,9 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ── Banner Carousel ── */}
+              <BannerCarousel lm={lm} />
+
               {/* ── Black Holes ── */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -3012,9 +3015,6 @@ export default function App() {
                       ))}
                 </div>
               </div>
-
-              {/* ── Banner Carousel ── */}
-              <BannerCarousel lm={lm} />
 
               {/* ── Simulation Search ── */}
               <SimulationSearch lm={lm} />
