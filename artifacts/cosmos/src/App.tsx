@@ -2958,6 +2958,22 @@ export default function App() {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-5 pb-8 scrollbar-hide">
 
+              {/* ── Singularity Nexus — AI Chat (pinned to top) ── */}
+              <div className="mb-7 pt-2">
+                <div className="flex items-baseline gap-3 mb-4">
+                  <h2
+                    className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`}
+                    style={{ fontFamily: 'var(--app-font-heading)' }}
+                  >
+                    ✦ Singularity Nexus
+                  </h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
+                    DeepSeek R1 AI
+                  </span>
+                </div>
+                <SingularityLaunchButton />
+              </div>
+
               {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
@@ -3216,19 +3232,6 @@ export default function App() {
                     }`}>›</div>
                   </div>
                 </motion.div>
-              </div>
-
-              {/* ── Singularity Nexus — AI Chat ── */}
-              <div className="mb-6">
-                <div className="flex items-baseline gap-3 mb-4">
-                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>
-                    ✦ Singularity Nexus
-                  </h2>
-                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
-                    DeepSeek R1 AI
-                  </span>
-                </div>
-                <SingularityLaunchButton />
               </div>
 
               {/* ── My Command Center ── */}

@@ -32,7 +32,11 @@ const FALLBACK_VOICE = "onwK4e9ZLuTAKqWW03F9"; // Daniel
 
 // ── POST /api/tts ──────────────────────────────────────────────────────────────
 router.post("/tts", async (req, res) => {
-  const { text, avatarName } = req.body as { text?: string; avatarName?: string };
+  const { text, avatarName, voiceId: voiceIdOverride } = req.body as {
+    text?: string;
+    avatarName?: string;
+    voiceId?: string; // optional direct override — used by SingularityChat (Rachel voice)
+  };
 
   if (!text?.trim()) {
     res.status(400).json({ error: "text is required" });
@@ -44,7 +48,8 @@ router.post("/tts", async (req, res) => {
     return;
   }
 
-  const voiceId  = AVATAR_VOICES[avatarName ?? ""] ?? FALLBACK_VOICE;
+  // voiceIdOverride wins (used by SingularityChat / Rachel); otherwise map by avatar name
+  const voiceId  = voiceIdOverride?.trim() || AVATAR_VOICES[avatarName ?? ""] || FALLBACK_VOICE;
   const safeText = text.slice(0, 2500);
   const elUrl    = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
