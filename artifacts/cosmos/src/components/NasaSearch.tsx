@@ -614,28 +614,57 @@ function SectionHeader({ icon: Icon, label, sub, count, lm }: {
   );
 }
 
-// ─── AI Summary card ──────────────────────────────────────────────────────────
+// ─── AI Summary card (Blue/Cyan — layered glass, light + dark) ─────────────
 function AISummaryCard({ text, lm }: { text: string; lm?: boolean }) {
+  const card = lm
+    ? 'bg-gradient-to-br from-blue-50/85 to-cyan-50/60 border-blue-200/60 backdrop-blur-xl shadow-[0_20px_40px_-16px_rgba(59,130,246,0.15),0_4px_12px_-2px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.6)]'
+    : 'bg-gradient-to-br from-blue-950/50 to-cyan-950/30 border-blue-400/25 backdrop-blur-xl shadow-[0_20px_50px_-12px_rgba(59,130,246,0.25),0_8px_20px_-6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)]';
+
+  const iconBadge = lm
+    ? 'bg-blue-100 border border-blue-200'
+    : 'bg-blue-500/20 border border-blue-400/25';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className={`relative rounded-2xl border px-6 py-5 mb-8 overflow-hidden ${
-        lm
-          ? 'bg-gradient-to-br from-violet-50/80 to-indigo-50/60 border-violet-200/60 shadow-[0_4px_24px_rgba(124,58,237,0.08)]'
-          : 'bg-gradient-to-br from-violet-950/40 to-indigo-950/30 border-violet-500/20 shadow-[0_4px_32px_rgba(124,58,237,0.12)]'
-      }`}
+      className={`relative rounded-3xl border p-6 mb-8 overflow-hidden ${card}`}
     >
-      {/* Subtle glow */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: lm ? 'radial-gradient(ellipse at 0% 0%, rgba(167,139,250,0.15), transparent 60%)' : 'radial-gradient(ellipse at 0% 0%, rgba(139,92,246,0.12), transparent 60%)' }} />
+      {/* Glow 1 — top-left blue */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: lm
+            ? 'radial-gradient(ellipse at 0% 0%, rgba(96,165,250,0.15), transparent 60%)'
+            : 'radial-gradient(ellipse at 0% 0%, rgba(59,130,246,0.14), transparent 60%)',
+        }}
+      />
+
+      {/* Glow 2 — bottom-right cyan, adds dimensionality so it doesn't read flat */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: lm
+            ? 'radial-gradient(ellipse at 100% 100%, rgba(34,211,238,0.10), transparent 55%)'
+            : 'radial-gradient(ellipse at 100% 100%, rgba(34,211,238,0.10), transparent 55%)',
+        }}
+      />
+
       <div className="relative flex gap-4 items-start">
-        <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 ${lm ? 'bg-violet-100 border border-violet-200' : 'bg-violet-500/20 border border-violet-400/25'}`}>
-          <Sparkles size={14} strokeWidth={2} className={lm ? 'text-violet-600' : 'text-violet-300'} />
+        <div
+          className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center mt-0.5 ${iconBadge}`}
+          style={lm ? undefined : { boxShadow: '0 0 16px rgba(59,130,246,0.3)' }}
+        >
+          <Sparkles size={14} strokeWidth={2} className={lm ? 'text-blue-600' : 'text-blue-300'} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className={`text-[10px] uppercase tracking-[0.22em] mb-2 ${lm ? 'text-violet-500' : 'text-violet-300/70'}`}>AI Overview</p>
-          <p className={`text-[13.5px] leading-relaxed tracking-wide ${lm ? 'text-gray-700' : 'text-white/72'}`}>{text}</p>
+          <p className={`text-[10px] uppercase tracking-[0.22em] mb-2 ${lm ? 'text-blue-500' : 'text-blue-300/70'}`}>
+            AI Overview
+          </p>
+          <p className={`text-[13.5px] leading-relaxed tracking-wide ${lm ? 'text-gray-700' : 'text-white/80'}`}>
+            {text}
+          </p>
         </div>
       </div>
     </motion.div>

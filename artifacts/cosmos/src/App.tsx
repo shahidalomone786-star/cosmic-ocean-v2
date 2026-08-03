@@ -18,6 +18,7 @@ import ProfileModal from './components/ProfileModal';
 import SimulationSearch from './components/SimulationSearch';
 import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
+import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
@@ -3215,6 +3216,19 @@ export default function App() {
                     }`}>›</div>
                   </div>
                 </motion.div>
+              </div>
+
+              {/* ── Singularity Nexus — AI Chat ── */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-3 mb-4">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>
+                    ✦ Singularity Nexus
+                  </h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
+                    DeepSeek R1 AI
+                  </span>
+                </div>
+                <SingularityLaunchButton />
               </div>
 
               {/* ── My Command Center ── */}

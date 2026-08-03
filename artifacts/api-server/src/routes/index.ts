@@ -1,3 +1,4 @@
+import singularityRouter from "./singularity";
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import chatRouter from "./chat";
@@ -24,5 +25,7 @@ router.use(cosmicRouter);
 router.use(biologyRouter);
 router.use(aiSummaryRouter);
 router.use(discoveryRouter);
+router.use(singularityRouter);
+
 
 export default router;

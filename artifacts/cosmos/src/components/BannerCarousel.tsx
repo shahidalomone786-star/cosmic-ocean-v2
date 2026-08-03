@@ -1,16 +1,12 @@
 /**
- * BannerCarousel — Pure cinematic image carousel. No overlays. No dots. No text.
- *
- * • Framer Motion horizontal slide with world-class spring easing
- * • Auto-advances every 4 s; pauses on hover & touch
- * • Next image prefetched so transitions are always instant
- * • Exactly 19 local images served from /public/banner/
+ * BannerCarousel — Premium Apple-level Image Carousel
+ * Pure cinematic experience. No overlays. No dots. No text.
  */
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// ── 19 uploaded images ────────────────────────────────────────────────────────
+// ── 19 local images ────────────────────────────────────────────────────────
 const IMAGES: string[] = Array.from(
   { length: 19 },
   (_, i) => `/banner/b${String(i + 1).padStart(2, '0')}.jpg`,
@@ -19,13 +15,27 @@ const IMAGES: string[] = Array.from(
 const TOTAL       = IMAGES.length;
 const INTERVAL_MS = 4000;
 
-// ── Slide variants — pure horizontal with premium cubic easing ────────────────
-const TRANSITION = { ease: [0.16, 1, 0.3, 1] as const, duration: 0.9 };
+// ── Apple-Level Ultra Smooth Transition ──────────────────────────────────────
+// Custom cubic-bezier for buttery smooth easing
+const TRANSITION = { ease: [0.32, 0.72, 0, 1] as const, duration: 1.5 };
 
+// Added subtle scale and opacity to make the slide feel 3D and premium
 const variants = {
-  enter: (dir: 1 | -1) => ({ x: dir > 0 ? '100%' : '-100%' }),
-  center: { x: 0 },
-  exit:  (dir: 1 | -1) => ({ x: dir > 0 ? '-100%' : '100%' }),
+  enter: (dir: 1 | -1) => ({ 
+    x: dir > 0 ? '100%' : '-100%',
+    opacity: 0.4,
+    scale: 0.96 
+  }),
+  center: { 
+    x: 0,
+    opacity: 1,
+    scale: 1 
+  },
+  exit:  (dir: 1 | -1) => ({ 
+    x: dir > 0 ? '-100%' : '100%',
+    opacity: 0.4,
+    scale: 0.96 
+  }),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +68,7 @@ function BannerCarousel({ lm: _lm }: { lm?: boolean }) {
       <link rel="prefetch" href={prefetchSrc} as="image" />
 
       <div
-        className="relative w-full aspect-video rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden bg-black"
+        className="relative w-full aspect-video rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.9)] bg-[#050505] overflow-hidden"
         onMouseEnter={pause}
         onMouseLeave={resume}
         onTouchStart={pause}
@@ -67,11 +77,11 @@ function BannerCarousel({ lm: _lm }: { lm?: boolean }) {
         aria-label="Image carousel"
         role="img"
       >
-        <AnimatePresence initial={false} custom={dir} mode="sync">
+        <AnimatePresence initial={false} custom={dir}>
           <motion.img
             key={idx}
             src={IMAGES[idx]}
-            alt=""
+            alt="Cosmic Banner"
             aria-hidden="true"
             draggable={false}
             loading="eager"
@@ -83,7 +93,7 @@ function BannerCarousel({ lm: _lm }: { lm?: boolean }) {
             exit="exit"
             transition={TRANSITION}
             className="absolute inset-0 w-full h-full object-cover select-none"
-            style={{ willChange: 'transform' }}
+            style={{ willChange: 'transform, opacity' }}
           />
         </AnimatePresence>
       </div>
