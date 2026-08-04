@@ -13,9 +13,10 @@
 import {
   memo, useEffect, useRef, useState, useCallback,
 } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ArrowLeftRight, Sparkles, Volume2, VolumeX,
+  BrainCircuit, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -249,6 +250,53 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
   );
 });
 
+// ─── Reasoning accordion (collapsed view after </think> closes) ───────────────
+
+const ReasoningAccordion = memo(function ReasoningAccordion({
+  reasoning, seconds, lm,
+}: { reasoning: string; seconds: number; lm?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-2.5">
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[8.5px] uppercase tracking-[0.13em] font-semibold transition-all duration-150 ${
+          lm
+            ? 'text-emerald-600/70 hover:text-emerald-700 hover:bg-emerald-50'
+            : 'text-emerald-400/50 hover:text-emerald-300/80 hover:bg-emerald-500/[0.07]'
+        }`}
+      >
+        <BrainCircuit size={10} strokeWidth={2} />
+        Thought for {seconds}s
+        {open
+          ? <ChevronUp size={9} strokeWidth={2.5} />
+          : <ChevronDown size={9} strokeWidth={2.5} />}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="reasoning-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className={`mt-1 text-[11px] italic leading-relaxed pl-3 pr-2 py-2 border-l-2 rounded-r-lg max-h-32 overflow-y-auto overscroll-contain ${
+              lm
+                ? 'text-gray-400 border-emerald-300/50 bg-emerald-50/50'
+                : 'text-white/30 border-emerald-500/25 bg-emerald-500/[0.04]'
+            }`}>
+              {reasoning}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+
 // ─── AI Analysis section ──────────────────────────────────────────────────────
 
 interface AISectionProps {
@@ -258,22 +306,31 @@ interface AISectionProps {
 }
 
 const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
-  // `generating` = stream is in flight (stays true even during the <think> phase)
-  // `content`    = accumulated visible text (empty while model is still reasoning)
-  const [content,    setContent]    = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const abortRef      = useRef<AbortController | null>(null);
-  // Dedup: track which pair has already been fetched
-  const fetchedKeyRef = useRef<string | null>(null);
+  // Three phases:
+  //  isThinking  — stream in flight, content still empty (inside <think>…</think>)
+  //  isAnswering — stream in flight, content arriving (after </think>)
+  //  isDone      — stream finished, no error
+  const [reasoning,        setReasoning]        = useState('');
+  const [reasoningDone,    setReasoningDone]    = useState(false);
+  const [reasoningSeconds, setReasoningSeconds] = useState(0);
+  const [content,          setContent]          = useState('');
+  const [generating,       setGenerating]       = useState(false);
+  const [error,            setError]            = useState<string | null>(null);
+  const abortRef       = useRef<AbortController | null>(null);
+  const fetchedKeyRef  = useRef<string | null>(null);
+  const thinkStartRef  = useRef<number>(0);
 
   const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
+    setReasoning('');
+    setReasoningDone(false);
+    setReasoningSeconds(0);
     setContent('');
     setError(null);
     setGenerating(true);
+    thinkStartRef.current = Date.now();
 
     const prompt = buildComparePrompt(a, b);
 
@@ -281,7 +338,6 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
       const res = await fetch('/api/singularity', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Backend reads `message` + `history` — not a `messages` array
         body:    JSON.stringify({ message: prompt, history: [] }),
         signal:  abortRef.current.signal,
       });
@@ -290,6 +346,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
+      let contentSealed = false; // latched once we record reasoningSeconds
 
       while (true) {
         const { done, value } = await reader.read();
@@ -302,10 +359,20 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
           if (data.error) throw new Error('Stream error from server');
           if (data.done) continue;
-          // Only update visible content when there is actual non-empty text.
-          // During the <think> phase the backend sends content: '' — we must
-          // NOT treat that as a signal to stop showing the loading state.
+
+          // reasoning = text the model produced inside <think>…</think>
+          if (typeof data.reasoning === 'string' && data.reasoning.trim()) {
+            setReasoning(data.reasoning);
+          }
+          // content = text after </think> — empty string while still reasoning
           if (typeof data.content === 'string' && data.content.trim().length > 0) {
+            if (!contentSealed) {
+              contentSealed = true;
+              setReasoningDone(true);
+              setReasoningSeconds(
+                Math.max(1, Math.round((Date.now() - thinkStartRef.current) / 1000)),
+              );
+            }
             setContent(data.content);
           }
         }
@@ -319,8 +386,8 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
   }, []);
 
   // Auto-trigger when dialog opens for a new paper pair.
-  // NOTE: `items` must be the same reference as the parent prop — do NOT
-  // reconstruct it as `[a, b]` in the parent JSX or this effect re-fires every render.
+  // Pass `items` directly from the parent prop (not reconstructed as [a,b])
+  // so the reference is stable and this effect doesn't re-fire every render.
   useEffect(() => {
     if (!open || !items) return;
     const [a, b] = items;
@@ -330,19 +397,17 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
     void fetchAnalysis(a, b);
   }, [open, items, fetchAnalysis]);
 
-  // Abort on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
-  // Dots are shown whenever the stream is in flight AND no content has arrived yet
-  const showDots = generating && !content;
+  const isThinking  = generating && !reasoningDone;   // still inside <think>
+  const isAnswering = generating && reasoningDone;     // answer streaming in
 
   return (
     <div className={`flex-shrink-0 border-b ${lm ? 'border-gray-100' : 'border-white/[0.055]'}`}>
-      {/* Section label row */}
+
+      {/* ── Section label row ────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-5 pt-3 pb-2">
-        <Sparkles
-          size={11}
-          strokeWidth={2}
+        <Sparkles size={11} strokeWidth={2}
           className={`flex-shrink-0 ${lm ? 'text-violet-500' : 'text-violet-300/80'}`}
         />
         <span className={`text-[8.5px] uppercase tracking-[0.18em] font-semibold flex-1 ${
@@ -351,43 +416,116 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           Singularity AI Analysis
         </span>
 
-        {/* Bouncing dots — stream in flight, no content yet (incl. <think> phase) */}
-        {showDots && (
-          <div className="flex items-center gap-1 mr-1">
-            {[0, 1, 2].map(i => (
-              <motion.div
-                key={i}
-                className={`w-1 h-1 rounded-full ${lm ? 'bg-violet-400' : 'bg-violet-400/60'}`}
-                animate={{ y: [0, -4, 0] }}
-                transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
-              />
-            ))}
-          </div>
+        {/* Phase status label */}
+        {isThinking && (
+          <span className={`text-[7.5px] uppercase tracking-[0.15em] font-medium ${
+            lm ? 'text-emerald-500/80' : 'text-emerald-400/55'
+          }`}>Reasoning…</span>
+        )}
+        {isAnswering && (
+          <span className={`text-[7.5px] uppercase tracking-[0.15em] font-medium ${
+            lm ? 'text-violet-500/70' : 'text-violet-400/50'
+          }`}>Writing…</span>
         )}
 
-        {/* Listen button — visible once content has fully streamed in */}
+        {/* Listen — only once fully done */}
         {content && !generating && (
           <ListenButton text={content} lm={lm} />
         )}
       </div>
 
-      {/* Content area */}
-      <div className="px-5 pb-3 max-h-52 overflow-y-auto overscroll-contain">
+      {/* ── Content area ─────────────────────────────────────────────────── */}
+      <div className="px-5 pb-3 max-h-56 overflow-y-auto overscroll-contain">
+
         {error ? (
-          <div className={`text-[11px] ${lm ? 'text-red-500' : 'text-red-400'}`}>
-            {error}
-          </div>
-        ) : content ? (
-          <div className={`prose prose-sm max-w-none text-[11.5px] leading-relaxed ${
-            lm
-              ? '[&_*]:text-gray-700 [&_strong]:text-gray-900 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-gray-800'
-              : '[&_*]:text-white/68 [&_strong]:text-white/88 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-white/80'
-          }`}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {content}
-            </ReactMarkdown>
-          </div>
-        ) : null}
+          <div className={`text-[11px] ${lm ? 'text-red-500' : 'text-red-400'}`}>{error}</div>
+        ) : (
+          <>
+            {/* ── LIVE reasoning block — visible while inside <think> ──── */}
+            <AnimatePresence>
+              {isThinking && reasoning && (
+                <motion.div
+                  key="live-think"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className={`mb-3 rounded-xl border-l-2 overflow-hidden ${
+                    lm
+                      ? 'border-emerald-400/50 bg-emerald-50/70'
+                      : 'border-emerald-500/30 bg-emerald-500/[0.05]'
+                  }`}
+                >
+                  {/* Live block header */}
+                  <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
+                    <motion.div
+                      animate={{ opacity: [0.45, 1, 0.45] }}
+                      transition={{ duration: 1.8, repeat: Infinity }}
+                    >
+                      <BrainCircuit size={10} strokeWidth={2}
+                        className={lm ? 'text-emerald-500' : 'text-emerald-400/65'}
+                      />
+                    </motion.div>
+                    <span className={`text-[8px] uppercase tracking-[0.16em] font-semibold ${
+                      lm ? 'text-emerald-600/80' : 'text-emerald-400/60'
+                    }`}>
+                      Singularity is analyzing…
+                    </span>
+                    {/* Pulse micro-dots */}
+                    <div className="flex items-center gap-0.5 ml-0.5">
+                      {[0, 1, 2].map(i => (
+                        <motion.div key={i}
+                          className={`w-[3px] h-[3px] rounded-full ${
+                            lm ? 'bg-emerald-400' : 'bg-emerald-400/55'
+                          }`}
+                          animate={{ opacity: [0.2, 1, 0.2] }}
+                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {/* Streaming reasoning text */}
+                  <p className={`px-3 pb-2.5 text-[11px] italic leading-relaxed ${
+                    lm ? 'text-gray-400' : 'text-white/33'
+                  }`}>
+                    {reasoning}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Collapsed accordion — visible after reasoning completes ── */}
+            {reasoningDone && reasoning && (
+              <ReasoningAccordion
+                reasoning={reasoning}
+                seconds={reasoningSeconds}
+                lm={lm}
+              />
+            )}
+
+            {/* ── Final answer ─────────────────────────────────────────── */}
+            {content ? (
+              <div className={`prose prose-sm max-w-none text-[11.5px] leading-relaxed ${
+                lm
+                  ? '[&_*]:text-gray-700 [&_strong]:text-gray-900 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-gray-800'
+                  : '[&_*]:text-white/68 [&_strong]:text-white/88 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-white/80'
+              }`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
+            ) : !reasoning && generating ? (
+              /* Pre-first-token dots — shown before any reasoning arrives */
+              <div className="flex items-center gap-1 py-2">
+                {[0, 1, 2].map(i => (
+                  <motion.div key={i}
+                    className={`w-1 h-1 rounded-full ${lm ? 'bg-violet-400' : 'bg-violet-400/60'}`}
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
