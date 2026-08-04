@@ -1,18 +1,33 @@
 /**
- * CompareDialog — side-by-side paper comparison
+ * CompareDialog — side-by-side paper comparison with Singularity AI Analysis
+ *
+ * Features:
+ *   1. AI Analysis — auto-triggered on open, streams from /api/singularity
+ *   2. TTS Listen — ElevenLabs Rachel voice via /api/tts
+ *   3. Comparison table — horizontally scrollable on mobile (min-w-[480px])
  *
  * Lazy-mounted: parent only renders this when `open` has been true at least once.
- * Compares two SectionItems across all available fields; highlights differences.
- *
  * z-index: 102 (above drawer at 99, above drawer backdrop at 98).
  */
 
-import { memo, useEffect, useRef } from 'react';
-import { X, ArrowLeftRight } from 'lucide-react';
+import {
+  memo, useEffect, useRef, useState, useCallback,
+} from 'react';
+import { motion } from 'framer-motion';
+import {
+  X, ArrowLeftRight, Sparkles, Volume2, VolumeX,
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { SectionItem } from './NasaSearch';
 import { getYear, getSourceName, getAuthors } from '../utils/citationFormatters';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// Rachel — ElevenLabs premium natural female voice (same as SingularityChat)
+const RACHEL_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CompareField {
   label:     string;
@@ -28,31 +43,52 @@ interface CompareDialogProps {
   lm?:     boolean;
 }
 
-// ─── Field builder ───────────────────────────────────────────────────────────
+// ─── Field builder ────────────────────────────────────────────────────────────
 
 function buildFields(a: SectionItem, b: SectionItem): CompareField[] {
   const field = (label: string, vA: string, vB: string, multiLine = false): CompareField =>
     ({ label, valueA: vA || '—', valueB: vB || '—', multiLine });
 
   const authStr = (item: SectionItem) => {
-    const a = getAuthors(item);
-    if (a.length === 0) return '—';
-    return a.slice(0, 5).join(', ') + (a.length > 5 ? ` +${a.length - 5} more` : '');
+    const authors = getAuthors(item);
+    if (authors.length === 0) return '—';
+    return authors.slice(0, 5).join(', ') + (authors.length > 5 ? ` +${authors.length - 5} more` : '');
   };
 
   return [
-    field('Title',     a.title,              b.title,             false),
-    field('Authors',   authStr(a),           authStr(b),           false),
-    field('Year',      getYear(a),           getYear(b),           false),
-    field('Source',    getSourceName(a),     getSourceName(b),     false),
-    field('Citations', a.citationCount != null ? String(a.citationCount) : '—',
-                       b.citationCount != null ? String(b.citationCount) : '—', false),
-    field('URL / DOI', a.url ?? '',          b.url ?? '',          false),
-    field('Abstract',  a.description ?? '', b.description ?? '',  true),
+    field('Title',     a.title,              b.title,              false),
+    field('Authors',   authStr(a),            authStr(b),           false),
+    field('Year',      getYear(a),            getYear(b),           false),
+    field('Source',    getSourceName(a),      getSourceName(b),     false),
+    field('Citations',
+      a.citationCount != null ? String(a.citationCount) : '—',
+      b.citationCount != null ? String(b.citationCount) : '—',
+      false,
+    ),
+    field('URL / DOI', a.url ?? '',           b.url ?? '',          false),
+    field('Abstract',  a.description ?? '',  b.description ?? '',  true),
   ];
 }
 
-// ─── Value cell ──────────────────────────────────────────────────────────────
+// ─── AI prompt builder ────────────────────────────────────────────────────────
+
+function buildComparePrompt(a: SectionItem, b: SectionItem): string {
+  const fmt = (item: SectionItem, label: string) =>
+    `**Paper ${label}**\nTitle: ${item.title}\nYear: ${getYear(item) || 'Unknown'}\nAbstract: ${
+      item.description?.trim() || '(no abstract available)'
+    }`;
+
+  return [
+    fmt(a, 'A'),
+    '',
+    fmt(b, 'B'),
+    '',
+    'Provide a concise, deep analytical summary comparing these two papers. Highlight their intersection, ' +
+    'theoretical differences, and key takeaways. Format cleanly. End with exactly 3 short follow-up questions.',
+  ].join('\n');
+}
+
+// ─── Value cell ───────────────────────────────────────────────────────────────
 
 const ValueCell = memo(function ValueCell({
   value, differs, multiLine, side, lm,
@@ -63,10 +99,10 @@ const ValueCell = memo(function ValueCell({
   side:      'a' | 'b';
   lm?:       boolean;
 }) {
-  const baseText = lm ? 'text-gray-800' : 'text-white/82';
+  const baseText  = lm ? 'text-gray-800' : 'text-white/82';
   const emptyText = lm ? 'text-gray-300 italic' : 'text-white/22 italic';
-  const isUrl = value.startsWith('http');
-  const isEmpty = value === '—';
+  const isUrl     = value.startsWith('http');
+  const isEmpty   = value === '—';
 
   const diffBg = differs
     ? lm
@@ -100,10 +136,257 @@ const ValueCell = memo(function ValueCell({
   );
 });
 
-// ─── Compare dialog ──────────────────────────────────────────────────────────
+// ─── TTS listen button ────────────────────────────────────────────────────────
+
+const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm?: boolean }) {
+  const [ttsState, setTtsState] = useState<'idle' | 'loading' | 'playing'>('idle');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+    setTtsState('idle');
+  }, []);
+
+  const play = useCallback(async () => {
+    if (ttsState === 'playing' || ttsState === 'loading') { stop(); return; }
+
+    setTtsState('loading');
+    abortRef.current = new AbortController();
+
+    try {
+      // Strip markdown / LaTeX for cleaner speech (mirrors SingularityChat)
+      const clean = text
+        .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
+        .replace(/\$[^$]*\$/g, ' formula ')
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/`[^`]*`/g, '')
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/\n{2,}/g, '. ')
+        .replace(/\n/g, ' ')
+        .trim()
+        .slice(0, 2500);
+
+      const res = await fetch('/api/tts', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: clean, voiceId: RACHEL_VOICE_ID }),
+        signal:  abortRef.current.signal,
+      });
+
+      if (!res.ok) throw new Error(`TTS ${res.status}`);
+
+      const blob  = await res.blob();
+      const url   = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => { URL.revokeObjectURL(url); setTtsState('idle'); };
+      audio.onerror = () => { URL.revokeObjectURL(url); setTtsState('idle'); };
+
+      setTtsState('playing');
+      await audio.play();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setTtsState('idle');
+    }
+  }, [text, ttsState, stop]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stop(), [stop]);
+
+  const isActive = ttsState === 'playing' || ttsState === 'loading';
+
+  return (
+    <button
+      onClick={play}
+      title={isActive ? 'Stop audio' : 'Listen to AI analysis'}
+      aria-label={isActive ? 'Stop audio' : 'Listen to AI analysis'}
+      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] uppercase tracking-[0.10em] font-medium transition-all duration-200 ${
+        isActive
+          ? lm
+            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+            : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+          : lm
+            ? 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+            : 'border-white/[0.09] text-white/42 hover:border-white/[0.18] hover:bg-white/[0.06]'
+      }`}
+    >
+      {ttsState === 'playing' ? (
+        <>
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <VolumeX size={9} strokeWidth={2} />
+          </motion.div>
+          Stop
+        </>
+      ) : ttsState === 'loading' ? (
+        <>
+          <motion.div
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            <Volume2 size={9} strokeWidth={2} />
+          </motion.div>
+          Loading…
+        </>
+      ) : (
+        <>
+          <Volume2 size={9} strokeWidth={2} />
+          Listen
+        </>
+      )}
+    </button>
+  );
+});
+
+// ─── AI Analysis section ──────────────────────────────────────────────────────
+
+interface AISectionProps {
+  items: [SectionItem, SectionItem];
+  open:  boolean;
+  lm?:   boolean;
+}
+
+const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
+  const [content,  setContent]  = useState('');
+  const [thinking, setThinking] = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const abortRef      = useRef<AbortController | null>(null);
+  // Track which pair we've already fetched to avoid duplicate calls
+  const fetchedKeyRef = useRef<string | null>(null);
+
+  const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem) => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    setContent('');
+    setError(null);
+    setThinking(true);
+
+    const prompt = buildComparePrompt(a, b);
+
+    try {
+      const res = await fetch('/api/singularity', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message: prompt, history: [] }),
+        signal:  abortRef.current.signal,
+      });
+
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let sawFirst  = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          let data: Record<string, unknown>;
+          try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
+          if (data.error) throw new Error('Stream error');
+          if (data.done) continue;
+          if (!sawFirst) { setThinking(false); sawFirst = true; }
+          if (typeof data.content === 'string') setContent(data.content);
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setThinking(false);
+      setError('Analysis unavailable. Please try again.');
+    } finally {
+      setThinking(false);
+    }
+  }, []);
+
+  // Auto-trigger when dialog opens with a new paper pair
+  useEffect(() => {
+    if (!open || !items) return;
+    const [a, b] = items;
+    const key = `${a.title}|||${b.title}`;
+    if (fetchedKeyRef.current === key) return; // already fetched this pair
+    fetchedKeyRef.current = key;
+    void fetchAnalysis(a, b);
+  }, [open, items, fetchAnalysis]);
+
+  // Abort stream on unmount
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
+
+  return (
+    <div className={`flex-shrink-0 border-b ${lm ? 'border-gray-100' : 'border-white/[0.055]'}`}>
+      {/* Section label row */}
+      <div className="flex items-center gap-2 px-5 pt-3 pb-2">
+        <Sparkles
+          size={11}
+          strokeWidth={2}
+          className={`flex-shrink-0 ${lm ? 'text-violet-500' : 'text-violet-300/80'}`}
+        />
+        <span className={`text-[8.5px] uppercase tracking-[0.18em] font-semibold flex-1 ${
+          lm ? 'text-violet-600' : 'text-violet-300/80'
+        }`}>
+          Singularity AI Analysis
+        </span>
+
+        {/* Thinking dots — shown while waiting for first token */}
+        {thinking && (
+          <div className="flex items-center gap-1 mr-1">
+            {[0, 1, 2].map(i => (
+              <motion.div
+                key={i}
+                className={`w-1 h-1 rounded-full ${lm ? 'bg-violet-400' : 'bg-violet-400/60'}`}
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Listen button — appears once we have text */}
+        {content && !thinking && (
+          <ListenButton text={content} lm={lm} />
+        )}
+      </div>
+
+      {/* Streaming content */}
+      <div className="px-5 pb-3 max-h-52 overflow-y-auto overscroll-contain">
+        {error ? (
+          <p className={`text-[11px] italic ${lm ? 'text-red-400' : 'text-red-400/70'}`}>
+            {error}
+          </p>
+        ) : content ? (
+          <div className={`prose prose-sm max-w-none text-[11.5px] leading-relaxed ${
+            lm
+              ? '[&_*]:text-gray-700 [&_strong]:text-gray-900 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-gray-800'
+              : '[&_*]:text-white/68 [&_strong]:text-white/88 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-white/80'
+          }`}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content}
+            </ReactMarkdown>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+});
+
+// ─── Compare dialog ───────────────────────────────────────────────────────────
 
 const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: CompareDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef   = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   // Escape key
@@ -114,7 +397,7 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
     return () => window.removeEventListener('keydown', h);
   }, [open, onClose]);
 
-  // Auto-focus
+  // Auto-focus close button on open
   useEffect(() => {
     if (!open) return;
     const raf = requestAnimationFrame(() => closeBtnRef.current?.focus());
@@ -141,7 +424,7 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
   if (!items) return null;
 
   const [a, b] = items;
-  const fields = buildFields(a, b);
+  const fields  = buildFields(a, b);
 
   return (
     <>
@@ -165,7 +448,7 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
           'sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2',
           'sm:top-6 sm:bottom-6 sm:w-[min(860px,calc(100vw-48px))]',
           'flex flex-col rounded-2xl border overflow-hidden',
-          'transition-all duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'transition-all duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
           open
             ? 'opacity-100 scale-100 pointer-events-auto'
             : 'opacity-0 scale-[0.97] pointer-events-none',
@@ -174,7 +457,7 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
             : 'bg-[rgba(7,7,16,0.97)] border-white/[0.09] shadow-[0_24px_80px_rgba(0,0,0,0.90)] backdrop-blur-2xl',
         ].join(' ')}
       >
-        {/* Header */}
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className={`flex-shrink-0 flex items-center gap-3 px-5 py-4 border-b ${
           lm ? 'border-gray-100' : 'border-white/[0.055]'
         }`}>
@@ -184,12 +467,14 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
             <ArrowLeftRight size={14} strokeWidth={2} className={lm ? 'text-violet-600' : 'text-violet-300'} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-[13px] font-semibold ${lm ? 'text-gray-900' : 'text-white/90'}`}
-              style={{ fontFamily: 'var(--app-font-heading)' }}>
+            <p
+              className={`text-[13px] font-semibold ${lm ? 'text-gray-900' : 'text-white/90'}`}
+              style={{ fontFamily: 'var(--app-font-heading)' }}
+            >
               Compare Papers
             </p>
             <p className={`text-[8.5px] uppercase tracking-[0.2em] ${lm ? 'text-gray-400' : 'text-white/28'}`}>
-              Differences highlighted
+              Differences highlighted · AI powered
             </p>
           </div>
           <button
@@ -206,67 +491,84 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
           </button>
         </div>
 
-        {/* Column headers — paper titles */}
-        <div className={`flex-shrink-0 grid grid-cols-[120px_1fr_1fr] gap-3 px-5 py-3 border-b ${
-          lm ? 'border-gray-100 bg-gray-50/60' : 'border-white/[0.055] bg-white/[0.015]'
-        }`}>
-          <div /> {/* label spacer */}
-          {[a, b].map((item, i) => (
-            <div key={i} className={`flex items-center gap-2 min-w-0`}>
-              <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold ${
-                i === 0
-                  ? lm ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-300'
-                  : lm ? 'bg-sky-100 text-sky-700'    : 'bg-sky-500/15 text-sky-300'
-              }`}>
-                {i === 0 ? 'A' : 'B'}
-              </span>
-              <p className={`text-[10.5px] font-semibold leading-snug line-clamp-2 min-w-0 ${
-                lm ? 'text-gray-800' : 'text-white/80'
-              }`} style={{ fontFamily: 'var(--app-font-heading)' }}>
-                {item.title}
-              </p>
-            </div>
-          ))}
-        </div>
+        {/* ── Singularity AI Analysis — auto-triggered on open ──────────── */}
+        <AIAnalysisSection items={[a, b]} open={open} lm={lm} />
 
-        {/* Comparison rows */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="flex flex-col divide-y divide-white/[0.035]">
-            {fields.map(({ label, valueA, valueB, multiLine }) => {
-              const differs = valueA !== valueB && valueA !== '—' && valueB !== '—';
-              return (
-                <div
-                  key={label}
-                  className={`grid grid-cols-[120px_1fr_1fr] gap-3 px-5 py-3 ${
-                    lm ? 'divide-x divide-gray-100' : ''
+        {/* ── Column headers — sticky, horizontally scrollable on mobile ── */}
+        <div className={`flex-shrink-0 overflow-x-auto border-b ${
+          lm ? 'border-gray-100' : 'border-white/[0.055]'
+        }`}>
+          <div
+            className={`grid gap-3 px-5 py-3 min-w-[480px] ${
+              lm ? 'bg-gray-50/60' : 'bg-white/[0.015]'
+            }`}
+            style={{ gridTemplateColumns: '120px 1fr 1fr' }}
+          >
+            <div /> {/* label spacer */}
+            {[a, b].map((item, i) => (
+              <div key={i} className="flex items-center gap-2 min-w-0">
+                <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                  i === 0
+                    ? lm ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-300'
+                    : lm ? 'bg-sky-100 text-sky-700'    : 'bg-sky-500/15 text-sky-300'
+                }`}>
+                  {i === 0 ? 'A' : 'B'}
+                </span>
+                <p
+                  className={`text-[10.5px] font-semibold leading-snug line-clamp-2 min-w-0 ${
+                    lm ? 'text-gray-800' : 'text-white/80'
                   }`}
+                  style={{ fontFamily: 'var(--app-font-heading)' }}
                 >
-                  {/* Field label */}
-                  <div className="flex items-start pt-2">
-                    <span className={`text-[8.5px] uppercase tracking-[0.16em] font-semibold ${
-                      lm ? 'text-gray-400' : 'text-white/30'
-                    }`}>
-                      {label}
-                    </span>
-                    {differs && (
-                      <span className={`ml-1.5 mt-[1px] text-[7px] px-1 py-[1px] rounded-full font-semibold ${
-                        lm ? 'bg-rose-50 text-rose-500 border border-rose-200' : 'bg-rose-500/10 text-rose-400/70 border border-rose-400/20'
-                      }`}>
-                        diff
-                      </span>
-                    )}
-                  </div>
-                  {/* Paper A */}
-                  <ValueCell value={valueA} differs={differs} multiLine={multiLine} side="a" lm={lm} />
-                  {/* Paper B */}
-                  <ValueCell value={valueB} differs={differs} multiLine={multiLine} side="b" lm={lm} />
-                </div>
-              );
-            })}
+                  {item.title}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Legend footer */}
+        {/* ── Comparison rows — scrollable body ───────────────────────────── */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {/* overflow-x-auto wraps the fixed-min-width grid for mobile */}
+          <div className="overflow-x-auto">
+            <div className="flex flex-col min-w-[480px]">
+              {fields.map(({ label, valueA, valueB, multiLine }) => {
+                const differs = valueA !== valueB && valueA !== '—' && valueB !== '—';
+                return (
+                  <div
+                    key={label}
+                    className={`grid gap-3 px-5 py-3 border-b ${
+                      lm ? 'border-gray-50' : 'border-white/[0.035]'
+                    }`}
+                    style={{ gridTemplateColumns: '120px 1fr 1fr' }}
+                  >
+                    {/* Field label */}
+                    <div className="flex items-start pt-2">
+                      <span className={`text-[8.5px] uppercase tracking-[0.16em] font-semibold ${
+                        lm ? 'text-gray-400' : 'text-white/30'
+                      }`}>
+                        {label}
+                      </span>
+                      {differs && (
+                        <span className={`ml-1.5 mt-[1px] text-[7px] px-1 py-[1px] rounded-full font-semibold ${
+                          lm ? 'bg-rose-50 text-rose-500 border border-rose-200' : 'bg-rose-500/10 text-rose-400/70 border border-rose-400/20'
+                        }`}>
+                          diff
+                        </span>
+                      )}
+                    </div>
+                    {/* Paper A */}
+                    <ValueCell value={valueA} differs={differs} multiLine={multiLine} side="a" lm={lm} />
+                    {/* Paper B */}
+                    <ValueCell value={valueB} differs={differs} multiLine={multiLine} side="b" lm={lm} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Legend footer ───────────────────────────────────────────────── */}
         <div className={`flex-shrink-0 flex items-center gap-4 px-5 py-3 border-t ${
           lm ? 'border-gray-100 bg-gray-50/60' : 'border-white/[0.055] bg-white/[0.01]'
         }`}>
@@ -277,7 +579,10 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
             { letter: 'A', dk: 'bg-amber-500/10 border-amber-400/20 text-amber-300', lmC: 'bg-amber-50 border-amber-200 text-amber-700' },
             { letter: 'B', dk: 'bg-sky-500/10 border-sky-400/20 text-sky-300',       lmC: 'bg-sky-50 border-sky-200 text-sky-700' },
           ].map(({ letter, dk, lmC }) => (
-            <span key={letter} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[8.5px] ${lm ? lmC : dk}`}>
+            <span
+              key={letter}
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[8.5px] ${lm ? lmC : dk}`}
+            >
               <span className="font-bold">{letter}</span>
               <span className="font-normal">= Paper {letter}</span>
             </span>
