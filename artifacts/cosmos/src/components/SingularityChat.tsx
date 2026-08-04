@@ -467,10 +467,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Chat with Singularity"
-      className="fixed inset-0 w-full h-[100dvh] z-[9999] flex flex-col bg-[#09090b]"
+      className="relative min-h-screen w-full flex flex-col bg-[#09090b]"
     >
       {/* Subtle top radial ambient */}
       <div

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
+import { useLocation } from 'wouter';
 // NasaSearch has runtime named exports used throughout — keep as static import
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
+import SingularityChat from './components/SingularityChat';
 // Heavy modals — code-split so they don't bloat the initial bundle
 const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
 const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
@@ -1966,6 +1968,9 @@ function UserBadge({ user, lm, onLogout }: { user: UserProfile; lm: boolean; onL
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  // Wouter location — used to render the dedicated /nexus route
+  const [location, setLocation] = useLocation();
+
   // show3D = false → clean charcoal background, no iframe, no WarpIntro (default)
   // show3D = true  → WarpIntro + Sketchfab 3D animation active
   const [show3D,       setShow3D]      = useState(false);
@@ -2391,6 +2396,11 @@ export default function App() {
         return { title: card.item.title,                                   description: card.item.description,                  source: 'cern'   };
     }
   }, []);
+
+  // ── /nexus — dedicated Singularity Chat page ──────────────────────────────
+  if (location === '/nexus') {
+    return <SingularityChat onClose={() => setLocation('/')} />;
+  }
 
   return (
     <div

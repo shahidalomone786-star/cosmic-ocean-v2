@@ -9,15 +9,15 @@
  * highlight, breathing emerald status dot, shimmer on hover.
  */
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Orbit } from 'lucide-react';
-import SingularityChat from './SingularityChat';
+import { useLocation } from 'wouter';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SingularityLaunchButton() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const [isHovered, setIsHovered] = useState(false);
   const shimmerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -65,7 +65,7 @@ export default function SingularityLaunchButton() {
           whileHover={{ scale: 1.025, y: -1 }}
           whileTap={{ scale: 0.97, y: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-          onClick={() => setIsOpen(true)}
+          onClick={() => setLocation('/nexus')}
           aria-label="Open Singularity Nexus — AI chat powered by DeepSeek R1"
           className="relative overflow-hidden flex items-center gap-3.5 px-5 py-3.5 rounded-[20px] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
           style={{
@@ -175,12 +175,6 @@ export default function SingularityLaunchButton() {
         </motion.button>
       </div>
 
-      {/* ── Singularity Chat overlay ── */}
-      <AnimatePresence>
-        {isOpen && (
-          <SingularityChat onClose={() => setIsOpen(false)} />
-        )}
-      </AnimatePresence>
     </>
   );
 }

@@ -320,7 +320,9 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
   const fetchedKeyRef  = useRef<string | null>(null);
   const thinkStartRef  = useRef<number>(0);
 
-  const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem) => {
+  // fetchAnalysis takes a `key` and only marks the pair as "done" on success/error —
+  // NOT on abort. This way, if the user closes mid-stream, the next open retries.
+  const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem, key: string) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
@@ -377,8 +379,17 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           }
         }
       }
+      // Stream completed successfully — mark this pair as done so reopening doesn't re-fetch
+      fetchedKeyRef.current = key;
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Dialog was closed mid-stream; do NOT set fetchedKeyRef so the
+        // next open retries cleanly instead of showing a blank section.
+        return;
+      }
+      console.error('[CompareDialog] AI Fetch Error:', err);
+      // Mark as done on hard errors too (prevents infinite retry loops)
+      fetchedKeyRef.current = key;
       setError('AI Analysis failed to load. Please close and reopen to retry.');
     } finally {
       setGenerating(false);
@@ -386,15 +397,15 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
   }, []);
 
   // Auto-trigger when dialog opens for a new paper pair.
-  // Pass `items` directly from the parent prop (not reconstructed as [a,b])
-  // so the reference is stable and this effect doesn't re-fire every render.
+  // `fetchedKeyRef` is only set after the stream completes (or errors) — NOT on abort.
+  // This means a dialog that was closed mid-stream will retry correctly on next open.
   useEffect(() => {
     if (!open || !items) return;
     const [a, b] = items;
     const key = `${a.title}|||${b.title}`;
-    if (fetchedKeyRef.current === key) return;
-    fetchedKeyRef.current = key;
-    void fetchAnalysis(a, b);
+    if (fetchedKeyRef.current === key) return; // already have completed result
+    console.log('[CompareDialog] Triggering AI Comparison:', a.title, '×', b.title);
+    void fetchAnalysis(a, b, key);
   }, [open, items, fetchAnalysis]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
@@ -441,19 +452,19 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           <div className={`text-[11px] ${lm ? 'text-red-500' : 'text-red-400'}`}>{error}</div>
         ) : (
           <>
-            {/* ── LIVE reasoning block — visible while inside <think> ──── */}
+            {/* ── LIVE reasoning block — glassmorphic, visible while inside <think> ── */}
             <AnimatePresence>
-              {isThinking && reasoning && (
+              {isThinking && (
                 <motion.div
                   key="live-think"
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18 }}
-                  className={`mb-3 rounded-xl border-l-2 overflow-hidden ${
+                  className={`mb-3 rounded-xl overflow-hidden border-l-2 ${
                     lm
-                      ? 'border-emerald-400/50 bg-emerald-50/70'
-                      : 'border-emerald-500/30 bg-emerald-500/[0.05]'
+                      ? 'border-emerald-400 bg-emerald-50/70'
+                      : 'border-emerald-500 bg-white/5'
                   }`}
                 >
                   {/* Live block header */}
@@ -463,11 +474,11 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
                       transition={{ duration: 1.8, repeat: Infinity }}
                     >
                       <BrainCircuit size={10} strokeWidth={2}
-                        className={lm ? 'text-emerald-500' : 'text-emerald-400/65'}
+                        className={lm ? 'text-emerald-500' : 'text-emerald-400/80'}
                       />
                     </motion.div>
                     <span className={`text-[8px] uppercase tracking-[0.16em] font-semibold ${
-                      lm ? 'text-emerald-600/80' : 'text-emerald-400/60'
+                      lm ? 'text-emerald-600/80' : 'text-emerald-400/70'
                     }`}>
                       Singularity is analyzing…
                     </span>
@@ -476,7 +487,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
                       {[0, 1, 2].map(i => (
                         <motion.div key={i}
                           className={`w-[3px] h-[3px] rounded-full ${
-                            lm ? 'bg-emerald-400' : 'bg-emerald-400/55'
+                            lm ? 'bg-emerald-400' : 'bg-emerald-400/70'
                           }`}
                           animate={{ opacity: [0.2, 1, 0.2] }}
                           transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
@@ -484,12 +495,24 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
                       ))}
                     </div>
                   </div>
-                  {/* Streaming reasoning text */}
-                  <p className={`px-3 pb-2.5 text-[11px] italic leading-relaxed ${
-                    lm ? 'text-gray-400' : 'text-white/33'
-                  }`}>
-                    {reasoning}
-                  </p>
+
+                  {/* Bouncing dots when no reasoning text yet */}
+                  {!reasoning ? (
+                    <div className="flex items-center gap-1 px-3 pb-3">
+                      {[0, 1, 2].map(i => (
+                        <motion.div key={i}
+                          className={`w-1.5 h-1.5 rounded-full ${lm ? 'bg-emerald-400' : 'bg-emerald-400/60'}`}
+                          animate={{ y: [0, -5, 0] }}
+                          transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    /* Streaming reasoning text */
+                    <p className="px-3 pb-2.5 text-[11px] italic leading-relaxed text-gray-400">
+                      {reasoning}
+                    </p>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -512,8 +535,8 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
               }`}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </div>
-            ) : !reasoning && generating ? (
-              /* Pre-first-token dots — shown before any reasoning arrives */
+            ) : isAnswering ? (
+              /* Dots while answer tokens are about to arrive after reasoning */
               <div className="flex items-center gap-1 py-2">
                 {[0, 1, 2].map(i => (
                   <motion.div key={i}
