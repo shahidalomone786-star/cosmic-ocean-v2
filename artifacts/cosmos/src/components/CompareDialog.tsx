@@ -258,11 +258,13 @@ interface AISectionProps {
 }
 
 const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
-  const [content,  setContent]  = useState('');
-  const [thinking, setThinking] = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  // `generating` = stream is in flight (stays true even during the <think> phase)
+  // `content`    = accumulated visible text (empty while model is still reasoning)
+  const [content,    setContent]    = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
   const abortRef      = useRef<AbortController | null>(null);
-  // Track which pair we've already fetched to avoid duplicate calls
+  // Dedup: track which pair has already been fetched
   const fetchedKeyRef = useRef<string | null>(null);
 
   const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem) => {
@@ -271,7 +273,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
 
     setContent('');
     setError(null);
-    setThinking(true);
+    setGenerating(true);
 
     const prompt = buildComparePrompt(a, b);
 
@@ -279,6 +281,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
       const res = await fetch('/api/singularity', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Backend reads `message` + `history` — not a `messages` array
         body:    JSON.stringify({ message: prompt, history: [] }),
         signal:  abortRef.current.signal,
       });
@@ -287,7 +290,6 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let sawFirst  = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -298,33 +300,41 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           if (!raw) continue;
           let data: Record<string, unknown>;
           try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
-          if (data.error) throw new Error('Stream error');
+          if (data.error) throw new Error('Stream error from server');
           if (data.done) continue;
-          if (!sawFirst) { setThinking(false); sawFirst = true; }
-          if (typeof data.content === 'string') setContent(data.content);
+          // Only update visible content when there is actual non-empty text.
+          // During the <think> phase the backend sends content: '' — we must
+          // NOT treat that as a signal to stop showing the loading state.
+          if (typeof data.content === 'string' && data.content.trim().length > 0) {
+            setContent(data.content);
+          }
         }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      setThinking(false);
-      setError('Analysis unavailable. Please try again.');
+      setError('AI Analysis failed to load. Please close and reopen to retry.');
     } finally {
-      setThinking(false);
+      setGenerating(false);
     }
   }, []);
 
-  // Auto-trigger when dialog opens with a new paper pair
+  // Auto-trigger when dialog opens for a new paper pair.
+  // NOTE: `items` must be the same reference as the parent prop — do NOT
+  // reconstruct it as `[a, b]` in the parent JSX or this effect re-fires every render.
   useEffect(() => {
     if (!open || !items) return;
     const [a, b] = items;
     const key = `${a.title}|||${b.title}`;
-    if (fetchedKeyRef.current === key) return; // already fetched this pair
+    if (fetchedKeyRef.current === key) return;
     fetchedKeyRef.current = key;
     void fetchAnalysis(a, b);
   }, [open, items, fetchAnalysis]);
 
-  // Abort stream on unmount
+  // Abort on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
+
+  // Dots are shown whenever the stream is in flight AND no content has arrived yet
+  const showDots = generating && !content;
 
   return (
     <div className={`flex-shrink-0 border-b ${lm ? 'border-gray-100' : 'border-white/[0.055]'}`}>
@@ -341,8 +351,8 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           Singularity AI Analysis
         </span>
 
-        {/* Thinking dots — shown while waiting for first token */}
-        {thinking && (
+        {/* Bouncing dots — stream in flight, no content yet (incl. <think> phase) */}
+        {showDots && (
           <div className="flex items-center gap-1 mr-1">
             {[0, 1, 2].map(i => (
               <motion.div
@@ -355,18 +365,18 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           </div>
         )}
 
-        {/* Listen button — appears once we have text */}
-        {content && !thinking && (
+        {/* Listen button — visible once content has fully streamed in */}
+        {content && !generating && (
           <ListenButton text={content} lm={lm} />
         )}
       </div>
 
-      {/* Streaming content */}
+      {/* Content area */}
       <div className="px-5 pb-3 max-h-52 overflow-y-auto overscroll-contain">
         {error ? (
-          <p className={`text-[11px] italic ${lm ? 'text-red-400' : 'text-red-400/70'}`}>
+          <div className={`text-[11px] ${lm ? 'text-red-500' : 'text-red-400'}`}>
             {error}
-          </p>
+          </div>
         ) : content ? (
           <div className={`prose prose-sm max-w-none text-[11.5px] leading-relaxed ${
             lm
@@ -492,7 +502,8 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
         </div>
 
         {/* ── Singularity AI Analysis — auto-triggered on open ──────────── */}
-        <AIAnalysisSection items={[a, b]} open={open} lm={lm} />
+        {/* Pass `items` directly (not `[a, b]`) so the reference is stable across renders */}
+        <AIAnalysisSection items={items} open={open} lm={lm} />
 
         {/* ── Column headers — sticky, horizontally scrollable on mobile ── */}
         <div className={`flex-shrink-0 overflow-x-auto border-b ${
