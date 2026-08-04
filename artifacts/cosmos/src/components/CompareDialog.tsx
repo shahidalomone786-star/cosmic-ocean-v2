@@ -549,7 +549,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
       </div>
 
       {/* ── Content area — enlarged to 65vh ──────────────────────────────── */}
-      <div className="px-5 pb-3 max-h-[65vh] overflow-y-auto overscroll-contain space-y-2">
+      <div className="px-5 pb-3 max-h-[65vh] overflow-y-auto overscroll-contain scroll-smooth space-y-2">
 
         {/* Error */}
         {apiError && (
