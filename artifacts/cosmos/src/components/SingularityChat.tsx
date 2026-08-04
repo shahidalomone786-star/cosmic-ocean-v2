@@ -124,8 +124,10 @@ const CopyButton = memo(function CopyButton({ text }: { text: string }) {
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
 const ListenButton = memo(function ListenButton({ text }: { text: string }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const audioRef      = useRef<HTMLAudioElement | null>(null);
+  const abortRef      = useRef<AbortController | null>(null);
+  // Blob URL cache — avoids re-fetching the same audio from ElevenLabs
+  const audioCacheRef = useRef<Map<string, string>>(new Map());
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -158,28 +160,28 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         .trim()
         .slice(0, 2500);
 
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: clean, voiceId: SINGULARITY_VOICE_ID }),
-        signal: abortRef.current.signal,
-      });
+      // Cache hit — reuse the existing blob URL (saves an ElevenLabs API call)
+      let url = audioCacheRef.current.get(clean);
 
-      if (!res.ok) throw new Error(`TTS error ${res.status}`);
+      if (!url) {
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: clean, voiceId: SINGULARITY_VOICE_ID }),
+          signal: abortRef.current.signal,
+        });
+        if (!res.ok) throw new Error(`TTS error ${res.status}`);
+        const blob = await res.blob();
+        url = URL.createObjectURL(blob);
+        audioCacheRef.current.set(clean, url);  // store for replay
+      }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;
 
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        setState('idle');
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        setState('idle');
-      };
+      // Do NOT revoke here — the URL stays in cache for replays
+      audio.onended = () => setState('idle');
+      audio.onerror = () => setState('idle');
 
       setState('playing');
       await audio.play();
@@ -189,8 +191,12 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
     }
   }, [text, state, stop]);
 
-  // Cleanup on unmount
-  useEffect(() => () => stop(), [stop]);
+  // Cleanup on unmount — stop playback and revoke all cached blob URLs
+  useEffect(() => () => {
+    stop();
+    audioCacheRef.current.forEach(url => URL.revokeObjectURL(url));
+    audioCacheRef.current.clear();
+  }, [stop]);
 
   const isActive = state === 'playing' || state === 'loading';
 
