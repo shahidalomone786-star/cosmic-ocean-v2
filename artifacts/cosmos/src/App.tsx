@@ -2397,8 +2397,8 @@ export default function App() {
     }
   }, []);
 
-  // ── /nexus — dedicated Singularity Chat page ──────────────────────────────
-  if (location === '/nexus') {
+  // ── /chat — dedicated Singularity Chat page ───────────────────────────────
+  if (location === '/chat') {
     return <SingularityChat onClose={() => setLocation('/')} />;
   }
 

@@ -65,8 +65,8 @@ export default function SingularityLaunchButton() {
           whileHover={{ scale: 1.025, y: -1 }}
           whileTap={{ scale: 0.97, y: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-          onClick={() => setLocation('/nexus')}
-          aria-label="Open Singularity Nexus — AI chat powered by DeepSeek R1"
+          onClick={() => setLocation('/chat')}
+          aria-label="Open Singularity Nexus — AI chat powered by GPT-OSS-120B"
           className="relative overflow-hidden flex items-center gap-3.5 px-5 py-3.5 rounded-[20px] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
           style={{
             background: 'rgba(8,8,8,0.90)',
@@ -152,7 +152,7 @@ export default function SingularityLaunchButton() {
               className="text-[9.5px] tracking-[0.18em] text-white/38 mt-0.5 uppercase"
               style={{ fontFamily: 'ui-monospace, "Cascadia Code", "JetBrains Mono", monospace' }}
             >
-              DEEPSEEK R1 CORE
+              GPT-OSS-120B CORE
             </span>
           </div>
 

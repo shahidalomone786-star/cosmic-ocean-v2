@@ -306,33 +306,22 @@ interface AISectionProps {
 }
 
 const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
-  // Three phases:
-  //  isThinking  — stream in flight, content still empty (inside <think>…</think>)
-  //  isAnswering — stream in flight, content arriving (after </think>)
-  //  isDone      — stream finished, no error
-  const [reasoning,        setReasoning]        = useState('');
-  const [reasoningDone,    setReasoningDone]    = useState(false);
-  const [reasoningSeconds, setReasoningSeconds] = useState(0);
-  const [content,          setContent]          = useState('');
-  const [generating,       setGenerating]       = useState(false);
-  const [error,            setError]            = useState<string | null>(null);
-  const abortRef       = useRef<AbortController | null>(null);
-  const fetchedKeyRef  = useRef<string | null>(null);
-  const thinkStartRef  = useRef<number>(0);
+  const [generating,     setGenerating]     = useState(false);
+  const [reasoningRaw,   setReasoningRaw]   = useState('');
+  const [contentRaw,     setContentRaw]     = useState('');
+  const [fetchError,     setFetchError]     = useState('');
 
-  // fetchAnalysis takes a `key` and only marks the pair as "done" on success/error —
-  // NOT on abort. This way, if the user closes mid-stream, the next open retries.
+  const abortRef      = useRef<AbortController | null>(null);
+  const fetchedKeyRef = useRef<string | null>(null);
+
   const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem, key: string) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    setReasoning('');
-    setReasoningDone(false);
-    setReasoningSeconds(0);
-    setContent('');
-    setError(null);
+    setReasoningRaw('');
+    setContentRaw('');
+    setFetchError('');
     setGenerating(true);
-    thinkStartRef.current = Date.now();
 
     const prompt = buildComparePrompt(a, b);
 
@@ -344,74 +333,55 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
         signal:  abortRef.current.signal,
       });
 
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok || !res.body) {
+        const errText = await res.text().catch(() => '(unreadable)');
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+      }
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let contentSealed = false; // latched once we record reasoningSeconds
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           let data: Record<string, unknown>;
           try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
-          if (data.error) throw new Error('Stream error from server');
+          if (data.error) throw new Error(`Server stream error: ${JSON.stringify(data)}`);
           if (data.done) continue;
 
-          // reasoning = text the model produced inside <think>…</think>
-          if (typeof data.reasoning === 'string' && data.reasoning.trim()) {
-            setReasoning(data.reasoning);
-          }
-          // content = text after </think> — empty string while still reasoning
-          if (typeof data.content === 'string' && data.content.trim().length > 0) {
-            if (!contentSealed) {
-              contentSealed = true;
-              setReasoningDone(true);
-              setReasoningSeconds(
-                Math.max(1, Math.round((Date.now() - thinkStartRef.current) / 1000)),
-              );
-            }
-            setContent(data.content);
-          }
+          // Blindly accumulate raw fields — reveals what's actually arriving
+          if (typeof data.reasoning === 'string') setReasoningRaw(data.reasoning);
+          if (typeof data.content === 'string')   setContentRaw(data.content);
         }
       }
-      // Stream completed successfully — mark this pair as done so reopening doesn't re-fetch
       fetchedKeyRef.current = key;
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        // Dialog was closed mid-stream; do NOT set fetchedKeyRef so the
-        // next open retries cleanly instead of showing a blank section.
-        return;
-      }
-      console.error('[CompareDialog] AI Fetch Error:', err);
-      // Mark as done on hard errors too (prevents infinite retry loops)
-      fetchedKeyRef.current = key;
-      setError('AI Analysis failed to load. Please close and reopen to retry.');
+      if (err instanceof Error && err.name === 'AbortError') return;
+      const msg = String((err as Error)?.message ?? err);
+      console.error('[CompareDialog] AI Fetch Error:', msg);
+      setFetchError(msg + ' | Payload/Network failed');
+      fetchedKeyRef.current = key; // prevent infinite retry on hard error
     } finally {
       setGenerating(false);
     }
   }, []);
 
-  // Auto-trigger when dialog opens for a new paper pair.
-  // `fetchedKeyRef` is only set after the stream completes (or errors) — NOT on abort.
-  // This means a dialog that was closed mid-stream will retry correctly on next open.
+  // Auto-trigger the moment the dialog opens with 2 papers
   useEffect(() => {
     if (!open || !items) return;
     const [a, b] = items;
     const key = `${a.title}|||${b.title}`;
-    if (fetchedKeyRef.current === key) return; // already have completed result
+    if (fetchedKeyRef.current === key) return;
     console.log('[CompareDialog] Triggering AI Comparison:', a.title, '×', b.title);
     void fetchAnalysis(a, b, key);
   }, [open, items, fetchAnalysis]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
-
-  const isThinking  = generating && !reasoningDone;   // still inside <think>
-  const isAnswering = generating && reasoningDone;     // answer streaming in
 
   return (
     <div className={`flex-shrink-0 border-b ${lm ? 'border-gray-100' : 'border-white/[0.055]'}`}>
@@ -426,128 +396,56 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
         }`}>
           Singularity AI Analysis
         </span>
-
-        {/* Phase status label */}
-        {isThinking && (
+        {generating && (
           <span className={`text-[7.5px] uppercase tracking-[0.15em] font-medium ${
             lm ? 'text-emerald-500/80' : 'text-emerald-400/55'
-          }`}>Reasoning…</span>
+          }`}>
+            {contentRaw ? 'Writing…' : 'Reasoning…'}
+          </span>
         )}
-        {isAnswering && (
-          <span className={`text-[7.5px] uppercase tracking-[0.15em] font-medium ${
-            lm ? 'text-violet-500/70' : 'text-violet-400/50'
-          }`}>Writing…</span>
-        )}
-
-        {/* Listen — only once fully done */}
-        {content && !generating && (
-          <ListenButton text={content} lm={lm} />
+        {contentRaw && !generating && (
+          <ListenButton text={contentRaw} lm={lm} />
         )}
       </div>
 
       {/* ── Content area ─────────────────────────────────────────────────── */}
       <div className="px-5 pb-3 max-h-56 overflow-y-auto overscroll-contain">
 
-        {error ? (
-          <div className={`text-[11px] ${lm ? 'text-red-500' : 'text-red-400'}`}>{error}</div>
-        ) : (
-          <>
-            {/* ── LIVE reasoning block — glassmorphic, visible while inside <think> ── */}
-            <AnimatePresence>
-              {isThinking && (
-                <motion.div
-                  key="live-think"
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className={`mb-3 rounded-xl overflow-hidden border-l-2 ${
-                    lm
-                      ? 'border-emerald-400 bg-emerald-50/70'
-                      : 'border-emerald-500 bg-white/5'
-                  }`}
-                >
-                  {/* Live block header */}
-                  <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-                    <motion.div
-                      animate={{ opacity: [0.45, 1, 0.45] }}
-                      transition={{ duration: 1.8, repeat: Infinity }}
-                    >
-                      <BrainCircuit size={10} strokeWidth={2}
-                        className={lm ? 'text-emerald-500' : 'text-emerald-400/80'}
-                      />
-                    </motion.div>
-                    <span className={`text-[8px] uppercase tracking-[0.16em] font-semibold ${
-                      lm ? 'text-emerald-600/80' : 'text-emerald-400/70'
-                    }`}>
-                      Singularity is analyzing…
-                    </span>
-                    {/* Pulse micro-dots */}
-                    <div className="flex items-center gap-0.5 ml-0.5">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i}
-                          className={`w-[3px] h-[3px] rounded-full ${
-                            lm ? 'bg-emerald-400' : 'bg-emerald-400/70'
-                          }`}
-                          animate={{ opacity: [0.2, 1, 0.2] }}
-                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+        {/* ── HARD ERROR — big red box ──────────────────────────────────── */}
+        {fetchError && (
+          <div className="bg-red-900 text-white p-3 font-bold border-2 border-red-500 rounded-lg mb-2 text-[11px]">
+            ERROR: {fetchError}
+          </div>
+        )}
 
-                  {/* Bouncing dots when no reasoning text yet */}
-                  {!reasoning ? (
-                    <div className="flex items-center gap-1 px-3 pb-3">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i}
-                          className={`w-1.5 h-1.5 rounded-full ${lm ? 'bg-emerald-400' : 'bg-emerald-400/60'}`}
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    /* Streaming reasoning text */
-                    <p className="px-3 pb-2.5 text-[11px] italic leading-relaxed text-gray-400">
-                      {reasoning}
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* ── Collapsed accordion — visible after reasoning completes ── */}
-            {reasoningDone && reasoning && (
+        {/* ── Stream content ───────────────────────────────────────────── */}
+        {(generating || reasoningRaw || contentRaw) && (
+          <div className="space-y-2">
+            {generating && !reasoningRaw && !contentRaw && (
+              <div className={`text-[11px] ${lm ? 'text-emerald-600/70' : 'text-emerald-400/60'}`}>
+                Connecting to Singularity…
+              </div>
+            )}
+            {reasoningRaw && (
               <ReasoningAccordion
-                reasoning={reasoning}
-                seconds={reasoningSeconds}
+                reasoning={reasoningRaw}
+                seconds={Math.max(1, Math.round((Date.now() - Date.now()) / 1000))}
                 lm={lm}
               />
             )}
+            {contentRaw && (
+              <div className={`text-[12px] leading-relaxed ${lm ? 'text-gray-800' : 'text-white/88'}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{contentRaw}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        )}
 
-            {/* ── Final answer ─────────────────────────────────────────── */}
-            {content ? (
-              <div className={`prose prose-sm max-w-none text-[11.5px] leading-relaxed ${
-                lm
-                  ? '[&_*]:text-gray-700 [&_strong]:text-gray-900 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-gray-800'
-                  : '[&_*]:text-white/68 [&_strong]:text-white/88 [&_p]:mt-1.5 [&_ul]:mt-1 [&_ol]:mt-1 [&_li]:mt-0.5 [&_h3]:text-white/80'
-              }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-              </div>
-            ) : isAnswering ? (
-              /* Dots while answer tokens are about to arrive after reasoning */
-              <div className="flex items-center gap-1 py-2">
-                {[0, 1, 2].map(i => (
-                  <motion.div key={i}
-                    className={`w-1 h-1 rounded-full ${lm ? 'bg-violet-400' : 'bg-violet-400/60'}`}
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.13, ease: 'easeInOut' }}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </>
+        {/* ── Idle state — not yet triggered ───────────────────────────── */}
+        {!generating && !fetchError && !reasoningRaw && !contentRaw && (
+          <div className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
+            Waiting to analyze…
+          </div>
         )}
       </div>
     </div>

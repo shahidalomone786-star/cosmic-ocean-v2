@@ -351,6 +351,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
   // ── Core generation ──────────────────────────────────────────────────────
   const generateResponse = useCallback(async (userText: string) => {
+    // Reset debug states for fresh run
     setIsThinking(true);
     thinkingStartRef.current = Date.now();
     abortRef.current = new AbortController();
@@ -361,13 +362,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       { id: msgId, role: 'assistant', content: '', reasoning: '', ts: Date.now() },
     ]);
 
-    // ── FIX: only send history with non-empty, non-placeholder content ──
-    // Groq strictly rejects messages with empty content strings.
+    // Only send history with non-empty content — Groq rejects empty strings
     const safeHistory = messages
       .filter(m =>
-        m.id !== 'welcome' &&           // exclude welcome placeholder
-        !m.error &&                      // exclude error messages
-        m.content.trim().length > 0      // exclude empty streaming placeholders
+        m.id !== 'welcome' &&
+        !m.error &&
+        m.content.trim().length > 0
       )
       .slice(-12)
       .map(m => ({ role: m.role, content: m.content.trim() }));
@@ -381,8 +381,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       });
 
       if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
+        const errText = await res.text().catch(() => '(unreadable)');
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
       }
 
       const reader  = res.body.getReader();
@@ -392,21 +392,35 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           let data: any;
           try { data = JSON.parse(raw); } catch { continue; }
-          if (data.error) throw new Error('Stream error from server');
+          if (data.error) throw new Error(`Server stream error: ${JSON.stringify(data)}`);
           if (data.done) continue;
 
           if (!sawFirstToken) { setIsThinking(false); sawFirstToken = true; }
+
+          // Resilient parser: works for both DeepSeek-style <think> streams AND
+          // standard plain-text streams (gpt-oss-120b sends no <think> tags).
+          // The backend's splitReasoning() already handles both:
+          //   - With <think> tags → { reasoning: '...', content: answer }
+          //   - Without <think> tags → { reasoning: '', content: fullText }
+          // We push content chunks to the message immediately — no hanging on a
+          // </think> that will never arrive.
           const seconds = Math.max(1, Math.round((Date.now() - thinkingStartRef.current) / 1000));
           setMessages(prev =>
             prev.map(m =>
               m.id === msgId
-                ? { ...m, reasoning: data.reasoning ?? '', content: data.content ?? '', reasoningSeconds: seconds }
+                ? {
+                    ...m,
+                    reasoning:        typeof data.reasoning === 'string' ? data.reasoning : (m.reasoning ?? ''),
+                    content:          typeof data.content   === 'string' ? data.content   : (m.content   ?? ''),
+                    reasoningSeconds: seconds,
+                  }
                 : m
             )
           );
@@ -415,11 +429,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      console.error('[SingularityChat] fetch error:', err?.message ?? err);
+      const msg = String(err?.message ?? err);
       setMessages(prev =>
         prev.map(m =>
           m.id === msgId
-            ? { ...m, error: true, content: 'Cosmic transmission failed. Please try again.' }
+            ? { ...m, error: true, content: 'Cosmic transmission failed. Check your connection and try again.' }
             : m
         )
       );
@@ -500,7 +514,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 Singularity
               </h2>
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/35 font-mono">
-                DeepSeek R1 · Cosmic Intelligence
+                GPT-OSS-120B · Cosmic Intelligence
               </p>
             </div>
           </div>
@@ -531,7 +545,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             <AnimatePresence initial={false}>
               {messages.map((msg, i) => {
                 const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
-                const showActions = msg.role === 'assistant' && !msg.error && msg.id !== 'welcome';
+                // showActions gates the entire action row (Listen, Copy, Regenerate).
+                // Listen is also gated on isLastAsst-awareness: for the actively-generating
+                // last message we suppress the row until the stream is complete.
+                const isGenerating = isThinking && i === messages.length - 1;
+                const showActions = msg.role === 'assistant' && !msg.error && msg.id !== 'welcome' && !isGenerating;
 
                 return (
                   <motion.div

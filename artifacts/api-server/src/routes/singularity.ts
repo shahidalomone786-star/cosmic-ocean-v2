@@ -136,7 +136,7 @@ router.post('/singularity', async (req, res) => {
         },
         signal: upstreamAbort.signal,
         body: JSON.stringify({
-          model:       'deepseek-r1-distill-llama-70b',
+          model:       'openai/gpt-oss-120b',
           messages,
           stream:      true,
           temperature: 0.6,
