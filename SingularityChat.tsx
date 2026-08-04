@@ -17,7 +17,7 @@ import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } fr
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown, ChevronUp,
-  Square, Copy, Check, RotateCcw, ArrowDown,
+  Square, Copy, Check, RotateCcw, ArrowDown, Volume2, Loader2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -216,6 +216,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [input, setInput]           = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [ttsLoading, setTtsLoading] = useState<Set<string>>(new Set());
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
@@ -341,7 +342,8 @@ const generateResponse = useCallback(async (userText: string) => {
   }, [input, isThinking, generateResponse]);
 
   const handleStop = useCallback(() => {
-    if (mockTimeoutRef.current) clearTimeout(mockTimeoutRef.current); // PHASE 3: abortRef.current?.abort();
+    if (mockTimeoutRef.current) clearTimeout(mockTimeoutRef.current);
+    abortRef.current?.abort();
     setIsThinking(false);
   }, []);
 
@@ -362,9 +364,35 @@ const generateResponse = useCallback(async (userText: string) => {
     }
   }, [handleSend]);
 
+  const handleListen = useCallback(async (msgId: string, text: string) => {
+    if (ttsLoading.has(msgId)) return;
+    setTtsLoading(prev => new Set(prev).add(msgId));
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Rachel — premium female voice
+        body: JSON.stringify({ text: text.slice(0, 2500), voiceId: '21m00Tcm4TlvDq8ikWAM' }),
+      });
+      if (!res.ok) throw new Error(`TTS error ${res.status}`);
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.play();
+    } catch {
+      // silently fail — button resets and user can retry
+    } finally {
+      setTtsLoading(prev => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+    }
+  }, [ttsLoading]);
+
   const isFreshChat = messages.length === 1;
 
   return (
+    <div className="!fixed !inset-0 !w-screen !h-[100dvh] !z-[999999] !bg-[#050505] !overflow-hidden">
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -373,7 +401,7 @@ const generateResponse = useCallback(async (userText: string) => {
       role="dialog"
       aria-modal="true"
       aria-label="Chat with Singularity"
-      className="fixed inset-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[420px] sm:h-[650px] z-[500] flex flex-col rounded-[2.5rem] border border-white/[0.08] overflow-hidden bg-[#050505]/80 backdrop-blur-3xl shadow-[0_24px_70px_-15px_rgba(0,0,0,0.85),0_8px_24px_-8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]"
+      className="max-w-3xl mx-auto w-full h-full flex flex-col"
     >
       {/* Ambient corner glow — neutral white, matches the platform's dark-glass language elsewhere */}
       <div
@@ -452,6 +480,19 @@ const generateResponse = useCallback(async (userText: string) => {
                   {msg.role === 'assistant' && !msg.error && msg.id !== 'welcome' && (
                     <div className="flex items-center gap-1 mt-1">
                       <CopyButton text={msg.content} />
+                      {msg.content && (
+                        <button
+                          onClick={() => handleListen(msg.id, msg.content)}
+                          disabled={ttsLoading.has(msg.id)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] text-white/35 hover:text-white/70 hover:bg-white/[0.06] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label={ttsLoading.has(msg.id) ? 'Loading audio…' : 'Listen to response'}
+                        >
+                          {ttsLoading.has(msg.id)
+                            ? <Loader2 size={11} strokeWidth={2} className="animate-spin" />
+                            : <Volume2 size={11} strokeWidth={2} />}
+                          Listen
+                        </button>
+                      )}
                       {isLastAssistant && (
                         <button
                           onClick={handleRegenerate}

@@ -98,11 +98,13 @@ router.post('/singularity', async (req, res) => {
   }
 
   const safeHistory = sanitiseHistory(history);
-  const messages = [
+  let messages: { role: string; content: string }[] = [
     { role: 'system',    content: SYSTEM_PROMPT },
     ...safeHistory,
     { role: 'user',      content: message.trim() },
   ];
+  // GROQ STRICT RULE: Groq instantly crashes on empty-content messages
+  messages = messages.filter(m => m.content && m.content.trim() !== '');
 
   console.log(
     `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)`
