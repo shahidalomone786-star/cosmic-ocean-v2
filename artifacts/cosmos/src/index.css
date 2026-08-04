@@ -2,6 +2,17 @@
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
 
+/* ── KaTeX display math — scroll horizontally instead of overflowing ── */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding-bottom: 4px; /* room for scrollbar */
+}
+.katex-display > .katex {
+  max-width: 100%;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

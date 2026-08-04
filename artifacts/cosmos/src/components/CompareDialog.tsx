@@ -16,7 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ArrowLeftRight, Sparkles, Volume2, VolumeX,
-  BrainCircuit, ChevronDown, ChevronUp,
+  BrainCircuit, ChevronDown, ChevronUp, Send,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -311,108 +311,123 @@ interface ApiError {
   details: unknown;
 }
 
-const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
-  const [generating,   setGenerating]   = useState(false);
-  const [reasoningRaw, setReasoningRaw] = useState('');
-  const [contentRaw,   setContentRaw]   = useState('');
-  const [apiError,     setApiError]     = useState<ApiError | null>(null);
+interface FollowUp {
+  id:       string;
+  question: string;
+  answer:   string;
+}
 
-  const abortRef      = useRef<AbortController | null>(null);
-  const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fetchedKeyRef = useRef<string | null>(null);
+// ── Shared SSE streaming helper ────────────────────────────────────────────────
+
+async function streamSingularity(
+  message:     string,
+  history:     Array<{ role: string; content: string }>,
+  signal:      AbortSignal,
+  onReasoning: (r: string) => void,
+  onContent:   (c: string) => void,
+  onError:     (e: ApiError) => void,
+): Promise<boolean> {
+  const res = await fetch('/api/singularity', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ message, history }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const errJson: ApiError = await res.json().catch(() => ({
+      error: `HTTP ${res.status}`, status: res.status, details: null,
+    }));
+    onError(errJson);
+    return false;
+  }
+  if (!res.body) {
+    onError({ error: 'No response body', status: 0, details: null });
+    return false;
+  }
+
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let sawFirstToken = false;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      if (!sawFirstToken) onError({ error: 'STREAM TERMINATED — no tokens received', status: 0, details: null });
+      break;
+    }
+    const chunk = decoder.decode(value, { stream: true });
+    for (const line of chunk.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6).trim();
+      if (!raw) continue;
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
+      if (data.error) {
+        onError({ error: String(data.message ?? 'STREAM TERMINATED'), status: 0, details: data });
+        return false;
+      }
+      if (data.done) continue;
+      sawFirstToken = true;
+      if (typeof data.reasoning === 'string') onReasoning(data.reasoning);
+      if (typeof data.content   === 'string') onContent(data.content);
+    }
+  }
+  return true;
+}
+
+// ── AIAnalysisSection ─────────────────────────────────────────────────────────
+
+const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
+  const [generating,       setGenerating]       = useState(false);
+  const [reasoningRaw,     setReasoningRaw]     = useState('');
+  const [contentRaw,       setContentRaw]       = useState('');
+  const [apiError,         setApiError]         = useState<ApiError | null>(null);
+  const [followUps,        setFollowUps]        = useState<FollowUp[]>([]);
+  const [followInput,      setFollowInput]      = useState('');
+  const [followGenerating, setFollowGenerating] = useState(false);
+
+  const abortRef       = useRef<AbortController | null>(null);
+  const timeoutRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchedKeyRef  = useRef<string | null>(null);
+  const followInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentRawRef  = useRef('');
+  const followUpsRef   = useRef<FollowUp[]>([]);
+
+  // Keep refs in sync so follow-up handler reads current values without stale closure
+  useEffect(() => { contentRawRef.current = contentRaw; }, [contentRaw]);
+  useEffect(() => { followUpsRef.current = followUps; }, [followUps]);
 
   const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem, key: string) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
-
-    // 60-second hard timeout
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => abortRef.current?.abort('timeout'), 60_000);
 
-    setReasoningRaw('');
-    setContentRaw('');
-    setApiError(null);
+    setReasoningRaw(''); setContentRaw(''); setApiError(null);
+    setFollowUps([]); setFollowInput('');
     setGenerating(true);
-
-    const prompt = buildComparePrompt(a, b);
+    contentRawRef.current = '';
+    followUpsRef.current  = [];
 
     try {
-      const res = await fetch('/api/singularity', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: prompt, history: [] }),
-        signal:  abortRef.current.signal,
-      });
-
-      // ── Non-2xx = structured JSON error (no stream) ──
-      if (!res.ok) {
-        const errJson: ApiError = await res.json().catch(() => ({
-          error:   `HTTP ${res.status} — could not parse error body`,
-          status:  res.status,
-          details: null,
-        }));
-        console.error('[CompareDialog] API error:', errJson);
-        setApiError(errJson);
-        fetchedKeyRef.current = key;
-        return;
-      }
-
-      if (!res.body) {
-        const noBody: ApiError = { error: 'Response body is null — cannot stream', status: 0, details: null };
-        setApiError(noBody);
-        fetchedKeyRef.current = key;
-        return;
-      }
-
-      const reader     = res.body.getReader();
-      const decoder    = new TextDecoder();
-      let chunkIndex   = 0;
-      let sawFirstToken = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (!sawFirstToken) {
-            setApiError({ error: 'STREAM TERMINATED — no tokens received', status: 0, details: null });
-          }
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        console.log(`[CompareDialog] chunk #${++chunkIndex}:`, chunk.slice(0, 300));
-
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
-          let data: Record<string, unknown>;
-          try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
-
-          if (data.error) {
-            const streamMsg = String(data.message ?? 'STREAM TERMINATED');
-            console.error('[CompareDialog] stream error event:', data);
-            setApiError({ error: streamMsg, status: 0, details: data });
-            return;
-          }
-          if (data.done) continue;
-
-          sawFirstToken = true;
-          if (typeof data.reasoning === 'string') setReasoningRaw(data.reasoning);
-          if (typeof data.content   === 'string') setContentRaw(data.content);
-        }
-      }
+      await streamSingularity(
+        buildComparePrompt(a, b), [],
+        abortRef.current.signal,
+        r => setReasoningRaw(r),
+        c => { setContentRaw(c); contentRawRef.current = c; },
+        e => { setApiError(e); fetchedKeyRef.current = key; },
+      );
       fetchedKeyRef.current = key;
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
-        const isTimeout = (err as any)?.message === 'timeout';
-        if (isTimeout) {
+        if ((err as any)?.message === 'timeout') {
           setApiError({ error: 'Request timed out after 60 seconds.', status: 504, details: null });
           fetchedKeyRef.current = key;
         }
         return;
       }
       const msg = String((err as Error)?.message ?? err);
-      console.error('[CompareDialog] fetch error:', msg, (err as Error)?.stack);
       setApiError({ error: msg, status: 0, details: null });
       fetchedKeyRef.current = key;
     } finally {
@@ -421,17 +436,59 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
     }
   }, []);
 
-  // Auto-trigger the moment the dialog opens with 2 papers
+  const handleFollowUp = useCallback(async () => {
+    const q = followInput.trim();
+    if (!q || followGenerating || generating) return;
+    setFollowInput('');
+
+    const fid = `fu-${Date.now()}`;
+    setFollowUps(prev => [...prev, { id: fid, question: q, answer: '' }]);
+    setFollowGenerating(true);
+
+    // Build history: initial prompt + response + any previous follow-ups
+    const [a, b] = items;
+    const history: Array<{ role: string; content: string }> = [
+      { role: 'user',      content: buildComparePrompt(a, b) },
+      { role: 'assistant', content: contentRawRef.current },
+      ...followUpsRef.current.flatMap(fu => [
+        { role: 'user',      content: fu.question },
+        { role: 'assistant', content: fu.answer },
+      ]),
+    ];
+
+    const fuAbort   = new AbortController();
+    const fuTimeout = setTimeout(() => fuAbort.abort('timeout'), 60_000);
+    try {
+      await streamSingularity(
+        q, history,
+        fuAbort.signal,
+        () => {},  // ignore reasoning for follow-ups
+        c  => setFollowUps(prev => prev.map(fu => fu.id === fid ? { ...fu, answer: c } : fu)),
+        e  => setFollowUps(prev => prev.map(fu => fu.id === fid ? { ...fu, answer: `Error: ${e.error}` } : fu)),
+      );
+    } catch (err: unknown) {
+      if (!(err instanceof Error && err.name === 'AbortError')) {
+        const msg = String((err as Error)?.message ?? err);
+        setFollowUps(prev => prev.map(fu => fu.id === fid ? { ...fu, answer: `Error: ${msg}` } : fu));
+      }
+    } finally {
+      setFollowGenerating(false);
+      clearTimeout(fuTimeout);
+    }
+  }, [followInput, followGenerating, generating, items]);
+
+  // Auto-trigger on open
   useEffect(() => {
     if (!open || !items) return;
     const [a, b] = items;
     const key = `${a.title}|||${b.title}`;
     if (fetchedKeyRef.current === key) return;
-    console.log('[CompareDialog] Triggering AI Comparison:', a.title, '×', b.title);
     void fetchAnalysis(a, b, key);
   }, [open, items, fetchAnalysis]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
+
+  const isDone = !generating && !!contentRaw;
 
   return (
     <div className={`flex-shrink-0 border-b ${lm ? 'border-gray-100' : 'border-white/[0.055]'}`}>
@@ -453,49 +510,36 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
             {contentRaw ? 'Writing…' : 'Reasoning…'}
           </span>
         )}
-        {contentRaw && !generating && (
-          <ListenButton text={contentRaw} lm={lm} />
-        )}
+        {contentRaw && !generating && <ListenButton text={contentRaw} lm={lm} />}
       </div>
 
-      {/* ── Content area ─────────────────────────────────────────────────── */}
-      <div className="px-5 pb-3 max-h-72 overflow-y-auto overscroll-contain space-y-2">
+      {/* ── Content area — enlarged to 65vh ──────────────────────────────── */}
+      <div className="px-5 pb-3 max-h-[65vh] overflow-y-auto overscroll-contain space-y-2">
 
-        {/* ── 🚨 GROQ DEBUG PANEL ──────────────────────────────────────── */}
+        {/* Error */}
         {apiError && (
           <div className={`p-3 rounded-xl border-2 font-mono text-[10.5px] space-y-1.5 ${
-            lm
-              ? 'bg-red-50 border-red-300 text-red-900'
-              : 'bg-red-950/80 border-red-500/70 text-white'
+            lm ? 'bg-red-50 border-red-300 text-red-900' : 'bg-red-950/80 border-red-500/70 text-white'
           }`}>
             <div className="flex items-center justify-between">
-              <span className={`font-bold text-[11px] ${lm ? 'text-red-700' : 'text-red-400'}`}>
-                🚨 GROQ DEBUG
-              </span>
-              <button
-                onClick={() => setApiError(null)}
-                className={`text-[9px] underline ${lm ? 'text-red-400' : 'text-white/30 hover:text-white/60'}`}
-              >Dismiss</button>
+              <span className={`font-bold text-[11px] ${lm ? 'text-red-700' : 'text-red-400'}`}>Error</span>
+              <button onClick={() => setApiError(null)}
+                className={`text-[9px] underline ${lm ? 'text-red-400' : 'text-white/30 hover:text-white/60'}`}>
+                Dismiss
+              </button>
             </div>
-            <div><span className={lm ? 'text-red-400' : 'text-white/45'}>Status: </span>
+            <div>
+              <span className={lm ? 'text-red-400' : 'text-white/45'}>Status: </span>
               <span className={`font-bold ${lm ? 'text-red-800' : 'text-red-300'}`}>{apiError.status || 'unknown'}</span>
             </div>
-            <div><span className={lm ? 'text-red-400' : 'text-white/45'}>Message: </span>
+            <div>
+              <span className={lm ? 'text-red-400' : 'text-white/45'}>Message: </span>
               <span className={lm ? 'text-red-800' : 'text-red-200'}>{apiError.error}</span>
             </div>
-            {apiError.details != null && (
-              <pre className={`whitespace-pre-wrap break-all max-h-36 overflow-y-auto text-[9.5px] p-2 rounded-lg leading-relaxed ${
-                lm ? 'bg-red-100 text-red-700' : 'bg-black/50 text-yellow-300/80 border border-yellow-600/20'
-              }`}>
-                {typeof apiError.details === 'string'
-                  ? apiError.details
-                  : JSON.stringify(apiError.details, null, 2)}
-              </pre>
-            )}
           </div>
         )}
 
-        {/* ── Stream content ───────────────────────────────────────────── */}
+        {/* Initial analysis */}
         {(generating || reasoningRaw || contentRaw) && (
           <div className="space-y-2">
             {generating && !reasoningRaw && !contentRaw && (
@@ -503,28 +547,123 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
                 Connecting to Singularity…
               </div>
             )}
-            {reasoningRaw && (
-              <ReasoningAccordion
-                reasoning={reasoningRaw}
-                seconds={1}
-                lm={lm}
-              />
-            )}
+            {reasoningRaw && <ReasoningAccordion reasoning={reasoningRaw} seconds={1} lm={lm} />}
             {contentRaw && (
-              <div className={`text-[12px] leading-relaxed ${lm ? 'text-gray-800' : 'text-white/88'}`}>
+              <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full ${
+                lm ? 'text-gray-800' : 'text-white/88'
+              }`}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{contentRaw}</ReactMarkdown>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Idle state — only shown when nothing has happened yet ─────── */}
+        {/* Follow-up exchanges */}
+        {followUps.map(fu => (
+          <div key={fu.id} className="space-y-1.5 pt-2 border-t border-white/[0.05]">
+            {/* User question bubble */}
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-xl ${
+              lm
+                ? 'bg-violet-50 border border-violet-100'
+                : 'bg-violet-500/[0.07] border border-violet-400/[0.12]'
+            }`}>
+              <span className={`text-[8px] uppercase tracking-widest font-bold mt-0.5 flex-shrink-0 ${
+                lm ? 'text-violet-500' : 'text-violet-300/70'
+              }`}>You</span>
+              <p className={`text-[12px] leading-relaxed ${lm ? 'text-violet-900' : 'text-white/85'}`}>
+                {fu.question}
+              </p>
+            </div>
+            {/* Answer or loading dots */}
+            {fu.answer ? (
+              <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full pl-1 ${
+                lm ? 'text-gray-800' : 'text-white/88'
+              }`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{fu.answer}</ReactMarkdown>
+              </div>
+            ) : followGenerating && (
+              <div className="flex gap-1 pl-3 pt-1">
+                {[0, 0.2, 0.4].map(d => (
+                  <motion.div
+                    key={d}
+                    animate={{ opacity: [0.25, 0.9, 0.25] }}
+                    transition={{ duration: 1.4, repeat: Infinity, delay: d }}
+                    className={`w-1.5 h-1.5 rounded-full ${lm ? 'bg-gray-400' : 'bg-white/40'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Idle placeholder */}
         {!generating && !apiError && !reasoningRaw && !contentRaw && (
           <div className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
             Initializing analysis…
           </div>
         )}
       </div>
+
+      {/* ── Follow-up input — appears after initial analysis completes ─────── */}
+      <AnimatePresence initial={false}>
+        {isDone && (
+          <motion.div
+            key="followup-input"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className={`px-5 pt-1 pb-4`}>
+              <div className={`flex items-end gap-2 rounded-xl border px-3 py-2 transition-colors duration-150 ${
+                lm
+                  ? 'border-gray-200 bg-gray-50/80 focus-within:border-violet-300'
+                  : 'border-white/[0.09] bg-white/[0.03] focus-within:border-violet-400/30'
+              }`}>
+                <textarea
+                  ref={followInputRef}
+                  value={followInput}
+                  onChange={e => {
+                    setFollowInput(e.target.value);
+                    // auto-resize
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleFollowUp(); }
+                  }}
+                  placeholder="Ask a follow-up question…"
+                  rows={1}
+                  disabled={followGenerating}
+                  className={`flex-1 resize-none bg-transparent text-[12px] leading-relaxed outline-none ${
+                    lm
+                      ? 'text-gray-800 placeholder:text-gray-400'
+                      : 'text-white/85 placeholder:text-white/22'
+                  }`}
+                  style={{ maxHeight: 80, overflowY: 'auto' }}
+                />
+                <button
+                  onClick={() => void handleFollowUp()}
+                  disabled={!followInput.trim() || followGenerating}
+                  className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                    followInput.trim() && !followGenerating
+                      ? lm
+                        ? 'bg-violet-600 text-white hover:bg-violet-700'
+                        : 'bg-violet-500/80 text-white hover:bg-violet-500'
+                      : lm
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white/[0.06] text-white/25 cursor-not-allowed'
+                  }`}
+                  aria-label="Send follow-up"
+                >
+                  <Send size={11} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });
@@ -592,7 +731,7 @@ const CompareDialog = memo(function CompareDialog({ open, items, onClose, lm }: 
         className={[
           'fixed z-[102] inset-x-3 top-4 bottom-4',
           'sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2',
-          'sm:top-6 sm:bottom-6 sm:w-[min(860px,calc(100vw-48px))]',
+          'sm:top-6 sm:bottom-6 sm:w-[min(1140px,90vw)]',
           'flex flex-col rounded-2xl border overflow-hidden',
           'transition-all duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
           open

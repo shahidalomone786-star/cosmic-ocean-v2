@@ -82,7 +82,7 @@ const markdownComponents = {
 
 const MessageContent = memo(function MessageContent({ content }: { content: string }) {
   return (
-    <div className="text-[14.5px] leading-[1.75] tracking-[0.01em] text-white/88">
+    <div className="text-[14.5px] leading-[1.75] tracking-[0.01em] text-white/88 overflow-x-auto overflow-y-hidden max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
