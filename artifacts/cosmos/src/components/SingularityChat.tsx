@@ -335,11 +335,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Smart auto-scroll
+  // Smart auto-scroll — instant during streaming to prevent jitter.
+  // scrollIntoView(smooth) re-triggers on every token update and fights itself;
+  // direct scrollTop assignment is jitter-free and respects the stick-to-bottom gate.
   useEffect(() => {
-    if (stickToBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (!stickToBottomRef.current) return;
+    const el = scrollBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, isThinking]);
 
   const handleScroll = useCallback(() => {
@@ -477,7 +479,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 : m
             )
           );
-          stickToBottomRef.current = true;
         }
       }
     } catch (err: any) {
@@ -543,7 +544,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative min-h-screen w-full flex flex-col bg-[#09090b]"
+      className="relative h-screen overflow-hidden w-full flex flex-col bg-[#09090b]"
     >
       {/* Subtle top radial ambient */}
       <div
