@@ -23,6 +23,8 @@ import {
   Star, FileText, FolderOpen, FolderPlus,
   ChevronLeft, Check, BookMarked, Eye, CheckCircle2,
   Clock, Folder, Layers,
+  Square, CheckSquare, ArrowLeftRight, Download, Copy,
+  ChevronDown,
 } from 'lucide-react';
 import type { SectionItem } from './NasaSearch';
 import { stableItemId } from '../hooks/useSavedPapers';
@@ -33,6 +35,12 @@ import {
   type Collection,
   type ReadStatus,
 } from '../hooks/useResearchWorkspace';
+import CompareDialog from './CompareDialog';
+import {
+  exportItems, downloadText,
+  FILE_EXTENSIONS, MIME_TYPES, toAPA,
+  type ExportFormat,
+} from '../utils/citationFormatters';
 
 // ─── Collection color palette ─────────────────────────────────────────────────
 // All Tailwind class strings are written in full (no dynamic construction).
@@ -324,12 +332,17 @@ interface PaperRowProps {
   onAddCol:    (id: string, colId: string) => void;
   onRemoveCol: (id: string, colId: string) => void;
   onCreate:    (name: string, color: string) => void;
+  // selection
+  selectable?: boolean;
+  selected?:   boolean;
+  onSelect?:   (id: string) => void;
   lm?:         boolean;
 }
 
 const PaperRow = memo(function PaperRow({
   item, meta, collections, onRemove, onCycle, onFav,
-  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate, lm,
+  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate,
+  selectable, selected, onSelect, lm,
 }: PaperRowProps) {
   const [noteOpen, setNoteOpen] = useState(false);
   const pid = stableItemId(item);
@@ -341,6 +354,7 @@ const PaperRow = memo(function PaperRow({
   const handleSave    = useCallback((n: string) => onSaveNote(pid, n), [onSaveNote, pid]);
   const handleAddCol  = useCallback((cid: string) => onAddCol(pid, cid),    [onAddCol,    pid]);
   const handleRmvCol  = useCallback((cid: string) => onRemoveCol(pid, cid), [onRemoveCol, pid]);
+  const handleSelect  = useCallback((e: React.MouseEvent) => { e.stopPropagation(); onSelect?.(pid); }, [onSelect, pid]);
   const toggleNote    = useCallback(() => {
     setNoteOpen(o => !o);
     onTouch(pid);
@@ -353,12 +367,33 @@ const PaperRow = memo(function PaperRow({
 
   return (
     <div className={`rounded-xl border transition-colors duration-150 ${
-      lm
-        ? 'bg-white border-gray-100 hover:border-gray-200'
-        : 'bg-white/[0.02] border-white/[0.05] hover:border-white/[0.09] hover:bg-white/[0.035]'
+      selected
+        ? lm
+          ? 'bg-violet-50/80 border-violet-300'
+          : 'bg-violet-500/[0.07] border-violet-400/30'
+        : lm
+          ? 'bg-white border-gray-100 hover:border-gray-200'
+          : 'bg-white/[0.02] border-white/[0.05] hover:border-white/[0.09] hover:bg-white/[0.035]'
     }`}>
       {/* Title row */}
       <div className="flex items-start gap-2.5 px-3.5 pt-3 pb-1.5">
+        {/* Selection checkbox */}
+        {selectable && (
+          <button
+            onClick={handleSelect}
+            aria-label={selected ? 'Deselect paper' : 'Select paper'}
+            className={`flex-shrink-0 mt-[4px] transition-colors duration-100 ${
+              selected
+                ? lm ? 'text-violet-600' : 'text-violet-400'
+                : lm ? 'text-gray-200 hover:text-gray-400' : 'text-white/14 hover:text-white/35'
+            }`}
+          >
+            {selected
+              ? <CheckSquare size={13} strokeWidth={2} />
+              : <Square size={13} strokeWidth={1.5} />
+            }
+          </button>
+        )}
         <div className="flex-shrink-0 mt-[5px] w-1.5 h-1.5 rounded-full bg-violet-400/55" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <p className={`text-[12px] font-semibold leading-snug line-clamp-2 ${lm ? 'text-gray-900' : 'text-white/87'}`}
@@ -483,12 +518,17 @@ interface PaperListProps {
   onRemoveCol: (id: string, colId: string) => void;
   onCreate:    (name: string, color: string) => void;
   emptyLabel?: string;
-  lm?:         boolean;
+  // selection
+  selectable?:  boolean;
+  selectedIds?: Set<string>;
+  onSelect?:    (id: string) => void;
+  lm?:          boolean;
 }
 
 const PaperList = memo(function PaperList({
   papers, paperMeta, collections, onRemove, onCycle, onFav,
-  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate, emptyLabel, lm,
+  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate, emptyLabel,
+  selectable, selectedIds, onSelect, lm,
 }: PaperListProps) {
   if (papers.length === 0) {
     return (
@@ -517,6 +557,9 @@ const PaperList = memo(function PaperList({
             onAddCol={onAddCol}
             onRemoveCol={onRemoveCol}
             onCreate={onCreate}
+            selectable={selectable}
+            selected={selectedIds?.has(pid)}
+            onSelect={onSelect}
             lm={lm}
           />
         );
@@ -697,12 +740,17 @@ interface ReadingViewProps {
   onAddCol:    (id: string, colId: string) => void;
   onRemoveCol: (id: string, colId: string) => void;
   onCreate:    (name: string, color: string) => void;
-  lm?:         boolean;
+  // selection
+  selectable?:  boolean;
+  selectedIds?: Set<string>;
+  onSelect?:    (id: string) => void;
+  lm?:          boolean;
 }
 
 const ReadingView = memo(function ReadingView({
   saved, paperMeta, collections, onRemove, onCycle, onFav,
-  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate, lm,
+  onSaveNote, onTouch, onAddCol, onRemoveCol, onCreate,
+  selectable, selectedIds, onSelect, lm,
 }: ReadingViewProps) {
   const [filter, setFilter] = useState<ReadFilter>('all');
 
@@ -751,6 +799,9 @@ const ReadingView = memo(function ReadingView({
         onRemoveCol={onRemoveCol}
         onCreate={onCreate}
         emptyLabel="No papers matching this filter."
+        selectable={selectable}
+        selectedIds={selectedIds}
+        onSelect={onSelect}
         lm={lm}
       />
     </div>
@@ -785,10 +836,93 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
   const [activeTab, setActiveTab]     = useState<ActiveTab>('all');
   const [activeColId, setActiveColId] = useState<string | null>(null);
 
+  // ── Selection state ──────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Compare dialog — lazy mount
+  const [compareItems, setCompareItems]     = useState<[SectionItem, SectionItem] | null>(null);
+  const [showCompare, setShowCompare]       = useState(false);
+  const [compareEverOpened, setCompareEverOpened] = useState(false);
+  // Export dropdown
+  const [exportOpen, setExportOpen]   = useState(false);
+  const exportRef                     = useRef<HTMLDivElement>(null);
+  // Toast
+  const [toastMsg, setToastMsg]       = useState<string | null>(null);
+  const toastTimer                    = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   const ws = useResearchWorkspace();
+
+  // ── Selection handlers ───────────────────────────────────────────────────
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Items matching current selection (stable order from `saved`)
+  const selectedItems = useMemo(
+    () => saved.filter(item => selectedIds.has(stableItemId(item))),
+    [saved, selectedIds],
+  );
+
+  const handleCompare = useCallback(() => {
+    if (selectedItems.length !== 2) return;
+    setCompareItems([selectedItems[0], selectedItems[1]]);
+    setShowCompare(true);
+    setCompareEverOpened(true);
+  }, [selectedItems]);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 2800);
+  }, []);
+
+  const handleCopyCitations = useCallback(async () => {
+    if (selectedItems.length === 0) return;
+    const text = selectedItems.map(toAPA).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(`${selectedItems.length} citation${selectedItems.length > 1 ? 's' : ''} copied`);
+    } catch {
+      showToast('Clipboard access denied');
+    }
+  }, [selectedItems, showToast]);
+
+  const handleExport = useCallback((fmt: ExportFormat) => {
+    if (selectedItems.length === 0) return;
+    const content  = exportItems(selectedItems, fmt);
+    const filename = `cosmos-papers${FILE_EXTENSIONS[fmt]}`;
+    downloadText(filename, content, MIME_TYPES[fmt]);
+    setExportOpen(false);
+    showToast(`Exported ${selectedItems.length} paper${selectedItems.length > 1 ? 's' : ''} as ${fmt.toUpperCase()}`);
+  }, [selectedItems, showToast]);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const h = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [exportOpen]);
+
+  // Clear selection when tab changes
+  const handleTabChange = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+    setActiveColId(null);
+    clearSelection();
+  }, [clearSelection]);
+
+  // Cleanup toast timer on unmount
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // Escape key
   useEffect(() => {
@@ -841,10 +975,8 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
   const favCount = favPapers.length;
   const colCount = ws.collections.length;
 
-  const handleTabChange = useCallback((tab: ActiveTab) => {
-    setActiveTab(tab);
-    setActiveColId(null);
-  }, []);
+  // Whether the current tab supports selection
+  const tabIsSelectable = activeTab === 'all' || activeTab === 'favorites' || activeTab === 'reading';
 
   return (
     <>
@@ -952,6 +1084,9 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
               onRemoveCol={ws.removeFromCollection}
               onCreate={ws.createCollection}
               emptyLabel="No saved papers yet. Tap the bookmark icon on any result."
+              selectable={tabIsSelectable}
+              selectedIds={selectedIds}
+              onSelect={toggleSelect}
               lm={lm}
             />
           )}
@@ -971,6 +1106,9 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
               onRemoveCol={ws.removeFromCollection}
               onCreate={ws.createCollection}
               emptyLabel="No favorites yet. Star any paper to add it here."
+              selectable={tabIsSelectable}
+              selectedIds={selectedIds}
+              onSelect={toggleSelect}
               lm={lm}
             />
           )}
@@ -1040,10 +1178,123 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
               onAddCol={ws.addToCollection}
               onRemoveCol={ws.removeFromCollection}
               onCreate={ws.createCollection}
+              selectable={tabIsSelectable}
+              selectedIds={selectedIds}
+              onSelect={toggleSelect}
               lm={lm}
             />
           )}
         </div>
+
+        {/* ── Selection toolbar ──────────────────────────────────────────────── */}
+        {tabIsSelectable && selectedIds.size > 0 && (
+          <div className={`flex-shrink-0 flex items-center gap-1.5 flex-wrap px-3 py-2.5 border-t ${
+            lm ? 'border-violet-100 bg-violet-50/60' : 'border-violet-400/[0.12] bg-violet-500/[0.05]'
+          }`}>
+            {/* Count */}
+            <span className={`flex-1 text-[10px] font-medium ${lm ? 'text-violet-700' : 'text-violet-300/80'}`}>
+              {selectedIds.size} selected
+            </span>
+
+            {/* Compare — only when exactly 2 */}
+            <button
+              onClick={handleCompare}
+              disabled={selectedIds.size !== 2}
+              title={selectedIds.size !== 2 ? 'Select exactly 2 papers to compare' : 'Compare side by side'}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] uppercase tracking-[0.10em] font-medium transition-colors duration-150 ${
+                selectedIds.size === 2
+                  ? lm
+                    ? 'border-violet-300 bg-violet-100 text-violet-700 hover:bg-violet-200'
+                    : 'border-violet-400/30 bg-violet-500/15 text-violet-300 hover:bg-violet-500/25'
+                  : lm
+                    ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                    : 'border-white/[0.05] text-white/18 cursor-not-allowed'
+              }`}
+            >
+              <ArrowLeftRight size={9} strokeWidth={2} />
+              Compare
+            </button>
+
+            {/* Export dropdown */}
+            <div ref={exportRef} className="relative">
+              <button
+                onClick={() => setExportOpen(o => !o)}
+                title="Export selected papers"
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] uppercase tracking-[0.10em] font-medium transition-colors duration-150 ${
+                  lm
+                    ? 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                    : 'border-white/[0.09] text-white/45 hover:border-white/[0.16] hover:bg-white/[0.06]'
+                }`}
+              >
+                <Download size={9} strokeWidth={2} />
+                Export
+                <ChevronDown size={8} strokeWidth={2} className={`transition-transform duration-150 ${exportOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {exportOpen && (
+                <div className={`absolute bottom-full right-0 mb-1.5 w-36 rounded-xl border shadow-xl z-20 overflow-hidden ${
+                  lm ? 'bg-white border-gray-200 shadow-black/10' : 'bg-[#0e0e1a] border-white/[0.10] shadow-black/80'
+                }`}>
+                  {(['bibtex', 'apa', 'mla', 'ris'] as ExportFormat[]).map(fmt => (
+                    <button
+                      key={fmt}
+                      onClick={() => handleExport(fmt)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] transition-colors duration-100 ${
+                        lm ? 'text-gray-700 hover:bg-gray-50' : 'text-white/72 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <span className={`text-[8px] font-bold uppercase px-1 py-[1px] rounded ${
+                        lm ? 'bg-gray-100 text-gray-500' : 'bg-white/[0.07] text-white/40'
+                      }`}>{fmt === 'bibtex' ? 'BIB' : fmt.toUpperCase()}</span>
+                      {fmt === 'bibtex' ? 'BibTeX' : fmt.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Copy citations (APA format) */}
+            <button
+              onClick={handleCopyCitations}
+              title="Copy citations to clipboard (APA format)"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] uppercase tracking-[0.10em] font-medium transition-colors duration-150 ${
+                lm
+                  ? 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                  : 'border-white/[0.09] text-white/45 hover:border-white/[0.16] hover:bg-white/[0.06]'
+              }`}
+            >
+              <Copy size={9} strokeWidth={2} />
+              Copy
+            </button>
+
+            {/* Clear selection */}
+            <button
+              onClick={clearSelection}
+              aria-label="Clear selection"
+              className={`p-1 rounded-lg transition-colors duration-150 ${
+                lm ? 'text-gray-300 hover:text-gray-600 hover:bg-gray-100' : 'text-white/22 hover:text-white/55 hover:bg-white/[0.06]'
+              }`}
+            >
+              <X size={11} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+
+        {/* ── Toast notification ─────────────────────────────────────────────── */}
+        {toastMsg && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 border-t text-[11px] font-medium ${
+              lm
+                ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                : 'border-emerald-400/[0.14] bg-emerald-500/[0.07] text-emerald-300/90'
+            }`}
+          >
+            <Check size={11} strokeWidth={2.5} />
+            {toastMsg}
+          </div>
+        )}
 
         {/* Footer — clear all (All tab only) */}
         {activeTab === 'all' && saved.length > 0 && (
@@ -1062,6 +1313,16 @@ const SavedPapersDrawer = memo(function SavedPapersDrawer({
           </div>
         )}
       </div>
+
+      {/* ── Compare dialog — lazy mount ────────────────────────────────────────── */}
+      {compareEverOpened && (
+        <CompareDialog
+          open={showCompare}
+          items={compareItems}
+          onClose={() => setShowCompare(false)}
+          lm={lm}
+        />
+      )}
     </>
   );
 });
