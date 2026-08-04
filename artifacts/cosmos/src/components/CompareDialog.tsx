@@ -651,10 +651,10 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
             className="overflow-hidden"
           >
             <div className={`px-5 pt-1 pb-4`}>
-              <div className={`flex items-end gap-2 rounded-xl border px-3 py-2 transition-colors duration-150 ${
+              <div className={`flex items-end gap-2 rounded-xl border px-3 py-2 transition-all duration-200 ${
                 lm
-                  ? 'border-gray-200 bg-gray-50/80 focus-within:border-violet-300'
-                  : 'border-white/[0.09] bg-white/[0.03] focus-within:border-violet-400/30'
+                  ? 'border-gray-200 bg-gray-50/80 focus-within:border-violet-300 focus-within:shadow-[0_0_0_1px_rgba(139,92,246,0.15)]'
+                  : 'border-white/[0.09] bg-white/[0.03] focus-within:border-violet-400/30 focus-within:shadow-[0_0_0_1px_rgba(139,92,246,0.10),0_0_16px_rgba(139,92,246,0.06)]'
               }`}>
                 <textarea
                   ref={followInputRef}
@@ -684,8 +684,8 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
                   className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150 ${
                     followInput.trim() && !followGenerating
                       ? lm
-                        ? 'bg-violet-600 text-white hover:bg-violet-700'
-                        : 'bg-violet-500/80 text-white hover:bg-violet-500'
+                        ? 'bg-violet-600 text-white hover:bg-violet-700 active:scale-90'
+                        : 'bg-violet-500/80 text-white hover:bg-violet-500 active:scale-90'
                       : lm
                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         : 'bg-white/[0.06] text-white/25 cursor-not-allowed'

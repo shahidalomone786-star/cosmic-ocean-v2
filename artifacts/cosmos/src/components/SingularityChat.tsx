@@ -110,7 +110,8 @@ const CopyButton = memo(function CopyButton({ text }: { text: string }) {
     <button
       onClick={handle}
       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-white/35
-        hover:text-white/70 hover:bg-white/[0.07] transition-colors duration-150"
+        hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150
+        active:scale-95 active:bg-white/[0.10]"
       aria-label={copied ? 'Copied' : 'Copy response'}
     >
       {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2} />}
@@ -228,6 +229,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
     <button
       onClick={play}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all duration-200
+        active:scale-95
         ${isActive
           ? 'text-emerald-400 bg-emerald-400/[0.10] border border-emerald-400/20'
           : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
@@ -310,18 +312,14 @@ const ThinkingDots = memo(function ThinkingDots() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
-      className="self-start flex items-center gap-2 px-4 py-3 rounded-2xl
-        bg-white/[0.04] border border-white/[0.06] rounded-bl-sm"
+      className="self-start flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-bl-sm
+        bg-[#0d1a14] border border-emerald-500/[0.18]
+        shadow-[0_0_18px_rgba(16,185,129,0.08)]"
       aria-label="Singularity is thinking"
     >
-      {[0, 0.2, 0.4].map(delay => (
-        <motion.div
-          key={delay}
-          animate={{ opacity: [0.25, 0.9, 0.25] }}
-          transition={{ duration: 1.5, repeat: Infinity, delay }}
-          className="w-1.5 h-1.5 bg-white/55 rounded-full"
-        />
-      ))}
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
     </motion.div>
   );
 });
@@ -699,7 +697,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           ? 'bg-white/10 text-white rounded-br-sm p-4 max-w-[85%] ml-auto text-[14px] leading-relaxed font-medium'
                           : msg.error
                             ? 'bg-red-500/[0.08] border border-red-500/[0.18] text-red-300/90 rounded-bl-sm text-[14px] leading-relaxed px-5 py-4 max-w-[85%]'
-                            : 'bg-[#18181b] border border-white/5 p-5 shadow-lg w-full'
+                            : isGenerating
+                              ? 'bg-[#0d1a14] border p-5 w-full stream-pulse-glow'
+                              : 'bg-[#18181b] border border-white/5 p-5 shadow-lg w-full animate-cosmos-fade'
                       }`}
                     >
                       {msg.role === 'assistant'
@@ -717,7 +717,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           <button
                             onClick={handleRegenerate}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                              text-white/30 hover:text-white/65 hover:bg-white/[0.07] transition-colors duration-150"
+                              text-white/30 hover:text-white/65 hover:bg-white/[0.07]
+                              transition-all duration-150 active:scale-95"
                             aria-label="Regenerate response"
                           >
                             <RotateCcw size={11} strokeWidth={2} />
@@ -767,7 +768,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     onClick={() => handleSend(p)}
                     className="text-left px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]
                       text-[13.5px] text-white/55 hover:bg-white/[0.06] hover:text-white/85
-                      hover:border-white/[0.12] transition-all duration-200"
+                      hover:border-white/[0.12] transition-all duration-200
+                      active:scale-[0.98] active:bg-white/[0.08]"
                   >
                     {p}
                   </button>
@@ -803,7 +805,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       <div className="flex-shrink-0 border-t border-white/[0.05] bg-[#09090b] pb-safe">
         <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-4">
           <div className="relative flex items-end gap-3 bg-white/[0.05] border border-white/[0.09]
-            rounded-2xl px-3 py-2.5 focus-within:border-white/[0.18] focus-within:bg-white/[0.07]
+            rounded-2xl px-3 py-2.5
+            focus-within:border-emerald-500/30 focus-within:bg-white/[0.06]
+            focus-within:shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_0_20px_rgba(16,185,129,0.06)]
             transition-all duration-300">
             <textarea
               ref={textareaRef}
@@ -821,7 +825,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               onClick={() => (isThinking ? handleStop() : handleSend())}
               disabled={!isThinking && !input.trim()}
               className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center
-                transition-all duration-200 mb-0.5 ${
+                transition-all duration-200 mb-0.5 active:scale-90 ${
                 isThinking
                   ? 'bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)]'
                   : input.trim()

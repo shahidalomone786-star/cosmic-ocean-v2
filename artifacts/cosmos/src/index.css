@@ -286,15 +286,34 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
 }
 
-/* ── Global scrollbar suppression ────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  scrollbar-width: none;       /* Firefox */
-  -ms-overflow-style: none;    /* IE/Edge */
+/* ── Thin elegant cosmic scrollbars ──────────────────────────────────────────── */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
+/* Chromium / Safari */
 *::-webkit-scrollbar {
-  display: none;               /* Chrome/Safari/WebKit */
+  width: 3px;
+  height: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+/* Light-mode override so thumbs stay readable on white backgrounds */
+.light *::-webkit-scrollbar-thumb,
+:root:not(.dark) *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+:root:not(.dark) *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
 }
 
 @layer base {
@@ -570,3 +589,40 @@ body {
   0%   { transform: translateY(0);    opacity: 0.4; }
   100% { transform: translateY(-5px); opacity: 1;   }
 }
+
+/* ── Cosmos micro-interaction utilities ───────────────────────────────────── */
+
+/* Soft fade + lift — applied to streaming message cards and follow-up answers */
+@keyframes cosmos-fade-up {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.animate-cosmos-fade {
+  animation: cosmos-fade-up 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Streaming / generating card — subtle emerald glow pulse on the border */
+@keyframes stream-pulse-glow {
+  0%, 100% {
+    border-color: rgba(16, 185, 129, 0.16);
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.06);
+  }
+  50% {
+    border-color: rgba(16, 185, 129, 0.32);
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.13);
+  }
+}
+.stream-pulse-glow {
+  animation: stream-pulse-glow 2s ease-in-out infinite;
+}
+
+/* Thinking dots enhanced — emerald pulse */
+@keyframes thinking-dot-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.8);  }
+  50%       { opacity: 0.9; transform: scale(1.15); }
+}
+.thinking-dot {
+  animation: thinking-dot-pulse 1.4s ease-in-out infinite;
+}
+.thinking-dot:nth-child(2) { animation-delay: 0.18s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.36s; }
