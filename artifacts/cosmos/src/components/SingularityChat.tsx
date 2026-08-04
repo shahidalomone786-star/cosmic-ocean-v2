@@ -291,17 +291,26 @@ const ThinkingDots = memo(function ThinkingDots() {
   );
 });
 
+// ─── API error type ───────────────────────────────────────────────────────────
+interface ApiError {
+  error:   string;
+  status:  number;
+  details: unknown;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [messages, setMessages]         = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput]               = useState('');
   const [isThinking, setIsThinking]     = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [apiError, setApiError]         = useState<ApiError | null>(null);
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
   const textareaRef      = useRef<HTMLTextAreaElement>(null);
   const abortRef         = useRef<AbortController | null>(null);
+  const timeoutRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thinkingStartRef = useRef<number>(0);
   const stickToBottomRef = useRef(true);
 
@@ -347,14 +356,23 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, []);
 
   // Cleanup on unmount
-  useEffect(() => () => { abortRef.current?.abort(); }, []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
 
   // ── Core generation ──────────────────────────────────────────────────────
   const generateResponse = useCallback(async (userText: string) => {
-    // Reset debug states for fresh run
+    setApiError(null);
     setIsThinking(true);
     thinkingStartRef.current = Date.now();
     abortRef.current = new AbortController();
+
+    // 60-second hard timeout
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      abortRef.current?.abort('timeout');
+    }, 60_000);
 
     const msgId = `asst-${Date.now()}`;
     setMessages(prev => [
@@ -362,55 +380,90 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       { id: msgId, role: 'assistant', content: '', reasoning: '', ts: Date.now() },
     ]);
 
-    // Only send history with non-empty content — Groq rejects empty strings
     const safeHistory = messages
-      .filter(m =>
-        m.id !== 'welcome' &&
-        !m.error &&
-        m.content.trim().length > 0
-      )
+      .filter(m => m.id !== 'welcome' && !m.error && m.content.trim().length > 0)
       .slice(-12)
       .map(m => ({ role: m.role, content: m.content.trim() }));
 
     try {
       const res = await fetch('/api/singularity', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, history: safeHistory }),
-        signal: abortRef.current.signal,
+        body:    JSON.stringify({ message: userText, history: safeHistory }),
+        signal:  abortRef.current.signal,
       });
 
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '(unreadable)');
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+      // ── Non-2xx = JSON error from backend (never a stream) ──
+      if (!res.ok) {
+        const errJson: ApiError = await res.json().catch(() => ({
+          error:   `HTTP ${res.status} — could not parse error body`,
+          status:  res.status,
+          details: null,
+        }));
+        console.error('[SingularityChat] API error:', errJson);
+        setApiError(errJson);
+        setMessages(prev => prev.map(m =>
+          m.id === msgId
+            ? { ...m, error: true, content: `[${errJson.status}] ${errJson.error}` }
+            : m
+        ));
+        return;
+      }
+
+      if (!res.body) {
+        const noBody: ApiError = { error: 'Response body is null — cannot stream', status: 0, details: null };
+        setApiError(noBody);
+        setMessages(prev => prev.map(m =>
+          m.id === msgId ? { ...m, error: true, content: noBody.error } : m
+        ));
+        return;
       }
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let sawFirstToken = false;
+      let chunkIndex    = 0;
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          if (!sawFirstToken) {
+            // Stream closed without sending any tokens — surface as error
+            const streamErr: ApiError = { error: 'STREAM TERMINATED — no tokens received', status: 0, details: null };
+            setApiError(streamErr);
+            setMessages(prev => prev.map(m =>
+              m.id === msgId ? { ...m, error: true, content: streamErr.error } : m
+            ));
+          }
+          break;
+        }
+
         const chunk = decoder.decode(value, { stream: true });
+        console.log(`[SingularityChat] chunk #${++chunkIndex}:`, chunk.slice(0, 300));
+
         for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           let data: any;
           try { data = JSON.parse(raw); } catch { continue; }
-          if (data.error) throw new Error(`Server stream error: ${JSON.stringify(data)}`);
+
+          // Stream-level error from backend (mid-stream)
+          if (data.error) {
+            const streamMsg = data.message ?? 'STREAM TERMINATED';
+            console.error('[SingularityChat] stream error event:', data);
+            const streamErr: ApiError = { error: streamMsg, status: 0, details: data };
+            setApiError(streamErr);
+            setMessages(prev => prev.map(m =>
+              m.id === msgId ? { ...m, error: true, content: streamMsg } : m
+            ));
+            return;
+          }
+
           if (data.done) continue;
 
           if (!sawFirstToken) { setIsThinking(false); sawFirstToken = true; }
 
-          // Resilient parser: works for both DeepSeek-style <think> streams AND
-          // standard plain-text streams (gpt-oss-120b sends no <think> tags).
-          // The backend's splitReasoning() already handles both:
-          //   - With <think> tags → { reasoning: '...', content: answer }
-          //   - Without <think> tags → { reasoning: '', content: fullText }
-          // We push content chunks to the message immediately — no hanging on a
-          // </think> that will never arrive.
           const seconds = Math.max(1, Math.round((Date.now() - thinkingStartRef.current) / 1000));
           setMessages(prev =>
             prev.map(m =>
@@ -428,17 +481,26 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         }
       }
     } catch (err: any) {
-      if (err?.name === 'AbortError') return;
-      const msg = String(err?.message ?? err);
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === msgId
-            ? { ...m, error: true, content: 'Cosmic transmission failed. Check your connection and try again.' }
-            : m
-        )
-      );
+      if (err?.name === 'AbortError') {
+        const isTimeout = err?.message === 'timeout' || String(err?.message).includes('timeout');
+        if (isTimeout) {
+          const timeoutErr: ApiError = { error: 'Request timed out after 60 seconds.', status: 504, details: null };
+          setApiError(timeoutErr);
+          setMessages(prev => prev.map(m =>
+            m.id === msgId ? { ...m, error: true, content: timeoutErr.error } : m
+          ));
+        }
+        return;
+      }
+      console.error('[SingularityChat] fetch error:', err?.message, err?.stack);
+      const catchErr: ApiError = { error: err?.message ?? String(err), status: 0, details: null };
+      setApiError(catchErr);
+      setMessages(prev => prev.map(m =>
+        m.id === msgId ? { ...m, error: true, content: catchErr.error } : m
+      ));
     } finally {
       setIsThinking(false);
+      if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     }
   }, [messages]);
 
@@ -531,6 +593,33 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           )}
         </div>
       </div>
+
+      {/* ── 🚨 GROQ DEBUG PANEL — visible whenever an API error occurs ─────── */}
+      {apiError && (
+        <div className="flex-shrink-0 mx-4 mt-3 p-4 bg-red-950/90 border-2 border-red-500/70 rounded-xl font-mono text-[11px] space-y-2 z-50">
+          <div className="flex items-center justify-between">
+            <span className="text-red-400 font-bold text-[12px]">🚨 GROQ DEBUG</span>
+            <button
+              onClick={() => setApiError(null)}
+              className="text-white/30 hover:text-white/70 text-[10px] underline underline-offset-2"
+            >Dismiss</button>
+          </div>
+          <div className="space-y-1">
+            <div><span className="text-white/45">Status: </span><span className="text-red-300 font-bold">{apiError.status || 'unknown'}</span></div>
+            <div><span className="text-white/45">Message: </span><span className="text-red-200">{apiError.error}</span></div>
+          </div>
+          {apiError.details != null && (
+            <div>
+              <div className="text-white/35 text-[9.5px] uppercase tracking-widest mb-1">Details</div>
+              <pre className="text-yellow-300/80 whitespace-pre-wrap break-all max-h-52 overflow-y-auto text-[10px] bg-black/50 p-2.5 rounded-lg border border-yellow-600/20 leading-relaxed">
+                {typeof apiError.details === 'string'
+                  ? apiError.details
+                  : JSON.stringify(apiError.details, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Chat Area ──────────────────────────────────────────────────────── */}
       <div className="relative flex-1 min-h-0">

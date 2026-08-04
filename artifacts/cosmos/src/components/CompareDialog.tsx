@@ -305,22 +305,33 @@ interface AISectionProps {
   lm?:   boolean;
 }
 
+interface ApiError {
+  error:   string;
+  status:  number;
+  details: unknown;
+}
+
 const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: AISectionProps) {
-  const [generating,     setGenerating]     = useState(false);
-  const [reasoningRaw,   setReasoningRaw]   = useState('');
-  const [contentRaw,     setContentRaw]     = useState('');
-  const [fetchError,     setFetchError]     = useState('');
+  const [generating,   setGenerating]   = useState(false);
+  const [reasoningRaw, setReasoningRaw] = useState('');
+  const [contentRaw,   setContentRaw]   = useState('');
+  const [apiError,     setApiError]     = useState<ApiError | null>(null);
 
   const abortRef      = useRef<AbortController | null>(null);
+  const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchedKeyRef = useRef<string | null>(null);
 
   const fetchAnalysis = useCallback(async (a: SectionItem, b: SectionItem, key: string) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
+    // 60-second hard timeout
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => abortRef.current?.abort('timeout'), 60_000);
+
     setReasoningRaw('');
     setContentRaw('');
-    setFetchError('');
+    setApiError(null);
     setGenerating(true);
 
     const prompt = buildComparePrompt(a, b);
@@ -333,41 +344,80 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
         signal:  abortRef.current.signal,
       });
 
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '(unreadable)');
-        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+      // ── Non-2xx = structured JSON error (no stream) ──
+      if (!res.ok) {
+        const errJson: ApiError = await res.json().catch(() => ({
+          error:   `HTTP ${res.status} — could not parse error body`,
+          status:  res.status,
+          details: null,
+        }));
+        console.error('[CompareDialog] API error:', errJson);
+        setApiError(errJson);
+        fetchedKeyRef.current = key;
+        return;
       }
 
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
+      if (!res.body) {
+        const noBody: ApiError = { error: 'Response body is null — cannot stream', status: 0, details: null };
+        setApiError(noBody);
+        fetchedKeyRef.current = key;
+        return;
+      }
+
+      const reader     = res.body.getReader();
+      const decoder    = new TextDecoder();
+      let chunkIndex   = 0;
+      let sawFirstToken = false;
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          if (!sawFirstToken) {
+            setApiError({ error: 'STREAM TERMINATED — no tokens received', status: 0, details: null });
+          }
+          break;
+        }
+
         const chunk = decoder.decode(value, { stream: true });
+        console.log(`[CompareDialog] chunk #${++chunkIndex}:`, chunk.slice(0, 300));
+
         for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
           if (!raw) continue;
           let data: Record<string, unknown>;
           try { data = JSON.parse(raw) as Record<string, unknown>; } catch { continue; }
-          if (data.error) throw new Error(`Server stream error: ${JSON.stringify(data)}`);
+
+          if (data.error) {
+            const streamMsg = String(data.message ?? 'STREAM TERMINATED');
+            console.error('[CompareDialog] stream error event:', data);
+            setApiError({ error: streamMsg, status: 0, details: data });
+            return;
+          }
           if (data.done) continue;
 
-          // Blindly accumulate raw fields — reveals what's actually arriving
+          sawFirstToken = true;
           if (typeof data.reasoning === 'string') setReasoningRaw(data.reasoning);
-          if (typeof data.content === 'string')   setContentRaw(data.content);
+          if (typeof data.content   === 'string') setContentRaw(data.content);
         }
       }
       fetchedKeyRef.current = key;
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') {
+        const isTimeout = (err as any)?.message === 'timeout';
+        if (isTimeout) {
+          setApiError({ error: 'Request timed out after 60 seconds.', status: 504, details: null });
+          fetchedKeyRef.current = key;
+        }
+        return;
+      }
       const msg = String((err as Error)?.message ?? err);
-      console.error('[CompareDialog] AI Fetch Error:', msg);
-      setFetchError(msg + ' | Payload/Network failed');
-      fetchedKeyRef.current = key; // prevent infinite retry on hard error
+      console.error('[CompareDialog] fetch error:', msg, (err as Error)?.stack);
+      setApiError({ error: msg, status: 0, details: null });
+      fetchedKeyRef.current = key;
     } finally {
       setGenerating(false);
+      if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     }
   }, []);
 
@@ -409,12 +459,39 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
       </div>
 
       {/* ── Content area ─────────────────────────────────────────────────── */}
-      <div className="px-5 pb-3 max-h-56 overflow-y-auto overscroll-contain">
+      <div className="px-5 pb-3 max-h-72 overflow-y-auto overscroll-contain space-y-2">
 
-        {/* ── HARD ERROR — big red box ──────────────────────────────────── */}
-        {fetchError && (
-          <div className="bg-red-900 text-white p-3 font-bold border-2 border-red-500 rounded-lg mb-2 text-[11px]">
-            ERROR: {fetchError}
+        {/* ── 🚨 GROQ DEBUG PANEL ──────────────────────────────────────── */}
+        {apiError && (
+          <div className={`p-3 rounded-xl border-2 font-mono text-[10.5px] space-y-1.5 ${
+            lm
+              ? 'bg-red-50 border-red-300 text-red-900'
+              : 'bg-red-950/80 border-red-500/70 text-white'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className={`font-bold text-[11px] ${lm ? 'text-red-700' : 'text-red-400'}`}>
+                🚨 GROQ DEBUG
+              </span>
+              <button
+                onClick={() => setApiError(null)}
+                className={`text-[9px] underline ${lm ? 'text-red-400' : 'text-white/30 hover:text-white/60'}`}
+              >Dismiss</button>
+            </div>
+            <div><span className={lm ? 'text-red-400' : 'text-white/45'}>Status: </span>
+              <span className={`font-bold ${lm ? 'text-red-800' : 'text-red-300'}`}>{apiError.status || 'unknown'}</span>
+            </div>
+            <div><span className={lm ? 'text-red-400' : 'text-white/45'}>Message: </span>
+              <span className={lm ? 'text-red-800' : 'text-red-200'}>{apiError.error}</span>
+            </div>
+            {apiError.details != null && (
+              <pre className={`whitespace-pre-wrap break-all max-h-36 overflow-y-auto text-[9.5px] p-2 rounded-lg leading-relaxed ${
+                lm ? 'bg-red-100 text-red-700' : 'bg-black/50 text-yellow-300/80 border border-yellow-600/20'
+              }`}>
+                {typeof apiError.details === 'string'
+                  ? apiError.details
+                  : JSON.stringify(apiError.details, null, 2)}
+              </pre>
+            )}
           </div>
         )}
 
@@ -429,7 +506,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
             {reasoningRaw && (
               <ReasoningAccordion
                 reasoning={reasoningRaw}
-                seconds={Math.max(1, Math.round((Date.now() - Date.now()) / 1000))}
+                seconds={1}
                 lm={lm}
               />
             )}
@@ -441,10 +518,10 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
           </div>
         )}
 
-        {/* ── Idle state — not yet triggered ───────────────────────────── */}
-        {!generating && !fetchError && !reasoningRaw && !contentRaw && (
+        {/* ── Idle state — only shown when nothing has happened yet ─────── */}
+        {!generating && !apiError && !reasoningRaw && !contentRaw && (
           <div className={`text-[10px] ${lm ? 'text-gray-400' : 'text-white/30'}`}>
-            Waiting to analyze…
+            Initializing analysis…
           </div>
         )}
       </div>
