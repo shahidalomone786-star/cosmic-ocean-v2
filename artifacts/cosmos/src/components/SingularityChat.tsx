@@ -46,46 +46,99 @@ const INITIAL_MESSAGE: Message = {
 
 // ─── Markdown renderer ──────────────────────────────────────────────────────
 const markdownComponents = {
-  p:          ({ children }: any) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
-  strong:     ({ children }: any) => <strong className="font-semibold text-white">{children}</strong>,
-  em:         ({ children }: any) => <em className="italic">{children}</em>,
-  a:          ({ children, href }: any) => (
-    <a href={href} target="_blank" rel="noreferrer"
-      className="text-blue-300 underline underline-offset-2 hover:text-blue-200">
+  // ── Block elements ─────────────────────────────────────────────────────────
+  p: ({ children }: any) => (
+    <p className="mb-[1.05em] last:mb-0 leading-[1.82] text-white/85">{children}</p>
+  ),
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-white/95">{children}</strong>
+  ),
+  em: ({ children }: any) => <em className="italic text-white/75">{children}</em>,
+  a: ({ children, href }: any) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-violet-300/90 underline underline-offset-[3px] decoration-violet-400/40
+        hover:text-violet-200 hover:decoration-violet-300/60 transition-colors duration-150"
+    >
       {children}
     </a>
   ),
-  ul:         ({ children }: any) => <ul className="list-disc ml-6 mb-4 space-y-1 marker:text-white/40">{children}</ul>,
-  ol:         ({ children }: any) => <ol className="list-decimal ml-6 mb-4 space-y-1 marker:text-white/40">{children}</ol>,
-  li:         ({ children }: any) => <li className="leading-relaxed">{children}</li>,
-  h1:         ({ children }: any) => <h1 className="text-[18px] font-semibold mt-6 mb-3 first:mt-0 text-white tracking-tight">{children}</h1>,
-  h2:         ({ children }: any) => <h2 className="text-[16px] font-semibold mt-5 mb-2.5 first:mt-0 text-white tracking-tight">{children}</h2>,
-  h3:         ({ children }: any) => <h3 className="text-[14.5px] font-semibold mt-4 mb-2 first:mt-0 text-white/90">{children}</h3>,
+  ul: ({ children }: any) => (
+    <ul className="list-disc ml-5 mb-[1em] space-y-[0.35em] marker:text-white/25">{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="list-decimal ml-5 mb-[1em] space-y-[0.35em] marker:text-white/30">{children}</ol>
+  ),
+  li: ({ children }: any) => (
+    <li className="leading-[1.75] text-white/82">{children}</li>
+  ),
+  // ── Headings — clear hierarchy, not too loud ───────────────────────────────
+  h1: ({ children }: any) => (
+    <h1 className="text-[17px] font-semibold mt-7 mb-3 first:mt-0 text-white
+      tracking-[-0.01em] border-b border-white/[0.07] pb-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 className="text-[15px] font-semibold mt-6 mb-2.5 first:mt-0 text-white/95 tracking-[-0.01em]">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className="text-[13.5px] font-semibold mt-5 mb-2 first:mt-0 text-white/88 tracking-[0.005em] uppercase text-[12px]">
+      {children}
+    </h3>
+  ),
+  // ── Blockquote — elegant left accent ──────────────────────────────────────
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-2 border-emerald-500/50 pl-4 italic text-white/50 my-4">
+    <blockquote className="border-l-[2px] border-violet-400/35 pl-4 pr-2 py-0.5
+      italic text-white/48 my-4 bg-white/[0.015] rounded-r-lg">
       {children}
     </blockquote>
   ),
-  pre:        ({ children }: any) => (
-    <pre className="bg-[#09090b] border border-white/10 rounded-lg p-4 overflow-x-auto my-4 text-[12.5px] leading-relaxed">
+  // ── Code blocks — refined dark surface ────────────────────────────────────
+  pre: ({ children }: any) => (
+    <pre className="relative bg-[#08080b] border border-white/[0.08] rounded-xl
+      px-4 py-3.5 overflow-x-auto my-4 text-[12px] leading-[1.7]
+      shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </pre>
   ),
-  code:       ({ className, children }: any) => {
+  code: ({ className, children }: any) => {
     const isBlock = /language-/.test(className || '');
     return isBlock ? (
-      <code className={`font-mono ${className || ''}`}>{children}</code>
+      <code className={`font-mono text-white/80 ${className || ''}`}>{children}</code>
     ) : (
-      <code className="bg-black/50 text-emerald-300 px-1.5 py-0.5 rounded-md text-[12px] font-mono">
+      <code className="bg-white/[0.07] border border-white/[0.08] text-violet-200/90
+        px-1.5 py-[2px] rounded-md text-[12px] font-mono">
         {children}
       </code>
     );
   },
+  // ── Table support ─────────────────────────────────────────────────────────
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto my-4 rounded-xl border border-white/[0.07]">
+      <table className="w-full text-[13px]">{children}</table>
+    </div>
+  ),
+  thead: ({ children }: any) => (
+    <thead className="border-b border-white/[0.07] bg-white/[0.025]">{children}</thead>
+  ),
+  th: ({ children }: any) => (
+    <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.12em]
+      font-semibold text-white/40">{children}</th>
+  ),
+  td: ({ children }: any) => (
+    <td className="px-4 py-2.5 text-white/78 border-t border-white/[0.04]">{children}</td>
+  ),
 };
 
 const MessageContent = memo(function MessageContent({ content }: { content: string }) {
   return (
-    <div className="text-[14.5px] leading-[1.75] tracking-[0.01em] text-white/88 overflow-x-auto overflow-y-hidden max-w-full">
+    <div className="text-[14px] leading-[1.82] tracking-[0.008em] text-white/85
+      overflow-x-auto overflow-y-hidden max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -272,19 +325,30 @@ const ReasoningBlock = memo(function ReasoningBlock({
 }: { reasoning: string; seconds?: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mb-3 w-full">
+    <div className="mb-2.5 w-full">
+      {/* Toggle pill */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 px-1 py-1 text-white/30 hover:text-white/55
-          transition-colors duration-150 rounded-lg hover:bg-white/[0.04]"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
+          text-white/25 hover:text-white/50 hover:bg-white/[0.04]
+          border border-transparent hover:border-white/[0.05]
+          transition-all duration-150 active:scale-95"
         aria-expanded={open}
+        aria-label={open ? 'Collapse reasoning' : 'Expand reasoning'}
       >
-        <BrainCircuit size={12} strokeWidth={2} />
-        <span className="text-[9.5px] uppercase tracking-widest font-semibold">
+        <BrainCircuit size={11} strokeWidth={1.8} />
+        <span className="text-[9px] uppercase tracking-[0.14em] font-semibold">
           {seconds ? `Thought for ${seconds}s` : 'Reasoning'}
         </span>
-        {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <ChevronDown size={10} strokeWidth={2} />
+        </motion.div>
       </button>
+
+      {/* Expandable body */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -294,8 +358,10 @@ const ReasoningBlock = memo(function ReasoningBlock({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <div className="text-[12px] leading-relaxed text-white/35 pl-4 border-l
-              border-white/[0.08] italic mt-2 pb-1">
+            <div className="mt-1.5 ml-1 pl-3.5 pr-3 py-2.5 border-l-[2px]
+              border-white/[0.06] bg-white/[0.015] rounded-r-xl
+              text-[12px] leading-[1.72] text-white/30 italic
+              max-h-44 overflow-y-auto">
               {reasoning}
             </div>
           </motion.div>
@@ -589,27 +655,34 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-white/[0.06] bg-[#09090b]/95 backdrop-blur-sm relative z-10">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between px-5 py-4">
+      <div className="flex-shrink-0 border-b border-white/[0.04]
+        bg-[#09090b]/98 backdrop-blur-md relative z-10
+        shadow-[0_1px_0_rgba(255,255,255,0.03)]">
+        <div className="max-w-3xl mx-auto w-full flex items-center justify-between px-5 py-[14px]">
           <div className="flex items-center gap-3">
+            {/* Icon — layered glow ring */}
             <div className="relative flex items-center justify-center w-9 h-9 rounded-full
-              bg-white/[0.06] border border-white/[0.10]">
-              <Sparkles size={16} strokeWidth={1.8} className="text-white/75" />
+              bg-white/[0.05] border border-white/[0.09]
+              shadow-[0_0_14px_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <Sparkles size={15} strokeWidth={1.7} className="text-white/72" />
               {!prefersReducedMotion && (
                 <motion.div
-                  className="absolute inset-0 rounded-full border border-white/[0.18]"
-                  animate={{ scale: [1, 1.25, 1], opacity: [0, 0.4, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border border-white/[0.15]"
+                  animate={{ scale: [1, 1.28, 1], opacity: [0, 0.35, 0] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   aria-hidden="true"
                 />
               )}
             </div>
+
             <div>
-              <h2 className="text-[14.5px] font-semibold tracking-wide text-white/95"
-                style={{ fontFamily: 'var(--app-font-heading)' }}>
+              <h2
+                className="text-[15px] font-semibold tracking-[-0.01em] text-white/96 leading-tight"
+                style={{ fontFamily: 'var(--app-font-heading)' }}
+              >
                 Singularity
               </h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-white/35 font-mono">
+              <p className="text-[9px] uppercase tracking-[0.24em] text-white/28 font-mono mt-[1px]">
                 GPT-OSS-120B · Cosmic Intelligence
               </p>
             </div>
@@ -618,11 +691,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-white/[0.08] text-white/35 hover:text-white/75
-                transition-all duration-150"
+              className="p-2 rounded-full hover:bg-white/[0.07] text-white/30 hover:text-white/70
+                transition-all duration-150 active:scale-95"
               aria-label="Close Singularity"
             >
-              <X size={18} strokeWidth={2} />
+              <X size={17} strokeWidth={1.8} />
             </button>
           )}
         </div>
@@ -664,7 +737,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-8">
+          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-6">
             <AnimatePresence initial={false}>
               {messages.map((msg, i) => {
                 const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
@@ -694,12 +767,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     <div
                       className={`rounded-2xl ${
                         msg.role === 'user'
-                          ? 'bg-white/10 text-white rounded-br-sm p-4 max-w-[85%] ml-auto text-[14px] leading-relaxed font-medium'
+                          // ── User: compact glass chip ───────────────────────
+                          ? 'bg-white/[0.07] border border-white/[0.11] text-white/93 rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto text-[13.5px] leading-[1.72] font-[450] shadow-[0_2px_12px_rgba(0,0,0,0.28)]'
                           : msg.error
-                            ? 'bg-red-500/[0.08] border border-red-500/[0.18] text-red-300/90 rounded-bl-sm text-[14px] leading-relaxed px-5 py-4 max-w-[85%]'
-                            : isGenerating
-                              ? 'bg-[#0d1a14] border p-5 w-full stream-pulse-glow'
-                              : 'bg-[#18181b] border border-white/5 p-5 shadow-lg w-full animate-cosmos-fade'
+                          // ── Error ─────────────────────────────────────────
+                            ? 'bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90 rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%]'
+                          : isGenerating
+                          // ── Streaming: emerald pulse glass ────────────────
+                            ? 'bg-gradient-to-b from-[#0c1510]/90 to-[#090d0b]/90 border px-5 py-5 w-full rounded-bl-[4px] stream-pulse-glow shadow-[0_4px_24px_rgba(0,0,0,0.4)]'
+                          // ── Done: premium layered glass ───────────────────
+                            : 'bg-gradient-to-b from-[#141418] to-[#0f0f13] border border-white/[0.07] px-5 py-5 sm:px-6 sm:py-6 w-full rounded-bl-[4px] shadow-[0_4px_28px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.045)] animate-cosmos-fade'
                       }`}
                     >
                       {msg.role === 'assistant'
