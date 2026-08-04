@@ -28,7 +28,10 @@ const AVATAR_VOICES: Record<string, string> = {
   "Nikola Tesla":    "nPczCjzI2devNBz1zQrb",  // Brian   — deep, resonant
   "Mahera Jannat":   "EXAVITQu4vr4xnSDxMaL",  // Bella   — warm female
 };
-const FALLBACK_VOICE = "onwK4e9ZLuTAKqWW03F9"; // Daniel
+// Configurable via ELEVENLABS_DEFAULT_VOICE env var; falls back to Rachel
+// (21m00Tcm4TlvDq8ikWAM) — premium natural female voice used by Singularity Chat.
+const FALLBACK_VOICE =
+  process.env.ELEVENLABS_DEFAULT_VOICE?.trim() || "21m00Tcm4TlvDq8ikWAM";
 
 // ── POST /api/tts ──────────────────────────────────────────────────────────────
 router.post("/tts", async (req, res) => {

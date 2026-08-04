@@ -25,9 +25,6 @@ import { getYear, getSourceName, getAuthors } from '../utils/citationFormatters'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Rachel — ElevenLabs premium natural female voice (same as SingularityChat)
-const RACHEL_VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CompareField {
@@ -145,10 +142,19 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
   const abortRef      = useRef<AbortController | null>(null);
   // Blob URL cache — avoids re-fetching the same audio from ElevenLabs
   const audioCacheRef = useRef<Map<string, string>>(new Map());
+  // Named listener refs so stop() can remove them from any detached Audio node
+  const listenersRef  = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
     if (audioRef.current) {
+      // Explicitly remove listeners before detaching — prevents ghost callbacks
+      // from a still-active Audio node after we null the ref
+      if (listenersRef.current) {
+        audioRef.current.removeEventListener('ended', listenersRef.current.onEnded);
+        audioRef.current.removeEventListener('error', listenersRef.current.onError);
+        listenersRef.current = null;
+      }
       audioRef.current.pause();
       audioRef.current.src = '';
       audioRef.current = null;
@@ -181,10 +187,11 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
       let url = audioCacheRef.current.get(clean);
 
       if (!url) {
+        // Voice choice is server-side; frontend sends text only
         const res = await fetch('/api/tts', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ text: clean, voiceId: RACHEL_VOICE_ID }),
+          body:    JSON.stringify({ text: clean }),
           signal:  abortRef.current.signal,
         });
         if (!res.ok) throw new Error(`TTS ${res.status}`);
@@ -193,12 +200,28 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
         audioCacheRef.current.set(clean, url);  // store for replay
       }
 
+      // Lazy-mount: Audio object is created only on first play
       const audio = new Audio(url);
       audioRef.current = audio;
 
-      // Do NOT revoke here — the URL stays in cache for replays
-      audio.onended = () => setTtsState('idle');
-      audio.onerror = () => setTtsState('idle');
+      // Named listeners so they can be removed by stop() if user cancels mid-play
+      const onEnded = () => {
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+        listenersRef.current = null;
+        audioRef.current = null;   // release the Audio object; blob URL stays cached
+        setTtsState('idle');
+      };
+      const onError = () => {
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+        listenersRef.current = null;
+        audioRef.current = null;
+        setTtsState('idle');
+      };
+      listenersRef.current = { onEnded, onError };
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError);
 
       setTtsState('playing');
       await audio.play();
@@ -211,7 +234,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
   // Cleanup on unmount — stop playback and revoke all cached blob URLs
   useEffect(() => () => {
     stop();
-    audioCacheRef.current.forEach(url => URL.revokeObjectURL(url));
+    audioCacheRef.current.forEach(blobUrl => URL.revokeObjectURL(blobUrl));
     audioCacheRef.current.clear();
   }, [stop]);
 
