@@ -138,7 +138,7 @@ router.post('/singularity', async (req, res) => {
           messages,
           stream:      true,
           temperature: 0.6,
-          max_tokens:  8192,
+          max_tokens:  4000,
         }),
       });
 
