@@ -48,32 +48,37 @@ const INITIAL_MESSAGE: Message = {
 
 // ─── Markdown renderer ──────────────────────────────────────────────────────
 const markdownComponents = {
-  p:      ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
-  strong: ({ children }: any) => <strong className="font-semibold text-white">{children}</strong>,
-  em:     ({ children }: any) => <em className="italic">{children}</em>,
-  a:      ({ children, href }: any) => (
+  p:          ({ children }: any) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
+  strong:     ({ children }: any) => <strong className="font-semibold text-white">{children}</strong>,
+  em:         ({ children }: any) => <em className="italic">{children}</em>,
+  a:          ({ children, href }: any) => (
     <a href={href} target="_blank" rel="noreferrer"
       className="text-blue-300 underline underline-offset-2 hover:text-blue-200">
       {children}
     </a>
   ),
-  ul: ({ children }: any) => <ul className="mb-2 pl-4 space-y-1 list-disc marker:text-white/30">{children}</ul>,
-  ol: ({ children }: any) => <ol className="mb-2 pl-4 space-y-1 list-decimal marker:text-white/30">{children}</ol>,
-  li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
-  h1: ({ children }: any) => <h1 className="text-[17px] font-semibold mt-4 mb-2 first:mt-0 text-white">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-[15px] font-semibold mt-3 mb-1.5 first:mt-0 text-white">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-[14px] font-semibold mt-2 mb-1 first:mt-0 text-white/90">{children}</h3>,
-  pre: ({ children }: any) => (
-    <pre className="my-3 p-4 rounded-xl bg-white/[0.05] border border-white/[0.08] overflow-x-auto text-[12.5px] leading-relaxed">
+  ul:         ({ children }: any) => <ul className="list-disc ml-6 mb-4 space-y-1 marker:text-white/40">{children}</ul>,
+  ol:         ({ children }: any) => <ol className="list-decimal ml-6 mb-4 space-y-1 marker:text-white/40">{children}</ol>,
+  li:         ({ children }: any) => <li className="leading-relaxed">{children}</li>,
+  h1:         ({ children }: any) => <h1 className="text-[18px] font-semibold mt-6 mb-3 first:mt-0 text-white tracking-tight">{children}</h1>,
+  h2:         ({ children }: any) => <h2 className="text-[16px] font-semibold mt-5 mb-2.5 first:mt-0 text-white tracking-tight">{children}</h2>,
+  h3:         ({ children }: any) => <h3 className="text-[14.5px] font-semibold mt-4 mb-2 first:mt-0 text-white/90">{children}</h3>,
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-2 border-emerald-500/50 pl-4 italic text-white/50 my-4">
+      {children}
+    </blockquote>
+  ),
+  pre:        ({ children }: any) => (
+    <pre className="bg-[#09090b] border border-white/10 rounded-lg p-4 overflow-x-auto my-4 text-[12.5px] leading-relaxed">
       {children}
     </pre>
   ),
-  code: ({ className, children }: any) => {
+  code:       ({ className, children }: any) => {
     const isBlock = /language-/.test(className || '');
     return isBlock ? (
       <code className={`font-mono ${className || ''}`}>{children}</code>
     ) : (
-      <code className="px-1.5 py-0.5 rounded-md bg-white/[0.10] text-[12px] font-mono text-blue-300/90">
+      <code className="bg-black/50 text-emerald-300 px-1.5 py-0.5 rounded-md text-[12px] font-mono">
         {children}
       </code>
     );
@@ -659,12 +664,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
                     {/* Bubble */}
                     <div
-                      className={`max-w-[85%] px-5 py-4 rounded-2xl ${
+                      className={`rounded-2xl ${
                         msg.role === 'user'
-                          ? 'bg-white text-black rounded-br-sm shadow-[0_2px_16px_rgba(255,255,255,0.12)] font-medium text-[14px] leading-relaxed'
+                          ? 'bg-white/10 text-white rounded-br-sm p-4 max-w-[85%] ml-auto text-[14px] leading-relaxed font-medium'
                           : msg.error
-                            ? 'bg-red-500/[0.08] border border-red-500/[0.18] text-red-300/90 rounded-bl-sm text-[14px] leading-relaxed'
-                            : 'bg-white/[0.05] border border-white/[0.07] text-white/88 rounded-bl-sm'
+                            ? 'bg-red-500/[0.08] border border-red-500/[0.18] text-red-300/90 rounded-bl-sm text-[14px] leading-relaxed px-5 py-4 max-w-[85%]'
+                            : 'bg-[#18181b] border border-white/5 p-5 shadow-lg w-full'
                       }`}
                     >
                       {msg.role === 'assistant'
