@@ -10,7 +10,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2, VolumeX,
-  BookmarkPlus, Bookmark, Share2, Wand2,
+  BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -594,7 +594,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [isStreaming, setIsStreaming]   = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [apiError, setApiError]         = useState<ApiError | null>(null);
+  const [attachOpen, setAttachOpen]     = useState(false);
+  const [attachToast, setAttachToast]   = useState('');
   const workspace                       = useWorkspace();
+  const attachRef                       = useRef<HTMLDivElement>(null);
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
@@ -608,6 +611,24 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
   // Autofocus on open
   useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  // Close attach popover on outside click
+  useEffect(() => {
+    if (!attachOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (attachRef.current && !attachRef.current.contains(e.target as Node)) {
+        setAttachOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [attachOpen]);
+
+  const showAttachToast = () => {
+    setAttachOpen(false);
+    setAttachToast('Multimodal uploads coming soon!');
+    setTimeout(() => setAttachToast(''), 3000);
+  };
 
   // Escape to close
   useEffect(() => {
@@ -842,7 +863,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative h-screen overflow-hidden w-full flex flex-col bg-[#09090b]"
+      className="relative h-[100dvh] overflow-hidden w-full flex flex-col bg-[#09090b]"
     >
       {/* Subtle top radial ambient */}
       <div
@@ -1188,13 +1209,68 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             {/* Quick-action chips (hide while AI is active or input long) */}
             <QuickChips input={input} onChip={applyChip} disabled={isThinking} />
 
-            {/* Textarea + send button row */}
-            <div className="flex items-end gap-3 px-4 py-3">
+            {/* Textarea + controls row */}
+            <div className="flex items-end gap-2.5 px-3 py-3">
+
+              {/* ── Attachment '+' button with popover ── */}
+              <div ref={attachRef} className="relative flex-shrink-0 mb-0.5">
+                <button
+                  onClick={() => setAttachOpen(o => !o)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center
+                    text-white/35 hover:text-white/70 hover:bg-white/10
+                    transition-colors duration-150 active:scale-90"
+                  aria-label="Attach file"
+                  aria-expanded={attachOpen}
+                >
+                  <Plus size={16} strokeWidth={2} />
+                </button>
+
+                {/* Popover — anchored above the button */}
+                <AnimatePresence>
+                  {attachOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.92, y: 6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.92, y: 6 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className="absolute bottom-full left-0 mb-2 w-52 z-50
+                        bg-[#18181b]/90 backdrop-blur-md
+                        border border-white/10 rounded-xl shadow-2xl
+                        overflow-hidden"
+                    >
+                      <div className="px-1 py-1">
+                        <button
+                          onClick={showAttachToast}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                            text-white/75 hover:text-white hover:bg-white/[0.07]
+                            transition-colors duration-120 text-left"
+                        >
+                          <Image size={15} strokeWidth={1.7} className="text-violet-400/80 flex-shrink-0" />
+                          <span className="text-[13px] font-medium">Upload Image</span>
+                        </button>
+                        <button
+                          onClick={showAttachToast}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                            text-white/75 hover:text-white hover:bg-white/[0.07]
+                            transition-colors duration-120 text-left"
+                        >
+                          <FileText size={15} strokeWidth={1.7} className="text-sky-400/80 flex-shrink-0" />
+                          <span className="text-[13px] font-medium">Upload Document</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
+                }}
                 placeholder="Ask Singularity anything…"
                 rows={1}
                 className="flex-1 resize-none bg-transparent text-[14px] text-white/90
@@ -1229,6 +1305,23 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             <span className="mx-1.5 opacity-40">·</span>
             always verify critical claims
           </p>
+
+          {/* Attach toast */}
+          <AnimatePresence>
+            {attachToast && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.18 }}
+                className="absolute bottom-24 left-1/2 -translate-x-1/2
+                  bg-[#18181b]/95 backdrop-blur-md border border-white/10
+                  rounded-xl px-4 py-2.5 shadow-2xl pointer-events-none z-50"
+              >
+                <p className="text-[13px] text-white/80 font-medium whitespace-nowrap">{attachToast}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>
