@@ -436,17 +436,18 @@ const AudioWave = memo(function AudioWave() {
 const ThinkingDots = memo(function ThinkingDots() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.93, y: 4 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className="self-start flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-bl-sm
         bg-[#0d1a14] border border-emerald-500/[0.18]
-        shadow-[0_0_18px_rgba(16,185,129,0.08)]"
+        shadow-[0_0_24px_rgba(16,185,129,0.10),0_4px_18px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(16,185,129,0.06)]"
       aria-label="Singularity is thinking"
     >
-      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
-      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
-      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
+      <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
     </motion.div>
   );
 });
@@ -519,7 +520,8 @@ const QuickChips = memo(function QuickChips({
                 className="flex-shrink-0 px-3 py-1.5 rounded-full
                   bg-white/[0.04] border border-white/[0.07]
                   text-[11px] text-white/42 hover:text-white/72
-                  hover:bg-white/[0.07] hover:border-white/[0.13]
+                  hover:bg-white/[0.07] hover:border-white/[0.12]
+                  hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]
                   transition-all duration-150 active:scale-95 whitespace-nowrap"
               >
                 {chip.label}
@@ -952,15 +954,15 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                       className={`rounded-2xl ${
                         msg.role === 'user'
                           // ── User: compact glass chip ───────────────────────
-                          ? 'bg-white/[0.07] border border-white/[0.11] text-white/93 rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto text-[13.5px] leading-[1.72] font-[450] shadow-[0_2px_12px_rgba(0,0,0,0.28)]'
+                          ? 'bg-white/[0.08] border border-white/[0.13] text-white/93 rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto text-[13.5px] leading-[1.72] font-[450] shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]'
                           : msg.error
                           // ── Error ─────────────────────────────────────────
-                            ? 'bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90 rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%]'
+                            ? 'bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90 rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%] shadow-[0_4px_16px_rgba(0,0,0,0.35)]'
                           : isGenerating
                           // ── Streaming: emerald pulse glass ────────────────
-                            ? 'bg-gradient-to-b from-[#0c1510]/90 to-[#090d0b]/90 border px-5 py-5 w-full rounded-bl-[4px] stream-pulse-glow shadow-[0_4px_24px_rgba(0,0,0,0.4)]'
+                            ? 'bg-gradient-to-b from-[#0c1510]/90 to-[#090d0b]/90 border px-5 py-5 w-full rounded-bl-[4px] stream-pulse-glow shadow-[0_4px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(16,185,129,0.04)]'
                           // ── Done: premium layered glass ───────────────────
-                            : 'bg-gradient-to-b from-[#141418] to-[#0f0f13] border border-white/[0.07] px-5 py-5 sm:px-6 sm:py-6 w-full rounded-bl-[4px] shadow-[0_4px_28px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.045)] animate-cosmos-fade'
+                            : 'bg-gradient-to-b from-[#16161b] to-[#0f0f13] border border-white/[0.07] px-5 py-5 sm:px-6 sm:py-6 w-full rounded-bl-[4px] shadow-[0_4px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)] animate-cosmos-fade'
                       }`}
                     >
                       {msg.role === 'assistant'
@@ -971,7 +973,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
                     {/* Action row */}
                     {showActions && (
-                      <div className="flex items-center gap-0.5 mt-2 ml-1">
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex items-center gap-0.5 mt-2 ml-1"
+                      >
                         <ListenButton text={msg.content} />
                         <CopyButton text={msg.content} />
                         <SaveButton onSave={() => workspace.save(msg.content)} />
@@ -987,14 +994,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                             Regenerate
                           </button>
                         )}
-                      </div>
+                      </motion.div>
                     )}
 
                     {/* Welcome message — show listen button */}
                     {msg.id === 'welcome' && msg.role === 'assistant' && (
-                      <div className="flex items-center gap-0.5 mt-2 ml-1">
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.22, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex items-center gap-0.5 mt-2 ml-1"
+                      >
                         <ListenButton text={msg.content} />
-                      </div>
+                      </motion.div>
                     )}
 
                     {/* Error retry */}
@@ -1018,23 +1030,26 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25, duration: 0.3 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
                 className="flex flex-col gap-2.5"
               >
                 <p className="text-[9.5px] uppercase tracking-[0.22em] text-white/20 mb-1">
                   Try asking
                 </p>
-                {STARTER_PROMPTS.map(p => (
-                  <button
+                {STARTER_PROMPTS.map((p, idx) => (
+                  <motion.button
                     key={p}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.28 + idx * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     onClick={() => handleSend(p)}
                     className="text-left px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]
                       text-[13.5px] text-white/55 hover:bg-white/[0.06] hover:text-white/85
-                      hover:border-white/[0.12] transition-all duration-200
-                      active:scale-[0.98] active:bg-white/[0.08]"
+                      hover:border-white/[0.11] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
+                      transition-all duration-200 active:scale-[0.98] active:bg-white/[0.08]"
                   >
                     {p}
-                  </button>
+                  </motion.button>
                 ))}
               </motion.div>
             )}
@@ -1047,13 +1062,17 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         <AnimatePresence>
           {showScrollBtn && (
             <motion.button
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
               onClick={scrollToBottom}
               className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full
-                bg-white/10 border border-white/[0.14] backdrop-blur-md flex items-center gap-2
-                text-white/60 text-[12px] hover:bg-white/[0.16] transition-colors"
+                bg-white/[0.10] border border-white/[0.14] backdrop-blur-md flex items-center gap-2
+                text-white/60 text-[12px] hover:bg-white/[0.16] hover:text-white/80
+                shadow-[0_4px_16px_rgba(0,0,0,0.4)] transition-colors duration-150"
               aria-label="Scroll to latest"
             >
               <ArrowDown size={13} strokeWidth={2} />
@@ -1074,7 +1093,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           <div className="rounded-2xl bg-[#0d0d12] border border-white/[0.09]
             shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]
             focus-within:border-white/[0.16]
-            focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(255,255,255,0.055),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]
+            focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]
             transition-all duration-300">
 
             {/* Quick-action chips (hide while AI is active or input long) */}
