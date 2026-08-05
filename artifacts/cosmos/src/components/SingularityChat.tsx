@@ -10,7 +10,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2, VolumeX,
-  BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText,
+  BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +18,8 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { WorkspacePanel, useWorkspace } from './WorkspacePanel';
+import { useDocumentIngestion } from '@/hooks/useDocumentIngestion';
+import { DocumentChip } from './DocumentChip';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -596,8 +598,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [apiError, setApiError]         = useState<ApiError | null>(null);
   const [attachOpen, setAttachOpen]     = useState(false);
   const [attachToast, setAttachToast]   = useState('');
+  const [isDragOver, setIsDragOver]     = useState(false);
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
+  const fileInputRef                    = useRef<HTMLInputElement>(null);
+
+  const {
+    processFile,
+    isProcessing,
+    error: docError,
+    attachedDoc,
+    clearDocument,
+    clearError,
+  } = useDocumentIngestion();
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
@@ -624,11 +637,52 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [attachOpen]);
 
-  const showAttachToast = () => {
+  const showAttachToast = useCallback(() => {
     setAttachOpen(false);
-    setAttachToast('Multimodal uploads coming soon!');
+    setAttachToast('Image uploads coming soon!');
     setTimeout(() => setAttachToast(''), 3000);
-  };
+  }, []);
+
+  const handleDocumentUploadClick = useCallback(() => {
+    setAttachOpen(false);
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) void processFile(file);
+      // Reset so the same file can be re-selected after "Replace"
+      e.target.value = '';
+    },
+    [processFile],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only clear when leaving the container, not when moving to a child element
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) void processFile(file);
+    },
+    [processFile],
+  );
 
   // Escape to close
   useEffect(() => {
@@ -673,6 +727,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     abortRef.current?.abort();
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
   }, []);
+
+  // Inject document text into textarea when extraction completes
+  useEffect(() => {
+    if (!attachedDoc) return;
+    setInput(attachedDoc.block);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [attachedDoc]);
 
   // ── Core generation ──────────────────────────────────────────────────────
   const generateResponse = useCallback(async (userText: string) => {
@@ -1199,12 +1260,55 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       >
         <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-4">
 
+          {/* Hidden file input — triggered by "Upload Document" button or Replace */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.csv,.json,.pdf,text/plain,text/markdown,text/csv,application/json,application/pdf"
+            className="sr-only"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={handleFileSelected}
+          />
+
           {/* ── Unified input shell: chips + textarea + send ─────────────── */}
-          <div className="rounded-2xl bg-[#0d0d12] border border-white/[0.09]
-            shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]
-            focus-within:border-white/[0.16]
-            focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]
-            transition-all duration-300">
+          <div
+            className={`relative rounded-2xl bg-[#0d0d12] border transition-all duration-300 ${
+              isDragOver
+                ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
+                : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
+            }`}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            aria-label={isDragOver ? 'Drop to attach document' : undefined}
+          >
+            {/* Drag-over highlight overlay */}
+            <AnimatePresence>
+              {isDragOver && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1 }}
+                  className="absolute inset-0 rounded-2xl pointer-events-none z-10
+                    bg-sky-400/[0.03] border border-dashed border-sky-400/30"
+                  aria-hidden="true"
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Document chip — shown when a document is attached */}
+            <AnimatePresence>
+              {attachedDoc && (
+                <DocumentChip
+                  meta={attachedDoc.meta}
+                  onRemove={clearDocument}
+                  onReplace={() => fileInputRef.current?.click()}
+                />
+              )}
+            </AnimatePresence>
 
             {/* Quick-action chips (hide while AI is active or input long) */}
             <QuickChips input={input} onChip={applyChip} disabled={isThinking} />
@@ -1221,6 +1325,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     transition-colors duration-150 active:scale-90"
                   aria-label="Attach file"
                   aria-expanded={attachOpen}
+                  aria-haspopup="menu"
                 >
                   <Plus size={16} strokeWidth={2} />
                 </button>
@@ -1229,6 +1334,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 <AnimatePresence>
                   {attachOpen && (
                     <motion.div
+                      role="menu"
                       initial={{ opacity: 0, scale: 0.92, y: 6 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 6 }}
@@ -1240,6 +1346,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     >
                       <div className="px-1 py-1">
                         <button
+                          role="menuitem"
                           onClick={showAttachToast}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                             text-white/75 hover:text-white hover:bg-white/[0.07]
@@ -1249,10 +1356,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           <span className="text-[13px] font-medium">Upload Image</span>
                         </button>
                         <button
-                          onClick={showAttachToast}
+                          role="menuitem"
+                          onClick={handleDocumentUploadClick}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                             text-white/75 hover:text-white hover:bg-white/[0.07]
                             transition-colors duration-120 text-left"
+                          aria-label="Upload document (.txt, .md, .csv, .json, .pdf — max 5 MB)"
                         >
                           <FileText size={15} strokeWidth={1.7} className="text-sky-400/80 flex-shrink-0" />
                           <span className="text-[13px] font-medium">Upload Document</span>
@@ -1271,32 +1380,56 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 onFocus={() => {
                   setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
                 }}
-                placeholder="Ask Singularity anything…"
+                placeholder={isProcessing ? 'Extracting document…' : 'Ask Singularity anything…'}
                 rows={1}
+                disabled={isProcessing}
                 className="flex-1 resize-none bg-transparent text-[14px] text-white/90
                   placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
-                  leading-relaxed py-[2px]"
+                  leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
+                aria-busy={isProcessing}
               />
               <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
-                disabled={!isThinking && !input.trim()}
+                disabled={!isThinking && (!input.trim() || isProcessing)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
                   transition-all duration-200 mb-0.5 active:scale-90 ${
                   isThinking
                     ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
-                    : input.trim()
+                    : (input.trim() && !isProcessing)
                       ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.28)]'
                       : 'bg-white/[0.06] text-white/18 cursor-not-allowed'
                 }`}
                 aria-label={isThinking ? 'Stop generating' : 'Send message'}
               >
-                {isThinking
-                  ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
-                  : <Send size={13} strokeWidth={2.5} className={input.trim() ? 'ml-[1px]' : ''} />
+                {isProcessing
+                  ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
+                  : isThinking
+                    ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
+                    : <Send size={13} strokeWidth={2.5} className={(input.trim() && !isProcessing) ? 'ml-[1px]' : ''} />
                 }
               </button>
             </div>
+
+            {/* Extraction progress indicator */}
+            <AnimatePresence>
+              {isProcessing && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 px-3 pb-2.5">
+                    <Loader2 size={11} strokeWidth={2.5} className="animate-spin text-sky-400/70 flex-shrink-0" />
+                    <span className="text-[11.5px] text-white/40" aria-live="polite">
+                      Extracting document…
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Disclaimer */}
@@ -1306,7 +1439,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             always verify critical claims
           </p>
 
-          {/* Attach toast */}
+          {/* Attach toast (image coming-soon) */}
           <AnimatePresence>
             {attachToast && (
               <motion.div
@@ -1319,6 +1452,34 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   rounded-xl px-4 py-2.5 shadow-2xl pointer-events-none z-50"
               >
                 <p className="text-[13px] text-white/80 font-medium whitespace-nowrap">{attachToast}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Document extraction error */}
+          <AnimatePresence>
+            {docError && (
+              <motion.div
+                role="alert"
+                initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm
+                  bg-[#1a0a0a]/95 backdrop-blur-md border border-red-500/25
+                  rounded-xl px-4 py-3 shadow-2xl z-50 flex items-start gap-2.5"
+              >
+                <X size={13} strokeWidth={2.5} className="text-red-400/80 flex-shrink-0 mt-[1px]" />
+                <p className="flex-1 text-[12.5px] text-red-200/90 leading-snug">{docError}</p>
+                <button
+                  onClick={clearError}
+                  className="flex-shrink-0 text-red-400/50 hover:text-red-300
+                    transition-colors duration-150 ml-1 focus-visible:outline-none
+                    focus-visible:ring-1 focus-visible:ring-red-400/50 rounded"
+                  aria-label="Dismiss error"
+                >
+                  <X size={12} strokeWidth={2.5} />
+                </button>
               </motion.div>
             )}
           </AnimatePresence>

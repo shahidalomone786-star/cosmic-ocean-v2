@@ -90,6 +90,7 @@
     "@types/matter-js": "^0.20.2",
     "chess.js": "^1.4.0",
     "matter-js": "^0.20.0",
+    "pdfjs-dist": "^6.2.108",
     "react-chessboard": "^5.10.0",
     "zustand": "^5.0.14"
   }
