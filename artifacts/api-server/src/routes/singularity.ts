@@ -216,7 +216,9 @@ if (GROQ_KEYS.length === 0) {
 
 let keyCursor = 0;
 const TEXT_MODEL = 'openai/gpt-oss-120b';
-const VISION_MODEL = 'llama-3.2-11b-vision-preview';
+const OPENAI_VISION_MODEL = 'gpt-4o-mini';
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() ?? '';
 
 const VISION_MIME_TYPES = new Set([
   'image/jpeg',
@@ -266,16 +268,13 @@ function sanitiseImageInputs(value: unknown): VisionImage[] {
   });
 }
 
-function isVisionModel(model: string): boolean {
-  return model === VISION_MODEL && VISION_MODEL.length > 0;
-}
-
 router.get('/singularity/capabilities', (_req, res) => {
   res.json({
     activeModel: TEXT_MODEL,
-    activeModelSupportsVision: isVisionModel(TEXT_MODEL),
-    multimodalModel: VISION_MODEL || null,
-    canRouteImages: Boolean(VISION_MODEL),
+    activeModelSupportsVision: false,
+    multimodalModel: OPENAI_VISION_MODEL,
+    multimodalProvider: 'openai',
+    canRouteImages: Boolean(OPENAI_API_KEY),
   });
 });
 
@@ -337,14 +336,6 @@ router.post('/singularity', async (req, res) => {
     return;
   }
 
-  if (GROQ_KEYS.length === 0) {
-    res.status(500).json({
-      success: false, error: 'No Groq API keys configured on the server',
-      status: 500, details: null,
-    });
-    return;
-  }
-
   if (Array.isArray(req.body?.images) && req.body.images.length > 0 && images.length === 0) {
     res.status(400).json({
       success: false,
@@ -357,14 +348,27 @@ router.post('/singularity', async (req, res) => {
 
   const safeHistory = sanitiseHistory(history);
   const historyHasImages = safeHistory.some(turn => (turn.images?.length ?? 0) > 0);
-  const model = images.length > 0 || historyHasImages ? VISION_MODEL : TEXT_MODEL;
-  if ((images.length > 0 || historyHasImages) && !isVisionModel(model)) {
+  const hasImages = images.length > 0 || historyHasImages;
+  const provider = hasImages ? 'OpenAI' : 'Groq';
+  const model = hasImages ? OPENAI_VISION_MODEL : TEXT_MODEL;
+
+  if (hasImages && !OPENAI_API_KEY) {
     res.status(415).json({
       success: false,
-      code: 'VISION_UNSUPPORTED',
-      error: 'This model currently supports text only.',
+      code: 'OPENAI_API_KEY_MISSING',
+      error: 'OpenAI vision is not configured. Add OPENAI_API_KEY to process image attachments.',
       status: 415,
-      details: { model },
+      details: { provider, model },
+    });
+    return;
+  }
+
+  if (!hasImages && GROQ_KEYS.length === 0) {
+    res.status(500).json({
+      success: false,
+      error: 'No Groq API keys configured on the server',
+      status: 500,
+      details: null,
     });
     return;
   }
@@ -403,13 +407,13 @@ router.post('/singularity', async (req, res) => {
     `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
   );
 
-  const maxAttempts = GROQ_KEYS.length;
+  const maxAttempts = hasImages ? 1 : GROQ_KEYS.length;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const key = nextKey();
+    const key = hasImages ? OPENAI_API_KEY : nextKey();
 
     try {
-      console.log(`[singularity] Attempt ${attempt + 1}/${maxAttempts} — calling Groq API…`);
+      console.log(`[singularity] Attempt ${attempt + 1}/${maxAttempts} — calling ${provider} API…`);
 
       // 60-second timeout only — do NOT abort on req.on('close').
       // req.on('close') fires immediately after the request body is consumed
@@ -419,7 +423,9 @@ router.post('/singularity', async (req, res) => {
       // headers are committed.
       const signal = AbortSignal.timeout(60_000);
 
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const completionRes = await fetch(
+        hasImages ? OPENAI_ENDPOINT : 'https://api.groq.com/openai/v1/chat/completions',
+        {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -433,34 +439,36 @@ router.post('/singularity', async (req, res) => {
           temperature: 0.6,
           max_tokens:  1500,
         }),
-      });
+        },
+      );
 
       // ── Rate limit → rotate key ──
-      if (groqRes.status === 429) {
-        console.warn(`[singularity] Key ${attempt + 1} rate-limited (429) — rotating…`);
+      if (completionRes.status === 429) {
+        console.warn(`[singularity] ${provider} request rate-limited (429) — rotating if possible…`);
         continue;
       }
 
       // ── Non-2xx → log everything + return JSON (no SSE commitment yet) ──
-      if (!groqRes.ok) {
-        const errBody = await groqRes.text().catch(() => '(unreadable)');
+      if (!completionRes.ok) {
+        const errBody = await completionRes.text().catch(() => '(unreadable)');
         let errDetails: unknown = null;
         try { errDetails = JSON.parse(errBody); } catch { errDetails = errBody; }
 
-        console.error('[singularity] ❌ Groq non-2xx:', {
+        console.error(`[singularity] ❌ ${provider} non-2xx:`, {
           attempt:    attempt + 1,
-          status:     groqRes.status,
-          statusText: groqRes.statusText,
+          status:     completionRes.status,
+          statusText: completionRes.statusText,
+          provider,
           model,
           body:       errBody.slice(0, 2000),
         });
 
         // 4xx = client/auth/model error — rotating keys won't help
-        if (groqRes.status >= 400 && groqRes.status < 500) {
-          res.status(groqRes.status).json({
+        if (completionRes.status >= 400 && completionRes.status < 500) {
+          res.status(completionRes.status).json({
             success: false,
-            error:   `Groq API error ${groqRes.status}: ${groqRes.statusText}`,
-            status:  groqRes.status,
+            error:   `${provider} API error ${completionRes.status}: ${completionRes.statusText}`,
+            status:  completionRes.status,
             details: errDetails,
           });
           return;
@@ -471,16 +479,16 @@ router.post('/singularity', async (req, res) => {
 
         res.status(502).json({
           success: false,
-          error:   `Groq returned ${groqRes.status} on all ${maxAttempts} key(s)`,
-          status:  groqRes.status,
+          error:   `${provider} returned ${completionRes.status} after ${maxAttempts} attempt(s)`,
+          status:  completionRes.status,
           details: errDetails,
         });
         return;
       }
 
-      if (!groqRes.body) {
+      if (!completionRes.body) {
         res.status(502).json({
-          success: false, error: 'Groq response body is null — cannot stream',
+          success: false, error: `${provider} response body is null — cannot stream`,
           status: 502, details: null,
         });
         return;
@@ -500,7 +508,7 @@ router.post('/singularity', async (req, res) => {
       const streamAbort = new AbortController();
       res.on('close', () => { if (!streamAbort.signal.aborted) streamAbort.abort(); });
 
-      const reader  = (groqRes.body as ReadableStream<Uint8Array>).getReader();
+      const reader  = (completionRes.body as ReadableStream<Uint8Array>).getReader();
       const decoder = new TextDecoder('utf-8');
       let rawBuffer  = '';
 
@@ -580,11 +588,11 @@ router.post('/singularity', async (req, res) => {
 
       if (attempt < maxAttempts - 1) continue;
 
-      // All keys exhausted
+      // All provider attempts exhausted
       if (!res.headersSent) {
         res.status(500).json({
           success: false,
-          error:   error?.message ?? 'All Groq keys exhausted',
+          error:   error?.message ?? `All ${provider} attempts exhausted`,
           status:  500,
           details: error?.response ?? null,
         });
@@ -598,7 +606,7 @@ router.post('/singularity', async (req, res) => {
 
   // Should never reach here, but guard anyway
   if (!res.headersSent) {
-    res.status(500).json({ success: false, error: 'All Groq keys failed', status: 500, details: null });
+    res.status(500).json({ success: false, error: `All ${provider} attempts failed`, status: 500, details: null });
   }
 });
 
