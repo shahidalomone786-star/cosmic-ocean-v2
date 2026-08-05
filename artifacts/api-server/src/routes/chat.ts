@@ -51,7 +51,11 @@ router.post("/chat", async (req, res) => {
     const response = await fetchGroq({
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: GROQ_MODEL, messages }),
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        max_tokens: 4000,
+      }),
     });
 
     if (!response.ok) {

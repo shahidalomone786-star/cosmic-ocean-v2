@@ -105,7 +105,7 @@ async function fetchAISummary(query: string): Promise<string | null> {
           },
           { role: "user", content: `Give a 2–3 sentence scientific overview of: ${query}` },
         ],
-        max_tokens: 220,
+        max_tokens: 4000,
         temperature: 0.35,
       }),
       signal: timeout(9_000),

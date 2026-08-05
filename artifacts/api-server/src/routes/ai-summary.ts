@@ -191,7 +191,7 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
           model:       GROQ_MODEL,
           messages,
           temperature: 0.1,   // lower → more deterministic, less hallucination risk
-          max_tokens:  180,   // 120-word cap ≈ 160 tokens; 180 gives headroom
+          max_tokens:  4000,
           stream:      wantStream,
         }),
         signal: AbortSignal.timeout(30_000),
