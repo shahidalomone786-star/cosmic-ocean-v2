@@ -216,9 +216,8 @@ if (GROQ_KEYS.length === 0) {
 
 let keyCursor = 0;
 const TEXT_MODEL = 'openai/gpt-oss-120b';
-const OPENAI_VISION_MODEL = 'gpt-4o-mini';
-const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim() ?? '';
+const VISION_MODEL = 'qwen/qwen3.6-27b';
+const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
 const VISION_MIME_TYPES = new Set([
   'image/jpeg',
@@ -272,9 +271,9 @@ router.get('/singularity/capabilities', (_req, res) => {
   res.json({
     activeModel: TEXT_MODEL,
     activeModelSupportsVision: false,
-    multimodalModel: OPENAI_VISION_MODEL,
-    multimodalProvider: 'openai',
-    canRouteImages: Boolean(OPENAI_API_KEY),
+    multimodalModel: VISION_MODEL,
+    multimodalProvider: 'groq',
+    canRouteImages: GROQ_KEYS.length > 0,
   });
 });
 
@@ -349,21 +348,10 @@ router.post('/singularity', async (req, res) => {
   const safeHistory = sanitiseHistory(history);
   const historyHasImages = safeHistory.some(turn => (turn.images?.length ?? 0) > 0);
   const hasImages = images.length > 0 || historyHasImages;
-  const provider = hasImages ? 'OpenAI' : 'Groq';
-  const model = hasImages ? OPENAI_VISION_MODEL : TEXT_MODEL;
+  const provider = 'Groq';
+  const model = hasImages ? VISION_MODEL : TEXT_MODEL;
 
-  if (hasImages && !OPENAI_API_KEY) {
-    res.status(415).json({
-      success: false,
-      code: 'OPENAI_API_KEY_MISSING',
-      error: 'OpenAI vision is not configured. Add OPENAI_API_KEY to process image attachments.',
-      status: 415,
-      details: { provider, model },
-    });
-    return;
-  }
-
-  if (!hasImages && GROQ_KEYS.length === 0) {
+  if (GROQ_KEYS.length === 0) {
     res.status(500).json({
       success: false,
       error: 'No Groq API keys configured on the server',
@@ -407,10 +395,10 @@ router.post('/singularity', async (req, res) => {
     `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
   );
 
-  const maxAttempts = hasImages ? 1 : GROQ_KEYS.length;
+  const maxAttempts = GROQ_KEYS.length;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const key = hasImages ? OPENAI_API_KEY : nextKey();
+    const key = nextKey();
 
     try {
       console.log(`[singularity] Attempt ${attempt + 1}/${maxAttempts} — calling ${provider} API…`);
@@ -423,9 +411,7 @@ router.post('/singularity', async (req, res) => {
       // headers are committed.
       const signal = AbortSignal.timeout(60_000);
 
-      const completionRes = await fetch(
-        hasImages ? OPENAI_ENDPOINT : 'https://api.groq.com/openai/v1/chat/completions',
-        {
+      const completionRes = await fetch(GROQ_ENDPOINT, {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -439,8 +425,7 @@ router.post('/singularity', async (req, res) => {
           temperature: 0.6,
           max_tokens:  1500,
         }),
-        },
-      );
+      });
 
       // ── Rate limit → rotate key ──
       if (completionRes.status === 429) {
