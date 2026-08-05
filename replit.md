@@ -18,7 +18,7 @@ A science social platform — AI chat, NASA/arXiv/SpaceX search, grandmaster che
 - DB: SQLite via `better-sqlite3` (file: `cosmos.db` at cwd, configurable via `DB_PATH` env)
 - Auth: JWT in httpOnly cookies (`SESSION_SECRET` required)
 - AI chat: Groq (llama-3.3-70b) — GROQ_KEY_1…5
-- TTS: Microsoft Edge Neural via `@andresaya/edge-tts` — no API key required
+- TTS: Microsoft Edge multilingual female Neural via `@andresaya/edge-tts` (`en-US-AvaMultilingualNeural`, +15%) — no API key required
 - Build: esbuild (CJS bundle) with `better-sqlite3` externalized
 
 ## Where things live

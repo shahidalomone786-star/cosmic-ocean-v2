@@ -3,29 +3,20 @@ import { EdgeTTS } from "@andresaya/edge-tts";
 
 const router = Router();
 
-const EDGE_VOICE = "en-IN-NeerjaNeural";
+// Ava is the installed Edge voice mapping's supported US female multilingual
+// voice. It auto-detects supported Unicode scripts without changing personas
+// between English, Hindi, Japanese, Chinese, and mixed-language text.
+const EDGE_VOICE = "en-US-AvaMultilingualNeural";
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 const EDGE_RATE = "+15%";
 
 function cleanSpeechText(input: string): string {
   return input
-    // Remove equations entirely: reading delimiters or LaTeX commands creates
-    // long, unnatural pauses in neural speech.
-    .replace(/\\\[([\s\S]*?)\\\]/g, " ")
-    .replace(/\\\(([\s\S]*?)\\\)/g, " ")
-    .replace(/\$\$[\s\S]*?\$\$/g, " ")
-    .replace(/\$[^$\n]*\$/g, " ")
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`([^`]*)`/g, "$1")
-    // Strip Markdown headings, bullets, numbered lists, links, and emphasis.
-    .replace(/^\s*#{1,6}\s+/gm, "")
-    .replace(/^\s*[-*+•]\s+/gm, "")
-    .replace(/^\s*\d+[.)]\s+/gm, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[*_~]/g, "")
-    // Strip remaining LaTeX commands and structural symbols.
-    .replace(/\\[a-zA-Z]+/g, " ")
-    .replace(/[{}[\]\\|^]/g, " ")
+    // Remove only presentation delimiters. Do not use an ASCII allow-list:
+    // Devanagari, Kana, Han characters, accents, and mixed Hinglish must
+    // reach the multilingual neural voice unchanged.
+    .replace(/\\\[|\\\]|\\\(|\\\)/g, " ")
+    .replace(/[*#_]/g, "")
     .replace(/\n{2,}/g, ". ")
     .replace(/\s+/g, " ")
     .trim()
