@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import type { SectionItem } from './NasaSearch';
 import { getYear, getSourceName, getAuthors } from '../utils/citationFormatters';
 
@@ -587,7 +590,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
               <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full ${
                 lm ? 'text-gray-800' : 'text-white/88'
               }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{contentRaw}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{contentRaw}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -614,7 +617,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
               <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full pl-1 ${
                 lm ? 'text-gray-800' : 'text-white/88'
               }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{fu.answer}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{fu.answer}</ReactMarkdown>
               </div>
             ) : followGenerating && (
               <div className="flex gap-1 pl-3 pt-1">

@@ -148,7 +148,7 @@ const markdownComponents = {
 
 const MessageContent = memo(function MessageContent({ content }: { content: string }) {
   return (
-    <div className="text-[17px] leading-[1.8] tracking-[0.005em] text-white/85
+    <div className="text-[15px] leading-[1.75] tracking-[0.005em] text-white/85
       overflow-x-auto overflow-y-hidden max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
