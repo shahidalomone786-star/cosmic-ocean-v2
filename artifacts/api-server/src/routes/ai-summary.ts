@@ -1,26 +1,14 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { logger } from "../lib/logger";
+import { fetchGroq, getGroqKeyCount, hasGroqKeys } from "../lib/groq";
 
 const router = Router();
 
-// ── Groq key pool — filter undefined / empty at startup ──────────────────────
-const GROQ_KEYS: string[] = [
-  process.env.GROQ_KEY_1,
-  process.env.GROQ_KEY_2,
-  process.env.GROQ_KEY_3,
-  process.env.GROQ_KEY_4,
-  process.env.GROQ_KEY_5,
-].filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-
-// Mutable round-robin pointer — advances on 429, wraps around pool
-let groqKeyIndex = 0;
-
-const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL    = "llama-3.3-70b-versatile";
 
 // ── Status codes that warrant a retry (with key rotation / backoff) ───────────
-const RETRY_CODES = new Set([429, 500, 502, 503, 504]);
+const RETRY_CODES = new Set([500, 502, 503, 504]);
 
 // ── In-memory summary cache (key = query::language, TTL = 24 h) ──────────────
 const CACHE_TTL_MS      = 24 * 60 * 60 * 1_000; // 24 hours
@@ -124,7 +112,7 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
     return;
   }
 
-  if (GROQ_KEYS.length === 0) {
+  if (!hasGroqKeys()) {
     logger.error({ msg: "ai-summary:no-keys" });
     res.status(503).json({ error: "No Groq API keys configured on the server." });
     return;
@@ -181,29 +169,23 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
   ];
 
   // ── Key-rotation loop with exponential backoff ────────────────────────────
-  const maxAttempts = GROQ_KEYS.length * 2; // try each key up to twice
+  const maxAttempts = getGroqKeyCount() * 2; // shared helper rotates keys on every request
   let lastError: unknown;
-  let usedKeyIndex  = groqKeyIndex;
   let fallbackUsed  = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const keyIndex = (groqKeyIndex + attempt) % GROQ_KEYS.length;
-    usedKeyIndex   = keyIndex;
     if (attempt > 0) {
       fallbackUsed = true;
       const delay = backoffMs(attempt - 1);
-      logger.warn({ msg: "ai-summary:backoff", attempt, delayMs: delay, keyIndex });
+      logger.warn({ msg: "ai-summary:backoff", attempt, delayMs: delay });
       await sleep(delay);
     }
 
-    const apiKey = GROQ_KEYS[keyIndex];
-
     try {
-      const groqRes = await fetch(GROQ_ENDPOINT, {
+      const groqRes = await fetchGroq({
         method:  "POST",
         headers: {
           "Content-Type":  "application/json",
-          "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model:       GROQ_MODEL,
@@ -220,11 +202,8 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
       // ── Retry-eligible HTTP status ──────────────────────────────────────
       if (RETRY_CODES.has(status)) {
         // 429 = rate-limit → rotate key; 5xx = server transient → keep key, just backoff
-        if (status === 429) {
-          groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
-        }
-        lastError = new Error(`Groq HTTP ${status} on key index ${keyIndex}`);
-        logger.warn({ msg: "ai-summary:retry", status, keyIndex, attempt });
+        lastError = new Error(`Groq HTTP ${status} after shared key rotation`);
+        logger.warn({ msg: "ai-summary:retry", status, attempt });
         continue;
       }
 
@@ -280,7 +259,7 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
 
         const confidence = estimateConfidence(snippets.length, fullText.length);
         const latencyMs  = Date.now() - startTime;
-        logger.info({ msg: "ai-summary:stream-complete", keyIndex: usedKeyIndex, fallbackUsed, latencyMs, sourcesUsed: snippets.length });
+        logger.info({ msg: "ai-summary:stream-complete", fallbackUsed, latencyMs, sourcesUsed: snippets.length });
 
         // Cache assembled text
         pruneCache();
@@ -311,7 +290,7 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
       const confidence = estimateConfidence(snippets.length, summary.length);
       const latencyMs  = Date.now() - startTime;
 
-      logger.info({ msg: "ai-summary:success", keyIndex: usedKeyIndex, fallbackUsed, latencyMs, sourcesUsed: snippets.length });
+      logger.info({ msg: "ai-summary:success", fallbackUsed, latencyMs, sourcesUsed: snippets.length });
 
       // Write to cache
       pruneCache();
@@ -327,20 +306,14 @@ router.post("/ai-summary", async (req: Request, res: Response) => {
     } catch (err: unknown) {
       lastError       = err;
       const msg       = (err as Error)?.message ?? String(err);
-      const isRateLimit  = /429|rate.?limit/i.test(msg);
       const isTransient  = /timeout|abort|network|econnreset|econnrefused|fetch failed/i.test(msg);
 
-      if (isRateLimit) {
-        groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
-        logger.warn({ msg: "ai-summary:rate-limit-exception", keyIndex, attempt });
-        continue;
-      }
       if (isTransient) {
-        logger.warn({ msg: "ai-summary:transient-exception", keyIndex, attempt, error: msg });
+        logger.warn({ msg: "ai-summary:transient-exception", attempt, error: msg });
         continue;
       }
       // Auth errors, malformed requests, etc. — no point retrying
-      logger.error({ msg: "ai-summary:unrecoverable", keyIndex, error: msg });
+      logger.error({ msg: "ai-summary:unrecoverable", attempt, error: msg });
       break;
     }
   }

@@ -7,4 +7,4 @@ Image attachments are an additive multimodal layer: optimize and validate them i
 
 **Why:** Singularity's existing stream uses a text model and must not receive invalid multimodal payloads or unbounded base64 history.
 
-**How to apply:** Keep document ingestion separate, enforce five images/10 MB input limits, validate signatures server-side, preserve image metadata in message history, route image turns to Groq `qwen/qwen3.6-27b`, and keep text turns on `openai/gpt-oss-120b` through the same Groq key pool.
+**How to apply:** Keep document ingestion separate, enforce five images/10 MB input limits, validate signatures server-side, preserve image metadata in message history, route image turns to Groq `qwen/qwen3.6-27b`, keep text turns on `openai/gpt-oss-120b`, and send every Groq request through the shared five-key rotation helper with 413/429 failover.

@@ -11,6 +11,7 @@
  */
 
 import { Router } from "express";
+import { fetchGroq } from "../lib/groq";
 
 const router = Router();
 
@@ -87,23 +88,11 @@ function timeout(ms: number) { return AbortSignal.timeout(ms); }
 
 // ── Groq AI Summary ───────────────────────────────────────────────────────────
 
-const GROQ_KEYS: string[] = [
-  process.env["GROQ_KEY_1"],
-  process.env["GROQ_KEY_2"],
-  process.env["GROQ_KEY_3"],
-  process.env["GROQ_KEY_4"],
-  process.env["GROQ_KEY_5"],
-].filter((k): k is string => typeof k === "string" && k.trim().length > 0);
-
-let groqKeyIdx = 0;
-
 async function fetchAISummary(query: string): Promise<string | null> {
-  if (GROQ_KEYS.length === 0) return null;
-  const key = GROQ_KEYS[groqKeyIdx % GROQ_KEYS.length];
   try {
-    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const resp = await fetchGroq({
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
@@ -121,7 +110,6 @@ async function fetchAISummary(query: string): Promise<string | null> {
       }),
       signal: timeout(9_000),
     });
-    if (resp.status === 429) { groqKeyIdx++; return null; }
     if (!resp.ok) return null;
     const data = await resp.json() as {
       choices?: { message?: { content?: string } }[];

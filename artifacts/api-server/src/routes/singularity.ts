@@ -5,6 +5,7 @@
 // Mid-stream failures → SSE event { error: true, message: "STREAM TERMINATED: …" }.
 
 import { Router } from 'express';
+import { fetchGroq, getGroqKeyCount, hasGroqKeys } from '../lib/groq';
 
 const router = Router();
 
@@ -199,25 +200,8 @@ Truth before confidence · Evidence before persuasion · Reasoning before assert
 Transparency before certainty · Accuracy before completeness · Clarity before complexity.
 The goal is not to appear intelligent. The goal is to be genuinely reliable.`;
 
-// ── Key pool ──────────────────────────────────────────────────────────────────
-const GROQ_KEYS = [
-  process.env.GROQ_KEY_1,
-  process.env.GROQ_KEY_2,
-  process.env.GROQ_KEY_3,
-  process.env.GROQ_KEY_4,
-  process.env.GROQ_KEY_5,
-].filter((k): k is string => typeof k === 'string' && k.trim().length > 0);
-
-if (GROQ_KEYS.length === 0) {
-  console.error('[singularity] ⚠️  No GROQ_KEY_* env vars found — all requests will fail.');
-} else {
-  console.log(`[singularity] Loaded ${GROQ_KEYS.length} Groq key(s).`);
-}
-
-let keyCursor = 0;
 const TEXT_MODEL = 'openai/gpt-oss-120b';
 const VISION_MODEL = 'qwen/qwen3.6-27b';
-const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
 const VISION_MIME_TYPES = new Set([
   'image/jpeg',
@@ -273,15 +257,9 @@ router.get('/singularity/capabilities', (_req, res) => {
     activeModelSupportsVision: false,
     multimodalModel: VISION_MODEL,
     multimodalProvider: 'groq',
-    canRouteImages: GROQ_KEYS.length > 0,
+    canRouteImages: hasGroqKeys(),
   });
 });
-
-function nextKey(): string {
-  const key = GROQ_KEYS[keyCursor % GROQ_KEYS.length];
-  keyCursor++;
-  return key;
-}
 
 // ── Reasoning tag splitter ────────────────────────────────────────────────────
 // Returns { reasoning: '', content: raw } when no <think> tags found,
@@ -351,7 +329,7 @@ router.post('/singularity', async (req, res) => {
   const provider = 'Groq';
   const model = hasImages ? VISION_MODEL : TEXT_MODEL;
 
-  if (GROQ_KEYS.length === 0) {
+  if (!hasGroqKeys()) {
     res.status(500).json({
       success: false,
       error: 'No Groq API keys configured on the server',
@@ -394,11 +372,9 @@ router.post('/singularity', async (req, res) => {
     `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
   );
 
-  const maxAttempts = GROQ_KEYS.length;
+  const maxAttempts = getGroqKeyCount();
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const key = nextKey();
-
     try {
       console.log(`[singularity] Attempt ${attempt + 1}/${maxAttempts} — calling ${provider} API…`);
 
@@ -410,11 +386,10 @@ router.post('/singularity', async (req, res) => {
       // headers are committed.
       const signal = AbortSignal.timeout(60_000);
 
-      const completionRes = await fetch(GROQ_ENDPOINT, {
+      const completionRes = await fetchGroq({
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': `Bearer ${key}`,
         },
         signal,
         body: JSON.stringify({
@@ -425,12 +400,6 @@ router.post('/singularity', async (req, res) => {
           max_tokens:  1500,
         }),
       });
-
-      // ── Rate limit → rotate key ──
-      if (completionRes.status === 429) {
-        console.warn(`[singularity] ${provider} request rate-limited (429) — rotating if possible…`);
-        continue;
-      }
 
       // ── Non-2xx → log everything + return JSON (no SSE commitment yet) ──
       if (!completionRes.ok) {
