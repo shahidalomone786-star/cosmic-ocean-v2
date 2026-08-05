@@ -382,14 +382,13 @@ router.post('/singularity', async (req, res) => {
         ]
       : turn.content,
   }));
-  let messages: { role: string; content: unknown }[] = [
+  // Keep Singularity's persona as the first message for every provider/model.
+  // In particular, Qwen vision requests must not bypass the system instruction.
+  const messages: { role: string; content: unknown }[] = [
     { role: 'system',    content: SYSTEM_PROMPT },
     ...historyMessages,
     { role: 'user',      content: userContent },
-  ].filter(m => {
-    if (typeof m.content === 'string') return m.content.trim().length > 0;
-    return Array.isArray(m.content) && m.content.length > 0;
-  });
+  ];
 
   console.log(
     `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
