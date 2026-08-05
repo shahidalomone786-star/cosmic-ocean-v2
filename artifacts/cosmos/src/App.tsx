@@ -672,7 +672,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const playBrowser = useCallback((text: string, idx: number) => {
     window.speechSynthesis?.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate  = 0.92;
+    utt.rate  = 1.05;
     utt.onend   = () => { setIsPlaying(false); setPlayingIdx(null); };
     utt.onerror = () => { setIsPlaying(false); setPlayingIdx(null); };
     window.speechSynthesis.speak(utt);

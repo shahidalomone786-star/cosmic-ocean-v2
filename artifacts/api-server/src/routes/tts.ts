@@ -3,23 +3,29 @@ import { EdgeTTS } from "@andresaya/edge-tts";
 
 const router = Router();
 
-const EDGE_VOICE = "hi-IN-SwaraNeural";
+const EDGE_VOICE = "en-IN-NeerjaNeural";
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
+const EDGE_RATE = "+15%";
 
 function cleanSpeechText(input: string): string {
   return input
-    .replace(/\\\[([\s\S]*?)\\\]/g, " formula ")
-    .replace(/\\\(([\s\S]*?)\\\)/g, " formula ")
-    .replace(/\$\$[\s\S]*?\$\$/g, " formula ")
-    .replace(/\$[^$]*\$/g, " formula ")
+    // Remove equations entirely: reading delimiters or LaTeX commands creates
+    // long, unnatural pauses in neural speech.
+    .replace(/\\\[([\s\S]*?)\\\]/g, " ")
+    .replace(/\\\(([\s\S]*?)\\\)/g, " ")
+    .replace(/\$\$[\s\S]*?\$\$/g, " ")
+    .replace(/\$[^$\n]*\$/g, " ")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]*)`/g, "$1")
-    .replace(/#{1,6}\s/g, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/__(.*?)__/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/_(.*?)_/g, "$1")
-    .replace(/[<>{}[\]\\\\|^~]/g, " ")
+    // Strip Markdown headings, bullets, numbered lists, links, and emphasis.
+    .replace(/^\s*#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*+•]\s+/gm, "")
+    .replace(/^\s*\d+[.)]\s+/gm, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_~]/g, "")
+    // Strip remaining LaTeX commands and structural symbols.
+    .replace(/\\[a-zA-Z]+/g, " ")
+    .replace(/[{}[\]\\|^]/g, " ")
     .replace(/\n{2,}/g, ". ")
     .replace(/\s+/g, " ")
     .trim()
@@ -39,9 +45,9 @@ router.post("/tts", async (req, res) => {
     const edgeTts = new EdgeTTS();
     await edgeTts.synthesize(speechText, EDGE_VOICE, {
       outputFormat: EDGE_OUTPUT_FORMAT,
-      rate: 0,
+      rate: EDGE_RATE,
       volume: 0,
-      pitch: 0,
+      pitch: "+0Hz",
     });
 
     const audio = edgeTts.toBuffer();
