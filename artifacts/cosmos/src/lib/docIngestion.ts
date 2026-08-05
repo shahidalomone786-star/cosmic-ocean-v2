@@ -9,6 +9,13 @@
  *   • RAG:      exportChunks(text, chunkSize) for vector indexing
  */
 
+// ── PDF.js worker setup (Vite local asset — avoids CDN CORS issues) ──────────
+// The '?url' suffix tells Vite to treat the worker as a static asset URL
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
 // ── Supported formats ────────────────────────────────────────────────────────
 
 export const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.csv', '.json', '.pdf'] as const;
@@ -130,7 +137,7 @@ export function formatDocumentBlock(
   return lines.join('\n');
 }
 
-// ── PDF extraction (lazy — only loads pdfjs-dist when a PDF is processed) ────
+// ── PDF extraction ────────────────────────────────────────────────────────────
 
 export interface PdfResult {
   text: string;
@@ -139,19 +146,10 @@ export interface PdfResult {
 
 /**
  * Extracts plain text from a PDF file using pdf.js.
- * Dynamically imports pdfjs-dist so it doesn't bloat the initial bundle.
+ * The worker is resolved locally by Vite — no CDN or network dependency.
  * Never uploads the file; all processing is local in the browser.
  */
 export async function extractPdfText(file: File): Promise<PdfResult> {
-  // Dynamic import — loads only when the user actually drops/selects a PDF
-  const pdfjsLib = await import('pdfjs-dist');
-
-  // Wire up the worker exactly once per page load
-  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-  }
-
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
