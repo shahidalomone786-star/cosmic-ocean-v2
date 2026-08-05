@@ -80,10 +80,14 @@ export function readFileAsText(file: File): Promise<string> {
 /** Normalizes line endings, trims trailing whitespace per line, collapses excess blank lines. */
 export function normalizeText(raw: string): string {
   return raw
+    // Remove null bytes and invalid C0 control characters.
+    // Preserves: \x09 (TAB), \x0A (LF), \x0D (CR).
+    // Preserves all Unicode ≥ \x80 — scientific symbols α β γ ∇ ∫ Σ ∞ etc.
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/[ \t]+$/gm, '')      // strip trailing spaces per line
-    .replace(/\n{4,}/g, '\n\n\n')  // max 3 consecutive blank lines
+    .replace(/[ \t]+$/gm, '')      // strip trailing whitespace per line
+    .replace(/\n{4,}/g, '\n\n\n')  // collapse runs of 4+ blank lines to 3
     .trim();
 }
 

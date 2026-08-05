@@ -1,2 +1,3 @@
 - [Cosmic Intelligence Engine](cosmic-intelligence-engine.md) — external_content UNION feed; source-dispatch cards; INSERT OR IGNORE dedup; SQLite FK off by default enables EC IDs in post_likes/bookmarks
 - [Biology Hub Architecture](biology-hub-architecture.md) — multi-tab sections (Overview/Articles/Papers), LiveResultsFeed shared component, debounced search in BiologyHub, synonym expansion in biology.ts backend
+- [Document workspace verification](document-workspace-verification.md) — keep extracted context hidden from the composer while reusing the attachment for follow-up questions

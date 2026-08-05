@@ -20,6 +20,8 @@ import 'katex/dist/katex.min.css';
 import { WorkspacePanel, useWorkspace } from './WorkspacePanel';
 import { useDocumentIngestion } from '@/hooks/useDocumentIngestion';
 import { DocumentChip } from './DocumentChip';
+import { selectRelevantChunks } from '@/lib/contextSelector';
+import { buildDocumentPrompt } from '@/lib/promptBuilder';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -728,10 +730,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
   }, []);
 
-  // Inject document text into textarea when extraction completes
+  // Refocus textarea once the document chip appears (extraction done)
   useEffect(() => {
     if (!attachedDoc) return;
-    setInput(attachedDoc.block);
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [attachedDoc]);
 
@@ -882,14 +883,23 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const handleSend = useCallback((overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isThinking) return;
+
+    // Build the enriched AI prompt — document context injected here, never in the textarea.
+    // The user's visible message is always the clean, unmodified `text`.
+    let aiPrompt = text;
+    if (attachedDoc && attachedDoc.chunks.length > 0) {
+      const relevantChunks = selectRelevantChunks(text, attachedDoc.chunks);
+      aiPrompt = buildDocumentPrompt(text, relevantChunks, attachedDoc.filename);
+    }
+
     setMessages(prev => [
       ...prev,
       { id: `usr-${Date.now()}`, role: 'user', content: text, ts: Date.now() },
     ]);
     setInput('');
     stickToBottomRef.current = true;
-    generateResponse(text);
-  }, [input, isThinking, generateResponse]);
+    generateResponse(aiPrompt);
+  }, [input, isThinking, generateResponse, attachedDoc]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -1303,7 +1313,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             <AnimatePresence>
               {attachedDoc && (
                 <DocumentChip
-                  meta={attachedDoc.meta}
+                  record={attachedDoc}
+                  isThinking={isThinking}
                   onRemove={clearDocument}
                   onReplace={() => fileInputRef.current?.click()}
                 />

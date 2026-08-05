@@ -2,14 +2,19 @@
  * useDocumentIngestion — React hook wrapping the pure docIngestion utilities.
  *
  * Responsibilities:
- *   • Validates, extracts, normalizes and truncates a dropped/selected file.
- *   • Exposes loading / error / result state to the consumer.
+ *   • Validates, extracts, normalizes, and chunks a dropped/selected file.
+ *   • Builds a DocumentRecord with full lifecycle metadata.
+ *   • Exposes loading / error / record state to the consumer.
  *   • Cleans up correctly on unmount — no memory leaks, no dangling updates.
  *
+ * The extracted text is NEVER returned to the caller for display.
+ * Consumers receive only the DocumentRecord (metadata + chunks).
+ * Prompt construction happens in SingularityChat via promptBuilder.
+ *
  * Future extension points (do NOT implement yet):
- *   • Multiple files   → expose attachedDocs: AttachedDoc[]
- *   • RAG indexing     → call chunkAndIndex(doc) after processFile
- *   • Knowledge WS     → persist attachedDoc to a KnowledgeStore
+ *   • Multiple files   → expose attachedDocs: DocumentRecord[]
+ *   • RAG indexing     → call embedChunks(record) after processFile
+ *   • Persistence      → serialize record to IndexedDB on ready
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -17,31 +22,31 @@ import {
   validateFile,
   readFileAsText,
   normalizeText,
-  limitContext,
-  formatDocumentBlock,
   extractPdfText,
   formatBytes,
-  type DocMeta,
 } from '@/lib/docIngestion';
+import { chunkText } from '@/lib/chunkManager';
+import type { DocumentRecord } from '@/lib/documentStore';
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+// ─── Re-exports ───────────────────────────────────────────────────────────────
 
-export interface AttachedDoc {
-  /** Metadata displayed in the DocumentChip */
-  meta: DocMeta;
-  /** Full formatted block ready to inject into the textarea */
-  block: string;
-}
+export type { DocumentRecord } from '@/lib/documentStore';
+export type { DocStatus }      from '@/lib/documentStore';
+
+// ─── Public API types ─────────────────────────────────────────────────────────
 
 export interface UseDocumentIngestionReturn {
-  /** Call with a File object. Validates, reads, normalises, limits context. */
+  /** Call with a File object. Validates, extracts, normalises, chunks. */
   processFile: (file: File) => Promise<void>;
-  /** True while reading / extracting text — disables the send button. */
+  /** True while reading / extracting — disables the Send button. */
   isProcessing: boolean;
   /** Human-readable error string, or null when clean. */
   error: string | null;
-  /** The currently attached document, or null when none. */
-  attachedDoc: AttachedDoc | null;
+  /**
+   * The currently attached document record, or null when none.
+   * Contains metadata + chunks; never exposes raw extracted text to the UI.
+   */
+  attachedDoc: DocumentRecord | null;
   /** Clears the attached document and any error. */
   clearDocument: () => void;
   /** Clears only the error message. */
@@ -52,8 +57,8 @@ export interface UseDocumentIngestionReturn {
 
 export function useDocumentIngestion(): UseDocumentIngestionReturn {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [attachedDoc, setAttachedDoc] = useState<AttachedDoc | null>(null);
+  const [error, setError]               = useState<string | null>(null);
+  const [attachedDoc, setAttachedDoc]   = useState<DocumentRecord | null>(null);
 
   // Tracks whether the component that owns this hook is still mounted.
   // Prevents state updates after unmount in long-running PDF extractions.
@@ -96,33 +101,35 @@ export function useDocumentIngestion(): UseDocumentIngestionReturn {
       if (isPdf) {
         const result = await extractPdfText(file);
         rawText = result.text;
-        pages = result.pages;
+        pages   = result.pages;
       } else {
         rawText = await readFileAsText(file);
       }
 
       if (!mountedRef.current) return; // unmounted during async work
 
-      // 3. Normalize line endings / whitespace
+      // 3. Normalize — strips control chars, collapses whitespace
+      //    Preserves all valid Unicode including scientific symbols.
       const normalized = normalizeText(rawText);
 
-      // 4. Truncate to context limit
-      const body = limitContext(normalized);
+      // 4. Chunk — split into logical segments for context selection
+      const chunks = chunkText(normalized);
 
-      // 5. Build metadata & formatted block
-      const meta: DocMeta = {
-        name: file.name,
-        sizeBytes: file.size,
-        sizeLabel: formatBytes(file.size),
+      // 5. Build the document record
+      const record: DocumentRecord = {
+        id:                 `doc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        filename:           file.name,
+        sizeBytes:          file.size,
+        sizeLabel:          formatBytes(file.size),
         pages,
-        chars: body.length,
+        extractedText:      normalized,   // stored internally only
+        chunks,
+        extractionTimestamp: Date.now(),
+        status:             'ready',
       };
 
-      const block = formatDocumentBlock(meta, body);
+      if (mountedRef.current) setAttachedDoc(record);
 
-      if (mountedRef.current) {
-        setAttachedDoc({ meta, block });
-      }
     } catch (err) {
       if (!mountedRef.current) return;
       const message =
