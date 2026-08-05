@@ -249,7 +249,7 @@ function sanitiseHistory(history: unknown): HistoryMsg[] {
     )
     .filter(m => typeof (m as any).content === 'string' && (m as any).content.trim().length > 0)
     .map(m => ({ role: (m as any).role as 'user' | 'assistant', content: (m as any).content.trim() }))
-    .slice(-14);
+    .slice(-6);
 }
 
 // ── POST /api/singularity ─────────────────────────────────────────────────────
@@ -311,7 +311,7 @@ router.post('/singularity', async (req, res) => {
           messages,
           stream:      true,
           temperature: 0.6,
-          max_tokens:  2500,
+          max_tokens:  1500,
         }),
       });
 
