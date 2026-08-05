@@ -337,6 +337,8 @@ function ThinkingDots() {
 
 // ─── Chat Modal ───────────────────────────────────────────────────────────────
 // ─── TTS Controls ────────────────────────────────────────────────────────────
+const VOICE_ENGINE_STORAGE_KEY = 'cosmos-voice-engine';
+
 function TtsControls({
   idx, playingIdx, isPlaying, activeEngine, preferEngine,
   onPlay, onSkip, onEngineToggle,
@@ -354,17 +356,34 @@ function TtsControls({
   const showSkip = isActive && activeEngine === 'premium';
   return (
     <div className="ml-10 flex items-center gap-1.5 pt-1 opacity-70">
-      {/* Engine toggle */}
-      <button
-        onClick={onEngineToggle}
-        title={preferEngine === 'premium' ? 'Switch to Standard (browser TTS)' : 'Switch to Premium (ElevenLabs)'}
-        className={`px-2 py-[2px] rounded-full text-[8.5px] uppercase tracking-[0.14em] border transition-all duration-200
-          ${preferEngine === 'premium'
-            ? 'border-violet-400/30 bg-violet-500/10 text-violet-300/90 hover:border-violet-400/50'
-            : 'border-white/[0.12] bg-white/[0.05] text-white/45 hover:text-white/70'}`}
-      >
-        {preferEngine === 'premium' ? '★ PREM' : '◎ STD'}
-      </button>
+      {/* Voice Engine — explicit manual choice */}
+      <div className="flex items-center gap-1 rounded-full border border-white/[0.10] bg-black/20 px-1 py-0.5 backdrop-blur-md">
+        <span className="px-1.5 text-[8px] uppercase tracking-[0.13em] text-white/35">Voice Engine</span>
+        <button
+          onClick={() => { if (preferEngine !== 'premium') onEngineToggle(); }}
+          title="Use ElevenLabs Premium AI voice"
+          aria-pressed={preferEngine === 'premium'}
+          className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
+            preferEngine === 'premium'
+              ? 'bg-violet-500/20 text-violet-200 shadow-[0_0_10px_rgba(139,92,246,0.16)]'
+              : 'text-white/35 hover:text-white/65'
+          }`}
+        >
+          Premium AI
+        </button>
+        <button
+          onClick={() => { if (preferEngine !== 'standard') onEngineToggle(); }}
+          title="Use the native browser voice"
+          aria-pressed={preferEngine === 'standard'}
+          className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
+            preferEngine === 'standard'
+              ? 'bg-white/10 text-white/75'
+              : 'text-white/35 hover:text-white/65'
+          }`}
+        >
+          Standard
+        </button>
+      </div>
       {/* Rewind 5s — premium + active only */}
       {showSkip && (
         <button onClick={() => onSkip(-5)} title="Back 5s"
@@ -566,7 +585,12 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const audioRef      = useRef<HTMLAudioElement>(null);
   const blobUrlRef    = useRef('');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [preferEngine, setPreferEngine] = useState<'premium' | 'standard'>('premium');
+  const [preferEngine, setPreferEngine] = useState<'premium' | 'standard'>(() => {
+    if (typeof window === 'undefined') return 'premium';
+    return window.localStorage.getItem(VOICE_ENGINE_STORAGE_KEY) === 'standard'
+      ? 'standard'
+      : 'premium';
+  });
   const [playingIdx,   setPlayingIdx]   = useState<number | null>(null);
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [activeEngine, setActiveEngine] = useState<'premium' | 'standard'>('premium');
@@ -579,6 +603,10 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   // Set of message indices currently in typewriter animation
   const [typingSet, setTypingSet] = useState<Set<number>>(() => new Set());
   const [showDashboard, setShowDashboard] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(VOICE_ENGINE_STORAGE_KEY, preferEngine);
+  }, [preferEngine]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -915,7 +943,10 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
                   preferEngine={preferEngine}
                   onPlay={() => { void playTTS(msg.text, idx); }}
                   onSkip={skipTime}
-                  onEngineToggle={() => setPreferEngine(e => e === 'premium' ? 'standard' : 'premium')}
+                   onEngineToggle={() => {
+                     stopAll();
+                     setPreferEngine(e => e === 'premium' ? 'standard' : 'premium');
+                   }}
                 />
               </div>
             )

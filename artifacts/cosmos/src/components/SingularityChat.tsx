@@ -297,7 +297,16 @@ const ShareButton = memo(function ShareButton({ text }: { text: string }) {
 });
 
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
-const ListenButton = memo(function ListenButton({ text }: { text: string }) {
+type VoiceEngine = 'premium' | 'standard';
+const VOICE_ENGINE_STORAGE_KEY = 'cosmos-voice-engine';
+
+const ListenButton = memo(function ListenButton({
+  text,
+  engine,
+}: {
+  text: string;
+  engine: VoiceEngine;
+}) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
   const audioRef       = useRef<HTMLAudioElement | null>(null);
   const abortRef       = useRef<AbortController | null>(null);
@@ -328,6 +337,13 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
 
     try {
       const clean = cleanTtsText(text);
+
+      if (engine === 'standard') {
+        setState('playing');
+        await speakWithBrowser(clean);
+        setState('idle');
+        return;
+      }
 
       let url = audioCacheRef.current.get(clean);
       if (!url) {
@@ -376,7 +392,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         setState('idle');
       }
     }
-  }, [text, state, stop]);
+  }, [engine, text, state, stop]);
 
   useEffect(() => () => {
     stop();
@@ -622,6 +638,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [attachOpen, setAttachOpen]     = useState(false);
   const [attachToast, setAttachToast]   = useState('');
   const [isDragOver, setIsDragOver]     = useState(false);
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
+    if (typeof window === 'undefined') return 'premium';
+    return window.localStorage.getItem(VOICE_ENGINE_STORAGE_KEY) === 'standard'
+      ? 'standard'
+      : 'premium';
+  });
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -644,6 +666,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const stickToBottomRef = useRef(true);
 
   const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    window.localStorage.setItem(VOICE_ENGINE_STORAGE_KEY, voiceEngine);
+  }, [voiceEngine]);
 
   // Autofocus on open
   useEffect(() => { textareaRef.current?.focus(); }, []);
@@ -1018,6 +1044,35 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
           {/* Right side: status + workspace + close */}
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-full border border-white/[0.10] bg-black/20 px-1 py-0.5 backdrop-blur-md">
+              <span className="hidden md:inline px-1.5 text-[8px] uppercase tracking-[0.13em] text-white/35">
+                Voice Engine
+              </span>
+              <button
+                onClick={() => setVoiceEngine('premium')}
+                title="Use ElevenLabs Premium AI voice"
+                aria-pressed={voiceEngine === 'premium'}
+                className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
+                  voiceEngine === 'premium'
+                    ? 'bg-violet-500/20 text-violet-200 shadow-[0_0_10px_rgba(139,92,246,0.16)]'
+                    : 'text-white/35 hover:text-white/65'
+                }`}
+              >
+                Premium AI
+              </button>
+              <button
+                onClick={() => setVoiceEngine('standard')}
+                title="Use the native browser voice"
+                aria-pressed={voiceEngine === 'standard'}
+                className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
+                  voiceEngine === 'standard'
+                    ? 'bg-white/10 text-white/75'
+                    : 'text-white/35 hover:text-white/65'
+                }`}
+              >
+                Standard
+              </button>
+            </div>
             <StatusPill phase={isThinking ? 'thinking' : isStreaming ? 'streaming' : 'idle'} />
 
             {/* Research Workspace toggle */}
@@ -1180,7 +1235,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                             className="flex items-center gap-0.5 flex-wrap"
                           >
-                            <ListenButton text={msg.content} />
+                            <ListenButton text={msg.content} engine={voiceEngine} />
                             <CopyButton text={msg.content} />
                             <ShareButton text={msg.content} />
                             <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
@@ -1226,7 +1281,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                             transition={{ duration: 0.22, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
                             className="flex items-center gap-0.5 mt-1"
                           >
-                            <ListenButton text={msg.content} />
+                             <ListenButton text={msg.content} engine={voiceEngine} />
                           </motion.div>
                         )}
                       </>

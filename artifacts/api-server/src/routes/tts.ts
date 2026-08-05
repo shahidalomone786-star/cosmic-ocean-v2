@@ -31,30 +31,15 @@ const getElevenLabsKeys = (): string[] => {
 // and wraps around for the next request.
 let elKeyIndex = 0;
 
-// ── Avatar → ElevenLabs voice ID ──────────────────────────────────────────────
-// Mapped to real voices available on this account:
-//   Einstein  → Bill    (Wise, Mature, Balanced — old American male)
-//   Feynman   → Charlie (Deep, Confident, Energetic — Australian male)
-//   Sagan     → Daniel  (Steady Broadcaster — formal British male)
-//   Tesla     → Brian   (Deep, Resonant and Comforting — American male)
-const AVATAR_VOICES: Record<string, string> = {
-  "Albert Einstein": "pqHfZKP75CvOlQylNhV4",  // Bill    — wise, old
-  "Richard Feynman": "IKne3meq5aSn9XLyUdCD",  // Charlie — energetic
-  "Carl Sagan":      "onwK4e9ZLuTAKqWW03F9",  // Daniel  — broadcaster
-  "Nikola Tesla":    "nPczCjzI2devNBz1zQrb",  // Brian   — deep, resonant
-  "Mahera Jannat":   "EXAVITQu4vr4xnSDxMaL",  // Bella   — warm female
-};
-// Configurable via ELEVENLABS_DEFAULT_VOICE env var; falls back to Rachel
-// (21m00Tcm4TlvDq8ikWAM) — premium natural female voice used by Singularity Chat.
-const FALLBACK_VOICE =
-  process.env.ELEVENLABS_DEFAULT_VOICE?.trim() || "21m00Tcm4TlvDq8ikWAM";
+// Rachel — calm, natural female voice compatible with ElevenLabs free-tier
+// accounts. Keep this server-side so the client never needs voice/provider
+// configuration and cannot select a premium-only library voice accidentally.
+const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
 
 // ── POST /api/tts ──────────────────────────────────────────────────────────────
 router.post("/tts", async (req, res) => {
-  const { text, avatarName, voiceId: voiceIdOverride } = req.body as {
+  const { text } = req.body as {
     text?: string;
-    avatarName?: string;
-    voiceId?: string; // optional direct override — used by SingularityChat (Rachel voice)
   };
 
   if (!text?.trim()) {
@@ -68,8 +53,7 @@ router.post("/tts", async (req, res) => {
     return;
   }
 
-  // voiceIdOverride wins (used by SingularityChat / Rachel); otherwise map by avatar name
-  const voiceId  = voiceIdOverride?.trim() || AVATAR_VOICES[avatarName ?? ""] || FALLBACK_VOICE;
+  const voiceId  = DEFAULT_VOICE;
   const safeText = text.slice(0, 2500);
   const elUrl    = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
