@@ -22,12 +22,14 @@ import { useDocumentIngestion } from '@/hooks/useDocumentIngestion';
 import { DocumentChip } from './DocumentChip';
 import { selectRelevantChunks } from '@/lib/contextSelector';
 import { buildDocumentPrompt } from '@/lib/promptBuilder';
+import type { DocumentRecord } from '@/lib/documentStore';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachedDocument?: DocumentRecord | null;
   reasoning?: string;
   reasoningSeconds?: number;
   error?: boolean;
@@ -884,22 +886,38 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     const text = (overrideText ?? input).trim();
     if (!text || isThinking) return;
 
+    // The current attachment belongs to this user turn. Once it is moved into
+    // the message, the composer can reset without losing document context.
+    const latestDocument =
+      attachedDoc ??
+      [...messages]
+        .reverse()
+        .find(message => message.attachedDocument)?.attachedDocument ??
+      null;
+
     // Build the enriched AI prompt — document context injected here, never in the textarea.
     // The user's visible message is always the clean, unmodified `text`.
     let aiPrompt = text;
-    if (attachedDoc && attachedDoc.chunks.length > 0) {
-      const relevantChunks = selectRelevantChunks(text, attachedDoc.chunks);
-      aiPrompt = buildDocumentPrompt(text, relevantChunks, attachedDoc.filename);
+    if (latestDocument && latestDocument.chunks.length > 0) {
+      const relevantChunks = selectRelevantChunks(text, latestDocument.chunks);
+      aiPrompt = buildDocumentPrompt(text, relevantChunks, latestDocument.filename);
     }
 
     setMessages(prev => [
       ...prev,
-      { id: `usr-${Date.now()}`, role: 'user', content: text, ts: Date.now() },
+      {
+        id: `usr-${Date.now()}`,
+        role: 'user',
+        content: text,
+        attachedDocument: attachedDoc,
+        ts: Date.now(),
+      },
     ]);
     setInput('');
+    clearDocument();
     stickToBottomRef.current = true;
     generateResponse(aiPrompt);
-  }, [input, isThinking, generateResponse, attachedDoc]);
+  }, [input, isThinking, generateResponse, attachedDoc, messages, clearDocument]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -1085,6 +1103,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                         rounded-2xl rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto
                         text-[13.5px] leading-[1.72] font-[450]
                         shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
+                        {msg.attachedDocument && (
+                          <DocumentChip
+                            record={msg.attachedDocument}
+                            isThinking={false}
+                            readOnly
+                          />
+                        )}
                         {msg.content}
                       </div>
                     )}
