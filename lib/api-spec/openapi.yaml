@@ -46,6 +46,57 @@ paths:
             type: integer
             minimum: 1
             default: 1
+        - name: author
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: title
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: yearFrom
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1000
+            maximum: 9999
+        - name: yearTo
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1000
+            maximum: 9999
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [article, paper, research]
+        - name: openAccess
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [relevance, date, cited]
       responses:
         "200":
           description: Biology search results
@@ -91,7 +142,7 @@ components:
           description: Official image URL when the provider supplies one.
         source:
           type: string
-          enum: [wikipedia, nih, ncbi, pubmed, medlineplus, openalex, semanticscholar]
+          enum: [wikipedia, wikidata, pubmed, europepmc, openalex]
         kind:
           type: string
           enum: [article, research]
@@ -105,7 +156,9 @@ components:
           type: ["integer", "null"]
         openAccess:
           type: ["boolean", "null"]
-      required: [id, title, description, url, imageUrl, source, kind, date, authors, citationCount, openAccess]
+        language:
+          type: ["string", "null"]
+      required: [id, title, description, url, imageUrl, source, kind, date, authors, citationCount, openAccess, language]
     BiologySourceStatus:
       type: object
       properties:

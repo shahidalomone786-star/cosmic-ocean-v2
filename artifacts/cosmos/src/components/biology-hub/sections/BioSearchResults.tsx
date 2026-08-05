@@ -7,6 +7,12 @@ import {
 } from 'lucide-react';
 import { useBiologySearch, getBiologySearchQueryKey } from '@workspace/api-client-react';
 import type { BiologySearchItem } from '@workspace/api-client-react';
+import {
+  DEFAULT_ADVANCED_FILTERS,
+  mergeAdvancedFilters,
+  parseAdvancedQuery,
+  type AdvancedSearchFilters,
+} from '../../../lib/advancedSearch';
 
 // ─── Global Biology Search Results ───────────────────────────────────────────
 // Shown when the user has typed ≥ 2 chars in the Biology Hub search bar.
@@ -14,6 +20,7 @@ import type { BiologySearchItem } from '@workspace/api-client-react';
 interface BioSearchResultsProps {
   lm: boolean;
   searchQuery: string;
+  advancedFilters?: AdvancedSearchFilters;
   onClearSearch?: () => void;
 }
 
@@ -209,7 +216,12 @@ function ResultCardImage({ src, alt }: { src: string; alt: string }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BioSearchResults({ lm, searchQuery, onClearSearch }: BioSearchResultsProps) {
+export default function BioSearchResults({
+  lm,
+  searchQuery,
+  advancedFilters = DEFAULT_ADVANCED_FILTERS,
+  onClearSearch,
+}: BioSearchResultsProps) {
   const [filter, setFilter] = useState<FilterMode>('all');
   const [sort, setSort]   = useState<SortMode>('relevant');
   const [showSort, setShowSort] = useState(false);
@@ -217,11 +229,27 @@ export default function BioSearchResults({ lm, searchQuery, onClearSearch }: Bio
   const [allItems, setAllItems] = useState<BiologySearchItem[]>([]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const q = searchQuery.trim();
+  const parsedQuery = useMemo(() => parseAdvancedQuery(q), [q]);
+  const effectiveFilters = useMemo(
+    () => mergeAdvancedFilters(parsedQuery.filters, advancedFilters),
+    [advancedFilters, parsedQuery.filters],
+  );
 
-  const queryParams = { q, page };
+  const queryParams = {
+    q: parsedQuery.text || q,
+    page,
+    ...(effectiveFilters.author ? { author: effectiveFilters.author } : {}),
+    ...(effectiveFilters.title ? { title: effectiveFilters.title } : {}),
+    ...(effectiveFilters.yearFrom ? { yearFrom: Number(effectiveFilters.yearFrom) } : {}),
+    ...(effectiveFilters.yearTo ? { yearTo: Number(effectiveFilters.yearTo) } : {}),
+    ...(effectiveFilters.source ? { source: effectiveFilters.source } : {}),
+    ...(effectiveFilters.type ? { type: effectiveFilters.type } : {}),
+    ...(effectiveFilters.openAccess ? { openAccess: true } : {}),
+    ...(effectiveFilters.language ? { language: effectiveFilters.language } : {}),
+  } as const;
   const { data, isLoading, isError, isFetching } = useBiologySearch(
     queryParams,
-    { query: { enabled: q.length >= 2, staleTime: 3 * 60 * 1000, queryKey: getBiologySearchQueryKey(queryParams) } }
+    { query: { enabled: queryParams.q.length >= 2, staleTime: 3 * 60 * 1000, queryKey: getBiologySearchQueryKey(queryParams) } }
   );
 
   // Accumulate items across pages
@@ -238,7 +266,12 @@ export default function BioSearchResults({ lm, searchQuery, onClearSearch }: Bio
   }, [data, page]);
 
   // Reset when query or filter changes
-  useEffect(() => { setPage(1); setAllItems([]); setFilter('all'); setSort('relevant'); }, [q]);
+  useEffect(() => {
+    setPage(1);
+    setAllItems([]);
+    setFilter('all');
+    setSort('relevant');
+  }, [q, advancedFilters]);
 
   // Apply filter
   const filtered = allItems.filter((i: BiologySearchItem) => {

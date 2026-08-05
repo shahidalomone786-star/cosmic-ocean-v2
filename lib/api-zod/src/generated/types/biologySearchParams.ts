@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BiologySearchSort } from './biologySearchSort';
+import type { BiologySearchType } from './biologySearchType';
 
 export type BiologySearchParams = {
 /**
@@ -15,4 +17,21 @@ q: string;
  * @minimum 1
  */
 page?: number;
+author?: string;
+title?: string;
+/**
+ * @minimum 1000
+ * @maximum 9999
+ */
+yearFrom?: number;
+/**
+ * @minimum 1000
+ * @maximum 9999
+ */
+yearTo?: number;
+source?: string;
+type?: BiologySearchType;
+openAccess?: boolean;
+language?: string;
+sort?: BiologySearchSort;
 };

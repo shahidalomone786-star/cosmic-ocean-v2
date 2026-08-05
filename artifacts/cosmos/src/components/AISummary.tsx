@@ -106,11 +106,43 @@ const CHIP_SM = `bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] ro
                 disabled:opacity-40 disabled:cursor-not-allowed`;
 
 // ─── TTS helper ───────────────────────────────────────────────────────────────
+function cleanTtsText(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
+    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
+    .replace(/\$[^$]*\$/g, ' formula ')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim()
+    .slice(0, 2500);
+}
+
+function speakWithBrowser(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!('speechSynthesis' in window)) {
+      reject(new Error('Browser speech is unavailable'));
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
+    utterance.rate = 0.92;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => reject(new Error('Browser speech failed'));
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 async function playTTS(text: string): Promise<void> {
   const res = await fetch('/api/tts', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ text: text.slice(0, 2500) }),
+    body:    JSON.stringify({ text: cleanTtsText(text) }),
   });
   if (!res.ok) throw new Error(`TTS ${res.status}`);
   const blob = await res.blob();
@@ -149,12 +181,21 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
       setState('idle');
     } catch (e: unknown) {
       if ((e as Error)?.name === 'AbortError') { setState('idle'); return; }
-      setState('error');
-      setTimeout(() => setState('idle'), 3000);
+      try {
+        setState('playing');
+        await speakWithBrowser(text);
+        setState('idle');
+      } catch {
+        setState('error');
+        setTimeout(() => setState('idle'), 3000);
+      }
     }
   }, [state, text]);
 
-  useEffect(() => () => { abortRef.current?.abort(); }, []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    window.speechSynthesis?.cancel();
+  }, []);
 
   const cls = small ? CHIP_SM : CHIP;
 

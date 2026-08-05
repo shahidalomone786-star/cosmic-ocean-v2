@@ -25,11 +25,26 @@ export const biologySearchQueryQMin = 2;
 
 export const biologySearchQueryPageDefault = 1;
 
+export const biologySearchQueryYearFromMin = 1000;
+export const biologySearchQueryYearFromMax = 9999;
+
+export const biologySearchQueryYearToMin = 1000;
+export const biologySearchQueryYearToMax = 9999;
+
 
 
 export const BiologySearchQueryParams = zod.object({
   "q": zod.coerce.string().min(biologySearchQueryQMin),
-  "page": zod.coerce.number().min(1).default(biologySearchQueryPageDefault)
+  "page": zod.coerce.number().min(1).default(biologySearchQueryPageDefault),
+  "author": zod.coerce.string().optional(),
+  "title": zod.coerce.string().optional(),
+  "yearFrom": zod.coerce.number().min(biologySearchQueryYearFromMin).max(biologySearchQueryYearFromMax).optional(),
+  "yearTo": zod.coerce.number().min(biologySearchQueryYearToMin).max(biologySearchQueryYearToMax).optional(),
+  "source": zod.coerce.string().optional(),
+  "type": zod.enum(['article', 'paper', 'research']).optional(),
+  "openAccess": zod.coerce.boolean().optional(),
+  "language": zod.coerce.string().optional(),
+  "sort": zod.enum(['relevance', 'date', 'cited']).optional()
 })
 
 export const BiologySearchResponse = zod.object({
@@ -41,12 +56,13 @@ export const BiologySearchResponse = zod.object({
   "description": zod.string(),
   "url": zod.string(),
   "imageUrl": zod.string().nullable().describe('Official image URL when the provider supplies one.'),
-  "source": zod.enum(['wikipedia', 'nih', 'ncbi', 'pubmed', 'medlineplus', 'openalex', 'semanticscholar']),
+  "source": zod.enum(['wikipedia', 'wikidata', 'pubmed', 'europepmc', 'openalex']),
   "kind": zod.enum(['article', 'research']),
   "date": zod.string().nullable(),
   "authors": zod.array(zod.string()),
   "citationCount": zod.number().nullable(),
-  "openAccess": zod.boolean().nullable()
+  "openAccess": zod.boolean().nullable(),
+  "language": zod.string().nullable()
 })),
   "sourceStatus": zod.array(zod.object({
   "source": zod.string(),

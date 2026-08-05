@@ -11,6 +11,8 @@ export * from './biologySearchItemKind';
 export * from './biologySearchItemSource';
 export * from './biologySearchParams';
 export * from './biologySearchPayload';
+export * from './biologySearchSort';
+export * from './biologySearchType';
 export * from './biologySourceStatus';
 export * from './biologySourceStatusStatus';
 export * from './errorResponse';

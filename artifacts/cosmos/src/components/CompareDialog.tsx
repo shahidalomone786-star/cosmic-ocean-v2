@@ -26,6 +26,45 @@ import 'katex/dist/katex.min.css';
 import type { SectionItem } from './NasaSearch';
 import { getYear, getSourceName, getAuthors } from '../utils/citationFormatters';
 
+const formatMath = (text: string) => {
+  if (!text) return text;
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+};
+
+function cleanTtsText(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
+    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
+    .replace(/\$[^$]*\$/g, ' formula ')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim()
+    .slice(0, 2500);
+}
+
+function speakWithBrowser(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!('speechSynthesis' in window)) {
+      reject(new Error('Browser speech is unavailable'));
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
+    utterance.rate = 0.92;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => reject(new Error('Browser speech failed'));
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -150,6 +189,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
+    window.speechSynthesis?.cancel();
     if (audioRef.current) {
       // Explicitly remove listeners before detaching — prevents ghost callbacks
       // from a still-active Audio node after we null the ref
@@ -173,18 +213,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
 
     try {
       // Strip markdown / LaTeX for cleaner speech (mirrors SingularityChat)
-      const clean = text
-        .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-        .replace(/\$[^$]*\$/g, ' formula ')
-        .replace(/```[\s\S]*?```/g, '')
-        .replace(/`[^`]*`/g, '')
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/\n{2,}/g, '. ')
-        .replace(/\n/g, ' ')
-        .trim()
-        .slice(0, 2500);
+      const clean = cleanTtsText(text);
 
       // Cache hit — reuse the existing blob URL (saves an ElevenLabs API call)
       let url = audioCacheRef.current.get(clean);
@@ -230,7 +259,13 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
       await audio.play();
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      setTtsState('idle');
+      try {
+        setTtsState('playing');
+        await speakWithBrowser(text);
+        setTtsState('idle');
+      } catch {
+        setTtsState('idle');
+      }
     }
   }, [text, ttsState, stop]);
 
@@ -590,7 +625,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
               <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full ${
                 lm ? 'text-gray-800' : 'text-white/88'
               }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{contentRaw}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatMath(contentRaw)}</ReactMarkdown>
               </div>
             )}
           </div>
@@ -617,7 +652,7 @@ const AIAnalysisSection = memo(function AIAnalysisSection({ items, open, lm }: A
               <div className={`text-[12px] leading-relaxed overflow-x-auto overflow-y-hidden max-w-full pl-1 ${
                 lm ? 'text-gray-800' : 'text-white/88'
               }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{fu.answer}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatMath(fu.answer)}</ReactMarkdown>
               </div>
             ) : followGenerating && (
               <div className="flex gap-1 pl-3 pt-1">

@@ -80,6 +80,16 @@ router.post("/tts", async (req, res) => {
         continue;
       }
 
+      if (elRes.status === 402) {
+        const body = await elRes.text();
+        res.status(503).json({
+          code: "PREMIUM_PLAN_REQUIRED",
+          error: "ElevenLabs requires a paid plan for the configured voice.",
+          detail: body.slice(0, 300),
+        });
+        return;
+      }
+
       if (!elRes.ok) {
         const body = await elRes.text();
         res.status(502).json({ error: `ElevenLabs ${elRes.status}: ${body.slice(0, 300)}` });

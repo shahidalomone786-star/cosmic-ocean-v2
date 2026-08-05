@@ -11,10 +11,8 @@ export type BiologySearchItemSource = typeof BiologySearchItemSource[keyof typeo
 
 export const BiologySearchItemSource = {
   wikipedia: 'wikipedia',
-  nih: 'nih',
-  ncbi: 'ncbi',
+  wikidata: 'wikidata',
   pubmed: 'pubmed',
-  medlineplus: 'medlineplus',
+  europepmc: 'europepmc',
   openalex: 'openalex',
-  semanticscholar: 'semanticscholar',
 } as const;

@@ -36,6 +36,23 @@ const cosmicScenes = [
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
 
+function cleanTtsText(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
+    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
+    .replace(/\$[^$]*\$/g, ' formula ')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim()
+    .slice(0, 2500);
+}
+
 const TYPEWRITER_PHRASES = [
   'Search the cosmos…',
   'Search Quantum Mechanics…',
@@ -724,6 +741,8 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         if (data.code === 'TOTAL_QUOTA_EXHAUSTED') {
           setQuotaExhausted(true);
           showToast('Premium quota exhausted — switching to Standard Voice.');
+        } else if (data.code === 'PREMIUM_PLAN_REQUIRED') {
+          showToast('Premium Voice requires an ElevenLabs paid plan — using Standard Voice.');
         } else {
           showToast('Premium TTS unavailable. Using Standard Voice.');
         }
@@ -750,6 +769,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   }, [avatar.name, showToast, playStandard, addVoiceChars]);
 
   const playTTS = useCallback(async (text: string, idx: number) => {
+    const spokenText = cleanTtsText(text);
     // Toggle pause on the active message
     if (playingIdx === idx && isPlaying) {
       if (activeEngine === 'premium' && audioRef.current) { audioRef.current.pause(); }
@@ -767,8 +787,8 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
     // New message — stop everything and start fresh
     stopAll();
-    if (preferEngine === 'premium' && !quotaExhausted) { await playPremium(text, idx); }
-    else { playStandard(text, idx); }
+    if (preferEngine === 'premium' && !quotaExhausted) { await playPremium(spokenText, idx); }
+    else { playStandard(spokenText, idx); }
   }, [playingIdx, isPlaying, activeEngine, preferEngine, quotaExhausted, stopAll, playPremium, playStandard]);
 
   const skipTime = useCallback((delta: number) => {

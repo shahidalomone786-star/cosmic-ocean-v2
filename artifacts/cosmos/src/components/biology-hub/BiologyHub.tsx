@@ -9,6 +9,16 @@ import BioHeader from './BioHeader';
 import BioSidebar from './BioSidebar';
 import BioMainContent from './BioMainContent';
 import { BIO_NAV_ITEMS, type BioSectionId } from './types';
+import {
+  DEFAULT_ADVANCED_FILTERS,
+  loadSearchHistory,
+  loadSavedSearches,
+  saveSearchHistory,
+  saveSavedSearches,
+  type AdvancedSearchFilters,
+  type SavedSearch,
+  type SearchHistoryEntry,
+} from '../../lib/advancedSearch';
 
 // ─── Biology Hub — Full-Screen Page ───────────────────────────────────────────
 
@@ -146,7 +156,9 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
   // Debounced value (used to trigger API calls — lags behind by DEBOUNCE_MS)
   const [debouncedQuery, setDebouncedQuery] = useState('');
   // Recent searches list
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>(() => loadSearchHistory());
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(() => loadSavedSearches());
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>(DEFAULT_ADVANCED_FILTERS);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -165,12 +177,23 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
   useEffect(() => {
     const q = debouncedQuery.trim();
     if (q.length >= 3) {
-      setRecentSearches((prev) => {
-        const deduped = [q, ...prev.filter((r) => r.toLowerCase() !== q.toLowerCase())];
-        return deduped.slice(0, MAX_RECENT);
+      setSearchHistory((prev) => {
+        const existing = prev.find((entry) => entry.query.toLowerCase() === q.toLowerCase());
+        const next: SearchHistoryEntry[] = [{
+          id: existing?.id ?? `${Date.now()}-${q}`,
+          query: q,
+          filters: { ...DEFAULT_ADVANCED_FILTERS, ...advancedFilters },
+          timestamp: Date.now(),
+          pinned: existing?.pinned ?? false,
+        }, ...prev.filter((entry) => entry.query.toLowerCase() !== q.toLowerCase())];
+        const limited = next
+          .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.timestamp - a.timestamp)
+          .slice(0, MAX_RECENT * 2);
+        saveSearchHistory(limited);
+        return limited;
       });
     }
-  }, [debouncedQuery]);
+  }, [debouncedQuery, advancedFilters]);
 
   const handleSearchChange = useCallback((q: string) => {
     setInputQuery(q);
@@ -179,6 +202,51 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
   const handleSearchSelect = useCallback((q: string) => {
     setInputQuery(q);
     setDebouncedQuery(q);
+  }, []);
+
+  const handleHistorySelect = useCallback((entry: SearchHistoryEntry) => {
+    setAdvancedFilters({ ...DEFAULT_ADVANCED_FILTERS, ...entry.filters });
+    setInputQuery(entry.query);
+    setDebouncedQuery(entry.query);
+  }, []);
+
+  const handleHistoryPin = useCallback((id: string) => {
+    setSearchHistory((prev) => {
+      const next = prev.map((entry) => entry.id === id ? { ...entry, pinned: !entry.pinned } : entry);
+      saveSearchHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleHistoryDelete = useCallback((id: string) => {
+    setSearchHistory((prev) => {
+      const next = prev.filter((entry) => entry.id !== id);
+      saveSearchHistory(next);
+      return next;
+    });
+  }, []);
+
+  const handleSaveSearch = useCallback(() => {
+    const query = inputQuery.trim();
+    if (!query) return;
+    setSavedSearches((prev) => {
+      const next: SavedSearch[] = [{
+        id: `${Date.now()}-${query}`,
+        query,
+        filters: { ...DEFAULT_ADVANCED_FILTERS, ...advancedFilters },
+        timestamp: Date.now(),
+      }, ...prev.filter((entry) => entry.query.toLowerCase() !== query.toLowerCase())].slice(0, 20);
+      saveSavedSearches(next);
+      return next;
+    });
+  }, [advancedFilters, inputQuery]);
+
+  const handleDeleteSavedSearch = useCallback((id: string) => {
+    setSavedSearches((prev) => {
+      const next = prev.filter((entry) => entry.id !== id);
+      saveSavedSearches(next);
+      return next;
+    });
   }, []);
 
   const handleSelect = useCallback((id: BioSectionId) => {
@@ -233,8 +301,17 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
         searchQuery={inputQuery}
         onSearchChange={handleSearchChange}
         onSearchSelect={handleSearchSelect}
-        recentSearches={recentSearches}
+        recentSearches={searchHistory}
         suggestedSearches={SUGGESTED_SEARCHES}
+        advancedFilters={advancedFilters}
+        onAdvancedFiltersChange={setAdvancedFilters}
+        onHistorySelect={handleHistorySelect}
+        onHistoryPin={handleHistoryPin}
+        onHistoryDelete={handleHistoryDelete}
+        savedSearches={savedSearches}
+        onSaveSearch={handleSaveSearch}
+        onSavedSearchSelect={handleHistorySelect}
+        onSavedSearchDelete={handleDeleteSavedSearch}
       />
 
       {/* ── Mobile horizontal scroll nav (hidden sm+) ── */}
@@ -260,6 +337,7 @@ const BiologyHub = memo(({ lm, onToggleLm, onClose }: BiologyHubProps) => {
           lm={lm}
           activeSection={activeSection}
           searchQuery={debouncedQuery}
+          advancedFilters={advancedFilters}
           onClearSearch={() => { setInputQuery(''); setDebouncedQuery(''); }}
         />
       </div>

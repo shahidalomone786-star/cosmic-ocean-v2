@@ -27,4 +27,6 @@ export interface BiologySearchItem {
   citationCount: number | null;
   /** @nullable */
   openAccess: boolean | null;
+  /** @nullable */
+  language: string | null;
 }

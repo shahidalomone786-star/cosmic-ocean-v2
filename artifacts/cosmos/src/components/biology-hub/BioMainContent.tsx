@@ -19,6 +19,7 @@ const BioSearchResults  = lazy(() => import('./sections/BioSearchResults'));
 // Small/always-needed sections kept as static imports
 import VideosSection from './sections/VideosSection';
 import { useBiologySearch, getBiologySearchQueryKey } from '@workspace/api-client-react';
+import type { AdvancedSearchFilters } from '../../lib/advancedSearch';
 import type { BiologySearchItem } from '@workspace/api-client-react';
 
 // ─── Biology Hub — Main Content Area ─────────────────────────────────────────
@@ -27,6 +28,7 @@ interface BioMainContentProps {
   lm: boolean;
   activeSection: BioSectionId;
   searchQuery: string;
+  advancedFilters?: AdvancedSearchFilters;
   onClearSearch?: () => void;
 }
 
@@ -601,13 +603,13 @@ const TOPIC_SECTION_IDS: BioSectionId[] = [
 
 // ─── Main switcher ────────────────────────────────────────────────────────────
 
-const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: BioMainContentProps) => {
+const BioMainContent = memo(({ lm, activeSection, searchQuery, advancedFilters, onClearSearch }: BioMainContentProps) => {
   // useMemo so the section JSX is only recomputed when the relevant inputs change,
   // not on every parent re-render that passes the same props through.
   const sectionNode = useMemo(() => {
     // ── Global search results (≥ 2 chars) ──
     if (searchQuery.trim().length >= 2) {
-      return <BioSearchResults lm={lm} searchQuery={searchQuery} onClearSearch={onClearSearch} />;
+       return <BioSearchResults lm={lm} searchQuery={searchQuery} advancedFilters={advancedFilters} onClearSearch={onClearSearch} />;
     }
 
     switch (activeSection) {
@@ -626,7 +628,7 @@ const BioMainContent = memo(({ lm, activeSection, searchQuery, onClearSearch }: 
         }
         return <OverviewSection lm={lm} />;
     }
-  }, [lm, activeSection, searchQuery, onClearSearch]);
+  }, [lm, activeSection, searchQuery, advancedFilters, onClearSearch]);
 
   return (
     <motion.main

@@ -61,6 +61,45 @@ const INITIAL_MESSAGE: Message = {
   ts: Date.now(),
 };
 
+const formatMath = (text: string) => {
+  if (!text) return text;
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+};
+
+function cleanTtsText(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
+    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
+    .replace(/\$[^$]*\$/g, ' formula ')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim()
+    .slice(0, 2500);
+}
+
+function speakWithBrowser(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!('speechSynthesis' in window)) {
+      reject(new Error('Browser speech is unavailable'));
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
+    utterance.rate = 0.92;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => reject(new Error('Browser speech failed'));
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 // ─── Markdown renderer ──────────────────────────────────────────────────────
 const markdownComponents = {
   // ── Block elements ─────────────────────────────────────────────────────────
@@ -161,7 +200,7 @@ const MessageContent = memo(function MessageContent({ content }: { content: stri
         rehypePlugins={[rehypeKatex]}
         components={markdownComponents}
       >
-        {content}
+        {formatMath(content)}
       </ReactMarkdown>
     </div>
   );
@@ -274,6 +313,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
+    window.speechSynthesis?.cancel();
     if (failTimerRef.current) { clearTimeout(failTimerRef.current); failTimerRef.current = null; }
     if (audioRef.current) {
       if (listenersRef.current) {
@@ -296,18 +336,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
     abortRef.current = new AbortController();
 
     try {
-      const clean = text
-        .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-        .replace(/\$[^$]*\$/g, ' formula ')
-        .replace(/```[\s\S]*?```/g, '')
-        .replace(/`[^`]*`/g, '')
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/\n{2,}/g, '. ')
-        .replace(/\n/g, ' ')
-        .trim()
-        .slice(0, 2500);
+      const clean = cleanTtsText(text);
 
       let url = audioCacheRef.current.get(clean);
       if (!url) {
@@ -348,7 +377,13 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
       await audio.play();
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      setFailed();
+      try {
+        setState('playing');
+        await speakWithBrowser(text);
+        setState('idle');
+      } catch {
+        setFailed();
+      }
     }
   }, [text, state, stop, setFailed]);
 

@@ -169,6 +169,7 @@ type BioItem = {
   authors: string[];
   citationCount: number | null;
   openAccess: boolean | null;
+  language: string | null;
 };
 
 type SourceStatus = {
@@ -238,6 +239,7 @@ async function fetchWikipedia(
     authors: ["Wikipedia Contributors"],
     citationCount: null,
     openAccess: true,
+    language: "en",
   }));
 
   return { items };
@@ -279,6 +281,7 @@ async function fetchWikidata(q: string): Promise<{ items: BioItem[] }> {
     authors: ["Wikidata Contributors"],
     citationCount: null,
     openAccess: true,
+    language: "en",
   }));
 
   return { items };
@@ -388,6 +391,7 @@ async function fetchPubMed(
             ? s.pmcrefcount
             : null,
         openAccess: null,
+        language: "en",
       };
     });
 
@@ -492,6 +496,7 @@ async function fetchEuropePMC(
             ? r.citedByCount
             : null,
         openAccess: r.isOpenAccess === "Y",
+        language: "en",
       };
     });
 
@@ -578,6 +583,7 @@ async function fetchOpenAlex(
           .map((a) => a.author?.display_name ?? "Unknown"),
         citationCount: w.cited_by_count ?? null,
         openAccess: w.open_access?.is_oa ?? null,
+        language: "en",
       };
     });
 
@@ -587,10 +593,58 @@ async function fetchOpenAlex(
 
 // ── GET /biology/search ───────────────────────────────────────────────────────
 
+type BiologySearchFilters = {
+  author?: string;
+  title?: string;
+  yearFrom?: number;
+  yearTo?: number;
+  source?: string;
+  type?: string;
+  openAccess?: boolean;
+  language?: string;
+};
+
+function filterBiologyItems(items: BioItem[], filters: BiologySearchFilters): BioItem[] {
+  const source = filters.source?.toLowerCase().trim();
+  const type = filters.type?.toLowerCase().trim();
+  const author = filters.author?.toLowerCase().trim();
+  const title = filters.title?.toLowerCase().trim();
+  const language = filters.language?.toLowerCase().trim();
+
+  return items.filter((item) => {
+    if (source && item.source.toLowerCase() !== source) return false;
+    if (type && item.kind !== (type === "paper" || type === "research" ? "research" : type)) return false;
+    if (filters.openAccess === true && item.openAccess !== true) return false;
+    if (language && item.language?.toLowerCase() !== language) return false;
+    if (author && !item.authors.some((name) => name.toLowerCase().includes(author))) return false;
+    if (title && !item.title.toLowerCase().includes(title)) return false;
+
+    const year = item.date ? Number(item.date.slice(0, 4)) : NaN;
+    if (filters.yearFrom !== undefined && (!Number.isFinite(year) || year < filters.yearFrom)) return false;
+    if (filters.yearTo !== undefined && (!Number.isFinite(year) || year > filters.yearTo)) return false;
+    return true;
+  });
+}
+
 router.get("/biology/search", async (req, res) => {
   const q = ((req.query.q as string) ?? "").trim();
   const page = Math.max(Number(req.query.page ?? 1), 1);
   const sort = (req.query.sort as OASort | undefined) ?? "cited";
+  const parseYearParam = (value: unknown): number | undefined => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 1000 && parsed <= 9999 ? parsed : undefined;
+  };
+  const openAccess = String(req.query.openAccess ?? "").toLowerCase() === "true";
+  const filters: BiologySearchFilters = {
+    author: typeof req.query.author === "string" ? req.query.author : undefined,
+    title: typeof req.query.title === "string" ? req.query.title : undefined,
+    yearFrom: parseYearParam(req.query.yearFrom),
+    yearTo: parseYearParam(req.query.yearTo),
+    source: typeof req.query.source === "string" ? req.query.source : undefined,
+    type: typeof req.query.type === "string" ? req.query.type : undefined,
+    openAccess: openAccess || undefined,
+    language: typeof req.query.language === "string" ? req.query.language : undefined,
+  };
 
   if (q.length < 2) {
     res.status(400).json({ error: "Query must be at least 2 characters" });
@@ -637,7 +691,8 @@ router.get("/biology/search", async (req, res) => {
     (epmcResult.status === "fulfilled" && epmcResult.value.hasMore) ||
     (openAlexResult.status === "fulfilled" && openAlexResult.value.hasMore);
 
-  res.json({ query: q, page, items, sourceStatus, hasMore });
+  const filteredItems = filterBiologyItems(items, filters);
+  res.json({ query: q, page, items: filteredItems, sourceStatus, hasMore: hasMore && filteredItems.length > 0 });
 });
 
 export default router;

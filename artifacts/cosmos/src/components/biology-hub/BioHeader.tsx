@@ -1,6 +1,10 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Search, Sun, Moon, Dna, X, Clock, TrendingUp } from 'lucide-react';
+import {
+  ArrowLeft, Search, Sun, Moon, Dna, X, Clock, TrendingUp,
+  SlidersHorizontal, Pin, Trash2, Bookmark, BookmarkCheck,
+} from 'lucide-react';
+import type { AdvancedSearchFilters, SavedSearch, SearchHistoryEntry } from '../../lib/advancedSearch';
 
 // ─── Biology Hub — Sticky Header ──────────────────────────────────────────────
 
@@ -11,16 +15,92 @@ interface BioHeaderProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onSearchSelect: (q: string) => void;
-  recentSearches: string[];
+  recentSearches: SearchHistoryEntry[];
   suggestedSearches: string[];
+  advancedFilters: AdvancedSearchFilters;
+  onAdvancedFiltersChange: (filters: AdvancedSearchFilters) => void;
+  onHistorySelect: (entry: SearchHistoryEntry) => void;
+  onHistoryPin: (id: string) => void;
+  onHistoryDelete: (id: string) => void;
+  savedSearches: SavedSearch[];
+  onSaveSearch: () => void;
+  onSavedSearchSelect: (entry: SavedSearch) => void;
+  onSavedSearchDelete: (id: string) => void;
+}
+
+function FilterInput({
+  label,
+  value,
+  onChange,
+  lm,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  lm: boolean;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-[9px] font-medium" style={{ color: lm ? 'rgba(6,78,59,0.55)' : 'rgba(255,255,255,0.45)' }}>
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg px-2 py-1.5 text-[10px] outline-none"
+        style={{
+          background: lm ? 'rgba(52,211,153,0.06)' : 'rgba(52,211,153,0.07)',
+          border: '1px solid rgba(52,211,153,0.15)',
+          color: lm ? '#064e3b' : 'rgba(255,255,255,0.78)',
+        }}
+      />
+    </label>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  lm,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  lm: boolean;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-[9px] font-medium" style={{ color: lm ? 'rgba(6,78,59,0.55)' : 'rgba(255,255,255,0.45)' }}>
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg px-2 py-1.5 text-[10px] outline-none"
+        style={{
+          background: lm ? 'rgba(52,211,153,0.06)' : 'rgba(3,20,13,0.95)',
+          border: '1px solid rgba(52,211,153,0.15)',
+          color: lm ? '#064e3b' : 'rgba(255,255,255,0.78)',
+        }}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option || `Any ${label.toLowerCase()}`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 const BioHeader = memo(({
   lm, onToggleLm, onClose,
   searchQuery, onSearchChange, onSearchSelect,
-  recentSearches, suggestedSearches,
+  recentSearches, suggestedSearches, advancedFilters, onAdvancedFiltersChange,
+  onHistorySelect, onHistoryPin, onHistoryDelete, savedSearches,
+  onSaveSearch, onSavedSearchSelect, onSavedSearchDelete,
 }: BioHeaderProps) => {
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +119,7 @@ const BioHeader = memo(({
     return () => document.removeEventListener('mousedown', handler);
   }, [searchFocused]);
 
-  const showDropdown = searchFocused && searchQuery.trim().length === 0;
+  const showDropdown = searchFocused;
   const suggestions = searchQuery.trim().length === 0
     ? suggestedSearches
     : suggestedSearches.filter((s) =>
@@ -171,6 +251,68 @@ const BioHeader = memo(({
             </AnimatePresence>
           </motion.div>
 
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((value) => !value)}
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-medium"
+              style={{
+                background: showAdvanced ? 'rgba(52,211,153,0.16)' : 'transparent',
+                border: '1px solid rgba(52,211,153,0.16)',
+                color: lm ? '#065f46' : 'rgba(52,211,153,0.75)',
+              }}
+            >
+              <SlidersHorizontal size={10} />
+              Advanced filters
+            </button>
+            {(Object.values(advancedFilters).some(Boolean) || searchQuery.match(/\b(?:author|year|source|type|title):/i)) && (
+              <span className="text-[9px]" style={{ color: lm ? 'rgba(6,78,59,0.45)' : 'rgba(255,255,255,0.35)' }}>
+                Filters active
+              </span>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {showAdvanced && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -4 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -4 }}
+                className="mt-2 rounded-xl p-3 overflow-hidden"
+                style={{
+                  background: lm ? 'rgba(240,253,244,0.97)' : 'rgba(3,12,8,0.97)',
+                  border: '1px solid rgba(52,211,153,0.15)',
+                }}
+              >
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <FilterInput label="From year" value={advancedFilters.yearFrom}
+                    onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, yearFrom: value.replace(/\D/g, '').slice(0, 4) })} lm={lm} />
+                  <FilterInput label="To year" value={advancedFilters.yearTo}
+                    onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, yearTo: value.replace(/\D/g, '').slice(0, 4) })} lm={lm} />
+                  <FilterSelect label="Source" value={advancedFilters.source}
+                    onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, source: value })} lm={lm}
+                    options={['', 'wikipedia', 'wikidata', 'pubmed', 'europepmc', 'openalex']} />
+                  <FilterSelect label="Type" value={advancedFilters.type}
+                    onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, type: value as AdvancedSearchFilters['type'] })} lm={lm}
+                    options={['', 'article', 'paper']} />
+                  <FilterInput label="Language" value={advancedFilters.language}
+                    onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, language: value })} lm={lm} />
+                  <label className="col-span-2 sm:col-span-2 flex items-end gap-2 pb-1 text-[10px]" style={{ color: lm ? '#065f46' : 'rgba(255,255,255,0.6)' }}>
+                    <input type="checkbox" checked={advancedFilters.openAccess}
+                      onChange={(event) => onAdvancedFiltersChange({ ...advancedFilters, openAccess: event.target.checked })}
+                      className="accent-emerald-400" />
+                    Open access only
+                  </label>
+                  <button type="button" onClick={onSaveSearch}
+                    className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-medium"
+                    style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)', color: lm ? '#065f46' : '#34d399' }}>
+                    <Bookmark size={11} /> Save search
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* ── Dropdown: recent + suggested ── */}
           <AnimatePresence>
             {showDropdown && (recentSearches.length > 0 || suggestions.length > 0) && (
@@ -201,19 +343,20 @@ const BioHeader = memo(({
                       Recent
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {recentSearches.map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => { onSearchSelect(r); setSearchFocused(false); }}
-                          className="px-2.5 py-1 rounded-full text-[10px] font-medium transition-all duration-150 hover:scale-105"
-                          style={{
-                            background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)',
-                            border: '1px solid rgba(52,211,153,0.18)',
-                            color: lm ? '#065f46' : 'rgba(255,255,255,0.7)',
-                          }}
-                        >
-                          {r}
-                        </button>
+                        {recentSearches.slice(0, 8).map((entry) => (
+                         <div key={entry.id} className="flex items-center gap-1">
+                           <button onClick={() => { onHistorySelect(entry); setSearchFocused(false); }}
+                             className="px-2.5 py-1 rounded-full text-[10px] font-medium transition-all duration-150 hover:scale-105"
+                             style={{ background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.18)', color: lm ? '#065f46' : 'rgba(255,255,255,0.7)' }}>
+                             {entry.query}
+                           </button>
+                           <button aria-label={entry.pinned ? 'Unpin search' : 'Pin search'} onClick={() => onHistoryPin(entry.id)} className="p-1">
+                             <Pin size={10} fill={entry.pinned ? 'currentColor' : 'none'} style={{ color: entry.pinned ? '#34d399' : 'rgba(255,255,255,0.35)' }} />
+                           </button>
+                           <button aria-label="Delete search" onClick={() => onHistoryDelete(entry.id)} className="p-1">
+                             <Trash2 size={10} style={{ color: 'rgba(251,113,133,0.65)' }} />
+                           </button>
+                         </div>
                       ))}
                     </div>
                   </div>
@@ -225,6 +368,32 @@ const BioHeader = memo(({
                     className="mx-3 my-1.5 h-px"
                     style={{ background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)' }}
                   />
+                )}
+
+                {/* Suggested searches */}
+                {savedSearches.length > 0 && (
+                  <>
+                    <div className="mx-3 my-1.5 h-px" style={{ background: lm ? 'rgba(52,211,153,0.1)' : 'rgba(52,211,153,0.08)' }} />
+                    <div className="px-3 pt-1.5 pb-2">
+                      <div className="flex items-center gap-1.5 mb-1.5 text-[9px] uppercase tracking-[0.18em] font-semibold" style={{ color: lm ? 'rgba(6,78,59,0.4)' : 'rgba(52,211,153,0.4)' }}>
+                        <BookmarkCheck size={9} /> Saved searches
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {savedSearches.slice(0, 8).map((entry) => (
+                          <div key={entry.id} className="flex items-center gap-1">
+                            <button onClick={() => { onSavedSearchSelect(entry); setSearchFocused(false); }}
+                              className="px-2.5 py-1 rounded-full text-[10px] font-medium"
+                              style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.18)', color: lm ? '#6d28d9' : '#c4b5fd' }}>
+                              {entry.query}
+                            </button>
+                            <button aria-label="Delete saved search" onClick={() => onSavedSearchDelete(entry.id)} className="p-1">
+                              <Trash2 size={10} style={{ color: 'rgba(251,113,133,0.65)' }} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {/* Suggested searches */}

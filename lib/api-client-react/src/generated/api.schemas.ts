@@ -18,12 +18,10 @@ export type BiologySearchItemSource = typeof BiologySearchItemSource[keyof typeo
 
 export const BiologySearchItemSource = {
   wikipedia: 'wikipedia',
-  nih: 'nih',
-  ncbi: 'ncbi',
+  wikidata: 'wikidata',
   pubmed: 'pubmed',
-  medlineplus: 'medlineplus',
+  europepmc: 'europepmc',
   openalex: 'openalex',
-  semanticscholar: 'semanticscholar',
 } as const;
 
 export type BiologySearchItemKind = typeof BiologySearchItemKind[keyof typeof BiologySearchItemKind];
@@ -53,6 +51,8 @@ export interface BiologySearchItem {
   citationCount: number | null;
   /** @nullable */
   openAccess: boolean | null;
+  /** @nullable */
+  language: string | null;
 }
 
 export type BiologySourceStatusStatus = typeof BiologySourceStatusStatus[keyof typeof BiologySourceStatusStatus];
@@ -87,5 +87,40 @@ q: string;
  * @minimum 1
  */
 page?: number;
+author?: string;
+title?: string;
+/**
+ * @minimum 1000
+ * @maximum 9999
+ */
+yearFrom?: number;
+/**
+ * @minimum 1000
+ * @maximum 9999
+ */
+yearTo?: number;
+source?: string;
+type?: BiologySearchType;
+openAccess?: boolean;
+language?: string;
+sort?: BiologySearchSort;
 };
+
+export type BiologySearchType = typeof BiologySearchType[keyof typeof BiologySearchType];
+
+
+export const BiologySearchType = {
+  article: 'article',
+  paper: 'paper',
+  research: 'research',
+} as const;
+
+export type BiologySearchSort = typeof BiologySearchSort[keyof typeof BiologySearchSort];
+
+
+export const BiologySearchSort = {
+  relevance: 'relevance',
+  date: 'date',
+  cited: 'cited',
+} as const;
 
