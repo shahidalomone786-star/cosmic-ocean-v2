@@ -59,7 +59,7 @@ const INITIAL_MESSAGE: Message = {
 const markdownComponents = {
   // ── Block elements ─────────────────────────────────────────────────────────
   p: ({ children }: any) => (
-    <p className="mb-[1.05em] last:mb-0 leading-[1.82] text-white/85">{children}</p>
+    <p className="mb-[1.1em] last:mb-0 leading-[1.8] text-white/85">{children}</p>
   ),
   strong: ({ children }: any) => (
     <strong className="font-semibold text-white/95">{children}</strong>
@@ -77,42 +77,42 @@ const markdownComponents = {
     </a>
   ),
   ul: ({ children }: any) => (
-    <ul className="list-disc ml-5 mb-[1em] space-y-[0.35em] marker:text-white/25">{children}</ul>
+    <ul className="list-disc ml-6 mb-[1.1em] space-y-[0.45em] marker:text-white/30">{children}</ul>
   ),
   ol: ({ children }: any) => (
-    <ol className="list-decimal ml-5 mb-[1em] space-y-[0.35em] marker:text-white/30">{children}</ol>
+    <ol className="list-decimal ml-6 mb-[1.1em] space-y-[0.45em] marker:text-white/35">{children}</ol>
   ),
   li: ({ children }: any) => (
-    <li className="leading-[1.75] text-white/82">{children}</li>
+    <li className="leading-[1.8] text-white/83">{children}</li>
   ),
-  // ── Headings — clear hierarchy, not too loud ───────────────────────────────
+  // ── Headings — document-grade hierarchy ───────────────────────────────────
   h1: ({ children }: any) => (
-    <h1 className="text-[17px] font-semibold mt-7 mb-3 first:mt-0 text-white
-      tracking-[-0.01em] border-b border-white/[0.07] pb-2">
+    <h1 className="text-[22px] font-bold mt-9 mb-4 first:mt-0 text-white
+      tracking-[-0.02em] border-b border-white/[0.08] pb-3">
       {children}
     </h1>
   ),
   h2: ({ children }: any) => (
-    <h2 className="text-[15px] font-semibold mt-6 mb-2.5 first:mt-0 text-white/95 tracking-[-0.01em]">
+    <h2 className="text-[19px] font-semibold mt-8 mb-3 first:mt-0 text-white/97 tracking-[-0.015em]">
       {children}
     </h2>
   ),
   h3: ({ children }: any) => (
-    <h3 className="text-[13.5px] font-semibold mt-5 mb-2 first:mt-0 text-white/88 tracking-[0.005em] uppercase text-[12px]">
+    <h3 className="text-[16px] font-semibold mt-6 mb-2.5 first:mt-0 text-white/90 tracking-[-0.01em]">
       {children}
     </h3>
   ),
   // ── Blockquote — elegant left accent ──────────────────────────────────────
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[2px] border-violet-400/35 pl-4 pr-2 py-0.5
-      italic text-white/48 my-4 bg-white/[0.015] rounded-r-lg">
+    <blockquote className="border-l-[3px] border-violet-400/40 pl-5 pr-2 py-1
+      italic text-white/55 my-5 bg-white/[0.015] rounded-r-lg">
       {children}
     </blockquote>
   ),
   // ── Code blocks — refined dark surface ────────────────────────────────────
   pre: ({ children }: any) => (
     <pre className="relative bg-[#08080b] border border-white/[0.08] rounded-xl
-      px-4 py-3.5 overflow-x-auto my-4 text-[12px] leading-[1.7]
+      px-5 py-4 overflow-x-auto my-5 text-[13px] leading-[1.7]
       shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </pre>
@@ -123,32 +123,32 @@ const markdownComponents = {
       <code className={`font-mono text-white/80 ${className || ''}`}>{children}</code>
     ) : (
       <code className="bg-white/[0.07] border border-white/[0.08] text-violet-200/90
-        px-1.5 py-[2px] rounded-md text-[12px] font-mono">
+        px-1.5 py-[2px] rounded-md text-[13px] font-mono">
         {children}
       </code>
     );
   },
   // ── Table support ─────────────────────────────────────────────────────────
   table: ({ children }: any) => (
-    <div className="overflow-x-auto my-4 rounded-xl border border-white/[0.07]">
-      <table className="w-full text-[13px]">{children}</table>
+    <div className="overflow-x-auto my-5 rounded-xl border border-white/[0.07]">
+      <table className="w-full text-[14px]">{children}</table>
     </div>
   ),
   thead: ({ children }: any) => (
     <thead className="border-b border-white/[0.07] bg-white/[0.025]">{children}</thead>
   ),
   th: ({ children }: any) => (
-    <th className="px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.12em]
+    <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.12em]
       font-semibold text-white/40">{children}</th>
   ),
   td: ({ children }: any) => (
-    <td className="px-4 py-2.5 text-white/78 border-t border-white/[0.04]">{children}</td>
+    <td className="px-4 py-3 text-white/80 border-t border-white/[0.04]">{children}</td>
   ),
 };
 
 const MessageContent = memo(function MessageContent({ content }: { content: string }) {
   return (
-    <div className="text-[14px] leading-[1.82] tracking-[0.008em] text-white/85
+    <div className="text-[17px] leading-[1.8] tracking-[0.005em] text-white/85
       overflow-x-auto overflow-y-hidden max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
@@ -968,7 +968,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-7">
+          <div className="max-w-4xl mx-auto w-full px-5 sm:px-8 py-8 flex flex-col gap-0">
             <AnimatePresence initial={false}>
               {messages.map((msg, i) => {
                 const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
@@ -981,112 +981,119 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 return (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 12 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                    className={`w-full flex flex-col ${msg.role === 'user' ? 'items-end mb-6' : 'items-start mb-8'}`}
                   >
-                    {/* Reasoning block (assistant only) */}
-                    {msg.reasoning && msg.reasoning.trim() && (
-                      <div className="w-full max-w-[85%]">
-                        <ReasoningBlock reasoning={msg.reasoning} seconds={msg.reasoningSeconds} />
+                    {/* ── User message: premium glass bubble ──────────────── */}
+                    {msg.role === 'user' && (
+                      <div className="bg-white/[0.08] border border-white/[0.13] text-white/93
+                        rounded-2xl rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto
+                        text-[13.5px] leading-[1.72] font-[450]
+                        shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
+                        {msg.content}
                       </div>
                     )}
 
-                    {/* Bubble */}
-                    <div
-                      className={`rounded-2xl ${
-                        msg.role === 'user'
-                          // ── User: compact glass chip ───────────────────────
-                          ? 'bg-white/[0.08] border border-white/[0.13] text-white/93 rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto text-[13.5px] leading-[1.72] font-[450] shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]'
-                          : msg.error
-                          // ── Error ─────────────────────────────────────────
-                            ? 'bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90 rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%] shadow-[0_4px_16px_rgba(0,0,0,0.35)]'
-                          : isGenerating
-                          // ── Streaming: emerald pulse glass ────────────────
-                            ? 'bg-gradient-to-b from-[#0c1510]/90 to-[#090d0b]/90 border px-5 py-5 w-full rounded-bl-[4px] stream-pulse-glow shadow-[0_4px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(16,185,129,0.04)]'
-                          // ── Done: premium layered glass ───────────────────
-                            : 'bg-gradient-to-b from-[#16161b] to-[#0f0f13] border border-white/[0.07] px-5 py-5 sm:px-6 sm:py-6 w-full rounded-bl-[4px] shadow-[0_4px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)] animate-cosmos-fade'
-                      }`}
-                    >
-                      {msg.role === 'assistant'
-                        ? <MessageContent content={msg.content || (isThinking && i === messages.length - 1 ? '' : '…')} />
-                        : msg.content
-                      }
-                    </div>
+                    {/* ── Error message: red-tinted surface ───────────────── */}
+                    {msg.role === 'assistant' && msg.error && (
+                      <>
+                        <div className="bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90
+                          rounded-2xl rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%]
+                          shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
+                          <MessageContent content={msg.content} />
+                        </div>
+                        <button
+                          onClick={handleRegenerate}
+                          className="mt-1.5 text-[11px] text-red-300/60 hover:text-red-200 underline underline-offset-2"
+                        >
+                          Retry
+                        </button>
+                      </>
+                    )}
 
-                    {/* Action row */}
-                    {showActions && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                        className="flex items-center gap-0.5 mt-2 ml-1 flex-wrap"
-                      >
-                        {/* Primary: playback + copy + share */}
-                        <ListenButton text={msg.content} />
-                        <CopyButton text={msg.content} />
-                        <ShareButton text={msg.content} />
-
-                        {/* Separator */}
-                        <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
-
-                        {/* Secondary: save + (last-msg) simplify + regenerate */}
-                        <SaveButton onSave={() => workspace.save(msg.content)} />
-                        {isLastAsst && (
-                          <>
-                            <button
-                              onClick={() => handleSend('Can you explain that in simpler terms?')}
-                              disabled={isThinking}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                                text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
-                                transition-all duration-150 active:scale-95
-                                disabled:opacity-40 disabled:cursor-not-allowed
-                                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
-                              aria-label="Ask Singularity to explain more simply"
-                            >
-                              <Wand2 size={11} strokeWidth={2} />
-                              Simplify
-                            </button>
-                            <button
-                              onClick={handleRegenerate}
-                              disabled={isThinking}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                                text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
-                                transition-all duration-150 active:scale-95
-                                disabled:opacity-40 disabled:cursor-not-allowed
-                                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
-                              aria-label="Regenerate response"
-                            >
-                              <RotateCcw size={11} strokeWidth={2} />
-                              Regenerate
-                            </button>
-                          </>
+                    {/* ── Assistant message: plain document layout ─────────── */}
+                    {msg.role === 'assistant' && !msg.error && (
+                      <>
+                        {/* Reasoning block */}
+                        {msg.reasoning && msg.reasoning.trim() && (
+                          <div className="w-full mb-3">
+                            <ReasoningBlock reasoning={msg.reasoning} seconds={msg.reasoningSeconds} />
+                          </div>
                         )}
-                      </motion.div>
-                    )}
 
-                    {/* Welcome message — show listen button */}
-                    {msg.id === 'welcome' && msg.role === 'assistant' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.22, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                        className="flex items-center gap-0.5 mt-2 ml-1"
-                      >
-                        <ListenButton text={msg.content} />
-                      </motion.div>
-                    )}
+                        {/* Content — no card, no border, no background */}
+                        <div className={`w-full pt-1 pb-2 ${isGenerating ? 'stream-pulse-text' : 'animate-cosmos-fade'}`}>
+                          <MessageContent
+                            content={msg.content || (isThinking && i === messages.length - 1 ? '' : '…')}
+                          />
+                        </div>
 
-                    {/* Error retry */}
-                    {msg.error && (
-                      <button
-                        onClick={handleRegenerate}
-                        className="mt-1.5 text-[11px] text-red-300/60 hover:text-red-200 underline underline-offset-2"
-                      >
-                        Retry
-                      </button>
+                        {/* Divider below response */}
+                        {!isGenerating && msg.id !== 'welcome' && (
+                          <div className="w-full border-b border-white/[0.05] mt-1 mb-3" />
+                        )}
+
+                        {/* Action row — below content, never inside a card */}
+                        {showActions && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex items-center gap-0.5 flex-wrap"
+                          >
+                            <ListenButton text={msg.content} />
+                            <CopyButton text={msg.content} />
+                            <ShareButton text={msg.content} />
+                            <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
+                            <SaveButton onSave={() => workspace.save(msg.content)} />
+                            {isLastAsst && (
+                              <>
+                                <button
+                                  onClick={() => handleSend('Can you explain that in simpler terms?')}
+                                  disabled={isThinking}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                                    text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
+                                    transition-all duration-150 active:scale-95
+                                    disabled:opacity-40 disabled:cursor-not-allowed
+                                    focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
+                                  aria-label="Ask Singularity to explain more simply"
+                                >
+                                  <Wand2 size={11} strokeWidth={2} />
+                                  Simplify
+                                </button>
+                                <button
+                                  onClick={handleRegenerate}
+                                  disabled={isThinking}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                                    text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
+                                    transition-all duration-150 active:scale-95
+                                    disabled:opacity-40 disabled:cursor-not-allowed
+                                    focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
+                                  aria-label="Regenerate response"
+                                >
+                                  <RotateCcw size={11} strokeWidth={2} />
+                                  Regenerate
+                                </button>
+                              </>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {/* Welcome message — listen button only */}
+                        {msg.id === 'welcome' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.22, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex items-center gap-0.5 mt-1"
+                          >
+                            <ListenButton text={msg.content} />
+                          </motion.div>
+                        )}
+                      </>
                     )}
                   </motion.div>
                 );

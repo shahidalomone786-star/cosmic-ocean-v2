@@ -616,6 +616,15 @@ body {
   animation: stream-pulse-glow 2s ease-in-out infinite;
 }
 
+/* Streaming text — subtle opacity pulse while AI is generating */
+@keyframes stream-pulse-text {
+  0%, 100% { opacity: 0.88; }
+  50%       { opacity: 0.72; }
+}
+.stream-pulse-text {
+  animation: stream-pulse-text 2.2s ease-in-out infinite;
+}
+
 /* Thinking dots enhanced — emerald pulse */
 @keyframes thinking-dot-pulse {
   0%, 100% { opacity: 0.2; transform: scale(0.8);  }
