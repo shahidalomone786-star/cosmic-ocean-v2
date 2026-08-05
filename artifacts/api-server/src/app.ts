@@ -35,7 +35,10 @@ app.use(
   }),
 );
 app.use(cookieParser());
-app.use(express.json());
+// Multimodal turns contain optimized data URLs (up to five images), plus one
+// retained image turn for follow-up questions. Keep the limit bounded while
+// leaving room for the structured JSON envelope.
+app.use(express.json({ limit: "32mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

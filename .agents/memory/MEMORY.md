@@ -2,3 +2,4 @@
 - [Biology Hub Architecture](biology-hub-architecture.md) — multi-tab sections (Overview/Articles/Papers), LiveResultsFeed shared component, debounced search in BiologyHub, synonym expansion in biology.ts backend
 - [Document workspace verification](document-workspace-verification.md) — keep extracted context hidden from the composer while reusing the attachment for follow-up questions
 - [Edge Neural TTS](edge-neural-tts.md) — server-side Microsoft Edge synthesis with browser speech fallback; no API keys or paid quota
+- [Singularity multimodal attachments](multimodal-attachments.md) — optimized structured images, capability-gated vision routing, bounded prior-image history, and unchanged text streaming

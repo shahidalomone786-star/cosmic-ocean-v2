@@ -215,6 +215,71 @@ if (GROQ_KEYS.length === 0) {
 }
 
 let keyCursor = 0;
+const TEXT_MODEL = 'openai/gpt-oss-120b';
+const VISION_MODEL = process.env.GROQ_VISION_MODEL?.trim() ||
+  'meta-llama/llama-4-scout-17b-16e-instruct';
+
+const VISION_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+interface ImageInput {
+  filename?: unknown;
+  mimeType?: unknown;
+  dataUrl?: unknown;
+}
+
+interface VisionImage {
+  filename: string;
+  mimeType: string;
+  dataUrl: string;
+}
+
+function sanitiseImageInputs(value: unknown): VisionImage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.slice(0, 5).flatMap((candidate: ImageInput) => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const mimeType = typeof candidate.mimeType === 'string' ? candidate.mimeType : '';
+    const dataUrl = typeof candidate.dataUrl === 'string' ? candidate.dataUrl : '';
+    const encoded = dataUrl.split(',', 2)[1] ?? '';
+    const decodedHeader = Buffer.from(encoded.slice(0, 32), 'base64');
+    const hasSignature =
+      (mimeType === 'image/jpeg' && decodedHeader[0] === 0xff && decodedHeader[1] === 0xd8 && decodedHeader[2] === 0xff) ||
+      (mimeType === 'image/png' && decodedHeader.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+      (mimeType === 'image/gif' && decodedHeader.subarray(0, 4).equals(Buffer.from('GIF8'))) ||
+      (mimeType === 'image/webp' && decodedHeader.subarray(0, 4).equals(Buffer.from('RIFF')) && decodedHeader.subarray(8, 12).equals(Buffer.from('WEBP')));
+    if (
+      !VISION_MIME_TYPES.has(mimeType) ||
+      !new RegExp(`^data:${mimeType.replace('/', '\\/')};base64,[A-Za-z0-9+/=]+$`).test(dataUrl) ||
+      dataUrl.length > 3_000_000 ||
+      !hasSignature
+    ) return [];
+
+    const filename = typeof candidate.filename === 'string'
+      ? candidate.filename.replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '_').slice(0, 180) || 'image'
+      : 'image';
+
+    return [{ filename, mimeType, dataUrl }];
+  });
+}
+
+function isVisionModel(model: string): boolean {
+  return model === VISION_MODEL && VISION_MODEL.length > 0;
+}
+
+router.get('/singularity/capabilities', (_req, res) => {
+  res.json({
+    activeModel: TEXT_MODEL,
+    activeModelSupportsVision: isVisionModel(TEXT_MODEL),
+    multimodalModel: VISION_MODEL || null,
+    canRouteImages: Boolean(VISION_MODEL),
+  });
+});
+
 function nextKey(): string {
   const key = GROQ_KEYS[keyCursor % GROQ_KEYS.length];
   keyCursor++;
@@ -237,7 +302,11 @@ function splitReasoning(raw: string): { reasoning: string; content: string } {
 }
 
 // ── History sanitiser ─────────────────────────────────────────────────────────
-interface HistoryMsg { role: 'user' | 'assistant'; content: string }
+interface HistoryMsg {
+  role: 'user' | 'assistant';
+  content: string;
+  images?: VisionImage[];
+}
 
 function sanitiseHistory(history: unknown): HistoryMsg[] {
   if (!Array.isArray(history)) return [];
@@ -248,13 +317,18 @@ function sanitiseHistory(history: unknown): HistoryMsg[] {
       ((m as any).role === 'user' || (m as any).role === 'assistant')
     )
     .filter(m => typeof (m as any).content === 'string' && (m as any).content.trim().length > 0)
-    .map(m => ({ role: (m as any).role as 'user' | 'assistant', content: (m as any).content.trim() }))
+    .map(m => ({
+      role: (m as any).role as 'user' | 'assistant',
+      content: (m as any).content.trim(),
+      images: sanitiseImageInputs((m as any).images),
+    }))
     .slice(-6);
 }
 
 // ── POST /api/singularity ─────────────────────────────────────────────────────
 router.post('/singularity', async (req, res) => {
   const { message, history } = req.body ?? {};
+  const images = sanitiseImageInputs(req.body?.images);
 
   if (!message || typeof message !== 'string' || !message.trim()) {
     res.status(400).json({
@@ -272,15 +346,62 @@ router.post('/singularity', async (req, res) => {
     return;
   }
 
+  if (Array.isArray(req.body?.images) && req.body.images.length > 0 && images.length === 0) {
+    res.status(400).json({
+      success: false,
+      error: 'The attached image payload is invalid or too large.',
+      status: 400,
+      details: null,
+    });
+    return;
+  }
+
   const safeHistory = sanitiseHistory(history);
-  let messages: { role: string; content: string }[] = [
+  const historyHasImages = safeHistory.some(turn => (turn.images?.length ?? 0) > 0);
+  const model = images.length > 0 || historyHasImages ? VISION_MODEL : TEXT_MODEL;
+  if ((images.length > 0 || historyHasImages) && !isVisionModel(model)) {
+    res.status(415).json({
+      success: false,
+      code: 'VISION_UNSUPPORTED',
+      error: 'This model currently supports text only.',
+      status: 415,
+      details: { model },
+    });
+    return;
+  }
+
+  const userContent = images.length > 0
+    ? [
+        { type: 'text', text: message.trim() },
+        ...images.map(image => ({
+          type: 'image_url',
+          image_url: { url: image.dataUrl },
+        })),
+      ]
+    : message.trim();
+  const historyMessages = safeHistory.map(turn => ({
+    role: turn.role,
+    content: turn.images?.length
+      ? [
+          { type: 'text', text: turn.content },
+          ...turn.images.map(image => ({
+            type: 'image_url',
+            image_url: { url: image.dataUrl },
+          })),
+        ]
+      : turn.content,
+  }));
+  let messages: { role: string; content: unknown }[] = [
     { role: 'system',    content: SYSTEM_PROMPT },
-    ...safeHistory,
-    { role: 'user',      content: message.trim() },
-  ].filter(m => m.content && m.content.trim() !== '');
+    ...historyMessages,
+    { role: 'user',      content: userContent },
+  ].filter(m => {
+    if (typeof m.content === 'string') return m.content.trim().length > 0;
+    return Array.isArray(m.content) && m.content.length > 0;
+  });
 
   console.log(
-    `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=openai/gpt-oss-120b`
+    `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
   );
 
   const maxAttempts = GROQ_KEYS.length;
@@ -307,7 +428,7 @@ router.post('/singularity', async (req, res) => {
         },
         signal,
         body: JSON.stringify({
-          model:       'openai/gpt-oss-120b',
+           model,
           messages,
           stream:      true,
           temperature: 0.6,
@@ -383,7 +504,6 @@ router.post('/singularity', async (req, res) => {
       const reader  = (groqRes.body as ReadableStream<Uint8Array>).getReader();
       const decoder = new TextDecoder('utf-8');
       let rawBuffer  = '';
-      let tokenCount = 0;
 
       try {
         while (true) {
@@ -395,9 +515,6 @@ router.post('/singularity', async (req, res) => {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-
-          // Log every raw chunk so we can see what Groq is actually sending
-          console.log(`[singularity] chunk #${++tokenCount} raw:`, chunk.slice(0, 300));
 
           for (const line of chunk.split('\n')) {
             if (!line.startsWith('data: ')) continue;
@@ -426,7 +543,6 @@ router.post('/singularity', async (req, res) => {
         return;
       }
 
-      console.log(`[singularity] ✅ Stream complete — ${tokenCount} chunk(s) sent`);
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();

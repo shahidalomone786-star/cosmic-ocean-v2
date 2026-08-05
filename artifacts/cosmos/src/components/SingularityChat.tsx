@@ -19,10 +19,13 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { WorkspacePanel, useWorkspace } from './WorkspacePanel';
 import { useDocumentIngestion } from '@/hooks/useDocumentIngestion';
+import { useImageAttachments } from '@/hooks/useImageAttachments';
+import { ImageAttachmentGrid } from './ImageAttachmentGrid';
 import { DocumentChip } from './DocumentChip';
 import { selectRelevantChunks } from '@/lib/contextSelector';
 import { buildDocumentPrompt } from '@/lib/promptBuilder';
 import type { DocumentRecord } from '@/lib/documentStore';
+import type { ImageAttachment } from '@/lib/attachmentTypes';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -30,6 +33,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   attachedDocument?: DocumentRecord | null;
+  attachedImages?: ImageAttachment[];
   reasoning?: string;
   reasoningSeconds?: number;
   error?: boolean;
@@ -611,6 +615,12 @@ interface ApiError {
   details: unknown;
 }
 
+interface SingularityCapabilities {
+  canRouteImages: boolean;
+  activeModelSupportsVision: boolean;
+  activeModel: string;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [messages, setMessages]         = useState<Message[]>([INITIAL_MESSAGE]);
@@ -620,11 +630,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [apiError, setApiError]         = useState<ApiError | null>(null);
   const [attachOpen, setAttachOpen]     = useState(false);
-  const [attachToast, setAttachToast]   = useState('');
   const [isDragOver, setIsDragOver]     = useState(false);
+  const [visionSupported, setVisionSupported] = useState<boolean | null>(null);
+  const [replaceImageIndex, setReplaceImageIndex] = useState<number | null>(null);
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
+  const imageInputRef                   = useRef<HTMLInputElement>(null);
 
   const {
     processFile,
@@ -634,6 +646,15 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearDocument,
     clearError,
   } = useDocumentIngestion();
+  const {
+    images,
+    isProcessing: isProcessingImages,
+    error: imageError,
+    processFiles: processImageFiles,
+    removeImage,
+    clearImages,
+    clearError: clearImageError,
+  } = useImageAttachments();
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
@@ -648,6 +669,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   // Autofocus on open
   useEffect(() => { textareaRef.current?.focus(); }, []);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/singularity/capabilities')
+      .then(response => response.ok ? response.json() as Promise<SingularityCapabilities> : null)
+      .then(capabilities => {
+        if (active && capabilities) setVisionSupported(capabilities.canRouteImages);
+      })
+      .catch(() => {
+        if (active) setVisionSupported(null);
+      });
+    return () => { active = false; };
+  }, []);
+
   // Close attach popover on outside click
   useEffect(() => {
     if (!attachOpen) return;
@@ -660,10 +694,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [attachOpen]);
 
-  const showAttachToast = useCallback(() => {
+  const showImagePicker = useCallback(() => {
     setAttachOpen(false);
-    setAttachToast('Image uploads coming soon!');
-    setTimeout(() => setAttachToast(''), 3000);
+    imageInputRef.current?.click();
   }, []);
 
   const handleDocumentUploadClick = useCallback(() => {
@@ -680,6 +713,27 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     },
     [processFile],
   );
+
+  const handleImagesSelected = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const selected = Array.from(event.target.files ?? []);
+      if (selected.length) void processImageFiles(selected, replaceImageIndex ?? undefined);
+      setReplaceImageIndex(null);
+      event.target.value = '';
+    },
+    [processImageFiles, replaceImageIndex],
+  );
+
+  const handleReplaceImage = useCallback((index: number) => {
+    setReplaceImageIndex(index);
+    imageInputRef.current?.click();
+  }, []);
+
+  const isImageFile = useCallback((file: File) => {
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    return ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(extension)
+      || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type);
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -701,11 +755,21 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       e.preventDefault();
       e.stopPropagation();
       setIsDragOver(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) void processFile(file);
+      const files = Array.from(e.dataTransfer.files ?? []);
+      const imageFiles = files.filter(isImageFile);
+      const documentFile = files.find(file => !isImageFile(file));
+      if (imageFiles.length) void processImageFiles(imageFiles);
+      if (documentFile) void processFile(documentFile);
     },
-    [processFile],
+    [isImageFile, processFile, processImageFiles],
   );
+
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.files ?? []).filter(isImageFile);
+    if (!files.length) return;
+    event.preventDefault();
+    void processImageFiles(files);
+  }, [isImageFile, processImageFiles]);
 
   // Escape to close
   useEffect(() => {
@@ -758,7 +822,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, [attachedDoc]);
 
   // ── Core generation ──────────────────────────────────────────────────────
-  const generateResponse = useCallback(async (userText: string) => {
+  const generateResponse = useCallback(async (userText: string, requestImages: ImageAttachment[] = []) => {
     setApiError(null);
     setIsThinking(true);
     setIsStreaming(true);
@@ -777,16 +841,39 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       { id: msgId, role: 'assistant', content: '', reasoning: '', ts: Date.now() },
     ]);
 
+    const latestImageMessageId = [...messages]
+      .reverse()
+      .find(m => m.attachedImages?.length)?.id;
     const safeHistory = messages
       .filter(m => m.id !== 'welcome' && !m.error && m.content.trim().length > 0)
       .slice(-12)
-      .map(m => ({ role: m.role, content: m.content.trim() }));
+      .map(m => ({
+        role: m.role,
+        content: m.content.trim(),
+        // Re-send only the latest prior image turn. The UI keeps every image
+        // in history, while the request stays bounded and responsive.
+        ...(m.id === latestImageMessageId && m.attachedImages?.length
+          ? { images: m.attachedImages.map(image => ({
+              filename: image.filename,
+              mimeType: image.mimeType,
+              dataUrl: image.dataUrl,
+            })) }
+          : {}),
+      }));
 
     try {
       const res = await fetch('/api/singularity', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: userText, history: safeHistory }),
+         body:    JSON.stringify({
+           message: userText,
+           history: safeHistory,
+           images: requestImages.map(image => ({
+             filename: image.filename,
+             mimeType: image.mimeType,
+             dataUrl: image.dataUrl,
+           })),
+         }),
         signal:  abortRef.current.signal,
       });
 
@@ -819,7 +906,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let sawFirstToken = false;
-      let chunkIndex    = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -836,8 +922,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         }
 
         const chunk = decoder.decode(value, { stream: true });
-        console.log(`[SingularityChat] chunk #${++chunkIndex}:`, chunk.slice(0, 300));
-
         for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
@@ -902,8 +986,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, [messages]);
 
   const handleSend = useCallback((overrideText?: string) => {
-    const text = (overrideText ?? input).trim();
-    if (!text || isThinking) return;
+    const typedText = (overrideText ?? input).trim();
+    if ((!typedText && images.length === 0) || isThinking) return;
+    const text = typedText || 'Please analyze the attached image(s).';
 
     // The current attachment belongs to this user turn. Once it is moved into
     // the message, the composer can reset without losing document context.
@@ -929,14 +1014,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         role: 'user',
         content: text,
         attachedDocument: attachedDoc,
+        attachedImages: images,
         ts: Date.now(),
       },
     ]);
     setInput('');
     clearDocument();
+    clearImages();
     stickToBottomRef.current = true;
-    generateResponse(aiPrompt);
-  }, [input, isThinking, generateResponse, attachedDoc, messages, clearDocument]);
+    generateResponse(aiPrompt, images);
+  }, [input, isThinking, generateResponse, attachedDoc, images, messages, clearDocument, clearImages]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -956,7 +1043,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       const idx = prev.map(m => m.role).lastIndexOf('assistant');
       return idx === -1 ? prev : prev.slice(0, idx);
     });
-    generateResponse(lastUser.content);
+    generateResponse(lastUser.content, lastUser.attachedImages ?? []);
   }, [messages, isThinking, generateResponse]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -964,6 +1051,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, [handleSend]);
 
   const isFreshChat = messages.length === 1;
+  const isProcessingAttachment = isProcessing || isProcessingImages;
+  const attachmentError = imageError || docError;
 
   return (
     <motion.div
@@ -1122,6 +1211,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                         rounded-2xl rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto
                         text-[13.5px] leading-[1.72] font-[450]
                         shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
+                        {msg.attachedImages?.length ? (
+                          <div className="mb-2.5">
+                            <ImageAttachmentGrid images={msg.attachedImages} readOnly />
+                          </div>
+                        ) : null}
                         {msg.attachedDocument && (
                           <DocumentChip
                             record={msg.attachedDocument}
@@ -1324,6 +1418,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             tabIndex={-1}
             onChange={handleFileSelected}
           />
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            className="sr-only"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={handleImagesSelected}
+          />
 
           {/* ── Unified input shell: chips + textarea + send ─────────────── */}
           <div
@@ -1365,6 +1469,24 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               )}
             </AnimatePresence>
 
+            {/* Optimized image attachments — data stays out of the textarea. */}
+            <AnimatePresence>
+              {images.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden px-3 pt-3"
+                >
+                  <ImageAttachmentGrid
+                    images={images}
+                    onRemove={removeImage}
+                    onReplace={handleReplaceImage}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Quick-action chips (hide while AI is active or input long) */}
             <QuickChips input={input} onChip={applyChip} disabled={isThinking} />
 
@@ -1402,7 +1524,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                       <div className="px-1 py-1">
                         <button
                           role="menuitem"
-                          onClick={showAttachToast}
+                           onClick={showImagePicker}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                             text-white/75 hover:text-white hover:bg-white/[0.07]
                             transition-colors duration-120 text-left"
@@ -1432,32 +1554,39 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 onFocus={() => {
                   setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
                 }}
-                placeholder={isProcessing ? 'Extracting document…' : 'Ask Singularity anything…'}
+                placeholder={
+                  isProcessingAttachment
+                    ? 'Preparing attachment…'
+                    : images.length && !input.trim()
+                      ? 'Add a question about these images…'
+                      : 'Ask Singularity anything…'
+                }
                 rows={1}
-                disabled={isProcessing}
+                disabled={isProcessingAttachment}
                 className="flex-1 resize-none bg-transparent text-[14px] text-white/90
                   placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
                   leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
-                aria-busy={isProcessing}
+                aria-busy={isProcessingAttachment}
               />
               <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
-                disabled={!isThinking && (!input.trim() || isProcessing)}
+                disabled={!isThinking && ((!input.trim() && images.length === 0) || isProcessingAttachment || visionSupported === false && images.length > 0)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
                   transition-all duration-200 mb-0.5 active:scale-90 ${
                   isThinking
                     ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
-                    : (input.trim() && !isProcessing)
+                    : ((input.trim() || images.length > 0) && !isProcessingAttachment && !(visionSupported === false && images.length > 0))
                       ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.28)]'
                       : 'bg-white/[0.06] text-white/18 cursor-not-allowed'
                 }`}
                 aria-label={isThinking ? 'Stop generating' : 'Send message'}
               >
-                {isProcessing
+                {isProcessingAttachment
                   ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
                   : isThinking
                     ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
@@ -1468,7 +1597,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
             {/* Extraction progress indicator */}
             <AnimatePresence>
-              {isProcessing && (
+              {isProcessingAttachment && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
@@ -1479,13 +1608,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   <div className="flex items-center gap-2 px-3 pb-2.5">
                     <Loader2 size={11} strokeWidth={2.5} className="animate-spin text-sky-400/70 flex-shrink-0" />
                     <span className="text-[11.5px] text-white/40" aria-live="polite">
-                      Extracting document…
+                      {isProcessingImages ? 'Optimizing image…' : 'Extracting document…'}
                     </span>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+
+          {visionSupported === false && images.length > 0 && (
+            <p role="status" className="mt-2 text-center text-[11px] text-amber-200/75">
+              This model currently supports text only.
+            </p>
+          )}
 
           {/* Disclaimer */}
           <p className="text-center text-[10px] text-white/[0.11] mt-3 tracking-[0.04em] leading-relaxed">
@@ -1494,26 +1629,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             always verify critical claims
           </p>
 
-          {/* Attach toast (image coming-soon) */}
-          <AnimatePresence>
-            {attachToast && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                transition={{ duration: 0.18 }}
-                className="absolute bottom-24 left-1/2 -translate-x-1/2
-                  bg-[#18181b]/95 backdrop-blur-md border border-white/10
-                  rounded-xl px-4 py-2.5 shadow-2xl pointer-events-none z-50"
-              >
-                <p className="text-[13px] text-white/80 font-medium whitespace-nowrap">{attachToast}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Document extraction error */}
           <AnimatePresence>
-            {docError && (
+            {attachmentError && (
               <motion.div
                 role="alert"
                 initial={{ opacity: 0, y: 6, scale: 0.97 }}
@@ -1525,9 +1643,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   rounded-xl px-4 py-3 shadow-2xl z-50 flex items-start gap-2.5"
               >
                 <X size={13} strokeWidth={2.5} className="text-red-400/80 flex-shrink-0 mt-[1px]" />
-                <p className="flex-1 text-[12.5px] text-red-200/90 leading-snug">{docError}</p>
+                 <p className="flex-1 text-[12.5px] text-red-200/90 leading-snug">{attachmentError}</p>
                 <button
-                  onClick={clearError}
+                   onClick={() => {
+                     clearError();
+                     clearImageError();
+                   }}
                   className="flex-shrink-0 text-red-400/50 hover:text-red-300
                     transition-colors duration-150 ml-1 focus-visible:outline-none
                     focus-visible:ring-1 focus-visible:ring-red-400/50 rounded"
