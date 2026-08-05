@@ -216,8 +216,7 @@ if (GROQ_KEYS.length === 0) {
 
 let keyCursor = 0;
 const TEXT_MODEL = 'openai/gpt-oss-120b';
-const VISION_MODEL = process.env.GROQ_VISION_MODEL?.trim() ||
-  'meta-llama/llama-4-scout-17b-16e-instruct';
+const VISION_MODEL = 'llama-3.2-90b-vision-preview';
 
 const VISION_MIME_TYPES = new Set([
   'image/jpeg',
@@ -452,7 +451,7 @@ router.post('/singularity', async (req, res) => {
           attempt:    attempt + 1,
           status:     groqRes.status,
           statusText: groqRes.statusText,
-          model:      'openai/gpt-oss-120b',
+          model,
           body:       errBody.slice(0, 2000),
         });
 
