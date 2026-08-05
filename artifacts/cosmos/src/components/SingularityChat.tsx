@@ -8,9 +8,9 @@
 import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  Send, Sparkles, BrainCircuit, X, ChevronDown, ChevronUp,
+  Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2, VolumeX,
-  BookmarkPlus, Bookmark,
+  BookmarkPlus, Bookmark, Share2, Wand2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -179,7 +179,8 @@ const SaveButton = memo(function SaveButton({ onSave }: { onSave: () => void }) 
     <button
       onClick={handle}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-        transition-all duration-200 active:scale-95 ${
+        transition-all duration-150 active:scale-95
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25 ${
         saved
           ? 'text-violet-400 bg-violet-400/[0.09] border border-violet-400/[0.18]'
           : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
@@ -209,11 +210,43 @@ const CopyButton = memo(function CopyButton({ text }: { text: string }) {
       onClick={handle}
       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-white/35
         hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150
-        active:scale-95 active:bg-white/[0.10]"
+        active:scale-95 active:bg-white/[0.10]
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
       aria-label={copied ? 'Copied' : 'Copy response'}
     >
       {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2} />}
       {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+});
+
+// ─── Share button ────────────────────────────────────────────────────────────
+const ShareButton = memo(function ShareButton({ text }: { text: string }) {
+  const [shared, setShared] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handle = useCallback(() => {
+    const excerpt = text.length > 800 ? `${text.slice(0, 800)}…` : text;
+    navigator.clipboard.writeText(`Singularity answered:\n\n${excerpt}`).then(() => {
+      setShared(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setShared(false), 2000);
+    }).catch(() => {});
+  }, [text]);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  return (
+    <button
+      onClick={handle}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+        transition-all duration-150 active:scale-95
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25 ${
+        shared
+          ? 'text-sky-400/80 bg-sky-400/[0.08] border border-sky-400/[0.15]'
+          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+      }`}
+      aria-label={shared ? 'Copied to clipboard' : 'Share this answer'}
+    >
+      {shared ? <Check size={11} strokeWidth={2.5} /> : <Share2 size={11} strokeWidth={2} />}
+      {shared ? 'Copied' : 'Share'}
     </button>
   );
 });
@@ -325,9 +358,12 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
       onClick={play}
       disabled={state === 'failed'}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-        transition-all duration-200 active:scale-95 ${
-        state === 'playing' || state === 'loading'
-          ? 'text-emerald-400 bg-emerald-400/[0.10] border border-emerald-400/18'
+        transition-all duration-200 active:scale-95
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 ${
+        state === 'playing'
+          ? 'text-emerald-400 bg-emerald-400/[0.11] border border-emerald-400/[0.28] shadow-[0_0_12px_rgba(52,211,153,0.10)]'
+          : state === 'loading'
+          ? 'text-emerald-400/70 bg-emerald-400/[0.07] border border-emerald-400/[0.14]'
           : state === 'failed'
             ? 'text-red-400/55 bg-red-500/[0.05] border border-red-400/10 cursor-default'
             : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
@@ -371,9 +407,10 @@ const ReasoningBlock = memo(function ReasoningBlock({
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-          text-white/25 hover:text-white/50 hover:bg-white/[0.04]
-          border border-transparent hover:border-white/[0.05]
-          transition-all duration-150 active:scale-95"
+          text-white/28 hover:text-white/55 hover:bg-white/[0.04]
+          border border-transparent hover:border-white/[0.06]
+          transition-all duration-150 active:scale-95
+          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/25"
         aria-expanded={open}
         aria-label={open ? 'Collapse reasoning' : 'Expand reasoning'}
       >
@@ -399,11 +436,14 @@ const ReasoningBlock = memo(function ReasoningBlock({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <div className="mt-1.5 ml-1 pl-3.5 pr-3 py-2.5 border-l-[2px]
-              border-white/[0.06] bg-white/[0.015] rounded-r-xl
-              text-[12px] leading-[1.72] text-white/30 italic
-              max-h-44 overflow-y-auto">
+            <div className="relative mt-1.5 ml-1 pl-3.5 pr-3 py-3 border-l-[2px]
+              border-violet-500/[0.14] bg-white/[0.018] rounded-r-xl
+              text-[12px] leading-[1.75] text-white/38 italic
+              max-h-48 overflow-y-auto">
               {reasoning}
+              {/* Fade-out gradient at bottom to hint scrollability */}
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6
+                bg-gradient-to-t from-[#0f0f11]/80 to-transparent rounded-br-xl" />
             </div>
           </motion.div>
         )}
@@ -413,19 +453,24 @@ const ReasoningBlock = memo(function ReasoningBlock({
 });
 
 // ─── Audio waveform ──────────────────────────────────────────────────────────
-const WAVE_BARS: Array<[number, number]> = [
-  [0, 0.65], [0.12, 0.82], [0.05, 0.55], [0.18, 0.75], [0.08, 0.7],
+const WAVE_BARS: Array<{ delay: number; dur: number; peak: number }> = [
+  { delay: 0,    dur: 0.62, peak: 0.80 },
+  { delay: 0.11, dur: 0.78, peak: 1.00 },
+  { delay: 0.05, dur: 0.52, peak: 0.58 },
+  { delay: 0.19, dur: 0.74, peak: 0.92 },
+  { delay: 0.08, dur: 0.66, peak: 0.70 },
+  { delay: 0.14, dur: 0.58, peak: 0.48 },
 ];
 const AudioWave = memo(function AudioWave() {
   return (
-    <div className="flex items-end gap-[2.5px] h-[13px]" aria-hidden="true">
-      {WAVE_BARS.map(([delay, duration], i) => (
+    <div className="flex items-end gap-[2px] h-[14px]" aria-hidden="true">
+      {WAVE_BARS.map((bar, i) => (
         <motion.div
           key={i}
-          className="w-[2px] rounded-full bg-emerald-400/80"
-          style={{ minHeight: '3px' }}
-          animate={{ scaleY: [0.2, 1, 0.3, 0.85, 0.2] }}
-          transition={{ duration, repeat: Infinity, delay, ease: 'easeInOut' }}
+          className="w-[2px] rounded-full bg-emerald-400/85"
+          style={{ minHeight: '3px', originY: 1 }}
+          animate={{ scaleY: [0.15, bar.peak, 0.22, bar.peak * 0.78, 0.15] }}
+          transition={{ duration: bar.dur, repeat: Infinity, delay: bar.delay, ease: 'easeInOut' }}
         />
       ))}
     </div>
@@ -923,7 +968,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-6">
+          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col gap-7">
             <AnimatePresence initial={false}>
               {messages.map((msg, i) => {
                 const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
@@ -977,22 +1022,47 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                        className="flex items-center gap-0.5 mt-2 ml-1"
+                        className="flex items-center gap-0.5 mt-2 ml-1 flex-wrap"
                       >
+                        {/* Primary: playback + copy + share */}
                         <ListenButton text={msg.content} />
                         <CopyButton text={msg.content} />
+                        <ShareButton text={msg.content} />
+
+                        {/* Separator */}
+                        <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
+
+                        {/* Secondary: save + (last-msg) simplify + regenerate */}
                         <SaveButton onSave={() => workspace.save(msg.content)} />
                         {isLastAsst && (
-                          <button
-                            onClick={handleRegenerate}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                              text-white/30 hover:text-white/65 hover:bg-white/[0.07]
-                              transition-all duration-150 active:scale-95"
-                            aria-label="Regenerate response"
-                          >
-                            <RotateCcw size={11} strokeWidth={2} />
-                            Regenerate
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleSend('Can you explain that in simpler terms?')}
+                              disabled={isThinking}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                                text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
+                                transition-all duration-150 active:scale-95
+                                disabled:opacity-40 disabled:cursor-not-allowed
+                                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
+                              aria-label="Ask Singularity to explain more simply"
+                            >
+                              <Wand2 size={11} strokeWidth={2} />
+                              Simplify
+                            </button>
+                            <button
+                              onClick={handleRegenerate}
+                              disabled={isThinking}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                                text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
+                                transition-all duration-150 active:scale-95
+                                disabled:opacity-40 disabled:cursor-not-allowed
+                                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
+                              aria-label="Regenerate response"
+                            >
+                              <RotateCcw size={11} strokeWidth={2} />
+                              Regenerate
+                            </button>
+                          </>
                         )}
                       </motion.div>
                     )}
@@ -1046,11 +1116,23 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     className="text-left px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]
                       text-[13.5px] text-white/55 hover:bg-white/[0.06] hover:text-white/85
                       hover:border-white/[0.11] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
-                      transition-all duration-200 active:scale-[0.98] active:bg-white/[0.08]"
+                      transition-all duration-200 active:scale-[0.98] active:bg-white/[0.08]
+                      focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
                   >
                     {p}
                   </motion.button>
                 ))}
+
+                {/* Capability hint — subtle feature summary */}
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6, duration: 0.5 }}
+                  className="text-center text-[10.5px] text-white/[0.15] mt-1 tracking-[0.05em]
+                    leading-relaxed select-none"
+                >
+                  Deep reasoning · LaTeX math · Multi-step science · Voice narration
+                </motion.p>
               </motion.div>
             )}
 
@@ -1135,8 +1217,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           </div>
 
           {/* Disclaimer */}
-          <p className="text-center text-[10px] text-white/12 mt-2.5 tracking-wide">
-            Singularity may make mistakes · verify important scientific claims
+          <p className="text-center text-[10px] text-white/[0.11] mt-3 tracking-[0.04em] leading-relaxed">
+            Singularity reasons deeply but can err on cutting-edge science
+            <span className="mx-1.5 opacity-40">·</span>
+            always verify critical claims
           </p>
         </div>
       </div>
