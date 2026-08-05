@@ -37,6 +37,15 @@ const STARTER_PROMPTS = [
   "Why doesn't the EPR paradox violate relativity?",
 ];
 
+// Quick-action modifier chips shown near the input
+const QUICK_CHIPS = [
+  { label: 'Explain simply',          suffix: 'Explain this simply.' },
+  { label: 'Give examples',           suffix: 'Give concrete examples.' },
+  { label: 'Compare concepts',        suffix: 'Compare the key concepts.' },
+  { label: 'Latest research',         suffix: 'What does the latest research say?' },
+  { label: 'Real-world impact',       suffix: 'What are the real-world applications?' },
+] as const;
+
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
@@ -390,6 +399,87 @@ const ThinkingDots = memo(function ThinkingDots() {
   );
 });
 
+// ─── Status pill ─────────────────────────────────────────────────────────────
+type ChatPhase = 'idle' | 'thinking' | 'streaming';
+
+const StatusPill = memo(function StatusPill({ phase }: { phase: ChatPhase }) {
+  const cfg: Record<ChatPhase, { dotCls: string; label: string; textCls: string }> = {
+    idle:      { dotCls: 'bg-emerald-400/50',  label: 'Ready',      textCls: 'text-white/22' },
+    thinking:  { dotCls: 'bg-violet-400/80',   label: 'Thinking',   textCls: 'text-violet-300/70' },
+    streaming: { dotCls: 'bg-violet-300/60',   label: 'Responding', textCls: 'text-violet-200/55' },
+  };
+  const { dotCls, label, textCls } = cfg[phase];
+  return (
+    <div className="flex items-center gap-1.5" aria-live="polite" aria-label={`Status: ${label}`}>
+      <motion.div
+        className={`w-[5px] h-[5px] rounded-full ${dotCls}`}
+        animate={phase !== 'idle'
+          ? { opacity: [0.3, 1, 0.3], scale: [0.9, 1.2, 0.9] }
+          : { opacity: 0.5 }}
+        transition={phase !== 'idle'
+          ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
+          : {}}
+      />
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={phase}
+          initial={{ opacity: 0, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -3 }}
+          transition={{ duration: 0.18 }}
+          className={`text-[9px] uppercase tracking-[0.16em] font-mono ${textCls}`}
+        >
+          {label}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+});
+
+// ─── Quick-action chips ───────────────────────────────────────────────────────
+const QuickChips = memo(function QuickChips({
+  input, onChip, disabled,
+}: {
+  input: string;
+  onChip: (text: string) => void;
+  disabled: boolean;
+}) {
+  const visible = !disabled && input.length < 80;
+  return (
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="overflow-hidden"
+        >
+          <div className="flex items-center gap-1.5 px-4 pt-3 pb-0.5 overflow-x-auto scrollbar-hide">
+            {QUICK_CHIPS.map(chip => (
+              <button
+                key={chip.label}
+                onClick={() => onChip(
+                  input.trim()
+                    ? `${input.trim()} — ${chip.suffix}`
+                    : chip.suffix
+                )}
+                className="flex-shrink-0 px-3 py-1.5 rounded-full
+                  bg-white/[0.04] border border-white/[0.07]
+                  text-[11px] text-white/42 hover:text-white/72
+                  hover:bg-white/[0.07] hover:border-white/[0.13]
+                  transition-all duration-150 active:scale-95 whitespace-nowrap"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+});
+
 // ─── API error type ───────────────────────────────────────────────────────────
 interface ApiError {
   error:   string;
@@ -402,6 +492,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [messages, setMessages]         = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput]               = useState('');
   const [isThinking, setIsThinking]     = useState(false);
+  const [isStreaming, setIsStreaming]   = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [apiError, setApiError]         = useState<ApiError | null>(null);
 
@@ -466,6 +557,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const generateResponse = useCallback(async (userText: string) => {
     setApiError(null);
     setIsThinking(true);
+    setIsStreaming(true);
     thinkingStartRef.current = Date.now();
     abortRef.current = new AbortController();
 
@@ -600,6 +692,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       ));
     } finally {
       setIsThinking(false);
+      setIsStreaming(false);
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     }
   }, [messages]);
@@ -619,6 +712,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
     setIsThinking(false);
+    setIsStreaming(false);
+  }, []);
+
+  const applyChip = useCallback((text: string) => {
+    setInput(text);
+    textareaRef.current?.focus();
   }, []);
 
   const handleRegenerate = useCallback(() => {
@@ -688,16 +787,20 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             </div>
           </div>
 
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-white/[0.07] text-white/30 hover:text-white/70
-                transition-all duration-150 active:scale-95"
-              aria-label="Close Singularity"
-            >
-              <X size={17} strokeWidth={1.8} />
-            </button>
-          )}
+          {/* Right side: live status + close */}
+          <div className="flex items-center gap-4">
+            <StatusPill phase={isThinking ? 'thinking' : isStreaming ? 'streaming' : 'idle'} />
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full hover:bg-white/[0.07] text-white/30 hover:text-white/70
+                  transition-all duration-150 active:scale-95"
+                aria-label="Close Singularity"
+              >
+                <X size={17} strokeWidth={1.8} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -879,46 +982,60 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-t border-white/[0.05] bg-[#09090b] pb-safe">
+      <div
+        className="flex-shrink-0 border-t border-white/[0.04] pb-safe"
+        style={{ background: 'linear-gradient(to top, #09090b 70%, transparent)' }}
+      >
         <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-4">
-          <div className="relative flex items-end gap-3 bg-white/[0.05] border border-white/[0.09]
-            rounded-2xl px-3 py-2.5
-            focus-within:border-emerald-500/30 focus-within:bg-white/[0.06]
-            focus-within:shadow-[0_0_0_1px_rgba(16,185,129,0.12),0_0_20px_rgba(16,185,129,0.06)]
+
+          {/* ── Unified input shell: chips + textarea + send ─────────────── */}
+          <div className="rounded-2xl bg-[#0d0d12] border border-white/[0.09]
+            shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)]
+            focus-within:border-white/[0.16]
+            focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(255,255,255,0.055),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]
             transition-all duration-300">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask the universe…  (Shift+Enter for new line)"
-              rows={1}
-              className="flex-1 resize-none bg-transparent text-[14px] text-white/90
-                placeholder:text-white/25 px-2 py-1.5 outline-none max-h-[160px]
-                leading-relaxed"
-              aria-label="Message Singularity"
-            />
-            <button
-              onClick={() => (isThinking ? handleStop() : handleSend())}
-              disabled={!isThinking && !input.trim()}
-              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center
-                transition-all duration-200 mb-0.5 active:scale-90 ${
-                isThinking
-                  ? 'bg-white/90 text-black shadow-[0_0_20px_rgba(255,255,255,0.25)]'
-                  : input.trim()
-                    ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.30)]'
-                    : 'bg-white/[0.07] text-white/25 cursor-not-allowed'
-              }`}
-              aria-label={isThinking ? 'Stop generating' : 'Send message'}
-            >
-              {isThinking
-                ? <Square size={12} strokeWidth={2.5} fill="currentColor" />
-                : <Send size={14} strokeWidth={2.5} className={input.trim() ? 'ml-0.5' : ''} />
-              }
-            </button>
+
+            {/* Quick-action chips (hide while AI is active or input long) */}
+            <QuickChips input={input} onChip={applyChip} disabled={isThinking} />
+
+            {/* Textarea + send button row */}
+            <div className="flex items-end gap-3 px-4 py-3">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask Singularity anything…"
+                rows={1}
+                className="flex-1 resize-none bg-transparent text-[14px] text-white/90
+                  placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
+                  leading-relaxed py-[2px]"
+                aria-label="Message Singularity"
+              />
+              <button
+                onClick={() => (isThinking ? handleStop() : handleSend())}
+                disabled={!isThinking && !input.trim()}
+                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                  transition-all duration-200 mb-0.5 active:scale-90 ${
+                  isThinking
+                    ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
+                    : input.trim()
+                      ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.28)]'
+                      : 'bg-white/[0.06] text-white/18 cursor-not-allowed'
+                }`}
+                aria-label={isThinking ? 'Stop generating' : 'Send message'}
+              >
+                {isThinking
+                  ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
+                  : <Send size={13} strokeWidth={2.5} className={input.trim() ? 'ml-[1px]' : ''} />
+                }
+              </button>
+            </div>
           </div>
-          <p className="text-center text-[10px] text-white/15 mt-2.5">
-            Singularity may make mistakes. Verify important physics claims.
+
+          {/* Disclaimer */}
+          <p className="text-center text-[10px] text-white/12 mt-2.5 tracking-wide">
+            Singularity may make mistakes · verify important scientific claims
           </p>
         </div>
       </div>
