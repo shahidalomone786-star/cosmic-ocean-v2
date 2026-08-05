@@ -730,6 +730,9 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   }, []);
 
   const playPremium = useCallback(async (text: string, idx: number) => {
+    // A prior exhausted response is informational only. The server rotates
+    // through the configured pool, so every new click should try premium again.
+    setQuotaExhausted(false);
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -787,9 +790,9 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
     // New message — stop everything and start fresh
     stopAll();
-    if (preferEngine === 'premium' && !quotaExhausted) { await playPremium(spokenText, idx); }
+    if (preferEngine === 'premium') { await playPremium(spokenText, idx); }
     else { playStandard(spokenText, idx); }
-  }, [playingIdx, isPlaying, activeEngine, preferEngine, quotaExhausted, stopAll, playPremium, playStandard]);
+  }, [playingIdx, isPlaying, activeEngine, preferEngine, stopAll, playPremium, playStandard]);
 
   const skipTime = useCallback((delta: number) => {
     if (audioRef.current && activeEngine === 'premium' && playingIdx !== null) {

@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } fr
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
-  Square, Copy, Check, RotateCcw, ArrowDown, Volume2, VolumeX,
+  Square, Copy, Check, RotateCcw, ArrowDown, Volume2,
   BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -298,23 +298,15 @@ const ShareButton = memo(function ShareButton({ text }: { text: string }) {
 
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
 const ListenButton = memo(function ListenButton({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'failed'>('idle');
+  const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
   const audioRef       = useRef<HTMLAudioElement | null>(null);
   const abortRef       = useRef<AbortController | null>(null);
   const audioCacheRef  = useRef<Map<string, string>>(new Map());
   const listenersRef   = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
-  const failTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const setFailed = useCallback(() => {
-    setState('failed');
-    if (failTimerRef.current) clearTimeout(failTimerRef.current);
-    failTimerRef.current = setTimeout(() => setState('idle'), 3500);
-  }, []);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
     window.speechSynthesis?.cancel();
-    if (failTimerRef.current) { clearTimeout(failTimerRef.current); failTimerRef.current = null; }
     if (audioRef.current) {
       if (listenersRef.current) {
         audioRef.current.removeEventListener('ended', listenersRef.current.onEnded);
@@ -330,7 +322,6 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
 
   const play = useCallback(async () => {
     if (state === 'playing' || state === 'loading') { stop(); return; }
-    if (state === 'failed') return;
 
     setState('loading');
     abortRef.current = new AbortController();
@@ -346,7 +337,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
           body: JSON.stringify({ text: clean }),
           signal: abortRef.current.signal,
         });
-        if (!res.ok) { setFailed(); return; }
+        if (!res.ok) throw new Error(`TTS ${res.status}`);
         const blob = await res.blob();
         url = URL.createObjectURL(blob);
         audioCacheRef.current.set(clean, url);
@@ -367,7 +358,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         audio.removeEventListener('error', onError);
         listenersRef.current = null;
         audioRef.current = null;
-        setFailed();
+        setState('idle');
       };
       listenersRef.current = { onEnded, onError };
       audio.addEventListener('ended', onEnded);
@@ -376,20 +367,19 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
       setState('playing');
       await audio.play();
     } catch (err: any) {
-      if (err?.name === 'AbortError') return;
+      if (err?.name === 'AbortError') { setState('idle'); return; }
       try {
         setState('playing');
-        await speakWithBrowser(text);
+        await speakWithBrowser(cleanTtsText(text));
         setState('idle');
       } catch {
-        setFailed();
+        setState('idle');
       }
     }
-  }, [text, state, stop, setFailed]);
+  }, [text, state, stop]);
 
   useEffect(() => () => {
     stop();
-    if (failTimerRef.current) clearTimeout(failTimerRef.current);
     audioCacheRef.current.forEach(blobUrl => URL.revokeObjectURL(blobUrl));
     audioCacheRef.current.clear();
   }, [stop]);
@@ -397,7 +387,6 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
   return (
     <button
       onClick={play}
-      disabled={state === 'failed'}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
         transition-all duration-200 active:scale-95
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 ${
@@ -405,14 +394,11 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
           ? 'text-emerald-400 bg-emerald-400/[0.11] border border-emerald-400/[0.28] shadow-[0_0_12px_rgba(52,211,153,0.10)]'
           : state === 'loading'
           ? 'text-emerald-400/70 bg-emerald-400/[0.07] border border-emerald-400/[0.14]'
-          : state === 'failed'
-            ? 'text-red-400/55 bg-red-500/[0.05] border border-red-400/10 cursor-default'
-            : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
       }`}
       aria-label={
         state === 'playing' ? 'Stop audio'
           : state === 'loading' ? 'Loading audio…'
-          : state === 'failed'  ? 'Voice unavailable'
           : 'Listen to response'
       }
     >
@@ -428,8 +414,6 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
           </motion.div>
           Loading…
         </>
-      ) : state === 'failed' ? (
-        <><VolumeX size={11} strokeWidth={2} />Unavailable</>
       ) : (
         <><Volume2 size={11} strokeWidth={2} />Listen</>
       )}

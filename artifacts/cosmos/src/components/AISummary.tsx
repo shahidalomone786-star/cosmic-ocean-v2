@@ -138,20 +138,44 @@ function speakWithBrowser(text: string): Promise<void> {
   });
 }
 
-async function playTTS(text: string): Promise<void> {
+async function playTTS(text: string, signal?: AbortSignal): Promise<void> {
   const res = await fetch('/api/tts', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ text: cleanTtsText(text) }),
+    signal,
   });
   if (!res.ok) throw new Error(`TTS ${res.status}`);
   const blob = await res.blob();
   const url  = URL.createObjectURL(blob);
   return new Promise((resolve, reject) => {
     const audio = new Audio(url);
-    audio.onended  = () => { URL.revokeObjectURL(url); resolve(); };
-    audio.onerror  = () => { URL.revokeObjectURL(url); reject(new Error('audio playback failed')); };
-    audio.play().catch(reject);
+    let settled = false;
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      signal?.removeEventListener('abort', onAbort);
+      URL.revokeObjectURL(url);
+    };
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      error ? reject(error) : resolve();
+    };
+    const onAbort = () => {
+      audio.pause();
+      audio.src = '';
+      finish(new DOMException('TTS playback aborted', 'AbortError'));
+    };
+    audio.onended = () => finish();
+    audio.onerror = () => finish(new Error('audio playback failed'));
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    audio.play().catch(error => finish(error));
   });
 }
 
@@ -174,10 +198,17 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
   const abortRef = useRef<AbortController | null>(null);
 
   const handleClick = useCallback(async () => {
-    if (state !== 'idle' && state !== 'error') return;
+    if (state === 'loading' || state === 'playing') {
+      abortRef.current?.abort();
+      window.speechSynthesis?.cancel();
+      setState('idle');
+      return;
+    }
     setState('loading');
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      await playTTS(text);
+      await playTTS(text, controller.signal);
       setState('idle');
     } catch (e: unknown) {
       if ((e as Error)?.name === 'AbortError') { setState('idle'); return; }
@@ -189,6 +220,8 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
         setState('error');
         setTimeout(() => setState('idle'), 3000);
       }
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
   }, [state, text]);
 
@@ -202,7 +235,6 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
   return (
     <button
       onClick={handleClick}
-      disabled={state === 'loading' || state === 'playing'}
       className={`${cls} flex items-center gap-2 ${state === 'error' ? 'text-red-400/80' : 'text-white/90'}`}
       aria-label={state === 'loading' ? 'Loading audio…' : state === 'playing' ? 'Playing…' : 'Listen'}
     >
