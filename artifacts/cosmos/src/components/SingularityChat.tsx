@@ -10,12 +10,14 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown, ChevronUp,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2, VolumeX,
+  BookmarkPlus, Bookmark,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { WorkspacePanel, useWorkspace } from './WorkspacePanel';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -159,6 +161,40 @@ const MessageContent = memo(function MessageContent({ content }: { content: stri
   );
 });
 
+// ─── Save-to-workspace button ────────────────────────────────────────────────
+const SaveButton = memo(function SaveButton({ onSave }: { onSave: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handle = useCallback(() => {
+    onSave();
+    setSaved(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSaved(false), 1800);
+  }, [onSave]);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  return (
+    <button
+      onClick={handle}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+        transition-all duration-200 active:scale-95 ${
+        saved
+          ? 'text-violet-400 bg-violet-400/[0.09] border border-violet-400/[0.18]'
+          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+      }`}
+      aria-label={saved ? 'Saved to workspace' : 'Save to workspace'}
+    >
+      {saved
+        ? <Check size={11} strokeWidth={2.5} />
+        : <BookmarkPlus size={11} strokeWidth={2} />
+      }
+      {saved ? 'Saved' : 'Save'}
+    </button>
+  );
+});
+
 // ─── Copy button ────────────────────────────────────────────────────────────
 const CopyButton = memo(function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -184,19 +220,23 @@ const CopyButton = memo(function CopyButton({ text }: { text: string }) {
 
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
 const ListenButton = memo(function ListenButton({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
-  const audioRef      = useRef<HTMLAudioElement | null>(null);
-  const abortRef      = useRef<AbortController | null>(null);
-  // Blob URL cache — avoids re-fetching the same audio from ElevenLabs
-  const audioCacheRef = useRef<Map<string, string>>(new Map());
-  // Named listener refs so stop() can remove them from any detached Audio node
-  const listenersRef  = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'failed'>('idle');
+  const audioRef       = useRef<HTMLAudioElement | null>(null);
+  const abortRef       = useRef<AbortController | null>(null);
+  const audioCacheRef  = useRef<Map<string, string>>(new Map());
+  const listenersRef   = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
+  const failTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const setFailed = useCallback(() => {
+    setState('failed');
+    if (failTimerRef.current) clearTimeout(failTimerRef.current);
+    failTimerRef.current = setTimeout(() => setState('idle'), 3500);
+  }, []);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
+    if (failTimerRef.current) { clearTimeout(failTimerRef.current); failTimerRef.current = null; }
     if (audioRef.current) {
-      // Explicitly remove listeners before detaching — prevents ghost callbacks
-      // from a still-active Audio node after we null the ref
       if (listenersRef.current) {
         audioRef.current.removeEventListener('ended', listenersRef.current.onEnded);
         audioRef.current.removeEventListener('error', listenersRef.current.onError);
@@ -211,12 +251,12 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
 
   const play = useCallback(async () => {
     if (state === 'playing' || state === 'loading') { stop(); return; }
+    if (state === 'failed') return;
 
     setState('loading');
     abortRef.current = new AbortController();
 
     try {
-      // Strip markdown/LaTeX for cleaner speech
       const clean = text
         .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
         .replace(/\$[^$]*\$/g, ' formula ')
@@ -230,33 +270,28 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         .trim()
         .slice(0, 2500);
 
-      // Cache hit — reuse the existing blob URL (saves an ElevenLabs API call)
       let url = audioCacheRef.current.get(clean);
-
       if (!url) {
-        // Voice choice is server-side; frontend sends text only
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: clean }),
           signal: abortRef.current.signal,
         });
-        if (!res.ok) throw new Error(`TTS error ${res.status}`);
+        if (!res.ok) { setFailed(); return; }
         const blob = await res.blob();
         url = URL.createObjectURL(blob);
-        audioCacheRef.current.set(clean, url);  // store for replay
+        audioCacheRef.current.set(clean, url);
       }
 
-      // Lazy-mount: Audio object is created only on first play
       const audio = new Audio(url);
       audioRef.current = audio;
 
-      // Named listeners so they can be removed by stop() if user cancels mid-play
       const onEnded = () => {
         audio.removeEventListener('ended', onEnded);
         audio.removeEventListener('error', onError);
         listenersRef.current = null;
-        audioRef.current = null;   // release the Audio object; blob URL stays cached
+        audioRef.current = null;
         setState('idle');
       };
       const onError = () => {
@@ -264,7 +299,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         audio.removeEventListener('error', onError);
         listenersRef.current = null;
         audioRef.current = null;
-        setState('idle');
+        setFailed();
       };
       listenersRef.current = { onEnded, onError };
       audio.addEventListener('ended', onEnded);
@@ -274,55 +309,52 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
       await audio.play();
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      setState('idle');
+      setFailed();
     }
-  }, [text, state, stop]);
+  }, [text, state, stop, setFailed]);
 
-  // Cleanup on unmount — stop playback and revoke all cached blob URLs
   useEffect(() => () => {
     stop();
+    if (failTimerRef.current) clearTimeout(failTimerRef.current);
     audioCacheRef.current.forEach(blobUrl => URL.revokeObjectURL(blobUrl));
     audioCacheRef.current.clear();
   }, [stop]);
 
-  const isActive = state === 'playing' || state === 'loading';
-
   return (
     <button
       onClick={play}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all duration-200
-        active:scale-95
-        ${isActive
-          ? 'text-emerald-400 bg-emerald-400/[0.10] border border-emerald-400/20'
-          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
-        }`}
-      aria-label={isActive ? 'Stop audio' : 'Listen to response'}
+      disabled={state === 'failed'}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+        transition-all duration-200 active:scale-95 ${
+        state === 'playing' || state === 'loading'
+          ? 'text-emerald-400 bg-emerald-400/[0.10] border border-emerald-400/18'
+          : state === 'failed'
+            ? 'text-red-400/55 bg-red-500/[0.05] border border-red-400/10 cursor-default'
+            : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+      }`}
+      aria-label={
+        state === 'playing' ? 'Stop audio'
+          : state === 'loading' ? 'Loading audio…'
+          : state === 'failed'  ? 'Voice unavailable'
+          : 'Listen to response'
+      }
     >
       {state === 'playing' ? (
-        <>
-          <motion.div
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <VolumeX size={11} strokeWidth={2} />
-          </motion.div>
-          Stop
-        </>
+        <><AudioWave />Stop</>
       ) : state === 'loading' ? (
         <>
           <motion.div
             animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 1, repeat: Infinity }}
+            transition={{ duration: 0.9, repeat: Infinity }}
           >
             <Volume2 size={11} strokeWidth={2} />
           </motion.div>
           Loading…
         </>
+      ) : state === 'failed' ? (
+        <><VolumeX size={11} strokeWidth={2} />Unavailable</>
       ) : (
-        <>
-          <Volume2 size={11} strokeWidth={2} />
-          Listen
-        </>
+        <><Volume2 size={11} strokeWidth={2} />Listen</>
       )}
     </button>
   );
@@ -376,6 +408,26 @@ const ReasoningBlock = memo(function ReasoningBlock({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+});
+
+// ─── Audio waveform ──────────────────────────────────────────────────────────
+const WAVE_BARS: Array<[number, number]> = [
+  [0, 0.65], [0.12, 0.82], [0.05, 0.55], [0.18, 0.75], [0.08, 0.7],
+];
+const AudioWave = memo(function AudioWave() {
+  return (
+    <div className="flex items-end gap-[2.5px] h-[13px]" aria-hidden="true">
+      {WAVE_BARS.map(([delay, duration], i) => (
+        <motion.div
+          key={i}
+          className="w-[2px] rounded-full bg-emerald-400/80"
+          style={{ minHeight: '3px' }}
+          animate={{ scaleY: [0.2, 1, 0.3, 0.85, 0.2] }}
+          transition={{ duration, repeat: Infinity, delay, ease: 'easeInOut' }}
+        />
+      ))}
     </div>
   );
 });
@@ -495,6 +547,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [isStreaming, setIsStreaming]   = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [apiError, setApiError]         = useState<ApiError | null>(null);
+  const workspace                       = useWorkspace();
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
@@ -787,9 +840,28 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             </div>
           </div>
 
-          {/* Right side: live status + close */}
-          <div className="flex items-center gap-4">
+          {/* Right side: status + workspace + close */}
+          <div className="flex items-center gap-3">
             <StatusPill phase={isThinking ? 'thinking' : isStreaming ? 'streaming' : 'idle'} />
+
+            {/* Research Workspace toggle */}
+            <button
+              onClick={() => workspace.setOpen(true)}
+              className="relative flex items-center justify-center p-2 rounded-full
+                text-white/30 hover:text-white/65 hover:bg-white/[0.07]
+                transition-all duration-150 active:scale-95"
+              aria-label="Open research workspace"
+            >
+              <Bookmark size={15} strokeWidth={1.7} />
+              {workspace.items.length > 0 && (
+                <span className="absolute -top-[3px] -right-[3px] min-w-[14px] h-[14px]
+                  rounded-full bg-violet-500/90 text-[7.5px] text-white font-bold
+                  flex items-center justify-center leading-none px-[3px]">
+                  {workspace.items.length > 9 ? '9+' : workspace.items.length}
+                </span>
+              )}
+            </button>
+
             {onClose && (
               <button
                 onClick={onClose}
@@ -803,6 +875,15 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
       </div>
+
+      {/* ── Research Workspace Panel ─────────────────────────────────────── */}
+      <WorkspacePanel
+        open={workspace.open}
+        onClose={() => workspace.setOpen(false)}
+        items={workspace.items}
+        onRemove={workspace.remove}
+        onNoteChange={workspace.updateNote}
+      />
 
       {/* ── 🚨 GROQ DEBUG PANEL — visible whenever an API error occurs ─────── */}
       {apiError && (
@@ -893,6 +974,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                       <div className="flex items-center gap-0.5 mt-2 ml-1">
                         <ListenButton text={msg.content} />
                         <CopyButton text={msg.content} />
+                        <SaveButton onSave={() => workspace.save(msg.content)} />
                         {isLastAsst && (
                           <button
                             onClick={handleRegenerate}
