@@ -76,6 +76,7 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  "@andresaya/edge-tts>fs": "-"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"

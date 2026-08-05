@@ -338,21 +338,21 @@ function ThinkingDots() {
 // ─── Chat Modal ───────────────────────────────────────────────────────────────
 // ─── TTS Controls ────────────────────────────────────────────────────────────
 function TtsControls({
-  idx, playingIdx, isPlaying, activeEngine,
+  idx, playingIdx, isPlaying, playbackMode,
   onPlay, onSkip,
 }: {
   idx: number;
   playingIdx: number | null;
   isPlaying: boolean;
-  activeEngine: 'premium' | 'standard';
+  playbackMode: 'edge' | 'browser';
   onPlay: () => void;
   onSkip: (delta: number) => void;
 }) {
   const isActive = playingIdx === idx;
-  const showSkip = isActive && activeEngine === 'premium';
+  const showSkip = isActive && playbackMode === 'edge';
   return (
     <div className="ml-10 flex items-center gap-1.5 pt-1 opacity-70">
-      {/* Rewind 5s — premium + active only */}
+      {/* Rewind 5s — Edge audio only */}
       {showSkip && (
         <button onClick={() => onSkip(-5)} title="Back 5s"
           className="w-[18px] h-[18px] flex items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.04] text-white/45 hover:text-white/75 hover:bg-white/[0.09] transition-all duration-150 text-[8px]">
@@ -366,7 +366,7 @@ function TtsControls({
           ? <span className="text-[10px]">⏸</span>
           : <span className="text-[9px] pl-px">▶</span>}
       </button>
-      {/* Fast-forward 5s — premium + active only */}
+      {/* Fast-forward 5s — Edge audio only */}
       {showSkip && (
         <button onClick={() => onSkip(5)} title="Forward 5s"
           className="w-[18px] h-[18px] flex items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.04] text-white/45 hover:text-white/75 hover:bg-white/[0.09] transition-all duration-150 text-[8px]">
@@ -377,22 +377,14 @@ function TtsControls({
   );
 }
 
-// ─── Usage Dashboard Modal ─────────────────────────────────────────────────────
-function UsageDashboard({
-  tokens, voiceChars, quotaExhausted, ttsEngine, onClose,
-}: {
+// ─── Usage Dashboard Modal ────────────────────────────────────────────────────
+function UsageDashboard({ tokens, voiceChars, playbackMode, onClose }: {
   tokens: number;
   voiceChars: number;
-  quotaExhausted: boolean;
-  ttsEngine: 'premium' | 'standard';
+  playbackMode: 'edge' | 'browser';
   onClose: () => void;
 }) {
-  const VOICE_CAP = 10_000; // chars ≈ 10 min
   const TOKEN_CAP = 30_000; // tokens ≈ 30 min
-
-  const voiceMinsUsed = (voiceChars / 1000).toFixed(1);
-  const voiceMinsLeft = Math.max(0, (VOICE_CAP - voiceChars) / 1000).toFixed(1);
-  const voicePct      = Math.min(100, (voiceChars / VOICE_CAP) * 100);
 
   const tokenMinsUsed = (tokens / 1000).toFixed(1);
   const tokenMinsLeft = Math.max(0, (TOKEN_CAP - tokens) / 1000).toFixed(1);
@@ -417,7 +409,7 @@ function UsageDashboard({
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <span className="text-[15px]">📊</span>
-            <h3 className="text-white text-[13px] font-semibold tracking-tight">Usage & Quota</h3>
+            <h3 className="text-white text-[13px] font-semibold tracking-tight">Usage</h3>
           </div>
           <button onClick={onClose}
             className="w-7 h-7 flex items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.05] text-white/40 hover:text-white text-[16px] leading-none transition-colors duration-150">
@@ -429,33 +421,16 @@ function UsageDashboard({
         <div className="mb-5">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${quotaExhausted ? 'bg-red-400' : ttsEngine === 'premium' ? 'bg-violet-400' : 'bg-white/30'}`} />
-              <span className="text-white/70 text-[11.5px] font-medium">Voice · ElevenLabs</span>
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${playbackMode === 'edge' ? 'bg-violet-400' : 'bg-white/30'}`} />
+              <span className="text-white/70 text-[11.5px] font-medium">Voice · Edge Neural</span>
             </div>
-            <span className={`text-[8.5px] px-2 py-0.5 rounded-full border uppercase tracking-[0.12em] ${
-              quotaExhausted
-                ? 'bg-red-500/15 border-red-400/20 text-red-300/90'
-                : ttsEngine === 'premium'
-                  ? 'bg-violet-500/15 border-violet-400/20 text-violet-300/90'
-                  : 'bg-white/[0.05] border-white/[0.09] text-white/35'}`}>
-              {quotaExhausted ? '✗ Exhausted' : ttsEngine === 'premium' ? '★ Premium' : '◎ Std'}
+            <span className="text-[8.5px] px-2 py-0.5 rounded-full border uppercase tracking-[0.12em] bg-violet-500/15 border-violet-400/20 text-violet-300/90">
+              {playbackMode === 'edge' ? 'Neural' : 'Browser fallback'}
             </span>
           </div>
           <div className="flex justify-between text-[10.5px] text-white/35 mb-1.5">
-            <span>{voiceMinsUsed} min used</span>
-            <span>{voiceMinsLeft} min left</span>
-          </div>
-          <div className="w-full h-[5px] rounded-full bg-white/[0.07] overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${voicePct}%` }}
-              transition={{ duration: 0.85, ease: 'easeOut' }}
-              className={`h-full rounded-full ${quotaExhausted ? 'bg-red-400' : 'bg-violet-400'}`}
-            />
-          </div>
-          <div className="flex justify-between text-[9.5px] text-white/20 mt-1">
-            <span>{voiceChars.toLocaleString()} chars</span>
-            <span>≈{VOICE_CAP / 1000} min cap</span>
+            <span>{voiceChars.toLocaleString()} chars synthesized</span>
+            <span>{playbackMode === 'edge' ? 'Edge Neural' : 'Browser fallback'}</span>
           </div>
         </div>
 
@@ -554,12 +529,11 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const blobUrlRef    = useRef('');
   const [playingIdx,   setPlayingIdx]   = useState<number | null>(null);
   const [isPlaying,    setIsPlaying]    = useState(false);
-  const [activeEngine, setActiveEngine] = useState<'premium' | 'standard'>('premium');
+  const [playbackMode, setPlaybackMode] = useState<'edge' | 'browser'>('edge');
 
-  // ── Quota / typewriter state ────────────────────────────────────────────────
+  // ── Usage / typewriter state ────────────────────────────────────────────────
   const [sessionTokens,   setSessionTokens]   = useState(0);
   const [sessionVoiceChars, setSessionVoiceChars] = useState(0);
-  const [quotaExhausted,  setQuotaExhausted]  = useState(false);
   // Set of message indices currently in typewriter animation
   const [typingSet, setTypingSet] = useState<Set<number>>(() => new Set());
   const [showDashboard, setShowDashboard] = useState(false);
@@ -695,7 +669,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     setPlayingIdx(null);
   }, []);
 
-  const playStandard = useCallback((text: string, idx: number) => {
+  const playBrowser = useCallback((text: string, idx: number) => {
     window.speechSynthesis?.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate  = 0.92;
@@ -704,25 +678,18 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     window.speechSynthesis.speak(utt);
     setPlayingIdx(idx);
     setIsPlaying(true);
-    setActiveEngine('standard');
+    setPlaybackMode('browser');
   }, []);
 
-  const playPremium = useCallback(async (text: string, idx: number) => {
-    // A prior exhausted response is informational only. The server rotates
-    // through the configured pool, so every new click should try premium again.
-    setQuotaExhausted(false);
+  const playEdge = useCallback(async (text: string, idx: number) => {
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, avatarName: avatar.name }),
+        body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        const data = await res.json() as { code?: string };
-        if (data.code === 'TOTAL_QUOTA_EXHAUSTED') {
-          setQuotaExhausted(true);
-        }
-        playStandard(text, idx);
+        playBrowser(text, idx);
         return;
       }
       addVoiceChars(text.length);
@@ -737,24 +704,24 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       try { await audio.play(); } catch { /* interrupted */ }
       setPlayingIdx(idx);
       setIsPlaying(true);
-      setActiveEngine('premium');
+      setPlaybackMode('edge');
     } catch {
-      playStandard(text, idx);
+      playBrowser(text, idx);
     }
-  }, [avatar.name, playStandard, addVoiceChars]);
+  }, [playBrowser, addVoiceChars]);
 
   const playTTS = useCallback(async (text: string, idx: number) => {
     const spokenText = cleanTtsText(text);
     // Toggle pause on the active message
     if (playingIdx === idx && isPlaying) {
-      if (activeEngine === 'premium' && audioRef.current) { audioRef.current.pause(); }
+      if (playbackMode === 'edge' && audioRef.current) { audioRef.current.pause(); }
       else { window.speechSynthesis?.pause(); }
       setIsPlaying(false);
       return;
     }
     // Resume a paused message
     if (playingIdx === idx && !isPlaying) {
-      if (activeEngine === 'premium' && audioRef.current) {
+      if (playbackMode === 'edge' && audioRef.current) {
         try { await audioRef.current.play(); } catch { /* ok */ }
       } else { window.speechSynthesis?.resume(); }
       setIsPlaying(true);
@@ -762,14 +729,14 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
     // New message — stop everything and start fresh
     stopAll();
-    await playPremium(spokenText, idx);
-  }, [playingIdx, isPlaying, activeEngine, stopAll, playPremium]);
+    await playEdge(spokenText, idx);
+  }, [playingIdx, isPlaying, playbackMode, stopAll, playEdge]);
 
   const skipTime = useCallback((delta: number) => {
-    if (audioRef.current && activeEngine === 'premium' && playingIdx !== null) {
+    if (audioRef.current && playbackMode === 'edge' && playingIdx !== null) {
       audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime + delta);
     }
-  }, [activeEngine, playingIdx]);
+  }, [playbackMode, playingIdx]);
 
   // Cleanup on unmount
   useEffect(() => () => {
@@ -805,7 +772,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         <div className="flex justify-end px-4 pt-2 pb-0 flex-shrink-0">
           <button
             onClick={() => setShowDashboard(true)}
-            title="Usage & Quota Dashboard"
+            title="Usage Dashboard"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-white/35 hover:text-white/70 hover:bg-white/[0.08] hover:border-white/[0.14] transition-all duration-200"
           >
             <span className="text-[12px]">📊</span>
@@ -881,7 +848,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
                   idx={idx}
                   playingIdx={playingIdx}
                   isPlaying={isPlaying}
-                  activeEngine={activeEngine}
+                  playbackMode={playbackMode}
                   onPlay={() => { void playTTS(msg.text, idx); }}
                   onSkip={skipTime}
                 />
@@ -914,14 +881,13 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
             <UsageDashboard
               tokens={sessionTokens}
               voiceChars={sessionVoiceChars}
-              quotaExhausted={quotaExhausted}
-              ttsEngine={activeEngine}
+              playbackMode={playbackMode}
               onClose={() => setShowDashboard(false)}
             />
           )}
         </AnimatePresence>
 
-        {/* Hidden audio element for premium TTS */}
+        {/* Hidden audio element for Edge Neural playback */}
         <audio ref={audioRef} preload="none" className="hidden" />
 
         {/* ── Input — with safe-area bottom padding ── */}

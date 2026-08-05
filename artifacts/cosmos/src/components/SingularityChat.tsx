@@ -2,7 +2,7 @@
  * SingularityChat — Full-screen immersive DeepSeek R1 chat
  * ─────────────────────────────────────────────────────────
  * Full-screen solid dark background (bg-[#09090b]), centered max-w-3xl
- * content column, ElevenLabs TTS "Listen" button on every AI message.
+ * content column, neural TTS "Listen" button on every AI message.
  */
 
 import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } from 'react';
@@ -398,7 +398,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
       }`}
       aria-label={
         state === 'playing' ? 'Stop audio'
-          : state === 'loading' ? 'Loading audio…'
+          : state === 'loading' ? 'Generating audio…'
           : 'Listen to response'
       }
     >
@@ -412,7 +412,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
           >
             <Volume2 size={11} strokeWidth={2} />
           </motion.div>
-          Loading…
+          Generating…
         </>
       ) : (
         <><Volume2 size={11} strokeWidth={2} />Listen</>

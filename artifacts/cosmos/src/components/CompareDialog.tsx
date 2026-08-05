@@ -3,7 +3,7 @@
  *
  * Features:
  *   1. AI Analysis — auto-triggered on open, streams from /api/singularity
- *   2. TTS Listen — ElevenLabs Rachel voice via /api/tts
+ *   2. TTS Listen — neural voice via /api/tts
  *   3. Comparison table — horizontally scrollable on mobile (min-w-[480px])
  *
  * Lazy-mounted: parent only renders this when `open` has been true at least once.
@@ -182,7 +182,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
   const [ttsState, setTtsState] = useState<'idle' | 'loading' | 'playing'>('idle');
   const audioRef      = useRef<HTMLAudioElement | null>(null);
   const abortRef      = useRef<AbortController | null>(null);
-  // Blob URL cache — avoids re-fetching the same audio from ElevenLabs
+  // Blob URL cache — avoids re-fetching the same synthesized audio
   const audioCacheRef = useRef<Map<string, string>>(new Map());
   // Named listener refs so stop() can remove them from any detached Audio node
   const listenersRef  = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
@@ -215,7 +215,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
       // Strip markdown / LaTeX for cleaner speech (mirrors SingularityChat)
       const clean = cleanTtsText(text);
 
-      // Cache hit — reuse the existing blob URL (saves an ElevenLabs API call)
+        // Cache hit — reuse the existing synthesized audio
       let url = audioCacheRef.current.get(clean);
 
       if (!url) {
@@ -311,7 +311,7 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
           >
             <Volume2 size={9} strokeWidth={2} />
           </motion.div>
-          Loading…
+          Generating…
         </>
       ) : (
         <>

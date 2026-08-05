@@ -4,7 +4,7 @@
  * Design:
  *   • bg-[#0A0A10]/70 backdrop-blur-2xl animated-gradient-border card
  *   • Premium chip / button system: bg-white/5 border border-white/10 backdrop-blur-md
- *   • Working ElevenLabs TTS: fetch /api/tts → Blob → URL.createObjectURL → Audio.play()
+ *   • Neural TTS: fetch /api/tts → Blob → URL.createObjectURL → Audio.play()
  *   • Follow-up responses: each in its own glassmorphism bubble + dedicated Listen button
  *
  * Performance:
@@ -236,7 +236,7 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
     <button
       onClick={handleClick}
       className={`${cls} flex items-center gap-2 ${state === 'error' ? 'text-red-400/80' : 'text-white/90'}`}
-      aria-label={state === 'loading' ? 'Loading audio…' : state === 'playing' ? 'Playing…' : 'Listen'}
+      aria-label={state === 'loading' ? 'Generating audio…' : state === 'playing' ? 'Playing…' : 'Listen'}
     >
       {state === 'loading' ? (
         <>
