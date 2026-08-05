@@ -216,7 +216,7 @@ if (GROQ_KEYS.length === 0) {
 
 let keyCursor = 0;
 const TEXT_MODEL = 'openai/gpt-oss-120b';
-const VISION_MODEL = 'llama-3.2-90b-vision-preview';
+const VISION_MODEL = 'llama-3.2-11b-vision-preview';
 
 const VISION_MIME_TYPES = new Set([
   'image/jpeg',
