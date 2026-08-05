@@ -337,53 +337,21 @@ function ThinkingDots() {
 
 // ─── Chat Modal ───────────────────────────────────────────────────────────────
 // ─── TTS Controls ────────────────────────────────────────────────────────────
-const VOICE_ENGINE_STORAGE_KEY = 'cosmos-voice-engine';
-
 function TtsControls({
-  idx, playingIdx, isPlaying, activeEngine, preferEngine,
-  onPlay, onSkip, onEngineToggle,
+  idx, playingIdx, isPlaying, activeEngine,
+  onPlay, onSkip,
 }: {
   idx: number;
   playingIdx: number | null;
   isPlaying: boolean;
   activeEngine: 'premium' | 'standard';
-  preferEngine: 'premium' | 'standard';
   onPlay: () => void;
   onSkip: (delta: number) => void;
-  onEngineToggle: () => void;
 }) {
   const isActive = playingIdx === idx;
   const showSkip = isActive && activeEngine === 'premium';
   return (
     <div className="ml-10 flex items-center gap-1.5 pt-1 opacity-70">
-      {/* Voice Engine — explicit manual choice */}
-      <div className="flex items-center gap-1 rounded-full border border-white/[0.10] bg-black/20 px-1 py-0.5 backdrop-blur-md">
-        <span className="px-1.5 text-[8px] uppercase tracking-[0.13em] text-white/35">Voice Engine</span>
-        <button
-          onClick={() => { if (preferEngine !== 'premium') onEngineToggle(); }}
-          title="Use ElevenLabs Premium AI voice"
-          aria-pressed={preferEngine === 'premium'}
-          className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
-            preferEngine === 'premium'
-              ? 'bg-violet-500/20 text-violet-200 shadow-[0_0_10px_rgba(139,92,246,0.16)]'
-              : 'text-white/35 hover:text-white/65'
-          }`}
-        >
-          Premium AI
-        </button>
-        <button
-          onClick={() => { if (preferEngine !== 'standard') onEngineToggle(); }}
-          title="Use the native browser voice"
-          aria-pressed={preferEngine === 'standard'}
-          className={`rounded-full px-1.5 py-0.5 text-[8px] transition-all duration-200 ${
-            preferEngine === 'standard'
-              ? 'bg-white/10 text-white/75'
-              : 'text-white/35 hover:text-white/65'
-          }`}
-        >
-          Standard
-        </button>
-      </div>
       {/* Rewind 5s — premium + active only */}
       {showSkip && (
         <button onClick={() => onSkip(-5)} title="Back 5s"
@@ -584,17 +552,9 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   // ── TTS state ──────────────────────────────────────────────────────────────
   const audioRef      = useRef<HTMLAudioElement>(null);
   const blobUrlRef    = useRef('');
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [preferEngine, setPreferEngine] = useState<'premium' | 'standard'>(() => {
-    if (typeof window === 'undefined') return 'premium';
-    return window.localStorage.getItem(VOICE_ENGINE_STORAGE_KEY) === 'standard'
-      ? 'standard'
-      : 'premium';
-  });
   const [playingIdx,   setPlayingIdx]   = useState<number | null>(null);
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [activeEngine, setActiveEngine] = useState<'premium' | 'standard'>('premium');
-  const [ttsToast,     setTtsToast]     = useState('');
 
   // ── Quota / typewriter state ────────────────────────────────────────────────
   const [sessionTokens,   setSessionTokens]   = useState(0);
@@ -603,10 +563,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   // Set of message indices currently in typewriter animation
   const [typingSet, setTypingSet] = useState<Set<number>>(() => new Set());
   const [showDashboard, setShowDashboard] = useState(false);
-
-  useEffect(() => {
-    window.localStorage.setItem(VOICE_ENGINE_STORAGE_KEY, preferEngine);
-  }, [preferEngine]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -732,12 +688,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   };
 
   // ── TTS helpers ────────────────────────────────────────────────────────────
-  const showToast = useCallback((msg: string) => {
-    setTtsToast(msg);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setTtsToast(''), 4500);
-  }, []);
-
   const stopAll = useCallback(() => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     window.speechSynthesis?.cancel();
@@ -771,11 +721,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
         const data = await res.json() as { code?: string };
         if (data.code === 'TOTAL_QUOTA_EXHAUSTED') {
           setQuotaExhausted(true);
-          showToast('Premium quota exhausted — switching to Standard Voice.');
-        } else if (data.code === 'PREMIUM_PLAN_REQUIRED') {
-          showToast('Premium Voice requires an ElevenLabs paid plan — using Standard Voice.');
-        } else {
-          showToast('Premium TTS unavailable. Using Standard Voice.');
         }
         playStandard(text, idx);
         return;
@@ -794,10 +739,9 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
       setIsPlaying(true);
       setActiveEngine('premium');
     } catch {
-      showToast('Premium TTS error. Using Standard Voice.');
       playStandard(text, idx);
     }
-  }, [avatar.name, showToast, playStandard, addVoiceChars]);
+  }, [avatar.name, playStandard, addVoiceChars]);
 
   const playTTS = useCallback(async (text: string, idx: number) => {
     const spokenText = cleanTtsText(text);
@@ -818,9 +762,8 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
     // New message — stop everything and start fresh
     stopAll();
-    if (preferEngine === 'premium') { await playPremium(spokenText, idx); }
-    else { playStandard(spokenText, idx); }
-  }, [playingIdx, isPlaying, activeEngine, preferEngine, stopAll, playPremium, playStandard]);
+    await playPremium(spokenText, idx);
+  }, [playingIdx, isPlaying, activeEngine, stopAll, playPremium]);
 
   const skipTime = useCallback((delta: number) => {
     if (audioRef.current && activeEngine === 'premium' && playingIdx !== null) {
@@ -833,7 +776,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     window.speechSynthesis?.cancel();
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
 
   return (
@@ -940,13 +882,8 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
                   playingIdx={playingIdx}
                   isPlaying={isPlaying}
                   activeEngine={activeEngine}
-                  preferEngine={preferEngine}
                   onPlay={() => { void playTTS(msg.text, idx); }}
                   onSkip={skipTime}
-                   onEngineToggle={() => {
-                     stopAll();
-                     setPreferEngine(e => e === 'premium' ? 'standard' : 'premium');
-                   }}
                 />
               </div>
             )
@@ -971,18 +908,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
           <div ref={bottomRef} />
         </div>
 
-        {/* ── TTS toast ── */}
-        <AnimatePresence>
-          {ttsToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.22 }}
-              className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/85 border border-white/[0.12] backdrop-blur-xl text-white/75 text-[11px] tracking-wide whitespace-nowrap z-20 pointer-events-none"
-            >
-              {ttsToast}
-            </motion.div>
-          )}
-        </AnimatePresence>
         {/* ── Usage Dashboard overlay ── */}
         <AnimatePresence>
           {showDashboard && (
