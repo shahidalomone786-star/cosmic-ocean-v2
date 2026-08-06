@@ -261,18 +261,64 @@ router.get('/singularity/capabilities', (_req, res) => {
   });
 });
 
+// ── Response sanitisation ─────────────────────────────────────────────────────
+const INTERNAL_SECTION_START =
+  /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:draft response(?:\s*\(\s*mental refinement\s*\))?|mental refinement|internal (?:monologue|reasoning)|scratchpad|rule[- ]?checking?|check against rules)\s*:?\s*(?:\*\*)?\s*/i;
+const FINAL_RESPONSE_MARKER =
+  /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:final response|final answer)\s*:?\s*(?:\*\*)?\s*/gi;
+
+/**
+ * Models sometimes emit an untagged planning transcript before the answer.
+ * Keep only the final-answer section and never forward the planning transcript
+ * as normal message content. Tagged <think> text remains in `reasoning` for
+ * the collapsible Thought UI.
+ */
+function sanitiseFinalResponse(content: string): string {
+  if (!content) return '';
+
+  let cleaned = content
+    .replace(/<\/?think>/gi, '')
+    .trim();
+
+  const internalStart = cleaned.search(INTERNAL_SECTION_START);
+  if (internalStart !== -1) {
+    const afterInternal = cleaned.slice(internalStart);
+    const finalMatches = [...afterInternal.matchAll(FINAL_RESPONSE_MARKER)];
+    if (finalMatches.length > 0) {
+      const finalMarker = finalMatches[finalMatches.length - 1];
+      cleaned = afterInternal.slice((finalMarker.index ?? 0) + finalMarker[0].length).trim();
+      const trailingInternal = cleaned.search(INTERNAL_SECTION_START);
+      if (trailingInternal !== -1) cleaned = cleaned.slice(0, trailingInternal).trim();
+    } else {
+      // There is no trustworthy final section, so do not expose the draft.
+      cleaned = cleaned.slice(0, internalStart).trim();
+    }
+  } else {
+    // Remove standalone checklist lines even when the model omitted a heading.
+    cleaned = cleaned
+      .split('\n')
+      .filter(line => !/^\s*(?:[-*•]\s*)?(?:check against rules|rule[- ]?check(?:ing)?|internal quality check)\s*:?\s*/i.test(line))
+      .join('\n')
+      .trim();
+  }
+
+  return cleaned;
+}
+
 // ── Reasoning tag splitter ────────────────────────────────────────────────────
 // Returns { reasoning: '', content: raw } when no <think> tags found,
 // so plain-text models (gpt-oss-120b) stream directly into content.
 function splitReasoning(raw: string): { reasoning: string; content: string } {
   const openIdx = raw.indexOf('<think>');
-  if (openIdx === -1) return { reasoning: '', content: raw };
+  if (openIdx === -1) return { reasoning: '', content: sanitiseFinalResponse(raw) };
   const before   = raw.slice(0, openIdx);
   const closeIdx = raw.indexOf('</think>');
-  if (closeIdx === -1) return { reasoning: raw.slice(openIdx + 7), content: before };
+  if (closeIdx === -1) {
+    return { reasoning: raw.slice(openIdx + 7), content: sanitiseFinalResponse(before) };
+  }
   return {
     reasoning: raw.slice(openIdx + 7, closeIdx).trim(),
-    content:   (before + raw.slice(closeIdx + 8)).trim(),
+    content:   sanitiseFinalResponse(before + raw.slice(closeIdx + 8)),
   };
 }
 

@@ -26,6 +26,7 @@ import { selectRelevantChunks } from '@/lib/contextSelector';
 import { buildDocumentPrompt } from '@/lib/promptBuilder';
 import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
+import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -196,6 +197,7 @@ const markdownComponents = {
 };
 
 const MessageContent = memo(function MessageContent({ content }: { content: string }) {
+  const visibleContent = sanitizeVisibleResponse(content);
   return (
     <div className="text-[15px] leading-[1.75] tracking-[0.005em] text-white/85
       overflow-x-auto overflow-y-hidden max-w-full">
@@ -204,7 +206,7 @@ const MessageContent = memo(function MessageContent({ content }: { content: stri
         rehypePlugins={[rehypeKatex]}
         components={markdownComponents}
       >
-        {formatMath(content)}
+        {formatMath(visibleContent)}
       </ReactMarkdown>
     </div>
   );
@@ -952,7 +954,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 ? {
                     ...m,
                     reasoning:        typeof data.reasoning === 'string' ? data.reasoning : (m.reasoning ?? ''),
-                    content:          typeof data.content   === 'string' ? data.content   : (m.content   ?? ''),
+                    content:          typeof data.content   === 'string'
+                      ? sanitizeVisibleResponse(data.content)
+                      : (m.content ?? ''),
                     reasoningSeconds: seconds,
                   }
                 : m
