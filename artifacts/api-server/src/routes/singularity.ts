@@ -10,6 +10,7 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
+const VOICE_MESSAGE_COOLDOWN_MS = 750;
 const MAX_HISTORY_CHARACTERS = 22_000;
 const MAX_MESSAGE_ESTIMATED_TOKENS = 6_000;
 const lastSingularityRequestByClient = new Map<string, number>();
@@ -21,12 +22,13 @@ function getSingularityClientKey(req: Request): string {
   return `ip:${req.ip || req.socket.remoteAddress || 'unknown'}`;
 }
 
-function claimSingularityCooldown(req: Request): number {
+function claimSingularityCooldown(req: Request, voiceMode = false): number {
   const now = Date.now();
-  const clientKey = getSingularityClientKey(req);
+  const clientKey = `${getSingularityClientKey(req)}:${voiceMode ? 'voice' : 'normal'}`;
   const lastRequestAt = lastSingularityRequestByClient.get(clientKey);
-  if (lastRequestAt && now - lastRequestAt < MESSAGE_COOLDOWN_MS) {
-    return Math.max(1, Math.ceil((MESSAGE_COOLDOWN_MS - (now - lastRequestAt)) / 1000));
+  const cooldownMs = voiceMode ? VOICE_MESSAGE_COOLDOWN_MS : MESSAGE_COOLDOWN_MS;
+  if (lastRequestAt && now - lastRequestAt < cooldownMs) {
+    return Math.max(1, Math.ceil((cooldownMs - (now - lastRequestAt)) / 1000));
   }
 
   lastSingularityRequestByClient.set(clientKey, now);
@@ -497,6 +499,7 @@ function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatReques
 // ── POST /api/singularity ─────────────────────────────────────────────────────
 router.post('/singularity', async (req, res) => {
   const { message, history } = req.body ?? {};
+  const voiceMode = req.body?.voiceMode === true;
   const images = sanitiseImageInputs(req.body?.images);
 
   if (!message || typeof message !== 'string' || !message.trim()) {
@@ -517,7 +520,7 @@ router.post('/singularity', async (req, res) => {
     return;
   }
 
-  const retryAfter = claimSingularityCooldown(req);
+  const retryAfter = claimSingularityCooldown(req, voiceMode);
   if (retryAfter > 0) {
     res.setHeader('Retry-After', String(retryAfter));
     res.status(429).json({

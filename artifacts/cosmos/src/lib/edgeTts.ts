@@ -343,3 +343,187 @@ export class TtsPlaybackQueue {
     });
   }
 }
+
+type TtsLevelListener = (level: number) => void;
+
+/**
+ * Streaming voice-mode player. Sentences are enqueued as the assistant SSE
+ * response arrives, so the first audio request can start before the response
+ * is complete. Playback remains sequential and abortable.
+ */
+export class TtsStreamingQueue {
+  private readonly controller = new AbortController();
+  private readonly pending: string[] = [];
+  private currentAudio: HTMLAudioElement | null = null;
+  private currentUrl: string | null = null;
+  private processing = false;
+  private stopped = false;
+  private finished = false;
+  private finishPromise: Promise<void> | null = null;
+  private finishResolve: (() => void) | null = null;
+  private analyserFrame: number | null = null;
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+
+  constructor(
+    private readonly onLevel?: TtsLevelListener,
+    private readonly onError?: (error: Error) => void,
+    private readonly onPlaybackStart?: () => void,
+  ) {}
+
+  get signal(): AbortSignal {
+    return this.controller.signal;
+  }
+
+  enqueue(text: string): void {
+    if (this.stopped || this.finished) return;
+    const cleaned = cleanTtsText(text);
+    if (!cleaned) return;
+    this.pending.push(cleaned);
+    void this.process();
+  }
+
+  finish(): Promise<void> {
+    this.finished = true;
+    if (!this.processing && this.pending.length === 0) return Promise.resolve();
+    if (!this.finishPromise) {
+      this.finishPromise = new Promise(resolve => {
+        this.finishResolve = resolve;
+      });
+    }
+    void this.process();
+    return this.finishPromise;
+  }
+
+  stop(): void {
+    this.stopped = true;
+    this.controller.abort();
+    this.pending.length = 0;
+    this.stopLevelMeter();
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.removeAttribute('src');
+      this.currentAudio.load();
+      this.currentAudio = null;
+    }
+    if (this.currentUrl) {
+      URL.revokeObjectURL(this.currentUrl);
+      this.currentUrl = null;
+    }
+    this.finishResolve?.();
+    this.finishResolve = null;
+  }
+
+  private async process(): Promise<void> {
+    if (this.processing || this.stopped) return;
+    this.processing = true;
+    try {
+      while (this.pending.length > 0 && !this.stopped) {
+        const text = this.pending.shift();
+        if (!text) continue;
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+          signal: this.signal,
+        });
+        if (!response.ok) {
+          let message = `Edge TTS request failed (${response.status})`;
+          try {
+            const body = await response.json() as { error?: string };
+            if (body.error) message = body.error;
+          } catch {
+            // Keep the status-based error when the server did not return JSON.
+          }
+          throw new Error(message);
+        }
+        await this.playBlob(await response.blob());
+      }
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        this.onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+      this.pending.length = 0;
+    } finally {
+      this.processing = false;
+      if (this.pending.length === 0 && (this.finished || this.stopped || Boolean(this.finishResolve))) {
+        this.finishResolve?.();
+        this.finishResolve = null;
+      }
+    }
+  }
+
+  private async playBlob(blob: Blob): Promise<void> {
+    if (this.stopped) throw new DOMException('TTS playback aborted', 'AbortError');
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    this.currentUrl = url;
+    this.currentAudio = audio;
+    this.startLevelMeter(audio);
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        audio.onended = null;
+        audio.onerror = null;
+        this.stopLevelMeter();
+        if (this.currentAudio === audio) this.currentAudio = null;
+        if (this.currentUrl === url) this.currentUrl = null;
+        URL.revokeObjectURL(url);
+        error ? reject(error) : resolve();
+      };
+      audio.onended = () => finish();
+      audio.onerror = () => finish(new Error('Edge TTS audio playback failed.'));
+      this.signal.addEventListener('abort', () => {
+        audio.pause();
+        finish(new DOMException('TTS playback aborted', 'AbortError'));
+      }, { once: true });
+      this.onPlaybackStart?.();
+      audio.play().catch(error => finish(error instanceof Error ? error : new Error(String(error))));
+    });
+  }
+
+  private startLevelMeter(audio: HTMLAudioElement): void {
+    const AudioContextClass = window.AudioContext
+      || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass || !this.onLevel) return;
+    try {
+      const context = new AudioContextClass();
+      const source = context.createMediaElementSource(audio);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.78;
+      source.connect(analyser);
+      analyser.connect(context.destination);
+      void context.resume().catch(() => undefined);
+      this.audioContext = context;
+      this.analyser = analyser;
+      const samples = new Uint8Array(analyser.fftSize);
+      const tick = () => {
+        if (!this.analyser || this.currentAudio !== audio) return;
+        this.analyser.getByteTimeDomainData(samples);
+        const rms = Math.sqrt(samples.reduce((sum, sample) => {
+          const normalized = (sample - 128) / 128;
+          return sum + normalized * normalized;
+        }, 0) / samples.length);
+        this.onLevel?.(Math.min(1, rms * 4.2));
+        this.analyserFrame = requestAnimationFrame(tick);
+      };
+      this.analyserFrame = requestAnimationFrame(tick);
+    } catch {
+      this.onLevel?.(0);
+    }
+  }
+
+  private stopLevelMeter(): void {
+    if (this.analyserFrame !== null) cancelAnimationFrame(this.analyserFrame);
+    this.analyserFrame = null;
+    this.analyser?.disconnect();
+    this.analyser = null;
+    void this.audioContext?.close().catch(() => undefined);
+    this.audioContext = null;
+    this.onLevel?.(0);
+  }
+}

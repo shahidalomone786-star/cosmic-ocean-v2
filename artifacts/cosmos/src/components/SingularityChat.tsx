@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } fr
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
-  Square, Copy, Check, Pencil, RotateCcw, ArrowDown, Volume2,
+  Square, Copy, Check, Pencil, RotateCcw, ArrowDown, Volume2, Mic2,
   BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2, Mic, MicOff,
   ExternalLink,
 } from 'lucide-react';
@@ -30,10 +30,13 @@ import type { ImageAttachment } from '@/lib/attachmentTypes';
 import type { VisualReferencesState } from '@/lib/visualReferences';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
 import {
+  chunkTtsText,
   getTtsPrefetchStatus,
   prefetchTtsAudio,
   TtsPlaybackQueue,
+  TtsStreamingQueue,
 } from '@/lib/edgeTts';
+import VoiceModeOverlay, { type VoiceModeState } from './VoiceModeOverlay';
 import { toast } from '@/hooks/use-toast';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
@@ -1109,6 +1112,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [voiceState, setVoiceState] = useState<MicrophoneState>('idle');
   const [voiceError, setVoiceError] = useState('');
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false);
+  const [voiceModeState, setVoiceModeState] = useState<VoiceModeState>('idle');
+  const [voiceStatusText, setVoiceStatusText] = useState('Ready when you are.');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceAssistantText, setVoiceAssistantText] = useState('');
+  const [voiceMicLevel, setVoiceMicLevel] = useState(0);
+  const [voiceOutputLevel, setVoiceOutputLevel] = useState(0);
+  const [voiceCaptionsEnabled, setVoiceCaptionsEnabled] = useState(true);
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -1150,6 +1161,32 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const recordingSilenceStartedAtRef = useRef<number | null>(null);
   const recordingFinalizingRef = useRef(false);
   const voiceResetTimerRef = useRef<number | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceRecordingStreamRef = useRef<MediaStream | null>(null);
+  const voiceRecordingChunksRef = useRef<Blob[]>([]);
+  const voiceRecordingAnalyserRef = useRef<AnalyserNode | null>(null);
+  const voiceRecordingAudioContextRef = useRef<AudioContext | null>(null);
+  const voiceRecordingVadTimerRef = useRef<number | null>(null);
+  const voiceRecordingMeterFrameRef = useRef<number | null>(null);
+  const voiceMicLevelRef = useRef(0);
+  const voiceRecordingStartedAtRef = useRef(0);
+  const voiceSpeechStartedRef = useRef(false);
+  const voiceFinalizingRef = useRef(false);
+  const voiceRecordingModeRef = useRef<'turn' | 'interrupt'>('turn');
+  const voiceWasInterruptedRef = useRef(false);
+  const voiceSessionRef = useRef(0);
+  const voiceRequestAbortRef = useRef<AbortController | null>(null);
+  const voiceTtsQueueRef = useRef<TtsStreamingQueue | null>(null);
+  const voiceSentenceBufferRef = useRef('');
+  const voiceLastAssistantContentRef = useRef('');
+  const voiceFinalizeRef = useRef<(() => void) | null>(null);
+  const voiceInterruptRef = useRef<((preserveRecording?: boolean) => void) | null>(null);
+  const voiceTurnRef = useRef<(text: string) => void>(() => undefined);
+  const voiceEntryHoldRef = useRef<number | null>(null);
+  const messagesRef = useRef(messages);
+  const voiceModeStateRef = useRef(voiceModeState);
+  messagesRef.current = messages;
+  voiceModeStateRef.current = voiceModeState;
 
   const prefersReducedMotion = useReducedMotion();
   const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - cooldownNow) / 1000));
@@ -1202,6 +1239,251 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     setVoiceError(message);
     setVoiceState('error');
   }, [stopRecordingResources]);
+
+  const stopVoiceModeResources = useCallback(() => {
+    if (voiceRecordingVadTimerRef.current !== null) {
+      window.clearInterval(voiceRecordingVadTimerRef.current);
+      voiceRecordingVadTimerRef.current = null;
+    }
+    if (voiceRecordingMeterFrameRef.current !== null) {
+      window.cancelAnimationFrame(voiceRecordingMeterFrameRef.current);
+      voiceRecordingMeterFrameRef.current = null;
+    }
+    voiceRecordingAnalyserRef.current?.disconnect();
+    voiceRecordingAnalyserRef.current = null;
+    void voiceRecordingAudioContextRef.current?.close().catch(() => undefined);
+    voiceRecordingAudioContextRef.current = null;
+    voiceRecordingStreamRef.current?.getTracks().forEach(track => track.stop());
+    voiceRecordingStreamRef.current = null;
+    voiceRecorderRef.current = null;
+    setVoiceMicLevel(0);
+  }, []);
+
+  const stopVoiceMode = useCallback((preserveRecording = false) => {
+    voiceSessionRef.current += 1;
+    voiceRequestAbortRef.current?.abort();
+    voiceRequestAbortRef.current = null;
+    voiceTtsQueueRef.current?.stop();
+    voiceTtsQueueRef.current = null;
+    voiceSentenceBufferRef.current = '';
+    voiceFinalizingRef.current = false;
+    voiceFinalizeRef.current = null;
+    if (!preserveRecording) {
+      const recorder = voiceRecorderRef.current;
+      if (recorder?.state === 'recording') recorder.stop();
+      stopVoiceModeResources();
+    }
+    setVoiceModeState('idle');
+    setVoiceStatusText('Voice mode closed.');
+  }, [stopVoiceModeResources]);
+
+  const finishVoiceRecording = useCallback(async () => {
+    if (voiceFinalizingRef.current) return;
+    const recorder = voiceRecorderRef.current;
+    if (!recorder) return;
+    voiceFinalizingRef.current = true;
+    if (voiceRecordingVadTimerRef.current !== null) {
+      window.clearInterval(voiceRecordingVadTimerRef.current);
+      voiceRecordingVadTimerRef.current = null;
+    }
+    const chunks = voiceRecordingChunksRef.current;
+    const blob = await new Promise<Blob | null>(resolve => {
+      const finish = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
+      recorder.addEventListener('stop', finish, { once: true });
+      recorder.addEventListener('error', () => resolve(null), { once: true });
+      if (recorder.state === 'recording') recorder.stop();
+      else finish();
+    });
+    stopVoiceModeResources();
+    voiceFinalizingRef.current = false;
+    voiceFinalizeRef.current = null;
+    if (!blob || blob.size === 0 || blob.size > 16 * 1024 * 1024 || voiceSessionRef.current === 0) {
+      if (voiceModeOpen) {
+        setVoiceModeState('listening');
+        setVoiceStatusText('I didn’t catch that. Try again.');
+      }
+      return;
+    }
+
+    const sessionId = voiceSessionRef.current;
+    setVoiceModeState('understanding');
+    setVoiceStatusText('Understanding your question…');
+    try {
+      const preparedAudio = await preprocessRecordedAudio(blob);
+      const controller = new AbortController();
+      voiceRequestAbortRef.current = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 30_000);
+      const form = new FormData();
+      form.append('audio', preparedAudio.blob, preparedAudio.filename);
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      window.clearTimeout(timeout);
+      const result = await response.json().catch(() => ({})) as { text?: unknown; error?: unknown };
+      const text = typeof result.text === 'string' ? result.text.trim() : '';
+      if (sessionId !== voiceSessionRef.current) return;
+      if (!response.ok || !text) throw new Error(typeof result.error === 'string' ? result.error : 'Transcription failed.');
+      setVoiceTranscript(text);
+      voiceRequestAbortRef.current = null;
+      voiceTurnRef.current(text);
+    } catch (error: unknown) {
+      if (sessionId !== voiceSessionRef.current) return;
+      setVoiceModeState(navigator.onLine ? 'idle' : 'offline');
+      setVoiceStatusText(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Transcription timed out. Try again.'
+        : error instanceof Error ? error.message : 'I couldn’t understand that. Try again.');
+    } finally {
+      voiceRequestAbortRef.current = null;
+    }
+  }, [voiceModeOpen, stopVoiceModeResources]);
+
+  const startVoiceRecording = useCallback(async (monitorForInterruption = false) => {
+    if (!voiceModeOpen || voiceFinalizingRef.current || voiceRecorderRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceModeState('offline');
+      setVoiceStatusText('This browser does not support microphone recording.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48_000 },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      if (!voiceModeOpen) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+      ].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('No supported recording format is available.');
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128_000 });
+      voiceRecordingStreamRef.current = stream;
+      voiceRecordingChunksRef.current = [];
+      voiceRecordingStartedAtRef.current = Date.now();
+      voiceSpeechStartedRef.current = false;
+      voiceRecordingModeRef.current = monitorForInterruption ? 'interrupt' : 'turn';
+      voiceWasInterruptedRef.current = false;
+      voiceRecorderRef.current = recorder;
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) voiceRecordingChunksRef.current.push(event.data);
+      };
+      recorder.start(200);
+      if (!monitorForInterruption) {
+        setVoiceModeState('listening');
+        setVoiceStatusText('Listening… speak naturally.');
+      }
+
+      const AudioContextClass = window.AudioContext
+        || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const context = new AudioContextClass();
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.78;
+        source.connect(analyser);
+        voiceRecordingAudioContextRef.current = context;
+        voiceRecordingAnalyserRef.current = analyser;
+        const samples = new Uint8Array(analyser.fftSize);
+        const measure = () => {
+          if (voiceRecordingAnalyserRef.current !== analyser) return;
+          analyser.getByteTimeDomainData(samples);
+          const rms = Math.sqrt(samples.reduce((sum, sample) => {
+            const normalized = (sample - 128) / 128;
+            return sum + normalized * normalized;
+          }, 0) / samples.length);
+          const level = Math.min(1, rms * 4.2);
+          voiceMicLevelRef.current = level;
+          setVoiceMicLevel(level);
+          if (voiceRecordingModeRef.current === 'interrupt') {
+            if (level > 0.14) voiceInterruptRef.current?.(true);
+          } else if (level > 0.075) {
+            voiceSpeechStartedRef.current = true;
+          }
+          voiceRecordingMeterFrameRef.current = window.requestAnimationFrame(measure);
+        };
+        measure();
+        voiceRecordingVadTimerRef.current = window.setInterval(() => {
+          const elapsed = Date.now() - voiceRecordingStartedAtRef.current;
+          if (elapsed >= 60_000) {
+            void finishVoiceRecording();
+            return;
+          }
+          if (voiceRecordingModeRef.current === 'turn' && voiceSpeechStartedRef.current && elapsed > 900 && voiceMicLevelRef.current < 0.035) {
+            void finishVoiceRecording();
+          }
+        }, 160);
+      }
+    } catch (error: unknown) {
+      setVoiceModeState(navigator.onLine ? 'idle' : 'offline');
+      setVoiceStatusText(error instanceof DOMException && error.name === 'NotAllowedError'
+        ? 'Microphone permission was denied. Allow access and try again.'
+        : error instanceof DOMException && error.name === 'NotFoundError'
+          ? 'No microphone was found on this device.'
+          : error instanceof Error ? error.message : 'Microphone could not be started.');
+    }
+  }, [finishVoiceRecording, voiceModeOpen]);
+
+  voiceFinalizeRef.current = finishVoiceRecording;
+
+  const handleVoiceInterrupt = useCallback((preserveRecording = false) => {
+    voiceRequestAbortRef.current?.abort();
+    voiceRequestAbortRef.current = null;
+    voiceTtsQueueRef.current?.stop();
+    voiceTtsQueueRef.current = null;
+    voiceSentenceBufferRef.current = '';
+    if (preserveRecording && voiceRecorderRef.current?.state === 'recording') {
+      voiceWasInterruptedRef.current = true;
+      voiceRecordingModeRef.current = 'turn';
+      voiceSpeechStartedRef.current = true;
+      setVoiceModeState('listening');
+      setVoiceStatusText('I’m listening…');
+      return;
+    }
+    stopVoiceModeResources();
+    setVoiceModeState('interrupted');
+    setVoiceStatusText('Output interrupted. Listening again…');
+    if (voiceModeOpen) {
+      window.setTimeout(() => {
+        if (voiceModeOpen && voiceSessionRef.current > 0) void startVoiceRecording();
+      }, 120);
+    }
+  }, [startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
+
+  voiceInterruptRef.current = handleVoiceInterrupt;
+
+  const handleOpenVoiceMode = useCallback(() => {
+    if (isThinking || isOffline) {
+      setVoiceModeState(isOffline ? 'offline' : 'reconnecting');
+      setVoiceStatusText(isOffline ? 'You are offline. Voice mode will reconnect when signal returns.' : 'Finish the current response before opening Voice Mode.');
+      return;
+    }
+    voiceSessionRef.current += 1;
+    setVoiceModeOpen(true);
+    setVoiceModeState('listening');
+    setVoiceStatusText('Starting your microphone…');
+    setVoiceTranscript('');
+    setVoiceAssistantText('');
+    window.setTimeout(() => {
+      if (voiceSessionRef.current > 0) void startVoiceRecording();
+    }, 0);
+  }, [isOffline, isThinking, startVoiceRecording]);
+
+  const handleCloseVoiceMode = useCallback(() => {
+    setVoiceModeOpen(false);
+    stopVoiceMode();
+  }, [stopVoiceMode]);
 
   const handleVoiceStart = useCallback(async () => {
     setVoiceError('');
@@ -1365,6 +1647,39 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       if (voiceResetTimerRef.current !== null) window.clearTimeout(voiceResetTimerRef.current);
     };
   }, [handleVoiceStop, stopRecordingResources]);
+
+  useEffect(() => {
+    if (!voiceModeOpen) return;
+    const handleOnline = () => {
+      setVoiceModeState('reconnecting');
+      setVoiceStatusText('Connection restored. Listening again…');
+      window.setTimeout(() => {
+        if (voiceModeOpen && voiceSessionRef.current > 0 && !voiceRecorderRef.current && !voiceRequestAbortRef.current) {
+          void startVoiceRecording();
+        }
+      }, 250);
+    };
+    const handleOffline = () => {
+      setVoiceModeState('offline');
+      setVoiceStatusText('You are offline. I’ll reconnect when signal returns.');
+      voiceRequestAbortRef.current?.abort();
+      voiceTtsQueueRef.current?.stop();
+      stopVoiceModeResources();
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
+
+  useEffect(() => () => {
+    voiceSessionRef.current += 1;
+    voiceRequestAbortRef.current?.abort();
+    voiceTtsQueueRef.current?.stop();
+    stopVoiceModeResources();
+  }, [stopVoiceModeResources]);
 
   useEffect(() => {
     void prepareChatHistoryRepository().then(async () => {
@@ -1853,18 +2168,54 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     }
   }, []);
 
-  const generateResponse = useCallback(async (userText: string, requestImages: ImageAttachment[] = []) => {
-    setApiError(null);
-    setIsThinking(true);
-    setIsStreaming(true);
+  const generateResponse = useCallback(async (
+    userText: string,
+    requestImages: ImageAttachment[] = [],
+    voiceMode = false,
+  ) => {
+    if (!voiceMode) {
+      setApiError(null);
+      setIsThinking(true);
+      setIsStreaming(true);
+    }
     thinkingStartRef.current = Date.now();
-    abortRef.current = new AbortController();
+    const requestController = new AbortController();
+    if (voiceMode) {
+      voiceRequestAbortRef.current = requestController;
+      setVoiceModeState('reasoning');
+      setVoiceStatusText('Thinking with you…');
+      setVoiceAssistantText('');
+      voiceSentenceBufferRef.current = '';
+      voiceLastAssistantContentRef.current = '';
+      const queue = new TtsStreamingQueue(
+        setVoiceOutputLevel,
+        error => {
+          if (voiceMode && voiceSessionRef.current > 0) {
+            setVoiceModeState('error');
+            setVoiceStatusText(`Voice playback paused: ${error.message}`);
+          }
+        },
+        () => {
+          if (voiceMode && voiceSessionRef.current > 0) {
+            setVoiceModeState('speaking');
+            setVoiceStatusText('Speaking…');
+            void startVoiceRecording(true);
+          }
+        },
+      );
+      voiceTtsQueueRef.current = queue;
+    } else {
+      abortRef.current = requestController;
+    }
 
     // 60-second hard timeout
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      abortRef.current?.abort('timeout');
-    }, 60_000);
+    let requestTimeout: number | null = null;
+    if (voiceMode) {
+      requestTimeout = window.setTimeout(() => requestController.abort('timeout'), 60_000);
+    } else {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => requestController.abort('timeout'), 60_000);
+    }
 
     const msgId = `asst-${Date.now()}`;
     setMessages(prev => [
@@ -1872,10 +2223,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       { id: msgId, role: 'assistant', content: '', reasoning: '', ts: Date.now() },
     ]);
 
-    const latestImageMessageId = [...messages]
+    const currentMessages = messagesRef.current;
+    const latestImageMessageId = [...currentMessages]
       .reverse()
       .find(m => m.attachedImages?.length)?.id;
-    const safeHistory = messages
+    const safeHistory = currentMessages
       .filter(m => m.id !== 'welcome' && !m.error && m.content.trim().length > 0)
       .slice(-12)
       .map(m => ({
@@ -1899,13 +2251,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
          body:    JSON.stringify({
            message: userText,
            history: safeHistory,
+           voiceMode,
            images: requestImages.map(image => ({
              filename: image.filename,
              mimeType: image.mimeType,
              dataUrl: image.dataUrl,
            })),
          }),
-        signal:  abortRef.current.signal,
+         signal:  requestController.signal,
       });
 
       // ── Non-2xx = JSON error from backend (never a stream) ──
@@ -1915,16 +2268,21 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           status:  res.status,
           details: null,
         }));
-        if (res.status === 429) {
+        if (res.status === 429 && !voiceMode) {
           const retryAfter = typeof (errJson as ApiError & { retryAfter?: unknown }).retryAfter === 'number'
             ? (errJson as ApiError & { retryAfter: number }).retryAfter
             : Number(res.headers.get('Retry-After')) || 15;
           beginMessageCooldown(Math.max(1, Math.min(15, retryAfter)));
-        } else {
+        } else if (!voiceMode) {
           clearMessageCooldown();
         }
         console.error('[SingularityChat] API error:', errJson);
-        setApiError(errJson);
+        if (voiceMode) {
+          setVoiceModeState(res.status === 429 ? 'reconnecting' : 'idle');
+          setVoiceStatusText(errJson.error || 'Singularity could not respond.');
+        } else {
+          setApiError(errJson);
+        }
         setMessages(prev => prev.map(m =>
           m.id === msgId
             ? { ...m, error: true, content: `[${errJson.status}] ${errJson.error}` }
@@ -1935,7 +2293,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
       if (!res.body) {
         const noBody: ApiError = { error: 'Response body is null — cannot stream', status: 0, details: null };
-        setApiError(noBody);
+        if (voiceMode) {
+          setVoiceModeState('reconnecting');
+          setVoiceStatusText(noBody.error);
+        } else {
+          setApiError(noBody);
+        }
         setMessages(prev => prev.map(m =>
           m.id === msgId ? { ...m, error: true, content: noBody.error } : m
         ));
@@ -1983,10 +2346,18 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
           if (data.done) continue;
 
-          if (!sawFirstToken) { setIsThinking(false); sawFirstToken = true; }
+           if (!sawFirstToken) {
+             if (voiceMode) {
+                setVoiceModeState('generating');
+                setVoiceStatusText('Forming a response…');
+             } else {
+               setIsThinking(false);
+             }
+             sawFirstToken = true;
+           }
 
           const seconds = Math.max(1, Math.round((Date.now() - thinkingStartRef.current) / 1000));
-          setMessages(prev =>
+           setMessages(prev =>
             prev.map(m =>
               m.id === msgId
                 ? {
@@ -2002,6 +2373,31 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           );
           if (typeof data.content === 'string') {
             streamedContent = sanitizeVisibleResponse(data.content);
+             if (voiceMode) {
+               setVoiceAssistantText(streamedContent);
+               const previousContent = voiceLastAssistantContentRef.current;
+               const nextDelta = streamedContent.startsWith(previousContent)
+                 ? streamedContent.slice(previousContent.length)
+                 : streamedContent;
+               voiceLastAssistantContentRef.current = streamedContent;
+               voiceSentenceBufferRef.current += nextDelta;
+               const queue = voiceTtsQueueRef.current;
+               while (queue) {
+                 const match = voiceSentenceBufferRef.current.match(/^([\s\S]*?[.!?。！？])(?:\s+|$)/);
+                 if (match) {
+                   const sentence = match[1].trim();
+                   voiceSentenceBufferRef.current = voiceSentenceBufferRef.current.slice(match[0].length);
+                   chunkTtsText(sentence).forEach(chunk => queue.enqueue(chunk));
+                   continue;
+                 }
+                 if (voiceSentenceBufferRef.current.length < 210) break;
+                 const splitAt = voiceSentenceBufferRef.current.lastIndexOf(' ', 180);
+                 if (splitAt < 80) break;
+                 chunkTtsText(voiceSentenceBufferRef.current.slice(0, splitAt))
+                   .forEach(chunk => queue.enqueue(chunk));
+                 voiceSentenceBufferRef.current = voiceSentenceBufferRef.current.slice(splitAt + 1);
+               }
+             }
           }
         }
       }
@@ -2013,12 +2409,37 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         prefetchTtsAudio(msgId, streamedContent);
         void loadVisualReferences(msgId, userText, streamedContent);
       }
+      if (voiceMode) {
+        const queue = voiceTtsQueueRef.current;
+        const remaining = voiceSentenceBufferRef.current.trim();
+        if (queue && remaining) {
+          chunkTtsText(remaining).forEach(chunk => queue.enqueue(chunk));
+          voiceSentenceBufferRef.current = '';
+        }
+        if (queue) await queue.finish();
+        if (voiceSessionRef.current > 0 && voiceModeOpen && !requestController.signal.aborted) {
+          const wasInterrupted = voiceWasInterruptedRef.current;
+          if (!wasInterrupted) stopVoiceModeResources();
+          setVoiceModeState('listening');
+          setVoiceStatusText('Listening again…');
+          if (!wasInterrupted) {
+            window.setTimeout(() => {
+              if (voiceModeOpen && voiceSessionRef.current > 0) void startVoiceRecording();
+            }, 100);
+          }
+        }
+      }
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         const isTimeout = err?.message === 'timeout' || String(err?.message).includes('timeout');
         if (isTimeout) {
           const timeoutErr: ApiError = { error: 'Request timed out after 60 seconds.', status: 504, details: null };
-          setApiError(timeoutErr);
+          if (voiceMode) {
+            setVoiceModeState('reconnecting');
+            setVoiceStatusText(timeoutErr.error);
+          } else {
+            setApiError(timeoutErr);
+          }
           setMessages(prev => prev.map(m =>
             m.id === msgId ? { ...m, error: true, content: timeoutErr.error } : m
           ));
@@ -2027,16 +2448,40 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       }
       console.error('[SingularityChat] fetch error:', err?.message, err?.stack);
       const catchErr: ApiError = { error: err?.message ?? String(err), status: 0, details: null };
-      setApiError(catchErr);
+      if (voiceMode) {
+        setVoiceModeState(navigator.onLine ? 'idle' : 'offline');
+        setVoiceStatusText(catchErr.error);
+      } else {
+        setApiError(catchErr);
+      }
       setMessages(prev => prev.map(m =>
         m.id === msgId ? { ...m, error: true, content: catchErr.error } : m
       ));
     } finally {
-      setIsThinking(false);
-      setIsStreaming(false);
-      if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+      if (!voiceMode) {
+        setIsThinking(false);
+        setIsStreaming(false);
+        if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+      } else if (requestTimeout !== null) {
+        window.clearTimeout(requestTimeout);
+        if (voiceRequestAbortRef.current === requestController) voiceRequestAbortRef.current = null;
+      }
     }
-  }, [beginMessageCooldown, clearMessageCooldown, loadVisualReferences, messages]);
+  }, [beginMessageCooldown, clearMessageCooldown, loadVisualReferences, messages, startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
+
+  const handleVoiceTurn = useCallback((text: string) => {
+    if (!voiceModeOpen || !text.trim() || voiceRequestAbortRef.current) return;
+    const cleanText = text.trim();
+    setMessages(previous => [
+      ...previous,
+      { id: `usr-${Date.now()}`, role: 'user', content: cleanText, ts: Date.now() },
+    ]);
+    setVoiceTranscript(cleanText);
+    setVoiceAssistantText('');
+    stickToBottomRef.current = true;
+    generateResponse(cleanText, [], true);
+  }, [generateResponse, voiceModeOpen]);
+  voiceTurnRef.current = handleVoiceTurn;
 
   const handleSend = useCallback((overrideText?: string) => {
     const typedText = (overrideText ?? input).trim();
@@ -2628,6 +3073,20 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 }}
               />
               <button
+                type="button"
+                onClick={handleOpenVoiceMode}
+                disabled={composerLocked || isThinking}
+                className="flex-shrink-0 mb-0.5 flex h-8 items-center gap-1.5 rounded-full border border-violet-300/[0.18]
+                  bg-violet-300/[0.06] px-2.5 text-[10px] font-medium tracking-[0.04em] text-violet-100/65
+                  transition-all duration-200 hover:border-violet-200/35 hover:bg-violet-200/[0.12] hover:text-violet-100
+                  active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                aria-label="Open immersive Voice Mode"
+                data-testid="button-open-voice-mode"
+              >
+                <Mic2 size={13} strokeWidth={1.8} />
+                <span className="hidden sm:inline">Voice Mode</span>
+              </button>
+              <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
                 disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
@@ -2742,6 +3201,22 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           </AnimatePresence>
         </div>
       </div>
+      <AnimatePresence>
+        {voiceModeOpen && (
+          <VoiceModeOverlay
+            state={voiceModeState}
+            statusText={voiceStatusText}
+            transcript={voiceTranscript}
+            assistantText={voiceAssistantText}
+            micLevel={voiceMicLevel}
+            outputLevel={voiceOutputLevel}
+            captionsEnabled={voiceCaptionsEnabled}
+            onClose={handleCloseVoiceMode}
+            onToggleCaptions={() => setVoiceCaptionsEnabled(value => !value)}
+            onInterrupt={() => handleVoiceInterrupt(false)}
+          />
+        )}
+      </AnimatePresence>
       </main>
     </motion.div>
   );
