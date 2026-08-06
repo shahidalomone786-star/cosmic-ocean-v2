@@ -29,7 +29,11 @@ import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
 import type { VisualReferencesState } from '@/lib/visualReferences';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
-import { TtsPlaybackQueue } from '@/lib/edgeTts';
+import {
+  getTtsPrefetchStatus,
+  prefetchTtsAudio,
+  TtsPlaybackQueue,
+} from '@/lib/edgeTts';
 import { toast } from '@/hooks/use-toast';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
@@ -528,8 +532,14 @@ const ShareButton = memo(function ShareButton({ text }: { text: string }) {
 });
 
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
-const ListenButton = memo(function ListenButton({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
+const ListenButton = memo(function ListenButton({
+  messageId,
+  text,
+}: {
+  messageId: string;
+  text: string;
+}) {
+  const [state, setState] = useState<'idle' | 'preparing' | 'playing'>('idle');
   const queueRef = useRef<TtsPlaybackQueue | null>(null);
 
   const stop = useCallback(() => {
@@ -539,15 +549,17 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
   }, []);
 
   const play = useCallback(async () => {
-    if (state === 'playing' || state === 'loading') { stop(); return; }
+    if (state === 'playing' || state === 'preparing') { stop(); return; }
 
     const queue = new TtsPlaybackQueue();
     queueRef.current = queue;
-    // The control becomes Stop before the first network request completes.
-    setState('playing');
+    const prefetchStatus = getTtsPrefetchStatus(messageId, text);
+    // Keep the preparing label only while the background first chunk is
+    // pending. A ready cache starts playback without another network wait.
+    setState(prefetchStatus === 'pending' || prefetchStatus === 'missing' ? 'preparing' : 'playing');
 
     try {
-      await queue.play(text);
+      await queue.play(text, messageId, () => setState('playing'));
       if (queueRef.current === queue) setState('idle');
     } catch (error: unknown) {
       if ((error as Error)?.name !== 'AbortError') {
@@ -562,7 +574,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         setState('idle');
       }
     }
-  }, [text, state, stop]);
+  }, [messageId, text, state, stop]);
 
   useEffect(() => () => {
     stop();
@@ -576,19 +588,19 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 ${
         state === 'playing'
           ? 'text-emerald-400 bg-emerald-400/[0.11] border border-emerald-400/[0.28] shadow-[0_0_12px_rgba(52,211,153,0.10)]'
-          : state === 'loading'
+           : state === 'preparing'
           ? 'text-emerald-400/70 bg-emerald-400/[0.07] border border-emerald-400/[0.14]'
           : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
       }`}
       aria-label={
-        state === 'playing' ? 'Stop audio'
-          : state === 'loading' ? 'Generating audio…'
+         state === 'playing' ? 'Stop audio'
+           : state === 'preparing' ? 'Preparing audio…'
           : 'Listen to response'
       }
     >
       {state === 'playing' ? (
         <><AudioWave />Stop</>
-      ) : state === 'loading' ? (
+      ) : state === 'preparing' ? (
         <>
           <motion.div
             animate={{ opacity: [0.4, 1, 0.4] }}
@@ -596,7 +608,7 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
           >
             <Volume2 size={11} strokeWidth={2} />
           </motion.div>
-          Generating…
+          Preparing…
         </>
       ) : (
         <><Volume2 size={11} strokeWidth={2} />Listen</>
@@ -1995,6 +2007,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       }
 
       if (sawFirstToken && streamedContent.trim()) {
+        // Start synthesis as soon as streaming completes. This work is
+        // intentionally independent from the Listen queue so a later click
+        // can consume the first cached MP3 immediately.
+        prefetchTtsAudio(msgId, streamedContent);
         void loadVisualReferences(msgId, userText, streamedContent);
       }
     } catch (err: any) {
@@ -2351,7 +2367,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                             className="flex items-center gap-0.5 flex-wrap"
                           >
-                            <ListenButton text={msg.content} />
+                            <ListenButton messageId={msg.id} text={msg.content} />
                             <CopyButton text={msg.content} />
                             <ShareButton text={msg.content} />
                             <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
