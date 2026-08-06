@@ -27,6 +27,14 @@ import { buildDocumentPrompt } from '@/lib/promptBuilder';
 import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
+import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
+import {
+  createChatSession,
+  deriveChatTitle,
+  loadChatSessions,
+  saveChatSessions,
+  type ChatSession,
+} from '@/lib/singularityChatHistory';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Message {
@@ -625,7 +633,18 @@ interface SingularityCapabilities {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SingularityChat({ onClose }: { onClose?: () => void }) {
-  const [messages, setMessages]         = useState<Message[]>([INITIAL_MESSAGE]);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const stored = loadChatSessions();
+    return stored.length > 0 ? stored : [createChatSession(INITIAL_MESSAGE)];
+  });
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    const stored = loadChatSessions();
+    return stored[0]?.id ?? '';
+  });
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const stored = loadChatSessions();
+    return stored[0]?.messages ?? [INITIAL_MESSAGE];
+  });
   const [input, setInput]               = useState('');
   const [isThinking, setIsThinking]     = useState(false);
   const [isStreaming, setIsStreaming]   = useState(false);
@@ -635,6 +654,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [isDragOver, setIsDragOver]     = useState(false);
   const [visionSupported, setVisionSupported] = useState<boolean | null>(null);
   const [replaceImageIndex, setReplaceImageIndex] = useState<number | null>(null);
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -667,6 +687,64 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const stickToBottomRef = useRef(true);
 
   const prefersReducedMotion = useReducedMotion();
+
+  // Persist the active conversation without touching the streaming transport.
+  useEffect(() => {
+    if (activeSessionId || sessions.length === 0) return;
+    setActiveSessionId(sessions[0].id);
+    setMessages(sessions[0].messages);
+  }, [activeSessionId, sessions]);
+
+  useEffect(() => {
+    if (!activeSessionId) return;
+    setSessions(previous => {
+      const existing = previous.find(session => session.id === activeSessionId);
+      if (!existing) return previous;
+      const updated: ChatSession = {
+        ...existing,
+        title: deriveChatTitle(messages),
+        messages,
+        updatedAt: messages.length > 1 ? Date.now() : existing.updatedAt,
+      };
+      const next = [updated, ...previous.filter(session => session.id !== activeSessionId)]
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+      saveChatSessions(next);
+      return next;
+    });
+  }, [activeSessionId, messages]);
+
+  useEffect(() => {
+    saveChatSessions(sessions);
+  }, [sessions]);
+
+  const handleNewChat = useCallback(() => {
+    if (isThinking) return;
+    const session = createChatSession(INITIAL_MESSAGE);
+    setSessions(previous => [session, ...previous.filter(item => item.id !== session.id)]);
+    setActiveSessionId(session.id);
+    setMessages([INITIAL_MESSAGE]);
+    setInput('');
+    setApiError(null);
+    clearDocument();
+    clearImages();
+    stickToBottomRef.current = true;
+    setMobileHistoryOpen(false);
+    window.setTimeout(() => textareaRef.current?.focus(), 40);
+  }, [clearDocument, clearImages, isThinking]);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    if (isThinking || sessionId === activeSessionId) return;
+    const session = sessions.find(item => item.id === sessionId);
+    if (!session) return;
+    setActiveSessionId(sessionId);
+    setMessages(session.messages);
+    setInput('');
+    setApiError(null);
+    clearDocument();
+    clearImages();
+    stickToBottomRef.current = true;
+    window.setTimeout(() => textareaRef.current?.focus(), 40);
+  }, [activeSessionId, clearDocument, clearImages, isThinking, sessions]);
 
   // Autofocus on open
   useEffect(() => { textareaRef.current?.focus(); }, []);
@@ -1064,8 +1142,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative h-[100dvh] overflow-hidden w-full flex flex-col bg-[#09090b]"
+      className="relative flex h-[100dvh] w-full flex-row overflow-hidden bg-[#09090b]"
     >
+      <SingularitySidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        mobileOpen={mobileHistoryOpen}
+        onMobileOpenChange={setMobileHistoryOpen}
+        onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        disabled={isThinking}
+      />
+
+      <main className="relative flex min-w-0 flex-1 flex-col">
       {/* Subtle top radial ambient */}
       <div
         aria-hidden="true"
@@ -1081,6 +1170,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         shadow-[0_1px_0_rgba(255,255,255,0.03)]">
         <div className="max-w-3xl mx-auto w-full flex items-center justify-between px-5 py-[14px]">
           <div className="flex items-center gap-3">
+            <MobileHistoryButton onClick={() => setMobileHistoryOpen(true)} />
             {/* Icon — layered glow ring */}
             <div className="relative flex items-center justify-center w-9 h-9 rounded-full
               bg-white/[0.05] border border-white/[0.09]
@@ -1665,6 +1755,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           </AnimatePresence>
         </div>
       </div>
+      </main>
     </motion.div>
   );
 }
