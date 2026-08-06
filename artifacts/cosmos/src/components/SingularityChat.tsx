@@ -3277,10 +3277,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             </AnimatePresence>
 
             {/* Textarea + controls row */}
-            <div className="flex items-end gap-2.5 px-3 py-3">
+            <div className="relative flex min-w-0 items-end gap-2.5 px-3 py-3">
 
               {/* ── Attachment '+' button with popover ── */}
-              <div ref={attachRef} className="relative flex-shrink-0 mb-0.5">
+              <div ref={attachRef} className="absolute bottom-3 left-3 z-20">
                 <button
                   onClick={() => setAttachOpen(o => !o)}
                   disabled={composerLocked}
@@ -3356,7 +3356,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 }
                 rows={1}
                 disabled={composerLocked}
-                className="flex-1 resize-none bg-transparent text-[14px] text-white/90
+                className="w-full min-w-0 flex-1 resize-none bg-transparent pl-10 text-left text-[14px] text-white/90
                   placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
                   leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
