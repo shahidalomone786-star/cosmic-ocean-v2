@@ -63,22 +63,6 @@ interface Message {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const STARTER_PROMPTS = [
-  'Derive time dilation from first principles',
-  "What actually happens at a black hole's event horizon?",
-  'Explain quantum entanglement to a physics undergrad',
-  "Why doesn't the EPR paradox violate relativity?",
-];
-
-// Quick-action modifier chips shown near the input
-const QUICK_CHIPS = [
-  { label: 'Explain simply',          suffix: 'Explain this simply.' },
-  { label: 'Give examples',           suffix: 'Give concrete examples.' },
-  { label: 'Compare concepts',        suffix: 'Compare the key concepts.' },
-  { label: 'Latest research',         suffix: 'What does the latest research say?' },
-  { label: 'Real-world impact',       suffix: 'What are the real-world applications?' },
-] as const;
-
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
@@ -216,11 +200,17 @@ const markdownComponents = {
   ),
 };
 
-const MessageContent = memo(function MessageContent({ content }: { content: string }) {
+const MessageContent = memo(function MessageContent({
+  content,
+  className = '',
+}: {
+  content: string;
+  className?: string;
+}) {
   const visibleContent = sanitizeVisibleResponse(content);
   return (
-    <div className="text-[15px] leading-[1.75] tracking-[0.005em] text-white/85
-      overflow-x-auto overflow-y-hidden max-w-full">
+    <div className={`text-[15px] leading-[1.75] tracking-[0.005em] text-white/85
+      overflow-x-auto overflow-y-hidden max-w-full ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -890,88 +880,6 @@ const ThinkingDots = memo(function ThinkingDots() {
       <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
       <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
     </motion.div>
-  );
-});
-
-// ─── Status pill ─────────────────────────────────────────────────────────────
-type ChatPhase = 'idle' | 'thinking' | 'streaming';
-
-const StatusPill = memo(function StatusPill({ phase }: { phase: ChatPhase }) {
-  const cfg: Record<ChatPhase, { dotCls: string; label: string; textCls: string }> = {
-    idle:      { dotCls: 'bg-emerald-400/50',  label: 'Ready',      textCls: 'text-white/22' },
-    thinking:  { dotCls: 'bg-violet-400/80',   label: 'Thinking',   textCls: 'text-violet-300/70' },
-    streaming: { dotCls: 'bg-violet-300/60',   label: 'Responding', textCls: 'text-violet-200/55' },
-  };
-  const { dotCls, label, textCls } = cfg[phase];
-  return (
-    <div className="flex items-center gap-1.5" aria-live="polite" aria-label={`Status: ${label}`}>
-      <motion.div
-        className={`w-[5px] h-[5px] rounded-full ${dotCls}`}
-        animate={phase !== 'idle'
-          ? { opacity: [0.3, 1, 0.3], scale: [0.9, 1.2, 0.9] }
-          : { opacity: 0.5 }}
-        transition={phase !== 'idle'
-          ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
-          : {}}
-      />
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={phase}
-          initial={{ opacity: 0, y: 3 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -3 }}
-          transition={{ duration: 0.18 }}
-          className={`text-[9px] uppercase tracking-[0.16em] font-mono ${textCls}`}
-        >
-          {label}
-        </motion.span>
-      </AnimatePresence>
-    </div>
-  );
-});
-
-// ─── Quick-action chips ───────────────────────────────────────────────────────
-const QuickChips = memo(function QuickChips({
-  input, onChip, disabled,
-}: {
-  input: string;
-  onChip: (text: string) => void;
-  disabled: boolean;
-}) {
-  const visible = !disabled && input.length < 80;
-  return (
-    <AnimatePresence initial={false}>
-      {visible && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="overflow-hidden"
-        >
-          <div className="flex items-center gap-1.5 px-4 pt-3 pb-0.5 overflow-x-auto scrollbar-hide">
-            {QUICK_CHIPS.map(chip => (
-              <button
-                key={chip.label}
-                onClick={() => onChip(
-                  input.trim()
-                    ? `${input.trim()} — ${chip.suffix}`
-                    : chip.suffix
-                )}
-                className="flex-shrink-0 px-3 py-1.5 rounded-full
-                  bg-white/[0.04] border border-white/[0.07]
-                  text-[11px] text-white/42 hover:text-white/72
-                  hover:bg-white/[0.07] hover:border-white/[0.12]
-                  hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]
-                  transition-all duration-150 active:scale-95 whitespace-nowrap"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
   );
 });
 
@@ -1917,11 +1825,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     setIsStreaming(false);
   }, []);
 
-  const applyChip = useCallback((text: string) => {
-    setInput(text);
-    textareaRef.current?.focus();
-  }, []);
-
   const handleRegenerate = useCallback(() => {
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     if (!lastUser || isThinking || cooldownUntilRef.current > Date.now()) return;
@@ -1937,7 +1840,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
 
-  const isFreshChat = messages.length === 1;
   const isProcessingAttachment = isProcessing || isProcessingImages;
   const attachmentError = imageError || docError;
   const isMessageCooldownActive = cooldownRemaining > 0;
@@ -1988,7 +1890,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       <div className="flex-shrink-0 border-b border-white/[0.04]
         bg-[#09090b]/98 backdrop-blur-md relative z-10
         shadow-[0_1px_0_rgba(255,255,255,0.03)]">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between px-5 py-[14px]">
+        <div className="max-w-3xl mx-auto w-full flex items-center justify-start px-5 py-[14px]">
           <div className="flex items-center gap-3">
             <MobileHistoryButton onClick={() => setMobileHistoryOpen(true)} />
             {/* Icon — layered glow ring */}
@@ -2019,39 +1921,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             </div>
           </div>
 
-          {/* Right side: status + workspace + close */}
-          <div className="flex items-center gap-3">
-            <StatusPill phase={isThinking ? 'thinking' : isStreaming ? 'streaming' : 'idle'} />
-
-            {/* Research Workspace toggle */}
-            <button
-              onClick={() => workspace.setOpen(true)}
-              className="relative flex items-center justify-center p-2 rounded-full
-                text-white/30 hover:text-white/65 hover:bg-white/[0.07]
-                transition-all duration-150 active:scale-95"
-              aria-label="Open research workspace"
-            >
-              <Bookmark size={15} strokeWidth={1.7} />
-              {workspace.items.length > 0 && (
-                <span className="absolute -top-[3px] -right-[3px] min-w-[14px] h-[14px]
-                  rounded-full bg-violet-500/90 text-[7.5px] text-white font-bold
-                  flex items-center justify-center leading-none px-[3px]">
-                  {workspace.items.length > 9 ? '9+' : workspace.items.length}
-                </span>
-              )}
-            </button>
-
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-white/[0.07] text-white/30 hover:text-white/70
-                  transition-all duration-150 active:scale-95"
-                aria-label="Close Singularity"
-              >
-                <X size={17} strokeWidth={1.8} />
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
@@ -2100,7 +1969,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className="max-w-4xl mx-auto w-full px-5 sm:px-8 py-8 flex flex-col gap-0">
+          <div className={`max-w-4xl mx-auto w-full px-5 sm:px-8 py-8 flex flex-col gap-0 ${
+            messages.length === 1 && messages[0]?.id === 'welcome' && !isThinking
+              ? 'min-h-full items-center justify-center'
+              : ''
+          }`}>
             <AnimatePresence initial={false}>
               {messages.map((msg, i) => {
                 const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
@@ -2113,11 +1986,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 return (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: msg.id === 'welcome' ? 18 : 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className={`w-full flex flex-col ${msg.role === 'user' ? 'items-end mb-6' : 'items-start mb-8'}`}
+                    transition={msg.id === 'welcome'
+                      ? { duration: 1.05, delay: 0.12, ease: [0.16, 1, 0.3, 1] }
+                      : { duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className={`w-full flex flex-col ${
+                      msg.id === 'welcome'
+                        ? 'items-center mb-0'
+                        : msg.role === 'user'
+                          ? 'items-end mb-6'
+                          : 'items-start mb-8'
+                    }`}
                   >
                     {/* ── User message: premium glass bubble ──────────────── */}
                     {msg.role === 'user' && (
@@ -2172,6 +2053,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                         <div className={`w-full pt-1 pb-2 ${isGenerating ? 'stream-pulse-text' : 'animate-cosmos-fade'}`}>
                           <MessageContent
                             content={msg.content || (isThinking && i === messages.length - 1 ? '' : '…')}
+                            className={msg.id === 'welcome'
+                              ? 'mx-auto max-w-2xl text-center !text-transparent bg-gradient-to-br from-slate-200 via-white to-sky-200 bg-clip-text text-[clamp(1.35rem,2.6vw,2rem)] leading-[1.35] tracking-[0.012em]'
+                              : ''}
                           />
                         </div>
 
@@ -2226,17 +2110,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           </motion.div>
                         )}
 
-                        {/* Welcome message — listen button only */}
-                        {msg.id === 'welcome' && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.22, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                            className="flex items-center gap-0.5 mt-1"
-                          >
-                             <ListenButton text={msg.content} />
-                          </motion.div>
-                        )}
                       </>
                     )}
                   </motion.div>
@@ -2245,47 +2118,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
               {isThinking && <ThinkingDots key="thinking" />}
             </AnimatePresence>
-
-            {/* Starter prompts */}
-            {isFreshChat && !isThinking && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-                className="flex flex-col gap-2.5"
-              >
-                <p className="text-[9.5px] uppercase tracking-[0.22em] text-white/20 mb-1">
-                  Try asking
-                </p>
-                {STARTER_PROMPTS.map((p, idx) => (
-                  <motion.button
-                    key={p}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.28 + idx * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                    onClick={() => handleSend(p)}
-                    className="text-left px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]
-                      text-[13.5px] text-white/55 hover:bg-white/[0.06] hover:text-white/85
-                      hover:border-white/[0.11] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
-                      transition-all duration-200 active:scale-[0.98] active:bg-white/[0.08]
-                      focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
-                  >
-                    {p}
-                  </motion.button>
-                ))}
-
-                {/* Capability hint — subtle feature summary */}
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6, duration: 0.5 }}
-                  className="text-center text-[10.5px] text-white/[0.15] mt-1 tracking-[0.05em]
-                    leading-relaxed select-none"
-                >
-                  Deep reasoning · LaTeX math · Multi-step science · Voice narration
-                </motion.p>
-              </motion.div>
-            )}
 
             <div ref={messagesEndRef} className="h-4" />
           </div>
@@ -2400,9 +2232,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Quick-action chips (hide while AI is active or input long) */}
-            <QuickChips input={input} onChip={applyChip} disabled={isThinking || isMessageCooldownActive} />
 
             {/* Textarea + controls row */}
             <div className="flex items-end gap-2.5 px-3 py-3">
