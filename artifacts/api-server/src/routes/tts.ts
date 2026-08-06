@@ -3,9 +3,10 @@ import { EdgeTTS } from "@andresaya/edge-tts";
 
 const router = Router();
 
-// This exact voice is required for consistent multilingual English/Hindi and
-// mixed-language playback. Do not silently substitute a browser voice.
-const EDGE_VOICE = "en-US-JennyMultilingualNeural";
+// This exact supported voice is required for consistent multilingual
+// English/Hindi and mixed-language playback. Do not silently substitute a
+// browser voice.
+const EDGE_VOICE = "en-US-AvaMultilingualNeural";
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 const EDGE_RATE = "+15%";
 
@@ -35,25 +36,34 @@ router.post("/tts", async (req, res) => {
     const edgeTts = new EdgeTTS();
     // EdgeTTS creates the Microsoft-compatible SSML document internally from
     // this bounded Unicode-preserving text and the exact multilingual voice.
-    await edgeTts.synthesize(speechText, EDGE_VOICE, {
+    // Forward the provider's audio frames immediately instead of waiting for
+    // the library's buffered synthesize() call to assemble the whole chunk.
+    res.status(200);
+    res.set("Content-Type", "audio/mpeg");
+    res.set("Cache-Control", "no-store");
+    res.flushHeaders();
+
+    for await (const audioChunk of edgeTts.synthesizeStream(speechText, EDGE_VOICE, {
       outputFormat: EDGE_OUTPUT_FORMAT,
       rate: EDGE_RATE,
       volume: 0,
       pitch: "+0Hz",
-    });
-
-    const audio = edgeTts.toBuffer();
-    res.set("Content-Type", "audio/mpeg");
-    res.set("Content-Length", String(audio.length));
-    res.set("Cache-Control", "no-store");
-    res.send(audio);
+    })) {
+      if (res.destroyed) return;
+      res.write(Buffer.from(audioChunk));
+    }
+    res.end();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[tts] Edge TTS synthesis failed:", message);
-    res.status(503).json({
-      code: "EDGE_TTS_UNAVAILABLE",
-      error: "Speech synthesis is temporarily unavailable.",
-    });
+    if (res.headersSent) {
+      res.destroy(error instanceof Error ? error : new Error(message));
+    } else {
+      res.status(503).json({
+        code: "EDGE_TTS_UNAVAILABLE",
+        error: "Speech synthesis is temporarily unavailable.",
+      });
+    }
   }
 });
 

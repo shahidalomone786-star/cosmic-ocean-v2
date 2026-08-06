@@ -1,4 +1,4 @@
-export const EDGE_TTS_VOICE = 'en-US-JennyMultilingualNeural';
+export const EDGE_TTS_VOICE = 'en-US-AvaMultilingualNeural';
 const MIN_CHUNK_LENGTH = 100;
 const MAX_CHUNK_LENGTH = 200;
 
