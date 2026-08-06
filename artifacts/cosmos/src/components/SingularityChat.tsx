@@ -5,7 +5,7 @@
  * content column, neural TTS "Listen" button on every AI message.
  */
 
-import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent, type ReactNode } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
@@ -93,7 +93,7 @@ const formatMath = (text: string) => {
 const markdownComponents = {
   // ── Block elements ─────────────────────────────────────────────────────────
   p: ({ children }: any) => (
-    <p className="mb-6 last:mb-0 text-[17px] leading-[1.82] tracking-[0.002em] text-white/85">
+    <p className="mb-6 last:mb-0 text-[15px] leading-[1.68] tracking-[0.002em] text-white/85">
       {children}
     </p>
   ),
@@ -119,7 +119,7 @@ const markdownComponents = {
     <ol className="my-6 ml-6 list-decimal space-y-2.5 marker:text-white/35">{children}</ol>
   ),
   li: ({ children }: any) => (
-    <li className="pl-1 text-[17px] leading-[1.72] text-white/83">{children}</li>
+    <li className="pl-1 text-[15px] leading-[1.68] text-white/83">{children}</li>
   ),
   // ── Headings — document-grade hierarchy ───────────────────────────────────
   h1: ({ children }: any) => (
@@ -452,17 +452,25 @@ const UserMessageActions = memo(function UserMessageActions({
   text,
   onEdit,
   disabled,
+  children,
 }: {
   text: string;
   onEdit: () => void;
   disabled?: boolean;
+  children: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  const suppressContextMenuUntilRef = useRef(0);
+  const touchOriginRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
+      setOpen(true);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopied(false), 1800);
     }).catch(() => {});
@@ -470,35 +478,99 @@ const UserMessageActions = memo(function UserMessageActions({
 
   useEffect(() => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
   }, []);
 
   return (
     <div
-      className="absolute right-1 top-full z-10 mt-1 flex items-center gap-0.5 rounded-lg border border-white/[0.09]
-        bg-[#18181f]/95 p-0.5 opacity-100 shadow-xl backdrop-blur-md transition-opacity duration-150
-        sm:pointer-events-none sm:opacity-0 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100
-        sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100"
-      aria-label="Message actions"
+      className="relative ml-auto max-w-[82%]"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => {
+        if (!longPressTriggeredRef.current) setOpen(false);
+      }}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={event => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onTouchStart={event => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        touchOriginRef.current = { x: touch.clientX, y: touch.clientY };
+        longPressTriggeredRef.current = false;
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = setTimeout(() => {
+          longPressTriggeredRef.current = true;
+          suppressContextMenuUntilRef.current = Date.now() + 900;
+          setOpen(true);
+        }, 400);
+      }}
+      onTouchMove={event => {
+        const touch = event.touches[0];
+        const origin = touchOriginRef.current;
+        if (!touch || !origin) return;
+        if (Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > 8) {
+          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+          touchOriginRef.current = null;
+        }
+      }}
+      onTouchEnd={event => {
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        touchOriginRef.current = null;
+        if (longPressTriggeredRef.current) {
+          event.preventDefault();
+          window.setTimeout(() => {
+            longPressTriggeredRef.current = false;
+          }, 0);
+        }
+      }}
+      onTouchCancel={() => {
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        touchOriginRef.current = null;
+        longPressTriggeredRef.current = false;
+      }}
+      onContextMenu={event => {
+        if (longPressTriggeredRef.current || Date.now() < suppressContextMenuUntilRef.current) {
+          event.preventDefault();
+        }
+      }}
     >
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
-        aria-label={copied ? 'Copied message' : 'Copy message'}
-      >
-        {copied ? <Check size={11} strokeWidth={2.5} className="text-emerald-300" /> : <Copy size={11} strokeWidth={2} />}
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-      <button
-        type="button"
-        onClick={onEdit}
-        disabled={disabled}
-        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
-        aria-label="Edit message"
-      >
-        <Pencil size={11} strokeWidth={2} />
-        Edit
-      </button>
+      {children}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -3, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute right-1 top-full z-10 mt-1 flex origin-top-right items-center gap-0.5 rounded-lg border border-white/[0.09]
+              bg-[#18181f]/95 p-0.5 shadow-xl backdrop-blur-md"
+            aria-label="Message actions"
+          >
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+              aria-label={copied ? 'Copied message' : 'Copy message'}
+            >
+              {copied ? <Check size={11} strokeWidth={2.5} className="text-emerald-300" /> : <Copy size={11} strokeWidth={2} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={disabled}
+              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+              aria-label="Edit message"
+            >
+              <Pencil size={11} strokeWidth={2} />
+              Edit
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });
@@ -2725,10 +2797,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   >
                     {/* ── User message: premium glass bubble ──────────────── */}
                     {msg.role === 'user' && (
-                      <div className="group relative ml-auto max-w-[82%]">
+                      <UserMessageActions
+                        text={msg.content}
+                        onEdit={() => handleEditUserMessage(msg.id)}
+                        disabled={isThinking}
+                      >
                         <div className="bg-white/[0.08] border border-white/[0.13] text-white/93
                           rounded-2xl rounded-br-[4px] px-4 py-3
-                          text-[13.5px] leading-[1.72] font-[450]
+                          text-[15px] leading-[1.6] font-[450]
                           shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
                           {msg.attachedImages?.length ? (
                             <div className="mb-2.5">
@@ -2744,12 +2820,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           )}
                           {msg.content}
                         </div>
-                        <UserMessageActions
-                          text={msg.content}
-                          onEdit={() => handleEditUserMessage(msg.id)}
-                          disabled={isThinking}
-                        />
-                      </div>
+                      </UserMessageActions>
                     )}
 
                     {/* ── Error message: red-tinted surface ───────────────── */}
