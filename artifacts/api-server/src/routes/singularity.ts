@@ -10,7 +10,6 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
-const VOICE_MESSAGE_COOLDOWN_MS = 750;
 const MAX_HISTORY_CHARACTERS = 22_000;
 const MAX_MESSAGE_ESTIMATED_TOKENS = 6_000;
 const lastSingularityRequestByClient = new Map<string, number>();
@@ -23,10 +22,11 @@ function getSingularityClientKey(req: Request): string {
 }
 
 function claimSingularityCooldown(req: Request, voiceMode = false): number {
+  if (voiceMode) return 0;
   const now = Date.now();
   const clientKey = `${getSingularityClientKey(req)}:${voiceMode ? 'voice' : 'normal'}`;
   const lastRequestAt = lastSingularityRequestByClient.get(clientKey);
-  const cooldownMs = voiceMode ? VOICE_MESSAGE_COOLDOWN_MS : MESSAGE_COOLDOWN_MS;
+  const cooldownMs = MESSAGE_COOLDOWN_MS;
   if (lastRequestAt && now - lastRequestAt < cooldownMs) {
     return Math.max(1, Math.ceil((cooldownMs - (now - lastRequestAt)) / 1000));
   }
@@ -285,6 +285,8 @@ Use concise, elegant English and natural transitions. Match the reader's level w
 announcing a difficulty label. Let structure serve comprehension, not ceremony.`;
 
 const FULL_SYSTEM_PROMPT = `${SYSTEM_PROMPT}${EDITORIAL_STYLE_EXTENSION}`;
+const VOICE_REALTIME_PROMPT =
+  'You are speaking out loud in a real-time voice conversation. Keep your response highly conversational, direct, and concise (1 to 3 sentences maximum) unless asked for a detailed explanation.';
 
 const TEXT_MODEL = 'openai/gpt-oss-120b';
 const VISION_MODEL = 'qwen/qwen3.6-27b';
@@ -597,7 +599,10 @@ router.post('/singularity', async (req, res) => {
   // Keep Singularity's persona as the first message for every provider/model.
   // In particular, Qwen vision requests must not bypass the system instruction.
   const messages: ChatRequestMessage[] = [
-    { role: 'system',    content: FULL_SYSTEM_PROMPT },
+    {
+      role: 'system',
+      content: voiceMode ? `${FULL_SYSTEM_PROMPT}\n\n${VOICE_REALTIME_PROMPT}` : FULL_SYSTEM_PROMPT,
+    },
     ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
   ];
@@ -650,7 +655,7 @@ router.post('/singularity', async (req, res) => {
            messages: boundedMessages,
           stream:      true,
           temperature: 0.6,
-           max_tokens: 1500,
+            max_tokens: voiceMode ? 320 : 1500,
         }),
       });
 

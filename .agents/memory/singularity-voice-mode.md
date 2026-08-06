@@ -15,6 +15,8 @@ Voice TTS is mobile-gesture-safe: one reusable inline audio element and AudioCon
 
 Voice transcription must construct the upload only after both the terminal `dataavailable` and `stop` events arrive. The client rejects empty/tiny or decoded-silent recordings locally, sends only WebM/MP4-compatible media through the existing `audio` multipart field, and quietly restarts Listening after empty or failed transcription. The single server route logs parser, format, payload, and exact Groq failures while returning generic client errors.
 
+Voice response latency is intentionally separate from normal chat: the server bypasses the normal message limiter for `voiceMode`, appends the concise real-time speech instruction, and uses a smaller voice completion budget. The client flushes the first sentence on punctuation or newline as soon as it appears in SSE, and the TTS queue progressively appends streamed MP3 bytes through MediaSource when supported, falling back to Blob playback otherwise.
+
 **Why:** The existing composer microphone intentionally inserts transcription into the composer and normal chat has a 15-second cooldown; continuous voice needs independent lifecycle ownership and a short voice-only request guard without changing ordinary chat behavior.
 
 **How to apply:** Preserve the separate voice path when changing chat streaming, transcription, or TTS. Interruption must abort the active SSE request, cancel TTS audio/object URLs, and retain a live recording when speech-overlap detection has already begun. Do not reintroduce persistent transcript panels, captions toggles, or per-chunk audio contexts. Keep normal chat streaming and composer recording behavior unchanged.

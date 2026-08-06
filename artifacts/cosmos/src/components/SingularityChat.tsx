@@ -2655,7 +2655,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               voiceSentenceBufferRef.current += nextDelta;
               const queue = voiceTtsQueueRef.current;
               while (queue) {
-                const match = voiceSentenceBufferRef.current.match(/^([\s\S]*?[.!?。！？])(?:\s+|$)/);
+                const match = voiceSentenceBufferRef.current.match(/^([\s\S]*?(?:[.!?。！？]|\n))/);
                 if (match) {
                   const sentence = match[1].trim();
                   voiceSentenceBufferRef.current = voiceSentenceBufferRef.current.slice(match[0].length);
