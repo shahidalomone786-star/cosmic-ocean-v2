@@ -11,7 +11,7 @@ import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, Pencil, RotateCcw, ArrowDown, Volume2, Mic2,
   BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2, Mic, MicOff,
-  ExternalLink,
+  ExternalLink, PanelRightOpen,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -283,7 +283,7 @@ const VisualReferences = memo(function VisualReferences({
       data-testid="visual-references"
     >
       <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
+             <div className="min-w-0">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.18em] text-sky-200/45">
             Visual evidence
           </p>
@@ -428,6 +428,27 @@ const SaveButton = memo(function SaveButton({ onSave }: { onSave: () => void }) 
         : <BookmarkPlus size={11} strokeWidth={2} />
       }
       {saved ? 'Saved' : 'Save'}
+    </button>
+  );
+});
+
+function isWorkspaceCandidate(content: string): boolean {
+  return content.trim().length >= 420
+    || /```|^\s*[-*]\s|^\s*\|.+\|/m.test(content)
+    || /\\begin\{|\\\[|\$\$|deriv|proof|research|algorithm|analysis|draft/i.test(content);
+}
+
+const WorkspaceButton = memo(function WorkspaceButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      data-testid="button-open-workspace-response"
+      className="flex items-center gap-1.5 rounded-lg border border-violet-300/[0.16] bg-violet-300/[0.06] px-2.5 py-1.5 text-[11px] text-violet-100/70 transition-gpu hover:border-violet-200/35 hover:bg-violet-200/[0.12] hover:text-violet-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+      aria-label="Open this response in Workspace"
+    >
+      <PanelRightOpen size={11} strokeWidth={1.9} />
+      Workspace
     </button>
   );
 });
@@ -1186,6 +1207,7 @@ interface MessageRowProps {
   onSimplify: () => void;
   onRegenerate: () => void;
   onSave: (content: string) => void;
+  onOpenWorkspace: (content: string) => void;
 }
 
 const MessageRow = memo(function MessageRow({
@@ -1199,6 +1221,7 @@ const MessageRow = memo(function MessageRow({
   onSimplify,
   onRegenerate,
   onSave,
+  onOpenWorkspace,
 }: MessageRowProps) {
   const handleEdit = useCallback(() => onEdit(msg.id), [msg.id, onEdit]);
   const handleSave = useCallback(() => onSave(msg.content), [msg.content, onSave]);
@@ -1297,6 +1320,9 @@ const MessageRow = memo(function MessageRow({
                 <ShareButton text={msg.content} />
                 <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
                 <SaveButton onSave={handleSave} />
+                {isWorkspaceCandidate(msg.content) && (
+                  <WorkspaceButton onOpen={() => onOpenWorkspace(msg.content)} />
+                )}
                 {isLastAssistant && (
                   <>
                     <button
@@ -3175,7 +3201,9 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         onOpenSettings={onOpenSettings}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col">
+      <main className={`relative flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${
+        workspace.open ? 'md:pr-[42%]' : ''
+      }`}>
       {/* Subtle top radial ambient */}
       <div
         aria-hidden="true"
@@ -3218,6 +3246,18 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                 GPT-OSS-120B · Cosmic Intelligence
               </p>
             </div>
+             {workspace.items.length > 0 && (
+               <button
+                 type="button"
+                 data-testid="button-open-workspace-library"
+                 onClick={() => workspace.setOpen(true)}
+                 className="ml-1 hidden items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.035] px-2.5 py-1.5 text-[10px] text-white/45 transition-gpu hover:border-violet-200/25 hover:bg-violet-200/[0.08] hover:text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:inline-flex"
+                 aria-label="Open saved Workspace library"
+               >
+                 <PanelRightOpen size={11} strokeWidth={1.8} />
+                 Workspace
+               </button>
+             )}
           </div>
 
         </div>
@@ -3230,13 +3270,14 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         items={workspace.items}
         onRemove={workspace.remove}
         onNoteChange={workspace.updateNote}
+        seedContent={workspace.seedContent}
       />
 
-      {/* ── 🚨 GROQ DEBUG PANEL — visible whenever an API error occurs ─────── */}
+      {/* ── GROQ DEBUG PANEL — visible whenever an API error occurs ─────── */}
       {apiError && (
         <div className="flex-shrink-0 mx-4 mt-3 p-4 bg-red-950/90 border-2 border-red-500/70 rounded-xl font-mono text-[11px] space-y-2 z-50">
           <div className="flex items-center justify-between">
-            <span className="text-red-400 font-bold text-[12px]">🚨 GROQ DEBUG</span>
+            <span className="text-red-400 font-bold text-[12px]">GROQ DEBUG</span>
             <button
               onClick={() => setApiError(null)}
               className="text-white/30 hover:text-white/70 text-[10px] underline underline-offset-2"
@@ -3296,6 +3337,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                     onSimplify={handleSimplify}
                     onRegenerate={handleRegenerate}
                     onSave={workspace.save}
+                    onOpenWorkspace={workspace.openWithContent}
                   />
                 );
               })}
