@@ -1957,6 +1957,10 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const handleCloseVoiceMode = useCallback(() => {
     voiceModeOpenRef.current = false;
     setVoiceModeOpen(false);
+    if (voiceRecordingStreamRef.current) {
+      voiceRecordingStreamRef.current.getTracks().forEach(track => track.stop());
+      voiceRecordingStreamRef.current = null;
+    }
     stopVoiceMode();
   }, [stopVoiceMode]);
 
@@ -2211,6 +2215,10 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     voiceRequestAbortRef.current?.abort();
     voiceTtsQueueRef.current?.stop();
     releaseVoiceAudio();
+    if (voiceRecordingStreamRef.current) {
+      voiceRecordingStreamRef.current.getTracks().forEach(track => track.stop());
+      voiceRecordingStreamRef.current = null;
+    }
     stopVoiceModeResources();
   }, [stopVoiceModeResources]);
 
