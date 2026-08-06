@@ -2320,7 +2320,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         className="flex-shrink-0 border-t border-white/[0.04] pb-safe"
         style={{ background: 'linear-gradient(to top, #09090b 70%, transparent)' }}
       >
-        <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-4">
+        <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 pt-4 pb-2 sm:pb-3">
 
           {/* Hidden file input — triggered by "Upload Document" button or Replace */}
           <input
@@ -2584,13 +2584,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               This model currently supports text only.
             </p>
           )}
-
-          {/* Disclaimer */}
-          <p className="text-center text-[10px] text-white/[0.11] mt-3 tracking-[0.04em] leading-relaxed">
-            Singularity reasons deeply but can err on cutting-edge science
-            <span className="mx-1.5 opacity-40">·</span>
-            always verify critical claims
-          </p>
 
           {/* Document extraction error */}
           <AnimatePresence>
