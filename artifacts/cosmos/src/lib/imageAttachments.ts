@@ -2,8 +2,10 @@ import type { ImageAttachment } from './attachmentTypes';
 
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const MAX_IMAGES_PER_MESSAGE = 5;
-const MAX_DIMENSION = 2048;
+const MAX_DIMENSION = 768;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+const OUTPUT_QUALITY = 0.7;
+const FALLBACK_OUTPUT_QUALITY = 0.55;
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 
@@ -204,8 +206,8 @@ export async function optimizeImage(file: File): Promise<ImageAttachment> {
     drawOriented(context, decoded.source, drawWidth, drawHeight, appliedOrientation);
     context.restore();
 
-    let blob = await canvasBlob(canvas, 0.84);
-    if (blob.size > MAX_OUTPUT_BYTES) blob = await canvasBlob(canvas, 0.68);
+    let blob = await canvasBlob(canvas, OUTPUT_QUALITY);
+    if (blob.size > MAX_OUTPUT_BYTES) blob = await canvasBlob(canvas, FALLBACK_OUTPUT_QUALITY);
     if (blob.size > MAX_OUTPUT_BYTES) throw new Error('This image could not be compressed enough for a vision request.');
 
     const dataUrl = await blobToDataUrl(blob);

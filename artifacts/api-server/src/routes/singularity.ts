@@ -394,28 +394,49 @@ router.post('/singularity', async (req, res) => {
         })),
       ]
     : message.trim();
-  const historyMessages = safeHistory.map(turn => ({
-    role: turn.role,
-    content: turn.images?.length
-      ? [
-          { type: 'text', text: turn.content },
-          ...turn.images.map(image => ({
-            type: 'image_url',
-            image_url: { url: image.dataUrl },
-          })),
-        ]
-      : turn.content,
-  }));
+  // Vision requests are intentionally stateless at the transport boundary:
+  // retained history can add thousands of input tokens on top of image data.
+  // Reuse the most recent retained image for image follow-ups, but never send
+  // the prior text turns or assistant responses to Qwen.
+  const visionImages = images.length > 0
+    ? images
+    : [...safeHistory]
+        .reverse()
+        .flatMap(turn => turn.images ?? [])
+        .slice(0, 5);
+  const visionUserContent = visionImages.length > 0
+    ? [
+        { type: 'text', text: message.trim() },
+        ...visionImages.map(image => ({
+          type: 'image_url',
+          image_url: { url: image.dataUrl },
+        })),
+      ]
+    : message.trim();
+  const historyMessages = hasImages
+    ? []
+    : safeHistory.map(turn => ({
+        role: turn.role,
+        content: turn.images?.length
+          ? [
+              { type: 'text', text: turn.content },
+              ...turn.images.map(image => ({
+                type: 'image_url',
+                image_url: { url: image.dataUrl },
+              })),
+            ]
+          : turn.content,
+      }));
   // Keep Singularity's persona as the first message for every provider/model.
   // In particular, Qwen vision requests must not bypass the system instruction.
   const messages: { role: string; content: unknown }[] = [
     { role: 'system',    content: SYSTEM_PROMPT },
     ...historyMessages,
-    { role: 'user',      content: userContent },
+    { role: 'user',      content: hasImages ? visionUserContent : userContent },
   ];
 
   console.log(
-    `[singularity] Request: "${message.slice(0, 60)}…"  history=${safeHistory.length} turn(s)  model=${model} images=${images.length}`
+    `[singularity] Request: "${message.slice(0, 60)}…"  history=${hasImages ? 0 : safeHistory.length} turn(s)  model=${model} images=${visionImages.length}`
   );
 
   const maxAttempts = getGroqKeyCount();
@@ -443,7 +464,7 @@ router.post('/singularity', async (req, res) => {
           messages,
           stream:      true,
           temperature: 0.6,
-          max_tokens:  4000,
+          max_tokens:  hasImages ? 1500 : 4000,
         }),
       });
 
