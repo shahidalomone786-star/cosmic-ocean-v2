@@ -25,6 +25,9 @@ import {
   CHAT_SIDEBAR_WIDTH_KEY,
   getChatPreview,
   getChatSearchText,
+  listChatSessionSummaries,
+  summarizeChatSession,
+  type ChatSessionSummary,
   type ChatSession,
 } from '@/lib/singularityChatHistory';
 
@@ -41,10 +44,13 @@ interface SingularitySidebarProps {
   onToggleFavorite: (sessionId: string) => void;
   onToggleArchive: (sessionId: string) => void;
   onDuplicateSession: (sessionId: string) => void;
-  onExportSession: (sessionId: string) => void;
+  onExportSession: (sessionId: string, format: 'json' | 'markdown' | 'txt' | 'pdf') => void;
   onUndoDelete: () => void;
   undoTitle?: string | null;
   historyNotice?: string | null;
+  historyRefreshToken?: number;
+  pendingHistoryWrites?: number;
+  isOffline?: boolean;
   disabled?: boolean;
 }
 
@@ -109,7 +115,7 @@ function SessionRow({
   onDuplicate,
   onExport,
 }: {
-  session: ChatSession;
+  session: ChatSession | ChatSessionSummary;
   active: boolean;
   collapsed: boolean;
   query: string;
@@ -120,9 +126,9 @@ function SessionRow({
   onToggleFavorite: () => void;
   onToggleArchive: () => void;
   onDuplicate: () => void;
-  onExport: () => void;
+  onExport: (format: 'json' | 'markdown' | 'txt' | 'pdf') => void;
 }) {
-  const preview = getChatPreview(session);
+  const preview = 'preview' in session ? session.preview : getChatPreview(session);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(session.title);
@@ -230,7 +236,11 @@ function SessionRow({
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleFavorite(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Star size={12} fill={session.favorite ? 'currentColor' : 'none'} />{session.favorite ? 'Remove favorite' : 'Favorite'}</button>
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleArchive(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50">{session.archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}{session.archived ? 'Restore' : 'Archive'}</button>
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDuplicate(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Copy size={12} />Duplicate</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Export</button>
+          <div className="px-2.5 pb-1 pt-1 text-[9px] uppercase tracking-[0.14em] text-white/25">Export as</div>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('markdown'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Markdown</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('txt'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Plain text</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('json'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />JSON</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('pdf'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />PDF</button>
           <div className="my-1 border-t border-white/[0.07]" />
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-red-300/80 transition hover:bg-red-400/[0.10] hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/50"><Trash2 size={12} />Delete</button>
         </div>
@@ -262,11 +272,14 @@ function SidebarContents({
   undoTitle,
   historyNotice,
   focusSearchRequest,
+  historyRefreshToken,
+  pendingHistoryWrites = 0,
+  isOffline = false,
   onCollapse,
   onCloseMobile,
   disabled,
 }: {
-  sessions: ChatSession[];
+  sessions: Array<ChatSession | ChatSessionSummary>;
   activeSessionId: string;
   collapsed: boolean;
   query: string;
@@ -279,30 +292,75 @@ function SidebarContents({
   onToggleFavorite: (sessionId: string) => void;
   onToggleArchive: (sessionId: string) => void;
   onDuplicateSession: (sessionId: string) => void;
-  onExportSession: (sessionId: string) => void;
+  onExportSession: (sessionId: string, format: 'json' | 'markdown' | 'txt' | 'pdf') => void;
   onUndoDelete: () => void;
   undoTitle?: string | null;
   historyNotice?: string | null;
   focusSearchRequest: number;
+  historyRefreshToken: number;
+  pendingHistoryWrites?: number;
+  isOffline?: boolean;
   onCollapse?: () => void;
   onCloseMobile?: () => void;
   disabled?: boolean;
 }) {
   const [ready, setReady] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ChatSession | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSession | ChatSessionSummary | null>(null);
+  const [summarySessions, setSummarySessions] = useState<ChatSessionSummary[]>([]);
+  const [hasMoreSummaries, setHasMoreSummaries] = useState(false);
+  const [summaryCursor, setSummaryCursor] = useState<string | null>(null);
+  const [summariesLoading, setSummariesLoading] = useState(false);
+  const [virtualStart, setVirtualStart] = useState(0);
+  const historyScrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    setSummariesLoading(true);
+    setSummaryCursor(null);
+    void listChatSessionSummaries(null).then(page => {
+      if (cancelled) return;
+      setSummarySessions(page.sessions);
+      setHasMoreSummaries(page.hasMore);
+      setSummaryCursor(page.sessions.at(-1)?.sortKey ?? null);
+    }).finally(() => {
+      if (!cancelled) setSummariesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [historyRefreshToken]);
+
+  const loadMoreSummaries = () => {
+    if (summariesLoading || !hasMoreSummaries) return;
+    setSummariesLoading(true);
+    void listChatSessionSummaries(summaryCursor).then(page => {
+      setSummarySessions(previous => {
+        const byId = new Map(previous.map(session => [session.id, session]));
+        page.sessions.forEach(session => byId.set(session.id, session));
+        return [...byId.values()];
+      });
+      setHasMoreSummaries(page.hasMore);
+      setSummaryCursor(page.sessions.at(-1)?.sortKey ?? summaryCursor);
+    }).finally(() => setSummariesLoading(false));
+  };
+
+  const mergedSessions = useMemo(() => {
+    const fromProps = sessions.map(session => 'messageCount' in session ? session : summarizeChatSession(session));
+    const byId = new Map(summarySessions.map(session => [session.id, session]));
+    fromProps.forEach(session => byId.set(session.id, session));
+    return [...byId.values()];
+  }, [sessions, summarySessions]);
+
   const filteredSessions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return sessions;
-    return sessions.filter(session =>
-      `${session.title}\n${getChatSearchText(session)}`.toLowerCase().includes(normalized),
+    if (!normalized) return mergedSessions;
+    return mergedSessions.filter(session =>
+      `${session.title}\n${'searchText' in session ? session.searchText : getChatSearchText(session)}`.toLowerCase().includes(normalized),
     );
-  }, [query, sessions]);
+  }, [mergedSessions, query]);
 
   useEffect(() => {
     if (!focusSearchRequest) return;
@@ -317,7 +375,7 @@ function SidebarContents({
   const regularSessions = visibleSessions.filter(session => !session.favorite && !session.pinned);
 
   const grouped = useMemo(() => {
-    const result = new Map<TimeGroup, ChatSession[]>();
+  const result = new Map<TimeGroup, ChatSessionSummary[]>();
     regularSessions.forEach(session => {
       const group = getTimeGroup(session.updatedAt);
       result.set(group, [...(result.get(group) ?? []), session]);
@@ -327,7 +385,7 @@ function SidebarContents({
       .map(group => ({ group, sessions: result.get(group) ?? [] }));
   }, [regularSessions]);
 
-  const renderRow = (session: ChatSession) => (
+  const renderRow = (session: ChatSessionSummary) => (
     <SessionRow
       key={session.id}
       session={session}
@@ -339,13 +397,46 @@ function SidebarContents({
         onCloseMobile?.();
       }}
       onRename={title => onRenameSession(session.id, title)}
-      onDelete={() => setDeleteTarget(session)}
+       onDelete={() => setDeleteTarget(session)}
       onTogglePin={() => onTogglePin(session.id)}
       onToggleFavorite={() => onToggleFavorite(session.id)}
       onToggleArchive={() => onToggleArchive(session.id)}
       onDuplicate={() => onDuplicateSession(session.id)}
-      onExport={() => onExportSession(session.id)}
+       onExport={format => onExportSession(session.id, format)}
     />
+  );
+
+  type VirtualRow =
+    | { kind: 'header'; key: string; label: string }
+    | { kind: 'session'; key: string; session: ChatSessionSummary };
+
+  const virtualRows = useMemo<VirtualRow[]>(() => {
+    const rows: VirtualRow[] = [];
+    if (pinned.length > 0) {
+      rows.push({ kind: 'header', key: 'header-pinned', label: 'Pinned' });
+      pinned.forEach(session => rows.push({ kind: 'session', key: session.id, session }));
+    }
+    if (favorites.length > 0) {
+      rows.push({ kind: 'header', key: 'header-favorites', label: 'Favorites' });
+      favorites.forEach(session => rows.push({ kind: 'session', key: session.id, session }));
+    }
+    grouped.forEach(({ group, sessions: groupSessions }) => {
+      rows.push({ kind: 'header', key: `header-${group}`, label: group });
+      groupSessions.forEach(session => rows.push({ kind: 'session', key: session.id, session }));
+    });
+    if (archivedSessions.length > 0) {
+      rows.push({ kind: 'header', key: 'header-archived', label: 'Archived' });
+      archivedSessions.forEach(session => rows.push({ kind: 'session', key: session.id, session }));
+    }
+    return rows;
+  }, [archivedSessions, favorites, grouped, pinned]);
+
+  const rowHeight = 58;
+  const overscan = 8;
+  const virtualStartWithOverscan = Math.max(0, virtualStart - overscan);
+  const renderedRows = virtualRows.slice(
+    virtualStartWithOverscan,
+    Math.min(virtualRows.length, virtualStart + Math.ceil(320 / rowHeight) + overscan),
   );
 
   return (
@@ -427,7 +518,15 @@ function SidebarContents({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-5 scrollbar-hide">
+      <div
+        ref={historyScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-5 scrollbar-hide"
+        onScroll={event => {
+          const element = event.currentTarget;
+          setVirtualStart(Math.max(0, Math.floor(element.scrollTop / rowHeight)));
+          if (element.scrollTop + element.clientHeight >= element.scrollHeight - 500) loadMoreSummaries();
+        }}
+      >
         {!ready ? (
           <div className="space-y-2 px-1" aria-label="Loading chat history">
             {[0, 1, 2, 3, 4].map(item => (
@@ -447,39 +546,21 @@ function SidebarContents({
             )}
           </div>
         ) : (
-          <>
-            {pinned.length > 0 && (
-              <section className="mb-5">
-                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-violet-200/45"><PinIcon active />Pinned</h3>}
-                <div className="space-y-0.5">{pinned.map(renderRow)}</div>
-              </section>
-            )}
-            {favorites.length > 0 && (
-              <section className="mb-5">
-                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-200/45"><Star size={10} fill="currentColor" />Favorites</h3>}
-                <div className="space-y-0.5">{favorites.map(renderRow)}</div>
-              </section>
-            )}
-            {grouped.map(({ group, sessions: groupSessions }) => (
-            <section key={group} className="mb-5">
-              {!collapsed && (
-                <h3 className="mb-1 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/20">
-                  {group}
-                </h3>
-              )}
-              <div className="space-y-0.5">
-                {groupSessions.map(renderRow)}
-              </div>
-            </section>
-            ))}
-            {archivedSessions.length > 0 && (
-              <section className="mb-5">
-                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/25"><Archive size={10} />Archived</h3>}
-                <div className="space-y-0.5">{archivedSessions.map(renderRow)}</div>
-              </section>
-            )}
-          </>
+          <div style={{ height: virtualRows.length * rowHeight, position: 'relative' }}>
+            <div style={{ transform: `translateY(${virtualStartWithOverscan * rowHeight}px)` }}>
+              {renderedRows.map(row => row.kind === 'header' ? (
+                <div key={row.key} className="flex h-[58px] items-end px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/25">
+                  {!collapsed && row.label}
+                </div>
+              ) : (
+                <div key={row.key} className="h-[58px] py-0.5">
+                  {renderRow(row.session)}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
+        {summariesLoading && <div className="px-3 py-2 text-[10px] text-white/25" role="status">Loading more history…</div>}
       </div>
 
       {(undoTitle || historyNotice) && !collapsed && (
@@ -492,7 +573,14 @@ function SidebarContents({
       {!collapsed && (
         <div className="border-t border-white/[0.06] px-4 py-3">
           <p className="text-[9px] uppercase tracking-[0.16em] text-white/20">Local history</p>
-          <p className="mt-1 text-[10px] leading-relaxed text-white/25">Saved securely in this browser.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-white/25">
+            {isOffline ? 'Offline cache active. Changes will sync when you reconnect.' : 'Saved securely in this browser.'}
+          </p>
+          {pendingHistoryWrites > 0 && (
+            <p className="mt-1 text-[9px] text-amber-200/55" role="status">
+              Sync queued · retrying automatically
+            </p>
+          )}
         </div>
       )}
 
@@ -537,6 +625,9 @@ export function SingularitySidebar({
   onUndoDelete,
   undoTitle,
   historyNotice,
+  historyRefreshToken = 0,
+  pendingHistoryWrites = 0,
+  isOffline = false,
   disabled = false,
 }: SingularitySidebarProps) {
   const [collapsed, setCollapsed] = useState(() => {
@@ -655,6 +746,9 @@ export function SingularitySidebar({
     undoTitle,
     historyNotice,
     focusSearchRequest,
+    historyRefreshToken,
+    pendingHistoryWrites,
+    isOffline,
     disabled,
   };
 
