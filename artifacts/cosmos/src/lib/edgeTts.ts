@@ -346,6 +346,60 @@ export class TtsPlaybackQueue {
 
 type TtsLevelListener = (level: number) => void;
 
+let sharedVoiceAudio: HTMLAudioElement | null = null;
+let sharedVoiceAudioContext: AudioContext | null = null;
+let sharedVoiceAudioSource: MediaElementAudioSourceNode | null = null;
+
+function getSharedVoiceAudio(): HTMLAudioElement {
+  if (!sharedVoiceAudio) {
+    sharedVoiceAudio = document.createElement('audio');
+    sharedVoiceAudio.preload = 'auto';
+    sharedVoiceAudio.setAttribute('playsinline', '');
+  }
+  return sharedVoiceAudio;
+}
+
+export function primeVoiceAudio(): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const audio = getSharedVoiceAudio();
+  audio.muted = true;
+  audio.volume = 0;
+  const AudioContextClass = window.AudioContext
+    || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (AudioContextClass && !sharedVoiceAudioContext) {
+    try {
+      sharedVoiceAudioContext = new AudioContextClass();
+    } catch {
+      sharedVoiceAudioContext = null;
+    }
+  }
+  void sharedVoiceAudioContext?.resume().catch(() => undefined);
+  void audio.play().then(() => {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.volume = 1;
+  }).catch(() => {
+    audio.muted = false;
+    audio.volume = 1;
+  });
+}
+
+export function releaseVoiceAudio(): void {
+  if (sharedVoiceAudio) {
+    sharedVoiceAudio.pause();
+    sharedVoiceAudio.onended = null;
+    sharedVoiceAudio.onerror = null;
+    sharedVoiceAudio.removeAttribute('src');
+    sharedVoiceAudio.load();
+  }
+  sharedVoiceAudioSource?.disconnect();
+  sharedVoiceAudioSource = null;
+  void sharedVoiceAudioContext?.close().catch(() => undefined);
+  sharedVoiceAudioContext = null;
+  sharedVoiceAudio = null;
+}
+
 /**
  * Streaming voice-mode player. Sentences are enqueued as the assistant SSE
  * response arrives, so the first audio request can start before the response
@@ -362,8 +416,11 @@ export class TtsStreamingQueue {
   private finishPromise: Promise<void> | null = null;
   private finishResolve: (() => void) | null = null;
   private analyserFrame: number | null = null;
-  private audioContext: AudioContext | null = null;
+  private audioContext: AudioContext | null = sharedVoiceAudioContext;
   private analyser: AnalyserNode | null = null;
+  private readonly audio = getSharedVoiceAudio();
+  private speakerEnabled = true;
+  private playbackStarted = false;
 
   constructor(
     private readonly onLevel?: TtsLevelListener,
@@ -373,6 +430,16 @@ export class TtsStreamingQueue {
 
   get signal(): AbortSignal {
     return this.controller.signal;
+  }
+
+  unlock(): void {
+    primeVoiceAudio();
+    this.audioContext = sharedVoiceAudioContext;
+  }
+
+  setSpeakerEnabled(enabled: boolean): void {
+    this.speakerEnabled = enabled;
+    this.audio.volume = enabled ? 1 : 0;
   }
 
   enqueue(text: string): void {
@@ -400,12 +467,13 @@ export class TtsStreamingQueue {
     this.controller.abort();
     this.pending.length = 0;
     this.stopLevelMeter();
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.removeAttribute('src');
-      this.currentAudio.load();
-      this.currentAudio = null;
-    }
+    this.playbackStarted = false;
+    this.audio.pause();
+    this.audio.onended = null;
+    this.audio.onerror = null;
+    this.audio.removeAttribute('src');
+    this.audio.load();
+    this.currentAudio = null;
     if (this.currentUrl) {
       URL.revokeObjectURL(this.currentUrl);
       this.currentUrl = null;
@@ -421,23 +489,37 @@ export class TtsStreamingQueue {
       while (this.pending.length > 0 && !this.stopped) {
         const text = this.pending.shift();
         if (!text) continue;
-        const response = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-          signal: this.signal,
-        });
-        if (!response.ok) {
-          let message = `Edge TTS request failed (${response.status})`;
+        let lastError: Error | null = null;
+        for (let attempt = 0; attempt < 2 && !this.stopped; attempt += 1) {
           try {
-            const body = await response.json() as { error?: string };
-            if (body.error) message = body.error;
-          } catch {
-            // Keep the status-based error when the server did not return JSON.
+            const response = await fetch('/api/tts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text }),
+              signal: this.signal,
+            });
+            if (!response.ok) {
+              let message = `Edge TTS request failed (${response.status})`;
+              try {
+                const body = await response.json() as { error?: string };
+                if (body.error) message = body.error;
+              } catch {
+                // Keep the status-based error when the server did not return JSON.
+              }
+              throw new Error(message);
+            }
+            await this.playBlob(await response.blob());
+            lastError = null;
+            break;
+          } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') throw error;
+            lastError = error instanceof Error ? error : new Error(String(error));
+            if (attempt === 0 && !this.stopped) {
+              await new Promise<void>(resolve => window.setTimeout(resolve, 160));
+            }
           }
-          throw new Error(message);
         }
-        await this.playBlob(await response.blob());
+        if (lastError) throw lastError;
       }
     } catch (error: unknown) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
@@ -456,9 +538,11 @@ export class TtsStreamingQueue {
   private async playBlob(blob: Blob): Promise<void> {
     if (this.stopped) throw new DOMException('TTS playback aborted', 'AbortError');
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
+    const audio = this.audio;
     this.currentUrl = url;
     this.currentAudio = audio;
+    audio.src = url;
+    audio.volume = this.speakerEnabled ? 1 : 0;
     this.startLevelMeter(audio);
 
     return new Promise((resolve, reject) => {
@@ -469,8 +553,12 @@ export class TtsStreamingQueue {
         audio.onended = null;
         audio.onerror = null;
         this.stopLevelMeter();
+        this.playbackStarted = false;
         if (this.currentAudio === audio) this.currentAudio = null;
         if (this.currentUrl === url) this.currentUrl = null;
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
         URL.revokeObjectURL(url);
         error ? reject(error) : resolve();
       };
@@ -480,8 +568,11 @@ export class TtsStreamingQueue {
         audio.pause();
         finish(new DOMException('TTS playback aborted', 'AbortError'));
       }, { once: true });
-      this.onPlaybackStart?.();
-      audio.play().catch(error => finish(error instanceof Error ? error : new Error(String(error))));
+      audio.play().then(() => {
+        if (this.stopped) return;
+        this.playbackStarted = true;
+        this.onPlaybackStart?.();
+      }).catch(error => finish(error instanceof Error ? error : new Error(String(error))));
     });
   }
 
@@ -490,8 +581,8 @@ export class TtsStreamingQueue {
       || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass || !this.onLevel) return;
     try {
-      const context = new AudioContextClass();
-      const source = context.createMediaElementSource(audio);
+      const context = this.audioContext ?? new AudioContextClass();
+      const source = sharedVoiceAudioSource ?? context.createMediaElementSource(audio);
       const analyser = context.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.78;
@@ -499,6 +590,7 @@ export class TtsStreamingQueue {
       analyser.connect(context.destination);
       void context.resume().catch(() => undefined);
       this.audioContext = context;
+      sharedVoiceAudioSource = source;
       this.analyser = analyser;
       const samples = new Uint8Array(analyser.fftSize);
       const tick = () => {
@@ -522,8 +614,7 @@ export class TtsStreamingQueue {
     this.analyserFrame = null;
     this.analyser?.disconnect();
     this.analyser = null;
-    void this.audioContext?.close().catch(() => undefined);
-    this.audioContext = null;
+    this.audioContext = sharedVoiceAudioContext;
     this.onLevel?.(0);
   }
 }
