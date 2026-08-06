@@ -672,6 +672,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [pendingHistoryWrites, setPendingHistoryWrites] = useState(0);
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -702,8 +704,38 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const timeoutRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thinkingStartRef = useRef<number>(0);
   const stickToBottomRef = useRef(true);
+  const cooldownUntilRef = useRef(0);
 
   const prefersReducedMotion = useReducedMotion();
+  const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - cooldownNow) / 1000));
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const updateCooldown = () => {
+      const now = Date.now();
+      setCooldownNow(now);
+      if (now >= cooldownUntilRef.current) {
+        cooldownUntilRef.current = 0;
+        setCooldownUntil(0);
+      }
+    };
+    updateCooldown();
+    const timer = window.setInterval(updateCooldown, 250);
+    return () => window.clearInterval(timer);
+  }, [cooldownUntil]);
+
+  const beginMessageCooldown = useCallback((seconds = 15) => {
+    const until = Date.now() + seconds * 1000;
+    cooldownUntilRef.current = until;
+    setCooldownUntil(until);
+    setCooldownNow(Date.now());
+  }, []);
+
+  const clearMessageCooldown = useCallback(() => {
+    cooldownUntilRef.current = 0;
+    setCooldownUntil(0);
+    setCooldownNow(Date.now());
+  }, []);
 
   useEffect(() => {
     void prepareChatHistoryRepository().then(async () => {
@@ -1186,6 +1218,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           status:  res.status,
           details: null,
         }));
+        if (res.status === 429) {
+          const retryAfter = typeof (errJson as ApiError & { retryAfter?: unknown }).retryAfter === 'number'
+            ? (errJson as ApiError & { retryAfter: number }).retryAfter
+            : Number(res.headers.get('Retry-After')) || 15;
+          beginMessageCooldown(Math.max(1, Math.min(15, retryAfter)));
+        } else {
+          clearMessageCooldown();
+        }
         console.error('[SingularityChat] API error:', errJson);
         setApiError(errJson);
         setMessages(prev => prev.map(m =>
@@ -1287,11 +1327,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       setIsStreaming(false);
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     }
-  }, [messages]);
+  }, [beginMessageCooldown, clearMessageCooldown, messages]);
 
   const handleSend = useCallback((overrideText?: string) => {
     const typedText = (overrideText ?? input).trim();
-    if ((!typedText && images.length === 0) || isThinking) return;
+    if ((!typedText && images.length === 0) || isThinking || cooldownUntilRef.current > Date.now()) return;
     const text = typedText || 'Please analyze the attached image(s).';
 
     // The current attachment belongs to this user turn. Once it is moved into
@@ -1326,8 +1366,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearDocument();
     clearImages();
     stickToBottomRef.current = true;
+    beginMessageCooldown();
     generateResponse(aiPrompt, images);
-  }, [input, isThinking, generateResponse, attachedDoc, images, messages, clearDocument, clearImages]);
+  }, [input, isThinking, generateResponse, attachedDoc, images, messages, clearDocument, clearImages, beginMessageCooldown]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -1342,13 +1383,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
   const handleRegenerate = useCallback(() => {
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
-    if (!lastUser || isThinking) return;
+    if (!lastUser || isThinking || cooldownUntilRef.current > Date.now()) return;
+    beginMessageCooldown();
     setMessages(prev => {
       const idx = prev.map(m => m.role).lastIndexOf('assistant');
       return idx === -1 ? prev : prev.slice(0, idx);
     });
     generateResponse(lastUser.content, lastUser.attachedImages ?? []);
-  }, [messages, isThinking, generateResponse]);
+  }, [messages, isThinking, generateResponse, beginMessageCooldown]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -1357,6 +1399,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const isFreshChat = messages.length === 1;
   const isProcessingAttachment = isProcessing || isProcessingImages;
   const attachmentError = imageError || docError;
+  const isMessageCooldownActive = cooldownRemaining > 0;
+  const composerLocked = isProcessingAttachment || isMessageCooldownActive;
 
   return (
     <motion.div
@@ -1817,7 +1861,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
             </AnimatePresence>
 
             {/* Quick-action chips (hide while AI is active or input long) */}
-            <QuickChips input={input} onChip={applyChip} disabled={isThinking} />
+            <QuickChips input={input} onChip={applyChip} disabled={isThinking || isMessageCooldownActive} />
 
             {/* Textarea + controls row */}
             <div className="flex items-end gap-2.5 px-3 py-3">
@@ -1826,9 +1870,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               <div ref={attachRef} className="relative flex-shrink-0 mb-0.5">
                 <button
                   onClick={() => setAttachOpen(o => !o)}
+                  disabled={composerLocked}
                   className="w-8 h-8 rounded-full flex items-center justify-center
                     text-white/35 hover:text-white/70 hover:bg-white/10
-                    transition-colors duration-150 active:scale-90"
+                    transition-colors duration-150 active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Attach file"
                   aria-expanded={attachOpen}
                   aria-haspopup="menu"
@@ -1890,39 +1935,75 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 placeholder={
                   isProcessingAttachment
                     ? 'Preparing attachment…'
+                    : isMessageCooldownActive
+                      ? `Recharging… ${cooldownRemaining}s`
                     : images.length && !input.trim()
                       ? 'Add a question about these images…'
                       : 'Ask Singularity anything…'
                 }
                 rows={1}
-                disabled={isProcessingAttachment}
+                disabled={composerLocked}
                 className="flex-1 resize-none bg-transparent text-[14px] text-white/90
                   placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
                   leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
-                aria-busy={isProcessingAttachment}
+                aria-busy={composerLocked}
               />
               <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
-                disabled={!isThinking && ((!input.trim() && images.length === 0) || isProcessingAttachment || visionSupported === false && images.length > 0)}
+                disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
                   transition-all duration-200 mb-0.5 active:scale-90 ${
                   isThinking
                     ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
-                    : ((input.trim() || images.length > 0) && !isProcessingAttachment && !(visionSupported === false && images.length > 0))
+                    : ((input.trim() || images.length > 0) && !composerLocked && !(visionSupported === false && images.length > 0))
                       ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.28)]'
                       : 'bg-white/[0.06] text-white/18 cursor-not-allowed'
                 }`}
-                aria-label={isThinking ? 'Stop generating' : 'Send message'}
+                aria-label={
+                  isThinking
+                    ? 'Stop generating'
+                    : isMessageCooldownActive
+                      ? `Recharging, ${cooldownRemaining} seconds remaining`
+                      : 'Send message'
+                }
               >
                 {isProcessingAttachment
                   ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
+                  : isMessageCooldownActive
+                    ? <span className="text-[10px] font-semibold tabular-nums">{cooldownRemaining}s</span>
                   : isThinking
                     ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
                     : <Send size={13} strokeWidth={2.5} className={(input.trim() && !isProcessing) ? 'ml-[1px]' : ''} />
                 }
               </button>
             </div>
+
+            <AnimatePresence>
+              {isMessageCooldownActive && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden px-3 pb-2"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center justify-between gap-3 text-[10px] tracking-[0.08em] uppercase text-violet-200/45">
+                    <span>Message channel recharging</span>
+                    <span className="tabular-nums text-violet-200/65">{cooldownRemaining}s</span>
+                  </div>
+                  <div className="mt-1.5 h-[2px] overflow-hidden rounded-full bg-white/[0.06]">
+                    <motion.div
+                      className="h-full origin-left rounded-full bg-gradient-to-r from-violet-400/80 via-fuchsia-300/80 to-sky-300/80"
+                      initial={{ scaleX: 1 }}
+                      animate={{ scaleX: cooldownRemaining / 15 }}
+                      transition={{ duration: 0.25, ease: 'linear' }}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Extraction progress indicator */}
             <AnimatePresence>

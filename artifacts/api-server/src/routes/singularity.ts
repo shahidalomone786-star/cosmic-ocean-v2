@@ -4,10 +4,39 @@
 // All pre-stream failures → structured JSON { success, error, status, details }.
 // Mid-stream failures → SSE event { error: true, message: "STREAM TERMINATED: …" }.
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { fetchGroq, getGroqKeyCount, hasGroqKeys } from '../lib/groq';
+import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
+const MESSAGE_COOLDOWN_MS = 15_000;
+const lastSingularityRequestByClient = new Map<string, number>();
+
+function getSingularityClientKey(req: Request): string {
+  const token = req.cookies?.[COOKIE_NAME] as string | undefined;
+  const userId = token ? verifyToken(token)?.sub : null;
+  if (userId) return `user:${userId}`;
+  return `ip:${req.ip || req.socket.remoteAddress || 'unknown'}`;
+}
+
+function claimSingularityCooldown(req: Request): number {
+  const now = Date.now();
+  const clientKey = getSingularityClientKey(req);
+  const lastRequestAt = lastSingularityRequestByClient.get(clientKey);
+  if (lastRequestAt && now - lastRequestAt < MESSAGE_COOLDOWN_MS) {
+    return Math.max(1, Math.ceil((MESSAGE_COOLDOWN_MS - (now - lastRequestAt)) / 1000));
+  }
+
+  lastSingularityRequestByClient.set(clientKey, now);
+
+  // Keep the process-local limiter bounded during long-running deployments.
+  if (lastSingularityRequestByClient.size > 10_000) {
+    for (const [key, timestamp] of lastSingularityRequestByClient) {
+      if (now - timestamp >= MESSAGE_COOLDOWN_MS) lastSingularityRequestByClient.delete(key);
+    }
+  }
+  return 0;
+}
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are Singularity — a cosmic intelligence built into this portal,
@@ -364,6 +393,19 @@ router.post('/singularity', async (req, res) => {
       success: false,
       error: 'The attached image payload is invalid or too large.',
       status: 400,
+      details: null,
+    });
+    return;
+  }
+
+  const retryAfter = claimSingularityCooldown(req);
+  if (retryAfter > 0) {
+    res.setHeader('Retry-After', String(retryAfter));
+    res.status(429).json({
+      success: false,
+      error: 'Please wait 15 seconds between messages.',
+      status: 429,
+      retryAfter,
       details: null,
     });
     return;
