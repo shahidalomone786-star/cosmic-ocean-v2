@@ -10,8 +10,8 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
-const MAX_HISTORY_CHARACTERS = 22_000;
-const MAX_MESSAGE_ESTIMATED_TOKENS = 6_000;
+const MAX_MESSAGE_ESTIMATED_TOKENS = 5_000;
+const MAX_MESSAGE_SERIALIZED_CHARACTERS = MAX_MESSAGE_ESTIMATED_TOKENS * 4;
 const lastSingularityRequestByClient = new Map<string, number>();
 
 function getSingularityClientKey(req: Request): string {
@@ -438,61 +438,67 @@ interface ChatRequestMessage {
   content: unknown;
 }
 
-function getMessageCharacterCount(message: ChatRequestMessage): number {
-  if (typeof message.content === 'string') return message.content.length;
-  if (Array.isArray(message.content)) {
-    return message.content.reduce((total, part) => {
-      if (!part || typeof part !== 'object') return total;
-      const text = (part as { text?: unknown }).text;
-      return total + (typeof text === 'string' ? text.length : 0);
-    }, 0);
-  }
-  return 0;
-}
-
 /**
- * Keep the newest context that fits the input budget. The system prompt and
- * current user message are assembled outside this window and are never removed.
- * History is retained in chronological order after the oldest turns are dropped.
+ * Transport policy: never send more than the four newest historical messages
+ * (two prior user/assistant turns). The current user turn is appended separately.
  */
 function trimHistoryWindow(historyMessages: ChatRequestMessage[]): ChatRequestMessage[] {
-  let characters = 0;
-  const retained: ChatRequestMessage[] = [];
-
-  for (let index = historyMessages.length - 1; index >= 0; index -= 1) {
-    const candidate = historyMessages[index];
-    const candidateCharacters = getMessageCharacterCount(candidate);
-    if (characters + candidateCharacters > MAX_HISTORY_CHARACTERS) break;
-    retained.push(candidate);
-    characters += candidateCharacters;
-  }
-
-  return retained.reverse();
+  return historyMessages.slice(-4);
 }
 
 /**
  * Apply the final request-size guard after the system prompt, history, and
- * newest user turn have been assembled. The system prompt and newest user
- * message are invariants; only the oldest historical message may be removed.
- *
- * The estimate intentionally follows the provider-safe rule used for this
- * route: serialized JSON characters divided by four. Keeping the messages
- * estimate at or below 6,000 leaves 2,000 estimated tokens for the 1,500-token
- * completion plus request overhead and safety margin.
+ * newest user turn have been assembled. This uses the exact serialized
+ * character budget that is logged and checked before the provider call.
  */
 function estimateMessageTokens(messages: ChatRequestMessage[]): number {
   return JSON.stringify(messages).length / 4;
 }
 
 function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatRequestMessage[] {
-  const boundedMessages = [...messages];
+  // Index 0 is always the system prompt. Keep the newest four historical
+  // messages, then append the current user turn.
+  const boundedMessages = [
+    messages[0],
+    ...messages.slice(1, -1).slice(-4),
+    messages[messages.length - 1],
+  ].filter(Boolean);
 
-  while (
-    estimateMessageTokens(boundedMessages) > MAX_MESSAGE_ESTIMATED_TOKENS &&
-    boundedMessages.length > 2
-  ) {
-    // Index 0 is the system prompt and the final item is the newest user turn.
-    boundedMessages.splice(1, 1);
+  const shrinkStringMessage = (index: number): boolean => {
+    const candidate = boundedMessages[index];
+    if (!candidate || typeof candidate.content !== 'string' || candidate.content.length === 0) return false;
+    const currentCharacters = JSON.stringify(boundedMessages).length;
+    const excessCharacters = currentCharacters - MAX_MESSAGE_SERIALIZED_CHARACTERS;
+    const nextLength = Math.max(
+      0,
+      candidate.content.length - Math.max(64, Math.ceil(excessCharacters * 1.1)),
+    );
+    if (nextLength >= candidate.content.length) return false;
+    candidate.content = candidate.content.slice(0, nextLength).trimEnd();
+    return true;
+  };
+
+  while (estimateMessageTokens(boundedMessages) > MAX_MESSAGE_ESTIMATED_TOKENS) {
+    // First preserve the system prompt and current turn by trimming the
+    // oldest retained history strings. This keeps the newest context useful.
+    let changed = false;
+    for (let index = 1; index < boundedMessages.length - 1; index += 1) {
+      if (shrinkStringMessage(index)) {
+        changed = true;
+        break;
+      }
+      if (Array.isArray(boundedMessages[index]?.content)) {
+        boundedMessages.splice(index, 1);
+        changed = true;
+        break;
+      }
+    }
+    if (changed) continue;
+
+    // If the current turn itself is oversized, truncate it rather than
+    // allowing an unsafe request to reach Groq.
+    if (shrinkStringMessage(boundedMessages.length - 1)) continue;
+    break;
   }
 
   return boundedMessages;

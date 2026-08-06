@@ -6,5 +6,6 @@
 - [Singularity chat history](singularity-chat-history.md) — browser-local productivity metadata stays outside streaming; idle smart titles, capped pins, undoable deletion, accessible shortcuts
 - [Singularity voice engine](singularity-voice.md) — browser MediaRecorder capture/preprocessing feeds bounded in-memory Whisper transcription; composer insertion never auto-sends
 - [Singularity immersive voice mode](singularity-voice-mode.md) — continuous voice sessions append to chat history while owning independent VAD, SSE abort, and cancellable sentence-fed TTS lifecycles
+- [Singularity mobile/request guards](singularity-mobile-guards.md) — dynamic keyboard viewport, gesture-primed regular Listen audio, and strict four-history-message request budgeting
 - [Singularity editorial system](singularity-editorial.md) — Markdown presentation stays narrow and document-grade; editorial response rules append to the existing scientific system prompt
 - [Singularity visual intelligence](singularity-visual-intelligence.md) — post-stream visual decisions use bounded Wikimedia references, async loading, and persisted per-message evidence

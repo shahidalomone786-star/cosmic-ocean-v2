@@ -33,6 +33,7 @@ import {
   chunkTtsText,
   getTtsPrefetchStatus,
   prefetchTtsAudio,
+  primeListenAudio,
   primeVoiceAudio,
   releaseVoiceAudio,
   TtsPlaybackQueue,
@@ -628,6 +629,9 @@ const ListenButton = memo(function ListenButton({
   const play = useCallback(async () => {
     if (state === 'playing' || state === 'preparing') { stop(); return; }
 
+    // Must happen synchronously in the trusted Listen click before any TTS
+    // fetch can complete and before the browser revokes the gesture grant.
+    primeListenAudio();
     const queue = new TtsPlaybackQueue();
     queueRef.current = queue;
     const prefetchStatus = getTtsPrefetchStatus(messageId, text);
@@ -1239,6 +1243,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
   const textareaRef      = useRef<HTMLTextAreaElement>(null);
+  const composerShellRef = useRef<HTMLDivElement>(null);
   const abortRef         = useRef<AbortController | null>(null);
   const timeoutRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thinkingStartRef = useRef<number>(0);
@@ -2877,7 +2882,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative flex h-[100dvh] w-full flex-row overflow-hidden bg-[#09090b]"
+      className="relative flex min-h-[100dvh] h-[100dvh] w-full flex-row overflow-hidden bg-[#09090b]"
     >
       <SingularitySidebar
         sessions={sessions}
@@ -3219,18 +3224,19 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           />
 
           {/* ── Unified input shell: chips + textarea + send ─────────────── */}
-          <div
-            className={`relative rounded-2xl bg-[#0d0d12] border transition-all duration-300 ${
-              isDragOver
-                ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
-                : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
-            }`}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            aria-label={isDragOver ? 'Drop to attach document' : undefined}
-          >
+            <div
+              ref={composerShellRef}
+              className={`relative rounded-2xl bg-[#0d0d12] border transition-all duration-300 ${
+                isDragOver
+                  ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
+                  : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
+              }`}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              aria-label={isDragOver ? 'Drop to attach document' : undefined}
+            >
             {/* Drag-over highlight overlay */}
             <AnimatePresence>
               {isDragOver && (
@@ -3343,7 +3349,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onFocus={() => {
-                  setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
+                  window.setTimeout(() => {
+                    composerShellRef.current?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'end',
+                    });
+                  }, 300);
                 }}
                 placeholder={
                   isProcessingAttachment

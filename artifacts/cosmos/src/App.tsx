@@ -2299,7 +2299,7 @@ export default function App() {
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden transition-all duration-700"
+      className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden transition-all duration-700"
       style={{ background: lm
         ? 'radial-gradient(ellipse at 50% -20%, #f8fafc 0%, #ffffff 45%, #e2e8f0 100%)'
         : 'radial-gradient(ellipse at 50% -10%, #27272a 0%, #0a0a0b 45%, #000000 100%)' }}

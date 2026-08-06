@@ -320,10 +320,10 @@ export class TtsPlaybackQueue {
 
   private playAudio(url: string): Promise<void> {
     this.assertActive();
-    const audio = new Audio(url);
+    const audio = getSharedListenAudio();
     this.currentAudio = audio;
 
-    return new Promise((resolve, reject) => {
+    return (listenAudioUnlockPromise ?? Promise.resolve()).then(() => new Promise((resolve, reject) => {
       let settled = false;
       const finish = (error?: Error) => {
         if (settled) return;
@@ -339,8 +339,16 @@ export class TtsPlaybackQueue {
         audio.pause();
         finish(new DOMException('TTS playback aborted', 'AbortError'));
       }, { once: true });
-      audio.play().catch(error => finish(error instanceof Error ? error : new Error(String(error))));
-    });
+      audio.src = url;
+      audio.volume = 1;
+      audio.play().catch(error => {
+        const playbackError = normalizePlaybackError(error);
+        if (playbackError.name === 'NotAllowedError') {
+          console.error('[EdgeTTS] Browser blocked Listen playback:', playbackError);
+        }
+        finish(playbackError);
+      });
+    }));
   }
 }
 
@@ -368,6 +376,60 @@ function normalizePlaybackError(error: unknown): Error {
   );
   if (typeof details.name === 'string' && details.name) normalized.name = details.name;
   return normalized;
+}
+
+let sharedListenAudio: HTMLAudioElement | null = null;
+let listenAudioUnlockPromise: Promise<void> | null = null;
+let listenAudioUnlocked = false;
+
+function getSharedListenAudio(): HTMLAudioElement {
+  if (!sharedListenAudio) {
+    sharedListenAudio = document.createElement('audio');
+    sharedListenAudio.preload = 'auto';
+    sharedListenAudio.setAttribute('playsinline', '');
+  }
+  return sharedListenAudio;
+}
+
+/**
+ * Called synchronously from the regular Listen button click handler so the
+ * later asynchronous TTS fetch can reuse the browser's gesture grant.
+ */
+export function primeListenAudio(): void {
+  if (
+    typeof window === 'undefined'
+    || typeof document === 'undefined'
+    || listenAudioUnlocked
+    || listenAudioUnlockPromise
+  ) return;
+
+  const audio = getSharedListenAudio();
+  audio.muted = true;
+  audio.volume = 0;
+  audio.src = SILENT_UNLOCK_WAV;
+  audio.load();
+  try {
+    listenAudioUnlockPromise = audio.play().then(() => {
+      listenAudioUnlocked = true;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.removeAttribute('src');
+      audio.load();
+      audio.muted = false;
+      audio.volume = 1;
+    }).catch(error => {
+      console.error('[EdgeTTS] Listen gesture audio unlock failed:', normalizePlaybackError(error));
+      audio.muted = false;
+      audio.volume = 1;
+    }).finally(() => {
+      listenAudioUnlockPromise = null;
+    });
+  } catch (error) {
+    console.error('[EdgeTTS] Listen gesture audio unlock failed:', normalizePlaybackError(error));
+    listenAudioUnlockPromise = null;
+    audio.muted = false;
+    audio.volume = 1;
+  }
 }
 
 function getSharedVoiceAudio(): HTMLAudioElement {
