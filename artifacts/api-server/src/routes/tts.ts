@@ -3,10 +3,9 @@ import { EdgeTTS } from "@andresaya/edge-tts";
 
 const router = Router();
 
-// Ava is the installed Edge voice mapping's supported US female multilingual
-// voice. It auto-detects supported Unicode scripts without changing personas
-// between English, Hindi, Japanese, Chinese, and mixed-language text.
-const EDGE_VOICE = "en-US-AvaMultilingualNeural";
+// This exact voice is required for consistent multilingual English/Hindi and
+// mixed-language playback. Do not silently substitute a browser voice.
+const EDGE_VOICE = "en-US-JennyMultilingualNeural";
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 const EDGE_RATE = "+15%";
 
@@ -20,7 +19,7 @@ function cleanSpeechText(input: string): string {
     .replace(/\n{2,}/g, ". ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 2500);
+    .slice(0, 240);
 }
 
 router.post("/tts", async (req, res) => {
@@ -34,6 +33,8 @@ router.post("/tts", async (req, res) => {
 
   try {
     const edgeTts = new EdgeTTS();
+    // EdgeTTS creates the Microsoft-compatible SSML document internally from
+    // this bounded Unicode-preserving text and the exact multilingual voice.
     await edgeTts.synthesize(speechText, EDGE_VOICE, {
       outputFormat: EDGE_OUTPUT_FORMAT,
       rate: EDGE_RATE,

@@ -29,6 +29,8 @@ import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
 import type { VisualReferencesState } from '@/lib/visualReferences';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
+import { TtsPlaybackQueue } from '@/lib/edgeTts';
+import { toast } from '@/hooks/use-toast';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
   createChatSession,
@@ -79,38 +81,6 @@ const formatMath = (text: string) => {
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
     .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
 };
-
-function cleanTtsText(text: string): string {
-  return text
-    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
-    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-    .replace(/\$[^$]*\$/g, ' formula ')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]*`/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 2500);
-}
-
-function speakWithBrowser(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!('speechSynthesis' in window)) {
-      reject(new Error('Browser speech is unavailable'));
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
-    utterance.rate = 1.05;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error('Browser speech failed'));
-    window.speechSynthesis.speak(utterance);
-  });
-}
 
 // ─── Markdown renderer ──────────────────────────────────────────────────────
 const markdownComponents = {
@@ -518,80 +488,35 @@ const ShareButton = memo(function ShareButton({ text }: { text: string }) {
 // ─── Listen (TTS) button ────────────────────────────────────────────────────
 const ListenButton = memo(function ListenButton({ text }: { text: string }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing'>('idle');
-  const audioRef       = useRef<HTMLAudioElement | null>(null);
-  const abortRef       = useRef<AbortController | null>(null);
-  const audioCacheRef  = useRef<Map<string, string>>(new Map());
-  const listenersRef   = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
+  const queueRef = useRef<TtsPlaybackQueue | null>(null);
 
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    window.speechSynthesis?.cancel();
-    if (audioRef.current) {
-      if (listenersRef.current) {
-        audioRef.current.removeEventListener('ended', listenersRef.current.onEnded);
-        audioRef.current.removeEventListener('error', listenersRef.current.onError);
-        listenersRef.current = null;
-      }
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+    queueRef.current?.stop();
+    queueRef.current = null;
     setState('idle');
   }, []);
 
   const play = useCallback(async () => {
     if (state === 'playing' || state === 'loading') { stop(); return; }
 
-    setState('loading');
-    abortRef.current = new AbortController();
+    const queue = new TtsPlaybackQueue();
+    queueRef.current = queue;
+    // The control becomes Stop before the first network request completes.
+    setState('playing');
 
     try {
-      const clean = cleanTtsText(text);
-
-      let url = audioCacheRef.current.get(clean);
-      if (!url) {
-        const res = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: clean }),
-          signal: abortRef.current.signal,
+      await queue.play(text);
+      if (queueRef.current === queue) setState('idle');
+    } catch (error: unknown) {
+      if ((error as Error)?.name !== 'AbortError') {
+        toast({
+          title: 'Audio unavailable',
+          description: error instanceof Error ? error.message : 'Edge TTS could not synthesize this response.',
+          variant: 'destructive',
         });
-        if (!res.ok) throw new Error(`TTS ${res.status}`);
-        const blob = await res.blob();
-        url = URL.createObjectURL(blob);
-        audioCacheRef.current.set(clean, url);
       }
-
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      const onEnded = () => {
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        listenersRef.current = null;
-        audioRef.current = null;
-        setState('idle');
-      };
-      const onError = () => {
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        listenersRef.current = null;
-        audioRef.current = null;
-        setState('idle');
-      };
-      listenersRef.current = { onEnded, onError };
-      audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError);
-
-      setState('playing');
-      await audio.play();
-    } catch (err: any) {
-      if (err?.name === 'AbortError') { setState('idle'); return; }
-      try {
-        setState('playing');
-        await speakWithBrowser(cleanTtsText(text));
-        setState('idle');
-      } catch {
+      if (queueRef.current === queue) {
+        queueRef.current = null;
         setState('idle');
       }
     }
@@ -599,8 +524,6 @@ const ListenButton = memo(function ListenButton({ text }: { text: string }) {
 
   useEffect(() => () => {
     stop();
-    audioCacheRef.current.forEach(blobUrl => URL.revokeObjectURL(blobUrl));
-    audioCacheRef.current.clear();
   }, [stop]);
 
   return (

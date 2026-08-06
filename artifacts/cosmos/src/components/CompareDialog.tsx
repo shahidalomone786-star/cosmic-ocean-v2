@@ -25,6 +25,8 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import type { SectionItem } from './NasaSearch';
 import { getYear, getSourceName, getAuthors } from '../utils/citationFormatters';
+import { TtsPlaybackQueue } from '@/lib/edgeTts';
+import { toast } from '@/hooks/use-toast';
 
 const formatMath = (text: string) => {
   if (!text) return text;
@@ -32,38 +34,6 @@ const formatMath = (text: string) => {
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
     .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
 };
-
-function cleanTtsText(text: string): string {
-  return text
-    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
-    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-    .replace(/\$[^$]*\$/g, ' formula ')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]*`/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 2500);
-}
-
-function speakWithBrowser(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!('speechSynthesis' in window)) {
-      reject(new Error('Browser speech is unavailable'));
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
-    utterance.rate = 1.05;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error('Browser speech failed'));
-    window.speechSynthesis.speak(utterance);
-  });
-}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -180,90 +150,37 @@ const ValueCell = memo(function ValueCell({
 
 const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm?: boolean }) {
   const [ttsState, setTtsState] = useState<'idle' | 'loading' | 'playing'>('idle');
-  const audioRef      = useRef<HTMLAudioElement | null>(null);
-  const abortRef      = useRef<AbortController | null>(null);
-  // Blob URL cache — avoids re-fetching the same synthesized audio
-  const audioCacheRef = useRef<Map<string, string>>(new Map());
-  // Named listener refs so stop() can remove them from any detached Audio node
-  const listenersRef  = useRef<{ onEnded: () => void; onError: () => void } | null>(null);
+  const queueRef = useRef<TtsPlaybackQueue | null>(null);
 
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    window.speechSynthesis?.cancel();
-    if (audioRef.current) {
-      // Explicitly remove listeners before detaching — prevents ghost callbacks
-      // from a still-active Audio node after we null the ref
-      if (listenersRef.current) {
-        audioRef.current.removeEventListener('ended', listenersRef.current.onEnded);
-        audioRef.current.removeEventListener('error', listenersRef.current.onError);
-        listenersRef.current = null;
-      }
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+    queueRef.current?.stop();
+    queueRef.current = null;
     setTtsState('idle');
   }, []);
 
   const play = useCallback(async () => {
     if (ttsState === 'playing' || ttsState === 'loading') { stop(); return; }
 
-    setTtsState('loading');
-    abortRef.current = new AbortController();
+    const queue = new TtsPlaybackQueue();
+    queueRef.current = queue;
+    setTtsState('playing');
 
     try {
-      // Strip markdown / LaTeX for cleaner speech (mirrors SingularityChat)
-      const clean = cleanTtsText(text);
-
-        // Cache hit — reuse the existing synthesized audio
-      let url = audioCacheRef.current.get(clean);
-
-      if (!url) {
-        // Voice choice is server-side; frontend sends text only
-        const res = await fetch('/api/tts', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ text: clean }),
-          signal:  abortRef.current.signal,
-        });
-        if (!res.ok) throw new Error(`TTS ${res.status}`);
-        const blob = await res.blob();
-        url = URL.createObjectURL(blob);
-        audioCacheRef.current.set(clean, url);  // store for replay
+      await queue.play(text);
+      if (queueRef.current === queue) {
+        queueRef.current = null;
+        setTtsState('idle');
       }
-
-      // Lazy-mount: Audio object is created only on first play
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      // Named listeners so they can be removed by stop() if user cancels mid-play
-      const onEnded = () => {
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        listenersRef.current = null;
-        audioRef.current = null;   // release the Audio object; blob URL stays cached
-        setTtsState('idle');
-      };
-      const onError = () => {
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        listenersRef.current = null;
-        audioRef.current = null;
-        setTtsState('idle');
-      };
-      listenersRef.current = { onEnded, onError };
-      audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError);
-
-      setTtsState('playing');
-      await audio.play();
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      try {
-        setTtsState('playing');
-        await speakWithBrowser(text);
-        setTtsState('idle');
-      } catch {
+    } catch (error: unknown) {
+      if ((error as Error)?.name !== 'AbortError') {
+        toast({
+          title: 'Audio unavailable',
+          description: error instanceof Error ? error.message : 'Edge TTS could not synthesize this analysis.',
+          variant: 'destructive',
+        });
+      }
+      if (queueRef.current === queue) {
+        queueRef.current = null;
         setTtsState('idle');
       }
     }
@@ -272,8 +189,6 @@ const ListenButton = memo(function ListenButton({ text, lm }: { text: string; lm
   // Cleanup on unmount — stop playback and revoke all cached blob URLs
   useEffect(() => () => {
     stop();
-    audioCacheRef.current.forEach(blobUrl => URL.revokeObjectURL(blobUrl));
-    audioCacheRef.current.clear();
   }, [stop]);
 
   const isActive = ttsState === 'playing' || ttsState === 'loading';

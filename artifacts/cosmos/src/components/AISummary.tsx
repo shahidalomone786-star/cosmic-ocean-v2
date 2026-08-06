@@ -28,6 +28,8 @@ import {
   Headphones, Copy, Check, ArrowRight, Volume2,
 } from 'lucide-react';
 import type { SearchSections } from './NasaSearch';
+import { TtsPlaybackQueue } from '@/lib/edgeTts';
+import { toast } from '@/hooks/use-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ConfidenceLabel = 'High' | 'Medium' | 'Limited Evidence';
@@ -105,80 +107,6 @@ const CHIP_SM = `bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] ro
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50
                 disabled:opacity-40 disabled:cursor-not-allowed`;
 
-// ─── TTS helper ───────────────────────────────────────────────────────────────
-function cleanTtsText(text: string): string {
-  return text
-    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
-    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-    .replace(/\$[^$]*\$/g, ' formula ')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]*`/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 2500);
-}
-
-function speakWithBrowser(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!('speechSynthesis' in window)) {
-      reject(new Error('Browser speech is unavailable'));
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleanTtsText(text));
-    utterance.rate = 1.05;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error('Browser speech failed'));
-    window.speechSynthesis.speak(utterance);
-  });
-}
-
-async function playTTS(text: string, signal?: AbortSignal): Promise<void> {
-  const res = await fetch('/api/tts', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ text: cleanTtsText(text) }),
-    signal,
-  });
-  if (!res.ok) throw new Error(`TTS ${res.status}`);
-  const blob = await res.blob();
-  const url  = URL.createObjectURL(blob);
-  return new Promise((resolve, reject) => {
-    const audio = new Audio(url);
-    let settled = false;
-    const cleanup = () => {
-      audio.onended = null;
-      audio.onerror = null;
-      signal?.removeEventListener('abort', onAbort);
-      URL.revokeObjectURL(url);
-    };
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      error ? reject(error) : resolve();
-    };
-    const onAbort = () => {
-      audio.pause();
-      audio.src = '';
-      finish(new DOMException('TTS playback aborted', 'AbortError'));
-    };
-    audio.onended = () => finish();
-    audio.onerror = () => finish(new Error('audio playback failed'));
-    signal?.addEventListener('abort', onAbort, { once: true });
-    if (signal?.aborted) {
-      onAbort();
-      return;
-    }
-    audio.play().catch(error => finish(error));
-  });
-}
-
 // ─── Spinner ──────────────────────────────────────────────────────────────────
 const Spinner = memo(function Spinner({ size = 12, color = 'border-violet-400' }: { size?: number; color?: string }) {
   return (
@@ -195,39 +123,42 @@ const Spinner = memo(function Spinner({ size = 12, color = 'border-violet-400' }
 // ─── Listen button (shared, fully self-contained) ─────────────────────────────
 const ListenButton = memo(function ListenButton({ text, small }: { text: string; small?: boolean }) {
   const [state, setState] = useState<ListenState>('idle');
-  const abortRef = useRef<AbortController | null>(null);
+  const queueRef = useRef<TtsPlaybackQueue | null>(null);
 
   const handleClick = useCallback(async () => {
     if (state === 'loading' || state === 'playing') {
-      abortRef.current?.abort();
-      window.speechSynthesis?.cancel();
+      queueRef.current?.stop();
+      queueRef.current = null;
       setState('idle');
       return;
     }
-    setState('loading');
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const queue = new TtsPlaybackQueue();
+    queueRef.current = queue;
+    setState('playing');
     try {
-      await playTTS(text, controller.signal);
-      setState('idle');
-    } catch (e: unknown) {
-      if ((e as Error)?.name === 'AbortError') { setState('idle'); return; }
-      try {
-        setState('playing');
-        await speakWithBrowser(text);
+      await queue.play(text);
+      if (queueRef.current === queue) {
+        queueRef.current = null;
         setState('idle');
-      } catch {
-        setState('error');
-        setTimeout(() => setState('idle'), 3000);
       }
-    } finally {
-      if (abortRef.current === controller) abortRef.current = null;
+    } catch (error: unknown) {
+      if ((error as Error)?.name !== 'AbortError') {
+        toast({
+          title: 'Audio unavailable',
+          description: error instanceof Error ? error.message : 'Edge TTS could not synthesize this response.',
+          variant: 'destructive',
+        });
+      }
+      if (queueRef.current === queue) {
+        queueRef.current = null;
+        setState('error');
+        window.setTimeout(() => setState('idle'), 3000);
+      }
     }
   }, [state, text]);
 
   useEffect(() => () => {
-    abortRef.current?.abort();
-    window.speechSynthesis?.cancel();
+    queueRef.current?.stop();
   }, []);
 
   const cls = small ? CHIP_SM : CHIP;
@@ -236,7 +167,7 @@ const ListenButton = memo(function ListenButton({ text, small }: { text: string;
     <button
       onClick={handleClick}
       className={`${cls} flex items-center gap-2 ${state === 'error' ? 'text-red-400/80' : 'text-white/90'}`}
-      aria-label={state === 'loading' ? 'Generating audio…' : state === 'playing' ? 'Playing…' : 'Listen'}
+      aria-label={state === 'playing' ? 'Stop audio' : state === 'loading' ? 'Generating audio…' : 'Listen'}
     >
       {state === 'loading' ? (
         <>

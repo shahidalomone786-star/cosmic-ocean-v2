@@ -22,6 +22,8 @@ import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
+import { TtsPlaybackQueue } from './lib/edgeTts';
+import { toast } from './hooks/use-toast';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -35,23 +37,6 @@ const cosmicScenes = [
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
-
-function cleanTtsText(text: string): string {
-  return text
-    .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
-    .replace(/\\\(([\s\S]*?)\\\)/g, ' formula ')
-    .replace(/\$\$[\s\S]*?\$\$/g, ' formula ')
-    .replace(/\$[^$]*\$/g, ' formula ')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]*`/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 2500);
-}
 
 const TYPEWRITER_PHRASES = [
   'Search the cosmos…',
@@ -344,12 +329,12 @@ function TtsControls({
   idx: number;
   playingIdx: number | null;
   isPlaying: boolean;
-  playbackMode: 'edge' | 'browser';
+  playbackMode: 'edge';
   onPlay: () => void;
   onSkip: (delta: number) => void;
 }) {
   const isActive = playingIdx === idx;
-  const showSkip = isActive && playbackMode === 'edge';
+  const showSkip = isActive;
   return (
     <div className="ml-10 flex items-center gap-1.5 pt-1 opacity-70">
       {/* Rewind 5s — Edge audio only */}
@@ -381,7 +366,7 @@ function TtsControls({
 function UsageDashboard({ tokens, voiceChars, playbackMode, onClose }: {
   tokens: number;
   voiceChars: number;
-  playbackMode: 'edge' | 'browser';
+  playbackMode: 'edge';
   onClose: () => void;
 }) {
   const TOKEN_CAP = 30_000; // tokens ≈ 30 min
@@ -425,12 +410,12 @@ function UsageDashboard({ tokens, voiceChars, playbackMode, onClose }: {
               <span className="text-white/70 text-[11.5px] font-medium">Voice · Edge Neural</span>
             </div>
             <span className="text-[8.5px] px-2 py-0.5 rounded-full border uppercase tracking-[0.12em] bg-violet-500/15 border-violet-400/20 text-violet-300/90">
-              {playbackMode === 'edge' ? 'Neural' : 'Browser fallback'}
+              Neural
             </span>
           </div>
           <div className="flex justify-between text-[10.5px] text-white/35 mb-1.5">
             <span>{voiceChars.toLocaleString()} chars synthesized</span>
-            <span>{playbackMode === 'edge' ? 'Edge Neural' : 'Browser fallback'}</span>
+            <span>Edge Neural</span>
           </div>
         </div>
 
@@ -525,11 +510,10 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
   const autoAnalysedRef = useRef(false);
 
   // ── TTS state ──────────────────────────────────────────────────────────────
-  const audioRef      = useRef<HTMLAudioElement>(null);
-  const blobUrlRef    = useRef('');
+  const ttsQueueRef   = useRef<TtsPlaybackQueue | null>(null);
   const [playingIdx,   setPlayingIdx]   = useState<number | null>(null);
   const [isPlaying,    setIsPlaying]    = useState(false);
-  const [playbackMode, setPlaybackMode] = useState<'edge' | 'browser'>('edge');
+  const [playbackMode] = useState<'edge'>('edge');
 
   // ── Usage / typewriter state ────────────────────────────────────────────────
   const [sessionTokens,   setSessionTokens]   = useState(0);
@@ -663,86 +647,55 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
 
   // ── TTS helpers ────────────────────────────────────────────────────────────
   const stopAll = useCallback(() => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
-    window.speechSynthesis?.cancel();
+    ttsQueueRef.current?.stop();
+    ttsQueueRef.current = null;
     setIsPlaying(false);
     setPlayingIdx(null);
   }, []);
 
-  const playBrowser = useCallback((text: string, idx: number) => {
-    window.speechSynthesis?.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate  = 1.05;
-    utt.onend   = () => { setIsPlaying(false); setPlayingIdx(null); };
-    utt.onerror = () => { setIsPlaying(false); setPlayingIdx(null); };
-    window.speechSynthesis.speak(utt);
+  const playTTS = useCallback(async (text: string, idx: number) => {
+    if (playingIdx === idx && isPlaying) {
+      stopAll();
+      return;
+    }
+
+    stopAll();
+    const queue = new TtsPlaybackQueue();
+    ttsQueueRef.current = queue;
     setPlayingIdx(idx);
     setIsPlaying(true);
-    setPlaybackMode('browser');
-  }, []);
 
-  const playEdge = useCallback(async (text: string, idx: number) => {
     try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) {
-        playBrowser(text, idx);
-        return;
-      }
+      await queue.play(text);
       addVoiceChars(text.length);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = url;
-      const audio = audioRef.current!;
-      audio.src     = url;
-      audio.onended = () => { setIsPlaying(false); setPlayingIdx(null); };
-      audio.onerror = () => { setIsPlaying(false); setPlayingIdx(null); };
-      try { await audio.play(); } catch { /* interrupted */ }
-      setPlayingIdx(idx);
-      setIsPlaying(true);
-      setPlaybackMode('edge');
-    } catch {
-      playBrowser(text, idx);
+      if (ttsQueueRef.current === queue) {
+        ttsQueueRef.current = null;
+        setIsPlaying(false);
+        setPlayingIdx(null);
+      }
+    } catch (error: unknown) {
+      if ((error as Error)?.name !== 'AbortError') {
+        toast({
+          title: 'Audio unavailable',
+          description: error instanceof Error ? error.message : 'Edge TTS could not synthesize this response.',
+          variant: 'destructive',
+        });
+      }
+      if (ttsQueueRef.current === queue) {
+        ttsQueueRef.current = null;
+        setIsPlaying(false);
+        setPlayingIdx(null);
+      }
     }
-  }, [playBrowser, addVoiceChars]);
-
-  const playTTS = useCallback(async (text: string, idx: number) => {
-    const spokenText = cleanTtsText(text);
-    // Toggle pause on the active message
-    if (playingIdx === idx && isPlaying) {
-      if (playbackMode === 'edge' && audioRef.current) { audioRef.current.pause(); }
-      else { window.speechSynthesis?.pause(); }
-      setIsPlaying(false);
-      return;
-    }
-    // Resume a paused message
-    if (playingIdx === idx && !isPlaying) {
-      if (playbackMode === 'edge' && audioRef.current) {
-        try { await audioRef.current.play(); } catch { /* ok */ }
-      } else { window.speechSynthesis?.resume(); }
-      setIsPlaying(true);
-      return;
-    }
-    // New message — stop everything and start fresh
-    stopAll();
-    await playEdge(spokenText, idx);
-  }, [playingIdx, isPlaying, playbackMode, stopAll, playEdge]);
+  }, [playingIdx, isPlaying, stopAll, addVoiceChars]);
 
   const skipTime = useCallback((delta: number) => {
-    if (audioRef.current && playbackMode === 'edge' && playingIdx !== null) {
-      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime + delta);
-    }
-  }, [playbackMode, playingIdx]);
+    if (playingIdx !== null) ttsQueueRef.current?.seekBy(delta);
+  }, [playingIdx]);
 
   // Cleanup on unmount
   useEffect(() => () => {
-    window.speechSynthesis?.cancel();
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
-    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    ttsQueueRef.current?.stop();
   }, []);
 
   return (
@@ -886,9 +839,6 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
             />
           )}
         </AnimatePresence>
-
-        {/* Hidden audio element for Edge Neural playback */}
-        <audio ref={audioRef} preload="none" className="hidden" />
 
         {/* ── Input — with safe-area bottom padding ── */}
         <div className="flex-shrink-0 px-5 sm:px-7 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,12px))] border-t border-white/[0.06] bg-gradient-to-b from-transparent via-white/[0.01] to-white/[0.02]">
