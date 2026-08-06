@@ -66,7 +66,7 @@ interface Message {
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: 'I am Singularity, the cosmic nexus of intelligence. What shall we explore today?',
+  content: 'Singularity',
   ts: Date.now(),
 };
 
@@ -219,6 +219,51 @@ const MessageContent = memo(function MessageContent({
         {formatMath(visibleContent)}
       </ReactMarkdown>
     </div>
+  );
+});
+
+const WelcomeHero = memo(function WelcomeHero({ reducedMotion }: { reducedMotion: boolean }) {
+  return (
+    <motion.section
+      aria-labelledby="singularity-hero-title"
+      initial={reducedMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={reducedMotion
+        ? { duration: 0 }
+        : { duration: 0.72, ease: [0.16, 1, 0.3, 1] }}
+      className="w-full max-w-[40rem] px-4 text-center -translate-y-2 sm:-translate-y-4"
+    >
+      <h1
+        id="singularity-hero-title"
+        className="text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold leading-[0.98]
+          tracking-[-0.065em] text-white"
+        style={{ fontFamily: 'var(--app-font-heading)' }}
+      >
+        Singularity
+      </h1>
+
+      <p className="mt-8 text-[clamp(1.125rem,2.2vw,1.5rem)] font-medium leading-[1.55]
+        tracking-[-0.012em] text-white/78">
+        Think deeper.
+        <br />
+        Explore further.
+        <br />
+        Create without limits.
+      </p>
+
+      <p className="mt-10 text-[10px] font-medium leading-[1.9]
+        tracking-[0.22em] text-white/38 sm:text-[11px]">
+        Powered by GPT-OSS-120B
+        <br />
+        <span className="normal-case tracking-[0.12em] text-white/28">
+          Designed for research,
+          <br />
+          creativity,
+          <br />
+          and intelligent conversations.
+        </span>
+      </p>
+    </motion.section>
   );
 });
 
@@ -1986,12 +2031,12 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 return (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: msg.id === 'welcome' ? 18 : 10 }}
+                    initial={msg.id === 'welcome' || prefersReducedMotion
+                      ? false
+                      : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={msg.id === 'welcome'
-                      ? { duration: 1.05, delay: 0.12, ease: [0.16, 1, 0.3, 1] }
-                      : { duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.25, ease: [0.16, 1, 0.3, 1] }}
                     className={`w-full flex flex-col ${
                       msg.id === 'welcome'
                         ? 'items-center mb-0'
@@ -2041,6 +2086,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
 
                     {/* ── Assistant message: plain document layout ─────────── */}
                     {msg.role === 'assistant' && !msg.error && (
+                      msg.id === 'welcome' ? (
+                        <WelcomeHero reducedMotion={Boolean(prefersReducedMotion)} />
+                      ) : (
                       <>
                         {/* Reasoning block */}
                         {msg.reasoning && msg.reasoning.trim() && (
@@ -2111,6 +2159,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                         )}
 
                       </>
+                      )
                     )}
                   </motion.div>
                 );
