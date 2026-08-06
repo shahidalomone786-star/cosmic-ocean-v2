@@ -7,4 +7,4 @@ Cosmos keeps synthesis server-side through `@andresaya/edge-tts`, using the supp
 
 **Why:** The previous hosted provider required account-specific paid-plan access and could fail even with configured credentials. Edge Neural removes that dependency, but Microsoft voice availability is authoritative and can differ from requested product copy; Ava is the approved supported multilingual replacement.
 
-**How to apply:** Keep the backend endpoint provider-neutral to the UI, preserve Unicode text, return MP3 audio, and never use `window.speechSynthesis` as a fallback. If the configured voice yields no audio, return a clean error so the UI toast explains the failure.
+**How to apply:** Keep the backend endpoint provider-neutral to the UI, sanitize Markdown/LaTeX artifacts server-side immediately before synthesis, preserve Unicode text, return MP3 audio, and never use `window.speechSynthesis` as a fallback. If the configured voice yields no audio, return a clean error so the UI toast explains the failure.
