@@ -2455,8 +2455,15 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         setVoiceOutputLevel,
         error => {
           if (voiceMode && voiceSessionRef.current > 0) {
-            setVoiceModeState('error');
-            setVoiceStatusText('Audio unavailable. Reconnecting…');
+            const playbackBlocked = error.name === 'NotAllowedError';
+            if (playbackBlocked) {
+              console.error('[SingularityChat] Voice Mode audio playback was blocked by the browser:', error);
+              setVoiceModeState('listening');
+              setVoiceStatusText('Audio playback was blocked. Listening…');
+            } else {
+              setVoiceModeState('error');
+              setVoiceStatusText('Audio unavailable. Reconnecting…');
+            }
             voiceTtsQueueRef.current?.stop();
             voiceTtsQueueRef.current = null;
           }

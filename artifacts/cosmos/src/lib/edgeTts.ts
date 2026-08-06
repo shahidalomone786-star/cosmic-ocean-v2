@@ -349,6 +349,26 @@ type TtsLevelListener = (level: number) => void;
 let sharedVoiceAudio: HTMLAudioElement | null = null;
 let sharedVoiceAudioContext: AudioContext | null = null;
 let sharedVoiceAudioSource: MediaElementAudioSourceNode | null = null;
+let sharedVoiceAudioUnlocking = false;
+let sharedVoiceAudioUnlocked = false;
+let sharedVoiceAudioUnlockPromise: Promise<void> | null = null;
+
+// A real, valid silent WAV is required here. Calling play() without a media
+// source does not reliably satisfy mobile autoplay policies.
+const SILENT_UNLOCK_WAV =
+  'data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
+function normalizePlaybackError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  const details = typeof error === 'object' && error !== null
+    ? error as { name?: unknown; message?: unknown }
+    : {};
+  const normalized = new Error(
+    typeof details.message === 'string' ? details.message : String(error),
+  );
+  if (typeof details.name === 'string' && details.name) normalized.name = details.name;
+  return normalized;
+}
 
 function getSharedVoiceAudio(): HTMLAudioElement {
   if (!sharedVoiceAudio) {
@@ -359,11 +379,9 @@ function getSharedVoiceAudio(): HTMLAudioElement {
   return sharedVoiceAudio;
 }
 
-export function primeVoiceAudio(): void {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+export function primeVoiceAudio(): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve();
   const audio = getSharedVoiceAudio();
-  audio.muted = true;
-  audio.volume = 0;
   const AudioContextClass = window.AudioContext
     || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (AudioContextClass && !sharedVoiceAudioContext) {
@@ -374,15 +392,40 @@ export function primeVoiceAudio(): void {
     }
   }
   void sharedVoiceAudioContext?.resume().catch(() => undefined);
-  void audio.play().then(() => {
-    audio.pause();
-    audio.currentTime = 0;
+  if (sharedVoiceAudioUnlocked) return Promise.resolve();
+  if (sharedVoiceAudioUnlocking) return sharedVoiceAudioUnlockPromise ?? Promise.resolve();
+
+  sharedVoiceAudioUnlocking = true;
+  audio.muted = true;
+  audio.volume = 0;
+  audio.src = SILENT_UNLOCK_WAV;
+  audio.load();
+  try {
+    sharedVoiceAudioUnlockPromise = audio.play().then(() => {
+      sharedVoiceAudioUnlocked = true;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.removeAttribute('src');
+      audio.load();
+      audio.muted = false;
+      audio.volume = 1;
+    }).catch(error => {
+      const playbackError = normalizePlaybackError(error);
+      console.error('[EdgeTTS] Gesture audio unlock failed:', playbackError);
+      audio.muted = false;
+      audio.volume = 1;
+    }).finally(() => {
+      sharedVoiceAudioUnlocking = false;
+      sharedVoiceAudioUnlockPromise = null;
+    });
+  } catch (error) {
+    console.error('[EdgeTTS] Gesture audio unlock failed:', normalizePlaybackError(error));
+    sharedVoiceAudioUnlocking = false;
+    sharedVoiceAudioUnlockPromise = null;
     audio.muted = false;
     audio.volume = 1;
-  }).catch(() => {
-    audio.muted = false;
-    audio.volume = 1;
-  });
+  }
+  return sharedVoiceAudioUnlockPromise ?? Promise.resolve();
 }
 
 export function releaseVoiceAudio(): void {
@@ -397,6 +440,9 @@ export function releaseVoiceAudio(): void {
   sharedVoiceAudioSource = null;
   void sharedVoiceAudioContext?.close().catch(() => undefined);
   sharedVoiceAudioContext = null;
+  sharedVoiceAudioUnlocking = false;
+  sharedVoiceAudioUnlocked = false;
+  sharedVoiceAudioUnlockPromise = null;
   sharedVoiceAudio = null;
 }
 
@@ -421,6 +467,7 @@ export class TtsStreamingQueue {
   private readonly audio = getSharedVoiceAudio();
   private speakerEnabled = true;
   private playbackStarted = false;
+  private audioUnlockPromise: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly onLevel?: TtsLevelListener,
@@ -433,7 +480,7 @@ export class TtsStreamingQueue {
   }
 
   unlock(): void {
-    primeVoiceAudio();
+    this.audioUnlockPromise = primeVoiceAudio();
     this.audioContext = sharedVoiceAudioContext;
   }
 
@@ -486,6 +533,7 @@ export class TtsStreamingQueue {
     if (this.processing || this.stopped) return;
     this.processing = true;
     try {
+      await this.audioUnlockPromise;
       while (this.pending.length > 0 && !this.stopped) {
         const text = this.pending.shift();
         if (!text) continue;
@@ -547,10 +595,16 @@ export class TtsStreamingQueue {
 
     return new Promise((resolve, reject) => {
       let settled = false;
+      const markPlaybackStarted = () => {
+        if (this.stopped || this.playbackStarted) return;
+        this.playbackStarted = true;
+        this.onPlaybackStart?.();
+      };
       const finish = (error?: Error) => {
         if (settled) return;
         settled = true;
         audio.onended = null;
+        audio.onplaying = null;
         audio.onerror = null;
         this.stopLevelMeter();
         this.playbackStarted = false;
@@ -563,16 +617,19 @@ export class TtsStreamingQueue {
         error ? reject(error) : resolve();
       };
       audio.onended = () => finish();
+      audio.onplaying = markPlaybackStarted;
       audio.onerror = () => finish(new Error('Edge TTS audio playback failed.'));
       this.signal.addEventListener('abort', () => {
         audio.pause();
         finish(new DOMException('TTS playback aborted', 'AbortError'));
       }, { once: true });
-      audio.play().then(() => {
-        if (this.stopped) return;
-        this.playbackStarted = true;
-        this.onPlaybackStart?.();
-      }).catch(error => finish(error instanceof Error ? error : new Error(String(error))));
+      audio.play().catch(error => {
+        const playbackError = normalizePlaybackError(error);
+        if (playbackError.name === 'NotAllowedError') {
+          console.error('[EdgeTTS] Browser blocked TTS playback:', playbackError);
+        }
+        finish(playbackError);
+      });
     });
   }
 
@@ -602,11 +659,17 @@ export class TtsStreamingQueue {
       let started = false;
       let sourceBuffer: SourceBuffer | null = null;
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+      const markPlaybackStarted = () => {
+        if (this.stopped || this.playbackStarted) return;
+        this.playbackStarted = true;
+        this.onPlaybackStart?.();
+      };
 
       const finish = (error?: Error) => {
         if (settled) return;
         settled = true;
         audio.onended = null;
+        audio.onplaying = null;
         audio.onerror = null;
         this.stopLevelMeter();
         if (this.currentAudio === audio) this.currentAudio = null;
@@ -629,14 +692,17 @@ export class TtsStreamingQueue {
       const startPlayback = () => {
         if (started || this.stopped) return;
         started = true;
-        audio.play().then(() => {
-          if (this.stopped) return;
-          this.playbackStarted = true;
-          this.onPlaybackStart?.();
-        }).catch(error => finish(error instanceof Error ? error : new Error(String(error))));
+        audio.play().catch(error => {
+          const playbackError = normalizePlaybackError(error);
+          if (playbackError.name === 'NotAllowedError') {
+            console.error('[EdgeTTS] Browser blocked TTS playback:', playbackError);
+          }
+          finish(playbackError);
+        });
       };
 
       audio.onended = () => finish();
+      audio.onplaying = markPlaybackStarted;
       audio.onerror = () => finish(new Error('Edge TTS audio playback failed.'));
       this.signal.addEventListener('abort', () => {
         audio.pause();

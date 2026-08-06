@@ -11,7 +11,7 @@ Voice sessions are generation-gated. Opening primes audio in the user gesture pa
 
 Voice VAD uses microphone constraints for echo cancellation, noise suppression, and auto gain control, with onset hysteresis and 2,500ms of continuous silence before finishing a turn. Speaking-over detection requires multiple consecutive frames and a short post-playback guard to avoid TTS echo interruptions.
 
-Voice TTS is mobile-gesture-safe: one reusable inline audio element and AudioContext/media source are primed at entry, playback is sequential and starts the speaking state only after `play()` resolves, failed chunks retry once, and the shared graph is explicitly released at session teardown.
+Voice TTS is mobile-gesture-safe: one reusable inline audio element and AudioContext/media source are primed at entry with a valid silent WAV gesture unlock, playback is sequential, and the speaking state starts only from the element's `onplaying` event. The queue awaits unlock settlement, failed chunks retry once, browser playback rejections recover to Listening, and the shared graph is explicitly released at session teardown.
 
 Voice transcription must construct the upload only after both the terminal `dataavailable` and `stop` events arrive. The client rejects empty/tiny or decoded-silent recordings locally, sends only WebM/MP4-compatible media through the existing `audio` multipart field, and quietly restarts Listening after empty or failed transcription. The single server route logs parser, format, payload, and exact Groq failures while returning generic client errors.
 
