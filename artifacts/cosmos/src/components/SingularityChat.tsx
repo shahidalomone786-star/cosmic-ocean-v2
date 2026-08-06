@@ -11,6 +11,7 @@ import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2,
   BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2, Mic, MicOff,
+  ExternalLink,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,6 +27,7 @@ import { selectRelevantChunks } from '@/lib/contextSelector';
 import { buildDocumentPrompt } from '@/lib/promptBuilder';
 import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
+import type { VisualReferencesState } from '@/lib/visualReferences';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
@@ -58,6 +60,7 @@ interface Message {
   reasoning?: string;
   reasoningSeconds?: number;
   error?: boolean;
+  visualReferences?: VisualReferencesState;
   ts: number;
 }
 
@@ -232,6 +235,148 @@ const MessageContent = memo(function MessageContent({
         {formatMath(visibleContent)}
       </ReactMarkdown>
     </div>
+  );
+});
+
+const VisualReferences = memo(function VisualReferences({
+  state,
+  reducedMotion,
+}: {
+  state?: VisualReferencesState;
+  reducedMotion: boolean;
+}) {
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setFailedIds(new Set());
+  }, [state?.references]);
+
+  if (!state) return null;
+
+  if (state.status === 'loading') {
+    return (
+      <section
+        className="mx-auto mt-8 w-full max-w-[70ch]"
+        aria-label="Loading visual references"
+        data-testid="visual-references-loading"
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-sky-300/65" />
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/40">
+            Visual References
+          </span>
+        </div>
+        <div className="flex gap-4 overflow-hidden sm:grid sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map(index => (
+            <div
+              key={index}
+              className="min-w-[82%] animate-pulse overflow-hidden rounded-2xl border border-white/[0.07]
+                bg-white/[0.025] sm:min-w-0"
+              aria-hidden="true"
+            >
+              <div className="aspect-[16/10] bg-white/[0.06]" />
+              <div className="space-y-2 p-4">
+                <div className="h-3 w-3/4 rounded bg-white/[0.08]" />
+                <div className="h-2.5 w-full rounded bg-white/[0.05]" />
+                <div className="h-2.5 w-2/3 rounded bg-white/[0.05]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  const visibleReferences = (state.references ?? []).filter(reference => !failedIds.has(reference.id));
+  const unavailable = state.status === 'unavailable' || (state.references.length > 0 && visibleReferences.length === 0);
+
+  if (unavailable) {
+    return (
+      <section
+        className="mx-auto mt-8 w-full max-w-[70ch] border-t border-white/[0.07] pt-5"
+        aria-label="Visual references unavailable"
+        data-testid="visual-references-unavailable"
+      >
+        <p className="text-[12px] leading-relaxed text-white/40">
+          Visual references are currently unavailable.
+        </p>
+      </section>
+    );
+  }
+
+  if (visibleReferences.length === 0) return null;
+
+  return (
+    <section
+      className="mx-auto mt-8 w-full max-w-[70ch]"
+      aria-labelledby={`visual-references-title-${visibleReferences[0].id}`}
+      data-testid="visual-references"
+    >
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.18em] text-sky-200/45">
+            Visual evidence
+          </p>
+          <h3
+            id={`visual-references-title-${visibleReferences[0].id}`}
+            className="text-[18px] font-semibold tracking-[-0.018em] text-white/90"
+          >
+            Visual References
+          </h3>
+        </div>
+        <span className="hidden text-[11px] text-white/30 sm:block">
+          {visibleReferences.length} {visibleReferences.length === 1 ? 'reference' : 'references'}
+        </span>
+      </div>
+
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 scrollbar-hide
+        sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
+        {visibleReferences.map(reference => (
+          <article
+            key={reference.id}
+            className="group min-w-[84%] snap-start overflow-hidden rounded-2xl border border-white/[0.09]
+              bg-white/[0.025] shadow-[0_10px_30px_rgba(0,0,0,0.24)]
+              transition-colors duration-200 hover:border-white/[0.16] sm:min-w-0"
+            data-testid={`card-visual-reference-${reference.id}`}
+          >
+            <a
+              href={reference.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 focus-visible:ring-inset"
+              aria-label={`Open source for ${reference.title}`}
+            >
+              <div className="relative aspect-[16/10] overflow-hidden bg-white/[0.04]">
+                <img
+                  src={reference.imageUrl}
+                  alt={reference.alt}
+                  loading="lazy"
+                  decoding="async"
+                  className={`h-full w-full object-cover transition duration-500 ${
+                    reducedMotion ? '' : 'group-hover:scale-[1.025]'
+                  }`}
+                  onError={() => setFailedIds(previous => new Set(previous).add(reference.id))}
+                />
+                <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white/65 backdrop-blur-sm">
+                  {reference.source}
+                </span>
+              </div>
+              <div className="p-4">
+                <h4 className="line-clamp-2 text-[13px] font-medium leading-[1.4] text-white/88">
+                  {reference.title}
+                </h4>
+                <p className="mt-2 line-clamp-3 text-[12px] leading-[1.55] text-white/48">
+                  {reference.caption}
+                </p>
+                <span className="mt-3 inline-flex items-center gap-1 text-[10px] text-sky-200/55">
+                  Source <ExternalLink size={10} aria-hidden="true" />
+                </span>
+              </div>
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 });
 
@@ -1663,6 +1808,82 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, [attachedDoc]);
 
   // ── Core generation ──────────────────────────────────────────────────────
+  const loadVisualReferences = useCallback(async (
+    messageId: string,
+    query: string,
+    responseText: string,
+  ) => {
+    setMessages(previous => previous.map(message =>
+      message.id === messageId
+        ? {
+            ...message,
+            visualReferences: { status: 'loading', references: [] },
+          }
+        : message
+    ));
+
+    try {
+      const response = await fetch('/api/visual-references', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, response: responseText }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        enabled?: boolean;
+        references?: VisualReferencesState['references'];
+        unavailable?: boolean;
+        message?: string;
+        query?: string;
+        category?: string;
+      } | null;
+
+      if (!response.ok || payload?.unavailable) {
+        setMessages(previous => previous.map(message =>
+          message.id === messageId
+            ? {
+                ...message,
+                visualReferences: {
+                  status: 'unavailable',
+                  references: [],
+                  message: payload?.message ?? 'Visual references are currently unavailable.',
+                },
+              }
+            : message
+        ));
+        return;
+      }
+
+      setMessages(previous => previous.map(message =>
+        message.id === messageId
+          ? {
+              ...message,
+              visualReferences: payload?.enabled
+                ? {
+                    status: 'ready',
+                    references: payload.references ?? [],
+                    query: payload.query,
+                    category: payload.category,
+                  }
+                : undefined,
+            }
+          : message
+      ));
+    } catch {
+      setMessages(previous => previous.map(message =>
+        message.id === messageId
+          ? {
+              ...message,
+              visualReferences: {
+                status: 'unavailable',
+                references: [],
+                message: 'Visual references are currently unavailable.',
+              },
+            }
+          : message
+      ));
+    }
+  }, []);
+
   const generateResponse = useCallback(async (userText: string, requestImages: ImageAttachment[] = []) => {
     setApiError(null);
     setIsThinking(true);
@@ -1755,6 +1976,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let sawFirstToken = false;
+      let streamedContent = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1809,7 +2031,14 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 : m
             )
           );
+          if (typeof data.content === 'string') {
+            streamedContent = sanitizeVisibleResponse(data.content);
+          }
         }
+      }
+
+      if (sawFirstToken && streamedContent.trim()) {
+        void loadVisualReferences(msgId, userText, streamedContent);
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') {
@@ -1834,7 +2063,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       setIsStreaming(false);
       if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
     }
-  }, [beginMessageCooldown, clearMessageCooldown, messages]);
+  }, [beginMessageCooldown, clearMessageCooldown, loadVisualReferences, messages]);
 
   const handleSend = useCallback((overrideText?: string) => {
     const typedText = (overrideText ?? input).trim();
@@ -2119,6 +2348,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                               : ''}
                           />
                         </div>
+
+                        {!isGenerating && msg.content.trim() && (
+                          <VisualReferences
+                            state={msg.visualReferences}
+                            reducedMotion={Boolean(prefersReducedMotion)}
+                          />
+                        )}
 
                         {/* Divider below response */}
                         {!isGenerating && msg.id !== 'welcome' && (

@@ -1,5 +1,6 @@
 import type { DocumentRecord } from './documentStore';
 import type { ImageAttachment } from './attachmentTypes';
+import type { VisualReferencesState } from './visualReferences';
 
 export const CHAT_HISTORY_STORAGE_KEY = 'cosmos.singularity.chat-history.v1';
 export const CHAT_SIDEBAR_WIDTH_KEY = 'cosmos.singularity.sidebar-width';
@@ -18,6 +19,7 @@ export interface ChatMessageRecord {
   reasoning?: string;
   reasoningSeconds?: number;
   error?: boolean;
+  visualReferences?: VisualReferencesState;
   ts: number;
 }
 

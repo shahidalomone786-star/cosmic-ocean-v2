@@ -12,6 +12,7 @@ import biologyRouter from "./biology";
 import aiSummaryRouter from "./ai-summary";
 import discoveryRouter from "./discovery";
 import transcribeRouter from "./transcribe";
+import visualReferencesRouter from "./visual-references";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(biologyRouter);
 router.use(aiSummaryRouter);
 router.use(discoveryRouter);
 router.use(transcribeRouter);
+router.use(visualReferencesRouter);
 router.use(singularityRouter);
 
 
