@@ -5,7 +5,7 @@
  * content column, neural TTS "Listen" button on every AI message.
  */
 
-import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, memo, type KeyboardEvent, type ReactNode } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
@@ -92,11 +92,14 @@ const formatMath = (text: string) => {
     .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
 };
 
+const markdownRemarkPlugins = [remarkGfm, remarkMath];
+const markdownRehypePlugins = [rehypeKatex];
+
 // ─── Markdown renderer ──────────────────────────────────────────────────────
 const markdownComponents = {
   // ── Block elements ─────────────────────────────────────────────────────────
   p: ({ children }: any) => (
-    <p className="mb-6 last:mb-0 text-[15px] leading-[1.68] tracking-[0.002em] text-white/85">
+    <p className="mb-5 last:mb-0 text-[15px] leading-[1.72] tracking-[0.002em] text-white/80">
       {children}
     </p>
   ),
@@ -109,8 +112,9 @@ const markdownComponents = {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="text-violet-300/90 underline underline-offset-[3px] decoration-violet-400/40
-        hover:text-violet-200 hover:decoration-violet-300/60 transition-colors duration-150"
+      className="text-violet-200/90 underline underline-offset-[3px] decoration-violet-300/35
+        transition-colors duration-150 hover:text-violet-100 hover:decoration-violet-200/65
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45 focus-visible:rounded-sm"
     >
       {children}
     </a>
@@ -122,7 +126,7 @@ const markdownComponents = {
     <ol className="my-6 ml-6 list-decimal space-y-2.5 marker:text-white/35">{children}</ol>
   ),
   li: ({ children }: any) => (
-    <li className="pl-1 text-[15px] leading-[1.68] text-white/83">{children}</li>
+    <li className="pl-1 text-[15px] leading-[1.72] text-white/80">{children}</li>
   ),
   // ── Headings — document-grade hierarchy ───────────────────────────────────
   h1: ({ children }: any) => (
@@ -145,8 +149,8 @@ const markdownComponents = {
   ),
   // ── Blockquote — elegant left accent ──────────────────────────────────────
   blockquote: ({ children }: any) => (
-    <blockquote className="my-8 rounded-r-xl border-l-2 border-sky-300/45 bg-white/[0.025]
-      px-5 py-4 text-[16px] leading-[1.75] text-white/66 shadow-[inset_1px_0_rgba(255,255,255,0.02)]">
+    <blockquote className="my-8 rounded-r-xl border-l-2 border-sky-200/40 bg-sky-200/[0.025]
+      px-5 py-4 text-[16px] leading-[1.75] text-white/64 shadow-[inset_1px_0_rgba(255,255,255,0.025)]">
       {children}
     </blockquote>
   ),
@@ -155,8 +159,8 @@ const markdownComponents = {
   ),
   // ── Code blocks — refined dark surface ────────────────────────────────────
   pre: ({ children }: any) => (
-    <pre className="relative my-8 overflow-x-auto rounded-xl border border-white/[0.09]
-      bg-[#08080b] px-5 py-5 text-[14px] leading-[1.7]
+    <pre className="relative my-8 overflow-x-auto rounded-2xl border border-white/[0.10]
+      bg-[#0b0b11] px-5 py-5 text-[14px] leading-[1.7]
       shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </pre>
@@ -203,16 +207,17 @@ const MessageContent = memo(function MessageContent({
   content: string;
   className?: string;
 }) {
-  const visibleContent = sanitizeVisibleResponse(content);
+  const visibleContent = useMemo(() => sanitizeVisibleResponse(content), [content]);
+  const markdownSource = useMemo(() => formatMath(visibleContent), [visibleContent]);
   return (
     <div className={`mx-auto w-full max-w-[70ch] overflow-x-auto overflow-y-hidden
-      text-white/85 ${className}`}>
+      text-white/82 ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        remarkPlugins={markdownRemarkPlugins}
+        rehypePlugins={markdownRehypePlugins}
         components={markdownComponents}
       >
-        {formatMath(visibleContent)}
+        {markdownSource}
       </ReactMarkdown>
     </div>
   );
@@ -356,19 +361,19 @@ const WelcomeHero = memo(function WelcomeHero({ reducedMotion }: { reducedMotion
       transition={reducedMotion
         ? { duration: 0 }
         : { duration: 0.72, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-[40rem] px-4 text-center -translate-y-2 sm:-translate-y-4"
+      className="w-full max-w-[40rem] px-5 text-center -translate-y-2 sm:-translate-y-4"
     >
       <h1
         id="singularity-hero-title"
-        className="text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold leading-[0.98]
-          tracking-[-0.065em] text-white"
+        className="text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold leading-[0.94]
+          tracking-[-0.07em] text-white"
         style={{ fontFamily: 'var(--app-font-heading)' }}
       >
         Singularity
       </h1>
 
-      <p className="mt-8 text-[clamp(1.125rem,2.2vw,1.5rem)] font-medium leading-[1.55]
-        tracking-[-0.012em] text-white/78">
+      <p className="mt-7 text-[clamp(1.125rem,2.2vw,1.5rem)] font-medium leading-[1.55]
+        tracking-[-0.018em] text-white/72">
         Think deeper.
         <br />
         Explore further.
@@ -376,8 +381,8 @@ const WelcomeHero = memo(function WelcomeHero({ reducedMotion }: { reducedMotion
         Create without limits.
       </p>
 
-      <p className="mt-10 text-[10px] font-medium leading-[1.9]
-        tracking-[0.22em] text-white/38 sm:text-[11px]">
+      <p className="mt-9 text-[10px] font-medium leading-[1.9]
+        tracking-[0.22em] text-white/32 sm:text-[11px]">
         Powered by GPT-OSS-120B
         <br />
         <span className="normal-case tracking-[0.12em] text-white/28">
@@ -410,11 +415,11 @@ const SaveButton = memo(function SaveButton({ onSave }: { onSave: () => void }) 
     <button
       onClick={handle}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-        transition-all duration-150 active:scale-95
-        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25 ${
+        transition-gpu active:scale-95
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45 ${
         saved
           ? 'text-violet-400 bg-violet-400/[0.09] border border-violet-400/[0.18]'
-          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+           : 'text-white/35 hover:text-white/80 hover:bg-white/[0.065] border border-transparent'
       }`}
       aria-label={saved ? 'Saved to workspace' : 'Save to workspace'}
     >
@@ -430,19 +435,27 @@ const SaveButton = memo(function SaveButton({ onSave }: { onSave: () => void }) 
 // ─── Copy button ────────────────────────────────────────────────────────────
 const CopyButton = memo(function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handle = useCallback(() => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        setCopied(false);
+      }, 2000);
     }).catch(() => {});
   }, [text]);
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
   return (
     <button
       onClick={handle}
       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-white/35
-        hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150
+        hover:text-white/80 hover:bg-white/[0.065] transition-gpu
         active:scale-95 active:bg-white/[0.10]
-        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45"
       aria-label={copied ? 'Copied' : 'Copy response'}
     >
       {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2} />}
@@ -555,7 +568,7 @@ const UserMessageActions = memo(function UserMessageActions({
             <button
               type="button"
               onClick={handleCopy}
-              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+               className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition-gpu hover:bg-white/[0.08] hover:text-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
               aria-label={copied ? 'Copied message' : 'Copy message'}
             >
               {copied ? <Check size={11} strokeWidth={2.5} className="text-emerald-300" /> : <Copy size={11} strokeWidth={2} />}
@@ -565,7 +578,7 @@ const UserMessageActions = memo(function UserMessageActions({
               type="button"
               onClick={onEdit}
               disabled={disabled}
-              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+               className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition-gpu hover:bg-white/[0.08] hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
               aria-label="Edit message"
             >
               <Pencil size={11} strokeWidth={2} />
@@ -595,11 +608,11 @@ const ShareButton = memo(function ShareButton({ text }: { text: string }) {
     <button
       onClick={handle}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-        transition-all duration-150 active:scale-95
-        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25 ${
+        transition-gpu active:scale-95
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/45 ${
         shared
           ? 'text-sky-400/80 bg-sky-400/[0.08] border border-sky-400/[0.15]'
-          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+           : 'text-white/35 hover:text-white/80 hover:bg-white/[0.065] border border-transparent'
       }`}
       aria-label={shared ? 'Copied to clipboard' : 'Share this answer'}
     >
@@ -665,13 +678,13 @@ const ListenButton = memo(function ListenButton({
     <button
       onClick={play}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-        transition-all duration-200 active:scale-95
-        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 ${
+        transition-gpu active:scale-95
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/45 ${
         state === 'playing'
           ? 'text-emerald-400 bg-emerald-400/[0.11] border border-emerald-400/[0.28] shadow-[0_0_12px_rgba(52,211,153,0.10)]'
            : state === 'preparing'
           ? 'text-emerald-400/70 bg-emerald-400/[0.07] border border-emerald-400/[0.14]'
-          : 'text-white/35 hover:text-white/70 hover:bg-white/[0.07] border border-transparent'
+           : 'text-white/35 hover:text-white/80 hover:bg-white/[0.065] border border-transparent'
       }`}
       aria-label={
          state === 'playing' ? 'Stop audio'
@@ -709,10 +722,10 @@ const ReasoningBlock = memo(function ReasoningBlock({
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-          text-white/28 hover:text-white/55 hover:bg-white/[0.04]
+          text-white/32 hover:text-white/72 hover:bg-white/[0.045]
           border border-transparent hover:border-white/[0.06]
-          transition-all duration-150 active:scale-95
-          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/25"
+          transition-gpu active:scale-95
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/35"
         aria-expanded={open}
         aria-label={open ? 'Collapse reasoning' : 'Expand reasoning'}
       >
@@ -1150,14 +1163,175 @@ const ThinkingDots = memo(function ThinkingDots() {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.93, y: 4 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="self-start flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-bl-sm
-        bg-[#0d1a14] border border-emerald-500/[0.18]
-        shadow-[0_0_24px_rgba(16,185,129,0.10),0_4px_18px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(16,185,129,0.06)]"
+      className="self-start flex items-center gap-2.5 rounded-2xl rounded-bl-sm border
+        border-emerald-300/[0.18] bg-emerald-300/[0.055] px-4 py-3
+        shadow-[0_10px_28px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.04)]"
       aria-label="Singularity is thinking"
     >
       <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
       <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
       <div className="thinking-dot w-1.5 h-1.5 bg-emerald-400/75 rounded-full" />
+    </motion.div>
+  );
+});
+
+interface MessageRowProps {
+  message: Message;
+  isThinking: boolean;
+  isLastAssistant: boolean;
+  isGenerating: boolean;
+  showActions: boolean;
+  prefersReducedMotion: boolean;
+  onEdit: (messageId: string) => void;
+  onSimplify: () => void;
+  onRegenerate: () => void;
+  onSave: (content: string) => void;
+}
+
+const MessageRow = memo(function MessageRow({
+  message: msg,
+  isThinking,
+  isLastAssistant,
+  isGenerating,
+  showActions,
+  prefersReducedMotion,
+  onEdit,
+  onSimplify,
+  onRegenerate,
+  onSave,
+}: MessageRowProps) {
+  const handleEdit = useCallback(() => onEdit(msg.id), [msg.id, onEdit]);
+  const handleSave = useCallback(() => onSave(msg.content), [msg.content, onSave]);
+
+  return (
+    <motion.div
+      initial={msg.id === 'welcome' || prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: prefersReducedMotion ? 0 : 0.25, ease: [0.16, 1, 0.3, 1] }}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 220px' }}
+      className={`w-full flex flex-col ${
+        msg.id === 'welcome'
+          ? 'items-center mb-0'
+          : msg.role === 'user'
+            ? 'items-end mb-9 sm:mb-10'
+            : 'items-start mb-7 sm:mb-8'
+      } ${msg.role === 'user' ? 'group' : ''}`}
+    >
+      {msg.role === 'user' && (
+        <UserMessageActions
+          text={msg.content}
+          onEdit={handleEdit}
+          disabled={isThinking}
+        >
+          <div className="bg-white/[0.075] border border-white/[0.14] text-white/92
+            rounded-2xl rounded-br-[4px] px-4 py-3.5
+            text-[15px] leading-[1.6] font-[450]
+            shadow-[0_8px_24px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.10)]">
+            {msg.attachedImages?.length ? (
+              <div className="mb-2.5">
+                <ImageAttachmentGrid images={msg.attachedImages} readOnly />
+              </div>
+            ) : null}
+            {msg.attachedDocument && (
+              <DocumentChip record={msg.attachedDocument} isThinking={false} readOnly />
+            )}
+            {msg.content}
+          </div>
+        </UserMessageActions>
+      )}
+
+      {msg.role === 'assistant' && msg.error && (
+        <>
+          <div className="bg-red-400/[0.055] border border-red-300/[0.18] text-red-200/90
+            rounded-2xl rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%]
+            shadow-[0_8px_22px_rgba(0,0,0,0.24)]">
+            <MessageContent content={msg.content} />
+          </div>
+          <button
+            onClick={onRegenerate}
+            className="mt-1.5 rounded px-1 text-[11px] text-red-300/65 underline underline-offset-2
+              transition-colors hover:bg-red-300/[0.07] hover:text-red-100
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/45"
+          >
+            Retry
+          </button>
+        </>
+      )}
+
+      {msg.role === 'assistant' && !msg.error && (
+        msg.id === 'welcome' ? (
+          <WelcomeHero reducedMotion={Boolean(prefersReducedMotion)} />
+        ) : (
+          <>
+            {msg.reasoning && msg.reasoning.trim() && (
+              <div className="w-full mb-3">
+                <ReasoningBlock reasoning={msg.reasoning} seconds={msg.reasoningSeconds} />
+              </div>
+            )}
+
+            <div className={`w-full pt-1 pb-2 ${isGenerating ? 'stream-pulse-text' : 'animate-cosmos-fade'}`}>
+              <MessageContent content={msg.content || (isGenerating ? '' : '…')} />
+            </div>
+
+            {!isGenerating && msg.content.trim() && (
+              <VisualReferences
+                state={msg.visualReferences}
+                reducedMotion={Boolean(prefersReducedMotion)}
+              />
+            )}
+
+            {!isGenerating && (
+              <div className="w-full border-b border-white/[0.05] mt-1 mb-3" />
+            )}
+
+            {showActions && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center gap-0.5 flex-wrap"
+              >
+                <ListenButton messageId={msg.id} text={msg.content} />
+                <CopyButton text={msg.content} />
+                <ShareButton text={msg.content} />
+                <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
+                <SaveButton onSave={handleSave} />
+                {isLastAssistant && (
+                  <>
+                    <button
+                      onClick={onSimplify}
+                      disabled={isGenerating}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                        text-white/32 hover:text-white/80 hover:bg-white/[0.065] border border-transparent
+                        transition-gpu active:scale-95
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45"
+                      aria-label="Ask Singularity to explain more simply"
+                    >
+                      <Wand2 size={11} strokeWidth={2} />
+                      Simplify
+                    </button>
+                    <button
+                      onClick={onRegenerate}
+                      disabled={isGenerating}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
+                        text-white/32 hover:text-white/80 hover:bg-white/[0.065] border border-transparent
+                        transition-gpu active:scale-95
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45"
+                      aria-label="Regenerate response"
+                    >
+                      <RotateCcw size={11} strokeWidth={2} />
+                      Regenerate
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </>
+        )
+      )}
     </motion.div>
   );
 });
@@ -1284,17 +1458,81 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const voiceInterruptRef = useRef<((preserveRecording?: boolean) => void) | null>(null);
   const voiceTurnRef = useRef<(text: string) => void>(() => undefined);
   const voiceRestartTimerRef = useRef<number | null>(null);
+  const composerFocusTimerRef = useRef<number | null>(null);
+  const composerScrollTimerRef = useRef<number | null>(null);
+  const streamUpdateFrameRef = useRef<number | null>(null);
+  const pendingStreamUpdateRef = useRef<{
+    messageId: string;
+    reasoning?: string;
+    content?: string;
+    reasoningSeconds: number;
+  } | null>(null);
   const voiceRestartRecordingRef = useRef<(sessionId: number) => void>(() => undefined);
   const voiceModeOpenRef = useRef(false);
   const voiceMutedRef = useRef(false);
   const voiceSpeakerEnabledRef = useRef(true);
   const messagesRef = useRef(messages);
+  const inputRef = useRef(input);
+  const imagesRef = useRef(images);
+  const attachedDocRef = useRef(attachedDoc);
+  const isThinkingRef = useRef(isThinking);
   const voiceModeStateRef = useRef(voiceModeState);
   messagesRef.current = messages;
+  inputRef.current = input;
+  imagesRef.current = images;
+  attachedDocRef.current = attachedDoc;
+  isThinkingRef.current = isThinking;
   voiceModeStateRef.current = voiceModeState;
   voiceModeOpenRef.current = voiceModeOpen;
   voiceMutedRef.current = voiceMuted;
   voiceSpeakerEnabledRef.current = voiceSpeakerEnabled;
+
+  const commitStreamUpdate = useCallback((update: {
+    messageId: string;
+    reasoning?: string;
+    content?: string;
+    reasoningSeconds: number;
+  }) => {
+    setMessages(previous => {
+      const index = previous.findIndex(message => message.id === update.messageId);
+      if (index < 0) return previous;
+      const message = previous[index];
+      const next = [...previous];
+      next[index] = {
+        ...message,
+        reasoning: update.reasoning ?? message.reasoning ?? '',
+        content: update.content ?? message.content ?? '',
+        reasoningSeconds: update.reasoningSeconds,
+      };
+      return next;
+    });
+  }, []);
+
+  const flushStreamUpdate = useCallback(() => {
+    if (streamUpdateFrameRef.current !== null) {
+      window.cancelAnimationFrame(streamUpdateFrameRef.current);
+      streamUpdateFrameRef.current = null;
+    }
+    const update = pendingStreamUpdateRef.current;
+    pendingStreamUpdateRef.current = null;
+    if (update) commitStreamUpdate(update);
+  }, [commitStreamUpdate]);
+
+  const scheduleStreamUpdate = useCallback((
+    messageId: string,
+    reasoning: string | undefined,
+    content: string | undefined,
+    reasoningSeconds: number,
+  ) => {
+    pendingStreamUpdateRef.current = { messageId, reasoning, content, reasoningSeconds };
+    if (streamUpdateFrameRef.current !== null) return;
+    streamUpdateFrameRef.current = window.requestAnimationFrame(() => {
+      streamUpdateFrameRef.current = null;
+      const update = pendingStreamUpdateRef.current;
+      pendingStreamUpdateRef.current = null;
+      if (update) commitStreamUpdate(update);
+    });
+  }, [commitStreamUpdate]);
 
   const prefersReducedMotion = useReducedMotion();
   const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - cooldownNow) / 1000));
@@ -1986,7 +2224,13 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, [activeSessionId, sessions]);
 
   useEffect(() => {
-    if (!activeSessionId) return;
+    if (
+      !activeSessionId
+      || isStreaming
+      || voiceModeState === 'reasoning'
+      || voiceModeState === 'generating'
+      || voiceModeState === 'speaking'
+    ) return;
     setSessions(previous => {
       const existing = previous.find(session => session.id === activeSessionId);
       if (!existing) return previous;
@@ -2008,7 +2252,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       }
       return next;
     });
-  }, [activeSessionId, isStreaming, messages]);
+  }, [activeSessionId, isStreaming, messages, voiceModeState]);
 
   useEffect(() => {
     if (!historyNotice) return;
@@ -2033,7 +2277,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearImages();
     stickToBottomRef.current = true;
     setMobileHistoryOpen(false);
-    window.setTimeout(() => textareaRef.current?.focus(), 40);
+    if (composerFocusTimerRef.current !== null) window.clearTimeout(composerFocusTimerRef.current);
+    composerFocusTimerRef.current = window.setTimeout(() => {
+      composerFocusTimerRef.current = null;
+      textareaRef.current?.focus();
+    }, 40);
   }, [clearDocument, clearImages, isThinking]);
 
   const resolveSession = useCallback(async (sessionId: string): Promise<ChatSession | null> => {
@@ -2063,7 +2311,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearDocument();
     clearImages();
     stickToBottomRef.current = true;
-    window.setTimeout(() => textareaRef.current?.focus(), 40);
+    if (composerFocusTimerRef.current !== null) window.clearTimeout(composerFocusTimerRef.current);
+    composerFocusTimerRef.current = window.setTimeout(() => {
+      composerFocusTimerRef.current = null;
+      textareaRef.current?.focus();
+    }, 40);
   }, [activeSessionId, clearDocument, clearImages, isThinking, resolveSession]);
 
   const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
@@ -2360,6 +2612,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   useEffect(() => () => {
     abortRef.current?.abort();
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (composerFocusTimerRef.current !== null) {
+      window.clearTimeout(composerFocusTimerRef.current);
+    }
+    if (composerScrollTimerRef.current !== null) {
+      window.clearTimeout(composerScrollTimerRef.current);
+    }
+    if (streamUpdateFrameRef.current !== null) {
+      window.cancelAnimationFrame(streamUpdateFrameRef.current);
+    }
+    pendingStreamUpdateRef.current = null;
   }, []);
 
   // Refocus textarea once the document chip appears (extraction done)
@@ -2641,19 +2903,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           }
 
           const seconds = Math.max(1, Math.round((Date.now() - thinkingStartRef.current) / 1000));
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === msgId
-                ? {
-                    ...m,
-                    reasoning: typeof data.reasoning === 'string' ? data.reasoning : (m.reasoning ?? ''),
-                    content: typeof data.content === 'string'
-                      ? sanitizeVisibleResponse(data.content)
-                      : (m.content ?? ''),
-                    reasoningSeconds: seconds,
-                  }
-                : m
-            )
+          scheduleStreamUpdate(
+            msgId,
+            typeof data.reasoning === 'string' ? data.reasoning : undefined,
+            typeof data.content === 'string' ? sanitizeVisibleResponse(data.content) : undefined,
+            seconds,
           );
           if (typeof data.content === 'string') {
             streamedContent = sanitizeVisibleResponse(data.content);
@@ -2766,6 +3020,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         m.id === msgId ? { ...m, error: true, content: catchErr.error } : m
       ));
     } finally {
+      flushStreamUpdate();
       if (!voiceMode) {
         setIsThinking(false);
         setIsStreaming(false);
@@ -2775,7 +3030,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         if (voiceRequestAbortRef.current === requestController) voiceRequestAbortRef.current = null;
       }
     }
-  }, [beginMessageCooldown, clearMessageCooldown, loadVisualReferences, messages, startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
+  }, [beginMessageCooldown, clearMessageCooldown, flushStreamUpdate, loadVisualReferences, scheduleStreamUpdate, startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
 
   const handleVoiceTurn = useCallback((text: string) => {
     if (!voiceModeOpen || !text.trim() || voiceRequestAbortRef.current) return;
@@ -2792,15 +3047,18 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   voiceTurnRef.current = handleVoiceTurn;
 
   const handleSend = useCallback((overrideText?: string) => {
-    const typedText = (overrideText ?? input).trim();
-    if ((!typedText && images.length === 0) || isThinking || cooldownUntilRef.current > Date.now()) return;
+    const currentInput = inputRef.current;
+    const currentImages = imagesRef.current;
+    const currentAttachedDoc = attachedDocRef.current;
+    const typedText = (overrideText ?? currentInput).trim();
+    if ((!typedText && currentImages.length === 0) || isThinkingRef.current || cooldownUntilRef.current > Date.now()) return;
     const text = typedText || 'Please analyze the attached image(s).';
 
     // The current attachment belongs to this user turn. Once it is moved into
     // the message, the composer can reset without losing document context.
     const latestDocument =
-      attachedDoc ??
-      [...messages]
+      currentAttachedDoc ??
+      [...messagesRef.current]
         .reverse()
         .find(message => message.attachedDocument)?.attachedDocument ??
       null;
@@ -2819,8 +3077,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         id: `usr-${Date.now()}`,
         role: 'user',
         content: text,
-        attachedDocument: attachedDoc,
-        attachedImages: images,
+        attachedDocument: currentAttachedDoc,
+        attachedImages: currentImages,
         ts: Date.now(),
       },
     ]);
@@ -2829,8 +3087,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearImages();
     stickToBottomRef.current = true;
     beginMessageCooldown();
-    generateResponse(aiPrompt, images);
-  }, [input, isThinking, generateResponse, attachedDoc, images, messages, clearDocument, clearImages, beginMessageCooldown]);
+    generateResponse(aiPrompt, currentImages);
+  }, [beginMessageCooldown, clearDocument, clearImages, generateResponse]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -2839,21 +3097,22 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   }, []);
 
   const handleRegenerate = useCallback(() => {
-    const lastUser = [...messages].reverse().find(m => m.role === 'user');
-    if (!lastUser || isThinking || cooldownUntilRef.current > Date.now()) return;
+    const lastUser = [...messagesRef.current].reverse().find(m => m.role === 'user');
+    if (!lastUser || isThinkingRef.current || cooldownUntilRef.current > Date.now()) return;
     beginMessageCooldown();
     setMessages(prev => {
       const idx = prev.map(m => m.role).lastIndexOf('assistant');
       return idx === -1 ? prev : prev.slice(0, idx);
     });
     generateResponse(lastUser.content, lastUser.attachedImages ?? []);
-  }, [messages, isThinking, generateResponse, beginMessageCooldown]);
+  }, [beginMessageCooldown, generateResponse]);
 
   const handleEditUserMessage = useCallback((messageId: string) => {
-    if (isThinking) return;
-    const message = messages.find(item => item.id === messageId);
+    if (isThinkingRef.current) return;
+    const currentMessages = messagesRef.current;
+    const message = currentMessages.find(item => item.id === messageId);
     if (!message || message.role !== 'user') return;
-    const messageIndex = messages.findIndex(item => item.id === messageId);
+    const messageIndex = currentMessages.findIndex(item => item.id === messageId);
     if (messageIndex < 0) return;
 
     // Keep the conversation before this turn, then let the user resubmit
@@ -2864,8 +3123,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     clearDocument();
     clearImages();
     stickToBottomRef.current = true;
-    window.setTimeout(() => textareaRef.current?.focus(), 40);
-  }, [clearDocument, clearImages, isThinking, messages]);
+    if (composerFocusTimerRef.current !== null) window.clearTimeout(composerFocusTimerRef.current);
+    composerFocusTimerRef.current = window.setTimeout(() => {
+      composerFocusTimerRef.current = null;
+      textareaRef.current?.focus();
+    }, 40);
+  }, [clearDocument, clearImages]);
+
+  const handleSimplify = useCallback(() => {
+    handleSend('Can you explain that in simpler terms?');
+  }, [handleSend]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -2918,16 +3185,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-white/[0.04]
-        bg-[#09090b]/98 backdrop-blur-md relative z-10
+      <div className="relative z-10 flex-shrink-0 border-b border-white/[0.06]
+        bg-[#09090b]/[0.96] backdrop-blur-md
         shadow-[0_1px_0_rgba(255,255,255,0.03)]">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-start px-5 py-[14px]">
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-start px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
             <MobileHistoryButton onClick={() => setMobileHistoryOpen(true)} />
             {/* Icon — layered glow ring */}
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-full
-              bg-white/[0.05] border border-white/[0.09]
-              shadow-[0_0_14px_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-full
+              border border-white/[0.10] bg-white/[0.05]
+              shadow-[0_8px_22px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.08)]">
               <Sparkles size={15} strokeWidth={1.7} className="text-white/72" />
               {!prefersReducedMotion && (
                 <motion.div
@@ -2946,7 +3213,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
               >
                 Singularity
               </h2>
-              <p className="text-[9px] uppercase tracking-[0.24em] text-white/28 font-mono mt-[1px]">
+              <p className="mt-[1px] font-mono text-[9px] uppercase tracking-[0.24em] text-white/30">
                 GPT-OSS-120B · Cosmic Intelligence
               </p>
             </div>
@@ -2996,171 +3263,39 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         <div
           ref={scrollBoxRef}
           onScroll={handleScroll}
-          className="h-full overflow-y-auto scrollbar-hide"
+          className="h-full overflow-y-auto px-1 scrollbar-hide sm:px-0"
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className={`max-w-4xl mx-auto w-full px-5 sm:px-8 py-8 flex flex-col gap-0 ${
+          <div className={`mx-auto flex w-full max-w-4xl flex-col gap-0 px-4 py-7 sm:px-8 sm:py-8 ${
             messages.length === 1 && messages[0]?.id === 'welcome' && !isThinking
               ? 'min-h-full items-center justify-center'
               : ''
           }`}>
             <AnimatePresence initial={false}>
-              {messages.map((msg, i) => {
-                const isLastAsst = msg.role === 'assistant' && i === messages.length - 1 && !isThinking;
-                // showActions gates the entire action row (Listen, Copy, Regenerate).
-                // Listen is also gated on isLastAsst-awareness: for the actively-generating
-                // last message we suppress the row until the stream is complete.
-                const isGenerating = isThinking && i === messages.length - 1;
-                const showActions = msg.role === 'assistant' && !msg.error && msg.id !== 'welcome' && !isGenerating;
+              {messages.map((message, index) => {
+                const isLastMessage = index === messages.length - 1;
+                const isLastAssistant = message.role === 'assistant' && isLastMessage && !isThinking;
+                const isGenerating = isThinking && isLastMessage;
+                const showActions = message.role === 'assistant'
+                  && !message.error
+                  && message.id !== 'welcome'
+                  && !isGenerating;
 
                 return (
-                  <motion.div
-                    key={msg.id}
-                    initial={msg.id === 'welcome' || prefersReducedMotion
-                      ? false
-                      : { opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: prefersReducedMotion ? 0 : 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className={`w-full flex flex-col ${
-                      msg.id === 'welcome'
-                        ? 'items-center mb-0'
-                        : msg.role === 'user'
-                          ? 'items-end mb-10'
-                          : 'items-start mb-8'
-                    } ${msg.role === 'user' ? 'group' : ''}`}
-                  >
-                    {/* ── User message: premium glass bubble ──────────────── */}
-                    {msg.role === 'user' && (
-                      <UserMessageActions
-                        text={msg.content}
-                        onEdit={() => handleEditUserMessage(msg.id)}
-                        disabled={isThinking}
-                      >
-                        <div className="bg-white/[0.08] border border-white/[0.13] text-white/93
-                          rounded-2xl rounded-br-[4px] px-4 py-3
-                          text-[15px] leading-[1.6] font-[450]
-                          shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
-                          {msg.attachedImages?.length ? (
-                            <div className="mb-2.5">
-                              <ImageAttachmentGrid images={msg.attachedImages} readOnly />
-                            </div>
-                          ) : null}
-                          {msg.attachedDocument && (
-                            <DocumentChip
-                              record={msg.attachedDocument}
-                              isThinking={false}
-                              readOnly
-                            />
-                          )}
-                          {msg.content}
-                        </div>
-                      </UserMessageActions>
-                    )}
-
-                    {/* ── Error message: red-tinted surface ───────────────── */}
-                    {msg.role === 'assistant' && msg.error && (
-                      <>
-                        <div className="bg-red-500/[0.06] border border-red-500/[0.16] text-red-300/90
-                          rounded-2xl rounded-bl-[4px] text-[13.5px] leading-relaxed px-5 py-4 max-w-[85%]
-                          shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
-                          <MessageContent content={msg.content} />
-                        </div>
-                        <button
-                          onClick={handleRegenerate}
-                          className="mt-1.5 text-[11px] text-red-300/60 hover:text-red-200 underline underline-offset-2"
-                        >
-                          Retry
-                        </button>
-                      </>
-                    )}
-
-                    {/* ── Assistant message: plain document layout ─────────── */}
-                    {msg.role === 'assistant' && !msg.error && (
-                      msg.id === 'welcome' ? (
-                        <WelcomeHero reducedMotion={Boolean(prefersReducedMotion)} />
-                      ) : (
-                      <>
-                        {/* Reasoning block */}
-                        {msg.reasoning && msg.reasoning.trim() && (
-                          <div className="w-full mb-3">
-                            <ReasoningBlock reasoning={msg.reasoning} seconds={msg.reasoningSeconds} />
-                          </div>
-                        )}
-
-                        {/* Content — no card, no border, no background */}
-                        <div className={`w-full pt-1 pb-2 ${isGenerating ? 'stream-pulse-text' : 'animate-cosmos-fade'}`}>
-                          <MessageContent
-                            content={msg.content || (isThinking && i === messages.length - 1 ? '' : '…')}
-                            className={msg.id === 'welcome'
-                              ? 'mx-auto max-w-2xl text-center !text-transparent bg-gradient-to-br from-slate-200 via-white to-sky-200 bg-clip-text text-[clamp(1.35rem,2.6vw,2rem)] leading-[1.35] tracking-[0.012em]'
-                              : ''}
-                          />
-                        </div>
-
-                        {!isGenerating && msg.content.trim() && (
-                          <VisualReferences
-                            state={msg.visualReferences}
-                            reducedMotion={Boolean(prefersReducedMotion)}
-                          />
-                        )}
-
-                        {/* Divider below response */}
-                        {!isGenerating && msg.id !== 'welcome' && (
-                          <div className="w-full border-b border-white/[0.05] mt-1 mb-3" />
-                        )}
-
-                        {/* Action row — below content, never inside a card */}
-                        {showActions && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                            className="flex items-center gap-0.5 flex-wrap"
-                          >
-                            <ListenButton messageId={msg.id} text={msg.content} />
-                            <CopyButton text={msg.content} />
-                            <ShareButton text={msg.content} />
-                            <span aria-hidden="true" className="mx-1 h-3.5 w-px bg-white/[0.09] self-center flex-shrink-0" />
-                            <SaveButton onSave={() => workspace.save(msg.content)} />
-                            {isLastAsst && (
-                              <>
-                                <button
-                                  onClick={() => handleSend('Can you explain that in simpler terms?')}
-                                  disabled={isThinking}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                                    text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
-                                    transition-all duration-150 active:scale-95
-                                    disabled:opacity-40 disabled:cursor-not-allowed
-                                    focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
-                                  aria-label="Ask Singularity to explain more simply"
-                                >
-                                  <Wand2 size={11} strokeWidth={2} />
-                                  Simplify
-                                </button>
-                                <button
-                                  onClick={handleRegenerate}
-                                  disabled={isThinking}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px]
-                                    text-white/30 hover:text-white/65 hover:bg-white/[0.07] border border-transparent
-                                    transition-all duration-150 active:scale-95
-                                    disabled:opacity-40 disabled:cursor-not-allowed
-                                    focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25"
-                                  aria-label="Regenerate response"
-                                >
-                                  <RotateCcw size={11} strokeWidth={2} />
-                                  Regenerate
-                                </button>
-                              </>
-                            )}
-                          </motion.div>
-                        )}
-
-                      </>
-                      )
-                    )}
-                  </motion.div>
+                  <MessageRow
+                    key={message.id}
+                    message={message}
+                    isThinking={isThinking}
+                    isLastAssistant={isLastAssistant}
+                    isGenerating={isGenerating}
+                    showActions={showActions}
+                    prefersReducedMotion={Boolean(prefersReducedMotion)}
+                    onEdit={handleEditUserMessage}
+                    onSimplify={handleSimplify}
+                    onRegenerate={handleRegenerate}
+                    onSave={workspace.save}
+                  />
                 );
               })}
 
@@ -3200,7 +3335,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         className="flex-shrink-0 border-t border-white/[0.04] pb-safe"
         style={{ background: 'linear-gradient(to top, #09090b 70%, transparent)' }}
       >
-        <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 pt-4 pb-2 sm:pb-3">
+        <div className="mx-auto w-full max-w-3xl px-3 pb-2 pt-3 sm:px-6 sm:pb-3 sm:pt-4">
 
           {/* Hidden file input — triggered by "Upload Document" button or Replace */}
           <input
@@ -3226,7 +3361,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
           {/* ── Unified input shell: chips + textarea + send ─────────────── */}
             <div
               ref={composerShellRef}
-              className={`relative rounded-2xl bg-[#0d0d12] border transition-all duration-300 ${
+              className={`relative rounded-2xl border bg-[#0d0d12] transition-gpu ${
                 isDragOver
                   ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
                   : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
@@ -3291,8 +3426,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   onClick={() => setAttachOpen(o => !o)}
                   disabled={composerLocked}
                   className="w-8 h-8 rounded-full flex items-center justify-center
-                    text-white/35 hover:text-white/70 hover:bg-white/10
-                    transition-colors duration-150 active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+                    text-white/35 hover:text-white/85 hover:bg-white/[0.09]
+                    transition-gpu active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
+                    disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Attach file"
                   aria-expanded={attachOpen}
                   aria-haspopup="menu"
@@ -3309,9 +3445,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 6 }}
                       transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute bottom-full left-0 mb-2 w-52 z-50
-                        bg-[#18181b]/90 backdrop-blur-md
-                        border border-white/10 rounded-xl shadow-2xl
+                      className="absolute bottom-full left-0 z-50 mb-2 w-52
+                        rounded-2xl border border-white/[0.11] bg-[#171720]/[0.98] shadow-[0_16px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl
                         overflow-hidden"
                     >
                       <div className="px-1 py-1">
@@ -3319,8 +3454,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           role="menuitem"
                            onClick={showImagePicker}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                            text-white/75 hover:text-white hover:bg-white/[0.07]
-                            transition-colors duration-120 text-left"
+                            text-white/70 hover:bg-white/[0.08] hover:text-white
+                            transition-gpu text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 focus-visible:ring-inset"
                         >
                           <Image size={15} strokeWidth={1.7} className="text-violet-400/80 flex-shrink-0" />
                           <span className="text-[13px] font-medium">Upload Image</span>
@@ -3329,8 +3464,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                           role="menuitem"
                           onClick={handleDocumentUploadClick}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                            text-white/75 hover:text-white hover:bg-white/[0.07]
-                            transition-colors duration-120 text-left"
+                            text-white/70 hover:bg-white/[0.08] hover:text-white
+                            transition-gpu text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 focus-visible:ring-inset"
                           aria-label="Upload document (.txt, .md, .csv, .json, .pdf — max 5 MB)"
                         >
                           <FileText size={15} strokeWidth={1.7} className="text-sky-400/80 flex-shrink-0" />
@@ -3349,7 +3484,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onFocus={() => {
-                  window.setTimeout(() => {
+                  if (composerScrollTimerRef.current !== null) {
+                    window.clearTimeout(composerScrollTimerRef.current);
+                  }
+                  composerScrollTimerRef.current = window.setTimeout(() => {
+                    composerScrollTimerRef.current = null;
                     composerShellRef.current?.scrollIntoView({
                       behavior: 'smooth',
                       block: 'end',
@@ -3391,8 +3530,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 disabled={composerLocked || isThinking}
                 className="flex-shrink-0 mb-0.5 flex h-8 items-center gap-1.5 rounded-full border border-violet-300/[0.18]
                   bg-violet-300/[0.06] px-2.5 text-[10px] font-medium tracking-[0.04em] text-violet-100/65
-                  transition-all duration-200 hover:border-violet-200/35 hover:bg-violet-200/[0.12] hover:text-violet-100
-                  active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                  transition-gpu hover:border-violet-200/40 hover:bg-violet-200/[0.12] hover:text-violet-50
+                  active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
+                  disabled:cursor-not-allowed disabled:opacity-30"
                 aria-label="Open immersive Voice Mode"
                 data-testid="button-open-voice-mode"
               >
@@ -3403,7 +3543,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                 onClick={() => (isThinking ? handleStop() : handleSend())}
                 disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                  transition-all duration-200 mb-0.5 active:scale-90 ${
+                  transition-gpu mb-0.5 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
                   isThinking
                     ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
                     : ((input.trim() || images.length > 0) && !composerLocked && !(visionSupported === false && images.length > 0))

@@ -6,7 +6,7 @@ import { useLocation } from 'wouter';
 import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
-import SingularityChat from './components/SingularityChat';
+const SingularityChat = lazy(() => import('./components/SingularityChat'));
 // Heavy modals — code-split so they don't bloat the initial bundle
 const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
 const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
@@ -2294,7 +2294,17 @@ export default function App() {
 
   // ── /chat — dedicated Singularity Chat page ───────────────────────────────
   if (location === '/chat') {
-    return <SingularityChat onClose={() => setLocation('/')} />;
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-[100dvh] items-center justify-center bg-[#09090b] text-white/45">
+            <span className="text-[11px] uppercase tracking-[0.22em]">Loading Singularity…</span>
+          </div>
+        }
+      >
+        <SingularityChat onClose={() => setLocation('/')} />
+      </Suspense>
+    );
   }
 
   return (

@@ -42,10 +42,11 @@ function ScanLines() {
 
 // ─── Input Field ──────────────────────────────────────────────────────────────
 function Field({
-  label, type = 'text', value, onChange, placeholder, autoFocus,
+  label, type = 'text', value, onChange, placeholder, autoFocus, autoComplete,
 }: {
   label: string; type?: string; value: string;
   onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean;
+  autoComplete?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -54,6 +55,7 @@ function Field({
         type={type}
         value={value}
         autoFocus={autoFocus}
+        autoComplete={autoComplete}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full bg-white/[0.04] border border-white/[0.10] hover:border-white/[0.20] focus:border-[rgba(147,112,219,0.7)] focus:bg-white/[0.06] rounded-lg px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none transition-all duration-200 font-mono"
@@ -195,13 +197,15 @@ export default function LoginScreen() {
               className="flex flex-col gap-4"
             >
               <Field label="Email Address" type="email" value={email} onChange={setEmail}
-                placeholder="you@example.com" autoFocus />
+                placeholder="you@example.com" autoFocus
+                autoComplete={tab === 'login' ? 'username' : 'email'} />
               {tab === 'signup' && (
                 <Field label="Username" value={username} onChange={setUsername}
-                  placeholder="Commander Cosmos" />
+                  placeholder="Commander Cosmos" autoComplete="username" />
               )}
               <Field label="Password" type="password" value={password} onChange={setPassword}
-                placeholder={tab === 'signup' ? 'Min. 6 characters' : '••••••••'} />
+                placeholder={tab === 'signup' ? 'Min. 6 characters' : '••••••••'}
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'} />
             </motion.div>
           </AnimatePresence>
 

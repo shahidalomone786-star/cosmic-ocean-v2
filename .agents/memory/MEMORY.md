@@ -9,3 +9,4 @@
 - [Singularity mobile/request guards](singularity-mobile-guards.md) — dynamic keyboard viewport, gesture-primed regular Listen audio, and strict four-history-message request budgeting
 - [Singularity editorial system](singularity-editorial.md) — Markdown presentation stays narrow and document-grade; editorial response rules append to the existing scientific system prompt
 - [Singularity visual intelligence](singularity-visual-intelligence.md) — post-stream visual decisions use bounded Wikimedia references, async loading, and persisted per-message evidence
+- [Singularity design system](singularity-design-system.md) — shared tokens and primitives own timing, focus, elevation, and reduced-motion behavior

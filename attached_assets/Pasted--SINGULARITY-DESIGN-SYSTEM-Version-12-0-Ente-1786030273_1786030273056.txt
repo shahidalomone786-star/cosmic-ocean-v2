@@ -1,0 +1,298 @@
+========================================================
+SINGULARITY DESIGN SYSTEM
+Version 12.0
+Enterprise UI Polish
+Append Only
+========================================================
+
+ROLE
+
+You are a Principal Product Designer,
+Design Systems Architect,
+Senior React Engineer,
+Motion Designer,
+Accessibility Engineer,
+and Performance Engineer.
+
+The application is fully functional.
+
+DO NOT:
+
+• modify backend
+• modify AI logic
+• modify API routes
+• modify streaming
+• modify voice
+• modify chat history
+
+Improve ONLY the overall design consistency,
+micro-interactions,
+component polish,
+and visual craftsmanship.
+
+========================================================
+GOAL
+========================================================
+
+Transform the UI into a cohesive premium design system comparable to:
+
+• ChatGPT
+• Claude
+• Apple
+• Linear
+• Notion
+• Perplexity
+
+Every interaction should feel intentional.
+
+========================================================
+1. DESIGN TOKENS
+========================================================
+
+Create centralized design tokens.
+
+Standardize:
+
+• spacing
+• radius
+• typography
+• shadows
+• opacity
+• transitions
+• border colors
+
+Avoid duplicated values.
+
+========================================================
+2. BUTTON SYSTEM
+========================================================
+
+Standardize every button.
+
+Consistent:
+
+• height
+• padding
+• hover
+• active
+• disabled
+• loading
+
+All animations:
+
+150–220ms
+
+========================================================
+3. INPUT SYSTEM
+========================================================
+
+Polish every input.
+
+Better:
+
+focus ring
+
+placeholder
+
+selection color
+
+cursor animation
+
+typing smoothness
+
+========================================================
+4. MICRO INTERACTIONS
+========================================================
+
+Add subtle animations.
+
+Examples:
+
+Hover
+
+Press
+
+Success
+
+Loading
+
+Selection
+
+Message send
+
+Attachment
+
+Voice
+
+Never flashy.
+
+========================================================
+5. LOADING EXPERIENCE
+========================================================
+
+Replace spinners where appropriate.
+
+Use elegant skeletons.
+
+Smooth shimmer.
+
+No jumping layouts.
+
+========================================================
+6. MESSAGE APPEARANCE
+========================================================
+
+Messages should fade and slide slightly.
+
+Streaming message should animate naturally.
+
+Avoid sudden rendering.
+
+========================================================
+7. SIDEBAR POLISH
+========================================================
+
+Improve:
+
+hover
+
+selection
+
+collapse animation
+
+scrollbars
+
+spacing
+
+========================================================
+8. SCROLL EXPERIENCE
+========================================================
+
+Smooth scrolling.
+
+Thin elegant scrollbar.
+
+Better momentum.
+
+========================================================
+9. MODAL SYSTEM
+========================================================
+
+Standardize every modal.
+
+Backdrop blur.
+
+Consistent spacing.
+
+Escape closes modal.
+
+Focus trapping.
+
+========================================================
+10. EMPTY STATES
+========================================================
+
+Every empty state should feel premium.
+
+Minimal.
+
+Helpful.
+
+Elegant.
+
+========================================================
+11. TRANSITIONS
+========================================================
+
+Use one unified animation system.
+
+Durations:
+
+120ms
+
+180ms
+
+240ms
+
+300ms
+
+No inconsistent timing.
+
+========================================================
+12. FEEDBACK
+========================================================
+
+Better success.
+
+Better errors.
+
+Better warnings.
+
+Better toast design.
+
+Never intrusive.
+
+========================================================
+13. ACCESSIBILITY
+========================================================
+
+Improve:
+
+keyboard navigation
+
+focus visibility
+
+contrast
+
+ARIA labels
+
+========================================================
+14. RESPONSIVENESS
+========================================================
+
+Perfect on:
+
+320px
+
+375px
+
+390px
+
+768px
+
+1024px
+
+1440px
+
+No overflow.
+
+========================================================
+15. CODE QUALITY
+========================================================
+
+Reusable components.
+
+No duplicated styling.
+
+Maintainability first.
+
+========================================================
+SUCCESS CRITERIA
+========================================================
+
+Every interaction should feel:
+
+• Smooth
+• Calm
+• Premium
+• Professional
+• Intentional
+• Enterprise-grade
+
+Maintain:
+
+• Zero TypeScript errors
+• Zero ESLint warnings
+• Zero regressions
+• Production-ready implementation
+========================================================

@@ -162,10 +162,10 @@ function SessionRow({
   };
 
   return (
-    <div className={`group relative flex w-full items-start rounded-xl transition-all duration-200
+    <div className={`group relative flex w-full items-start rounded-xl transition-gpu
       ${active
-        ? 'bg-violet-400/[0.12] text-white shadow-[inset_0_1px_0_rgba(196,181,253,0.08)]'
-        : 'text-white/55 hover:bg-white/[0.055] hover:text-white/85'}
+        ? 'border border-violet-300/[0.16] bg-violet-300/[0.10] text-white shadow-[inset_0_1px_0_rgba(196,181,253,0.10),0_6px_18px_rgba(0,0,0,0.16)]'
+        : 'border border-transparent text-white/55 hover:bg-white/[0.055] hover:text-white/90'}
       ${collapsed ? 'justify-center' : ''}
       ${deleting ? 'pointer-events-none translate-x-1 scale-[0.98] opacity-0' : ''}`}>
       <button
@@ -173,11 +173,11 @@ function SessionRow({
         onClick={onSelect}
         title={collapsed ? session.title : undefined}
         className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50
+          transition-gpu focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55 focus-visible:ring-inset
           ${collapsed ? 'justify-center px-0' : ''}`}
       >
         <span className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg
-          ${active ? 'bg-violet-400/20 text-violet-200' : 'bg-white/[0.055] text-white/30 group-hover:text-white/60'}`}>
+          ${active ? 'bg-violet-300/20 text-violet-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]' : 'bg-white/[0.055] text-white/30 group-hover:bg-white/[0.08] group-hover:text-white/70'}`}>
           {session.favorite ? <Star size={13} fill="currentColor" strokeWidth={1.8} /> : <MessageCircle size={13} strokeWidth={1.8} />}
         </span>
         {!collapsed && (
@@ -195,7 +195,7 @@ function SessionRow({
                   }}
                   onBlur={commitRename}
                   maxLength={80}
-                  className="min-w-0 flex-1 rounded border border-violet-300/30 bg-black/30 px-1.5 py-0.5 text-[12px] text-white outline-none"
+                   className="min-w-0 flex-1 rounded-md border border-violet-300/35 bg-black/30 px-1.5 py-0.5 text-[12px] text-white outline-none focus-visible:ring-2 focus-visible:ring-violet-300/45"
                   aria-label={`Rename ${session.title}`}
                 />
               ) : (
@@ -206,12 +206,12 @@ function SessionRow({
                   <span className="truncate">{highlightMatches(session.title, query)}</span>
                 </span>
               )}
-              <span className={`flex-shrink-0 text-[9px] ${active ? 'text-violet-200/60' : 'text-white/25'}`}>
+              <span className={`flex-shrink-0 text-[9px] ${active ? 'text-violet-100/65' : 'text-white/30'}`}>
                 {formatUpdatedAt(session.updatedAt)}
               </span>
             </span>
             {preview && (
-              <span className="mt-1 block truncate text-[10px] text-white/28">
+              <span className="mt-1 block truncate text-[10px] text-white/32">
                 {highlightMatches(preview, query)}
               </span>
             )}
@@ -223,7 +223,7 @@ function SessionRow({
         <button
           type="button"
           onClick={event => { event.stopPropagation(); setMenuOpen(value => !value); }}
-           className="mr-1 mt-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white/25 opacity-100 transition group-hover:bg-white/[0.08] hover:bg-white/[0.10] hover:text-white/80 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+            className="mr-1 mt-2 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-white/25 opacity-100 transition-gpu group-hover:bg-white/[0.08] hover:bg-white/[0.12] hover:text-white/90 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"
           aria-label={`Actions for ${session.title}`}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
@@ -235,21 +235,21 @@ function SessionRow({
       {menuOpen && !collapsed && (
         <div
           role="menu"
-          className="absolute right-1 top-9 z-30 w-44 rounded-xl border border-white/[0.10] bg-[#18181f]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl"
+          className="absolute right-1 top-9 z-30 w-44 rounded-2xl border border-white/[0.11] bg-[#171720]/[0.98] p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl"
           onClick={event => event.stopPropagation()}
         >
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setEditing(true); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Edit3 size={12} />Rename</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onTogglePin(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><PinIcon active={Boolean(session.pinned)} />{session.pinned ? 'Unpin' : 'Pin'}</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleFavorite(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Star size={12} fill={session.favorite ? 'currentColor' : 'none'} />{session.favorite ? 'Remove favorite' : 'Favorite'}</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleArchive(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50">{session.archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}{session.archived ? 'Restore' : 'Archive'}</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDuplicate(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Copy size={12} />Duplicate</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setEditing(true); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Edit3 size={12} />Rename</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onTogglePin(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><PinIcon active={Boolean(session.pinned)} />{session.pinned ? 'Unpin' : 'Pin'}</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleFavorite(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Star size={12} fill={session.favorite ? 'currentColor' : 'none'} />{session.favorite ? 'Remove favorite' : 'Favorite'}</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleArchive(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55">{session.archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}{session.archived ? 'Restore' : 'Archive'}</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDuplicate(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Copy size={12} />Duplicate</button>
           <div className="px-2.5 pb-1 pt-1 text-[9px] uppercase tracking-[0.14em] text-white/25">Export as</div>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('markdown'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Markdown</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('txt'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Plain text</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('json'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />JSON</button>
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('pdf'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />PDF</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('markdown'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Download size={12} />Markdown</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('txt'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Download size={12} />Plain text</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('json'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Download size={12} />JSON</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport('pdf'); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-white/65 transition-gpu hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"><Download size={12} />PDF</button>
           <div className="my-1 border-t border-white/[0.07]" />
-          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-red-300/80 transition hover:bg-red-400/[0.10] hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/50"><Trash2 size={12} />Delete</button>
+           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-red-300/80 transition-gpu hover:bg-red-400/[0.10] hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/50"><Trash2 size={12} />Delete</button>
         </div>
       )}
     </div>
@@ -450,10 +450,10 @@ function SidebarContents({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-3 pb-3 pt-4`}>
+      <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-3 pb-4 pt-4`}>
         {!collapsed && (
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-300/20 bg-violet-300/[0.10] text-violet-200 shadow-[0_0_18px_rgba(167,139,250,0.12)]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-200/20 bg-violet-200/[0.09] text-violet-100 shadow-[0_8px_20px_rgba(88,28,135,0.16)]">
               <span className="text-sm">✦</span>
             </div>
             <div className="min-w-0">
@@ -466,7 +466,7 @@ function SidebarContents({
           <button
             type="button"
             onClick={onCollapse}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition hover:bg-white/[0.06] hover:text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-gpu hover:bg-white/[0.07] hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
@@ -476,7 +476,7 @@ function SidebarContents({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition-gpu hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"
             aria-label="Close chat history"
           >
             <X size={16} />
@@ -489,10 +489,10 @@ function SidebarContents({
           type="button"
           onClick={onNewChat}
           disabled={disabled}
-          className={`flex items-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/[0.11]
-            text-[11px] font-medium text-violet-100 shadow-[0_8px_24px_rgba(76,29,149,0.15)]
-            transition hover:border-violet-200/35 hover:bg-violet-300/[0.17] active:scale-[0.98]
-            disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60
+          className={`flex items-center gap-2 rounded-xl border border-violet-200/20 bg-violet-200/[0.10]
+            text-[11px] font-medium text-violet-50 shadow-[0_8px_24px_rgba(76,29,149,0.14)]
+            transition-gpu hover:border-violet-200/40 hover:bg-violet-200/[0.16] active:scale-[0.98]
+            disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/60
             ${collapsed ? 'h-10 w-10 justify-center px-0' : 'w-full justify-center px-3 py-2.5'}`}
           aria-label="Start a new chat"
         >
@@ -506,13 +506,13 @@ function SidebarContents({
           <button
             type="button"
             onClick={() => onCollapse?.()}
-            className="flex h-9 w-10 items-center justify-center rounded-lg text-white/35 transition hover:bg-white/[0.06] hover:text-white/75"
+            className="flex h-9 w-10 items-center justify-center rounded-lg text-white/35 transition-gpu hover:bg-white/[0.07] hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"
             aria-label="Search chat history"
           >
             <Search size={14} />
           </button>
         ) : (
-          <label className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/15 px-3 py-2 text-white/35 focus-within:border-violet-300/30 focus-within:text-white/65">
+          <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-white/35 transition-colors focus-within:border-violet-300/35 focus-within:bg-white/[0.025] focus-within:text-white/70">
             <Search size={13} className="flex-shrink-0" />
             <input
               ref={searchRef}
@@ -529,7 +529,7 @@ function SidebarContents({
 
       <div
         ref={historyScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-5 scrollbar-hide"
+        className="min-h-0 flex-1 overflow-y-auto px-2 pb-5 pt-4 scrollbar-hide"
         onScroll={event => {
           const element = event.currentTarget;
           setVirtualStart(Math.max(0, Math.floor(element.scrollTop / rowHeight)));
@@ -558,7 +558,7 @@ function SidebarContents({
           <div style={{ height: virtualRows.length * rowHeight, position: 'relative' }}>
             <div style={{ transform: `translateY(${virtualStartWithOverscan * rowHeight}px)` }}>
               {renderedRows.map(row => row.kind === 'header' ? (
-                <div key={row.key} className="flex h-[58px] items-end px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/25">
+                <div key={row.key} className="flex h-[58px] items-end px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/30">
                   {!collapsed && row.label}
                 </div>
               ) : (
@@ -580,7 +580,7 @@ function SidebarContents({
       )}
 
       {!collapsed && (
-        <div className="border-t border-white/[0.06] px-4 py-3">
+        <div className="border-t border-white/[0.07] bg-black/[0.08] px-4 py-3.5">
           <p className="text-[9px] uppercase tracking-[0.16em] text-white/20">Local history</p>
           <p className="mt-1 text-[10px] leading-relaxed text-white/25">
             {isOffline ? 'Offline cache active. Changes will sync when you reconnect.' : 'Saved securely in this browser.'}
@@ -779,7 +779,7 @@ export function SingularitySidebar({
   return (
     <>
       <aside
-        className="relative hidden h-full flex-shrink-0 border-r border-white/[0.07] bg-[#0b0b10]/85 backdrop-blur-2xl md:block"
+        className="relative hidden h-full flex-shrink-0 border-r border-white/[0.08] bg-[#0b0b10]/88 shadow-[8px_0_32px_rgba(0,0,0,0.14)] backdrop-blur-2xl md:block"
         style={{ width: collapsed ? 68 : width }}
         aria-label="Singularity chat history"
       >
@@ -794,7 +794,7 @@ export function SingularitySidebar({
             aria-label="Resize chat history sidebar"
             aria-orientation="vertical"
             onPointerDown={startResize}
-            className="absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize transition hover:bg-violet-300/20"
+            className="absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize transition-colors hover:bg-violet-300/20"
           />
         )}
       </aside>
@@ -803,11 +803,11 @@ export function SingularitySidebar({
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Chat history">
           <button
             type="button"
-            className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 cursor-default bg-black/65 backdrop-blur-sm"
             onClick={() => onMobileOpenChange(false)}
             aria-label="Close chat history"
           />
-          <aside className="relative z-10 h-full w-[min(88vw,340px)] border-r border-white/[0.09] bg-[#0b0b10]/95 shadow-[20px_0_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+          <aside className="relative z-10 h-full w-[min(90vw,340px)] border-r border-white/[0.10] bg-[#0b0b10]/[0.98] shadow-[20px_0_60px_rgba(0,0,0,0.48)] backdrop-blur-2xl">
             <SidebarContents
               {...contentsProps}
               collapsed={false}
@@ -825,7 +825,7 @@ export function MobileHistoryButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-white/35 transition hover:bg-white/[0.06] hover:text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50 md:hidden"
+      className="flex h-9 w-9 items-center justify-center rounded-xl text-white/38 transition-gpu hover:bg-white/[0.07] hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55 md:hidden"
       aria-label="Open chat history"
     >
       <Menu size={16} />
@@ -838,7 +838,7 @@ export function DesktopSidebarPeek({ collapsed, onClick }: { collapsed: boolean;
     <button
       type="button"
       onClick={onClick}
-      className="hidden h-8 w-8 items-center justify-center rounded-lg text-white/30 transition hover:bg-white/[0.06] hover:text-white/75 md:flex"
+      className="hidden h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-gpu hover:bg-white/[0.07] hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55 md:flex"
       aria-label="Expand chat history sidebar"
     >
       <ChevronRight size={15} />
