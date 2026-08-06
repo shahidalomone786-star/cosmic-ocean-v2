@@ -6,6 +6,10 @@ export interface VisualReference {
   sourceUrl: string;
   source: string;
   alt: string;
+  confidence?: number;
+  sourceTier?: 1 | 2 | 3;
+  width?: number;
+  height?: number;
 }
 
 export interface VisualReferencesState {
@@ -14,4 +18,5 @@ export interface VisualReferencesState {
   message?: string;
   query?: string;
   category?: string;
+  confidence?: number;
 }

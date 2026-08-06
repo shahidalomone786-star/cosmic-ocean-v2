@@ -258,21 +258,6 @@ const VisualReferences = memo(function VisualReferences({
   }
 
   const visibleReferences = (state.references ?? []).filter(reference => !failedIds.has(reference.id));
-  const unavailable = state.status === 'unavailable' || (state.references.length > 0 && visibleReferences.length === 0);
-
-  if (unavailable) {
-    return (
-      <section
-        className="mx-auto mt-8 w-full max-w-[70ch] border-t border-white/[0.07] pt-5"
-        aria-label="Visual references unavailable"
-        data-testid="visual-references-unavailable"
-      >
-        <p className="text-[12px] leading-relaxed text-white/40">
-          Visual references are currently unavailable.
-        </p>
-      </section>
-    );
-  }
 
   if (visibleReferences.length === 0) return null;
 
@@ -317,16 +302,18 @@ const VisualReferences = memo(function VisualReferences({
               aria-label={`Open source for ${reference.title}`}
             >
               <div className="relative aspect-[16/10] overflow-hidden bg-white/[0.04]">
-                <img
-                  src={reference.imageUrl}
-                  alt={reference.alt}
-                  loading="lazy"
-                  decoding="async"
-                  className={`h-full w-full object-cover transition duration-500 ${
-                    reducedMotion ? '' : 'group-hover:scale-[1.025]'
-                  }`}
-                  onError={() => setFailedIds(previous => new Set(previous).add(reference.id))}
-                />
+                {!failedIds.has(reference.id) && (
+                  <img
+                    src={reference.imageUrl}
+                    alt={reference.alt}
+                    loading="lazy"
+                    decoding="async"
+                    className={`h-full w-full object-cover transition duration-500 ${
+                      reducedMotion ? '' : 'group-hover:scale-[1.025]'
+                    }`}
+                    onError={() => setFailedIds(previous => new Set(previous).add(reference.id))}
+                  />
+                )}
                 <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white/65 backdrop-blur-sm">
                   {reference.source}
                 </span>
@@ -1754,22 +1741,17 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       const payload = await response.json().catch(() => null) as {
         enabled?: boolean;
         references?: VisualReferencesState['references'];
-        unavailable?: boolean;
-        message?: string;
         query?: string;
         category?: string;
+        confidence?: number;
       } | null;
 
-      if (!response.ok || payload?.unavailable) {
+      if (!response.ok) {
         setMessages(previous => previous.map(message =>
           message.id === messageId
             ? {
                 ...message,
-                visualReferences: {
-                  status: 'unavailable',
-                  references: [],
-                  message: payload?.message ?? 'Visual references are currently unavailable.',
-                },
+                visualReferences: undefined,
               }
             : message
         ));
@@ -1786,6 +1768,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                     references: payload.references ?? [],
                     query: payload.query,
                     category: payload.category,
+                    confidence: payload.confidence,
                   }
                 : undefined,
             }
@@ -1796,11 +1779,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         message.id === messageId
           ? {
               ...message,
-              visualReferences: {
-                status: 'unavailable',
-                references: [],
-                message: 'Visual references are currently unavailable.',
-              },
+              visualReferences: undefined,
             }
           : message
       ));
