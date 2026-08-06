@@ -31,6 +31,7 @@ import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
   createChatSession,
   deriveChatTitle,
+  deriveSmartChatTitle,
   loadChatSessions,
   saveChatSessions,
   type ChatSession,
@@ -655,6 +656,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [visionSupported, setVisionSupported] = useState<boolean | null>(null);
   const [replaceImageIndex, setReplaceImageIndex] = useState<number | null>(null);
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [deletedSession, setDeletedSession] = useState<ChatSession | null>(null);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -702,7 +705,9 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       if (!existing) return previous;
       const updated: ChatSession = {
         ...existing,
-        title: deriveChatTitle(messages),
+          title: existing.manualTitle
+          ? existing.title
+            : (!isStreaming ? (deriveSmartChatTitle(messages) ?? deriveChatTitle(messages)) : existing.title),
         messages,
         updatedAt: messages.length > 1 ? Date.now() : existing.updatedAt,
       };
@@ -711,11 +716,20 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       saveChatSessions(next);
       return next;
     });
-  }, [activeSessionId, messages]);
+  }, [activeSessionId, isStreaming, messages]);
 
   useEffect(() => {
     saveChatSessions(sessions);
   }, [sessions]);
+
+  useEffect(() => {
+    if (!historyNotice) return;
+    const timer = window.setTimeout(() => {
+      setHistoryNotice(null);
+      setDeletedSession(null);
+    }, 6500);
+    return () => window.clearTimeout(timer);
+  }, [historyNotice]);
 
   const handleNewChat = useCallback(() => {
     if (isThinking) return;
@@ -745,6 +759,136 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     stickToBottomRef.current = true;
     window.setTimeout(() => textareaRef.current?.focus(), 40);
   }, [activeSessionId, clearDocument, clearImages, isThinking, sessions]);
+
+  const handleRenameSession = useCallback((sessionId: string, title: string) => {
+    setSessions(previous => previous.map(session =>
+      session.id === sessionId
+        ? { ...session, title, manualTitle: true, updatedAt: Date.now() }
+        : session
+    ));
+  }, []);
+
+  const handleTogglePin = useCallback((sessionId: string) => {
+    setSessions(previous => {
+      const target = previous.find(session => session.id === sessionId);
+      if (!target) return previous;
+      if (!target.pinned && previous.filter(session => session.pinned).length >= 10) {
+        setHistoryNotice('You can pin up to 10 chats.');
+        return previous;
+      }
+      return previous.map(session =>
+        session.id === sessionId
+          ? { ...session, pinned: !session.pinned, updatedAt: Date.now() }
+          : session
+      );
+    });
+  }, []);
+
+  const handleToggleFavorite = useCallback((sessionId: string) => {
+    setSessions(previous => previous.map(session =>
+      session.id === sessionId
+        ? { ...session, favorite: !session.favorite, updatedAt: Date.now() }
+        : session
+    ));
+  }, []);
+
+  const handleToggleArchive = useCallback((sessionId: string) => {
+    const target = sessions.find(session => session.id === sessionId);
+    if (!target) return;
+    const nextArchived = !target.archived;
+    setSessions(previous => previous.map(session =>
+      session.id === sessionId
+        ? { ...session, archived: nextArchived, updatedAt: Date.now() }
+        : session
+    ));
+    if (nextArchived && sessionId === activeSessionId) {
+      const nextSession = sessions.find(session => session.id !== sessionId && !session.archived);
+      if (nextSession) {
+        setActiveSessionId(nextSession.id);
+        setMessages(nextSession.messages);
+      }
+    }
+    setHistoryNotice(nextArchived ? 'Chat archived.' : 'Chat restored.');
+  }, [activeSessionId, sessions]);
+
+  const handleDuplicateSession = useCallback((sessionId: string) => {
+    const source = sessions.find(session => session.id === sessionId);
+    if (!source) return;
+    const now = Date.now();
+    const duplicate: ChatSession = {
+      ...source,
+      id: `chat-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      title: `${source.title} copy`,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      favorite: false,
+      archived: false,
+      manualTitle: true,
+      messages: source.messages.map(message => ({ ...message, id: `${message.id}-${now}` })),
+    };
+    setSessions(previous => [duplicate, ...previous]);
+    setActiveSessionId(duplicate.id);
+    setMessages(duplicate.messages);
+    setHistoryNotice('Chat duplicated.');
+  }, [sessions]);
+
+  const handleExportSession = useCallback((sessionId: string) => {
+    const session = sessions.find(item => item.id === sessionId);
+    if (!session) return;
+    const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${session.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'singularity-chat'}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setHistoryNotice('Chat exported.');
+  }, [sessions]);
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    const target = sessions.find(session => session.id === sessionId);
+    if (!target) return;
+    setDeletedSession(target);
+    setSessions(previous => previous.filter(session => session.id !== sessionId));
+    setHistoryNotice(`“${target.title}” deleted.`);
+
+    if (sessionId === activeSessionId) {
+      const nextSession = sessions.find(session => session.id !== sessionId && !session.archived);
+      if (nextSession) {
+        setActiveSessionId(nextSession.id);
+        setMessages(nextSession.messages);
+      } else {
+        const fresh = createChatSession(INITIAL_MESSAGE);
+        setSessions(previous => [fresh, ...previous]);
+        setActiveSessionId(fresh.id);
+        setMessages(fresh.messages);
+      }
+    }
+  }, [activeSessionId, sessions]);
+
+  const handleUndoDelete = useCallback(() => {
+    if (!deletedSession) return;
+    setSessions(previous => [deletedSession, ...previous.filter(session => session.id !== deletedSession.id)]);
+    setActiveSessionId(deletedSession.id);
+    setMessages(deletedSession.messages);
+    setDeletedSession(null);
+    setHistoryNotice('Chat restored.');
+  }, [deletedSession]);
+
+  // History shortcuts are global so they also work while the mobile drawer is closed.
+  useEffect(() => {
+    const onHistoryShortcut = (event: globalThis.KeyboardEvent) => {
+      const modifier = event.metaKey || event.ctrlKey;
+      if (modifier && event.shiftKey && event.key.toLowerCase() === 'o') {
+        event.preventDefault();
+        handleNewChat();
+        return;
+      }
+    };
+    window.addEventListener('keydown', onHistoryShortcut);
+    return () => window.removeEventListener('keydown', onHistoryShortcut);
+  }, [handleNewChat, mobileHistoryOpen]);
 
   // Autofocus on open
   useEffect(() => { textareaRef.current?.focus(); }, []);
@@ -854,10 +998,17 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   // Escape to close
   useEffect(() => {
     if (!onClose) return;
-    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (mobileHistoryOpen) {
+        setMobileHistoryOpen(false);
+        return;
+      }
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [mobileHistoryOpen, onClose]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -1151,6 +1302,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         onMobileOpenChange={setMobileHistoryOpen}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
+        onRenameSession={handleRenameSession}
+        onDeleteSession={handleDeleteSession}
+        onTogglePin={handleTogglePin}
+        onToggleFavorite={handleToggleFavorite}
+        onToggleArchive={handleToggleArchive}
+        onDuplicateSession={handleDuplicateSession}
+        onExportSession={handleExportSession}
+        onUndoDelete={handleUndoDelete}
+        undoTitle={deletedSession?.title ?? null}
+        historyNotice={historyNotice}
         disabled={isThinking}
       />
 

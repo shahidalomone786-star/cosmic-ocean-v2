@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  Archive,
+  ArchiveRestore,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Clock3,
+  Download,
+  Edit3,
+  Ellipsis,
   Menu,
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
+  Star,
+  Trash2,
+  Undo2,
   X,
 } from 'lucide-react';
 import {
@@ -26,6 +35,16 @@ interface SingularitySidebarProps {
   onMobileOpenChange: (open: boolean) => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
+  onRenameSession: (sessionId: string, title: string) => void;
+  onDeleteSession: (sessionId: string) => void;
+  onTogglePin: (sessionId: string) => void;
+  onToggleFavorite: (sessionId: string) => void;
+  onToggleArchive: (sessionId: string) => void;
+  onDuplicateSession: (sessionId: string) => void;
+  onExportSession: (sessionId: string) => void;
+  onUndoDelete: () => void;
+  undoTitle?: string | null;
+  historyNotice?: string | null;
   disabled?: boolean;
 }
 
@@ -82,49 +101,146 @@ function SessionRow({
   collapsed,
   query,
   onSelect,
+  onRename,
+  onDelete,
+  onTogglePin,
+  onToggleFavorite,
+  onToggleArchive,
+  onDuplicate,
+  onExport,
 }: {
   session: ChatSession;
   active: boolean;
   collapsed: boolean;
   query: string;
   onSelect: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+  onTogglePin: () => void;
+  onToggleFavorite: () => void;
+  onToggleArchive: () => void;
+  onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const preview = getChatPreview(session);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(session.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [menuOpen]);
+
+  const commitRename = () => {
+    const nextTitle = draftTitle.replace(/\s+/g, ' ').trim();
+    if (nextTitle) onRename(nextTitle);
+    setEditing(false);
+  };
+
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      title={collapsed ? session.title : undefined}
-      className={`group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left
-        transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50
-        ${collapsed ? 'justify-center px-0' : ''}
-        ${active
-          ? 'bg-violet-400/[0.12] text-white shadow-[inset_0_1px_0_rgba(196,181,253,0.08)]'
-          : 'text-white/55 hover:bg-white/[0.055] hover:text-white/85'}`}
-    >
-      <span className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg
-        ${active ? 'bg-violet-400/20 text-violet-200' : 'bg-white/[0.055] text-white/30 group-hover:text-white/60'}`}>
-        <MessageCircle size={13} strokeWidth={1.8} />
-      </span>
-      {!collapsed && (
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-[12px] font-medium">
-              {highlightMatches(session.title, query)}
-            </span>
-            <span className={`flex-shrink-0 text-[9px] ${active ? 'text-violet-200/60' : 'text-white/25'}`}>
-              {formatUpdatedAt(session.updatedAt)}
-            </span>
-          </span>
-          {preview && (
-            <span className="mt-1 block truncate text-[10px] text-white/28">
-              {highlightMatches(preview, query)}
-            </span>
-          )}
+    <div className={`group relative flex w-full items-start rounded-xl transition-all duration-150
+      ${active
+        ? 'bg-violet-400/[0.12] text-white shadow-[inset_0_1px_0_rgba(196,181,253,0.08)]'
+        : 'text-white/55 hover:bg-white/[0.055] hover:text-white/85'}
+      ${collapsed ? 'justify-center' : ''}`}>
+      <button
+        type="button"
+        onClick={onSelect}
+        title={collapsed ? session.title : undefined}
+        className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50
+          ${collapsed ? 'justify-center px-0' : ''}`}
+      >
+        <span className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg
+          ${active ? 'bg-violet-400/20 text-violet-200' : 'bg-white/[0.055] text-white/30 group-hover:text-white/60'}`}>
+          {session.favorite ? <Star size={13} fill="currentColor" strokeWidth={1.8} /> : <MessageCircle size={13} strokeWidth={1.8} />}
         </span>
+        {!collapsed && (
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center justify-between gap-2">
+              {editing ? (
+                <input
+                  ref={titleInputRef}
+                  value={draftTitle}
+                  onChange={event => setDraftTitle(event.target.value)}
+                  onClick={event => event.stopPropagation()}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') { event.preventDefault(); commitRename(); }
+                    if (event.key === 'Escape') { event.preventDefault(); setEditing(false); }
+                  }}
+                  onBlur={commitRename}
+                  maxLength={80}
+                  className="min-w-0 flex-1 rounded border border-violet-300/30 bg-black/30 px-1.5 py-0.5 text-[12px] text-white outline-none"
+                  aria-label={`Rename ${session.title}`}
+                />
+              ) : (
+                <span className="truncate text-[12px] font-medium">
+                  {highlightMatches(session.title, query)}
+                </span>
+              )}
+              <span className={`flex-shrink-0 text-[9px] ${active ? 'text-violet-200/60' : 'text-white/25'}`}>
+                {formatUpdatedAt(session.updatedAt)}
+              </span>
+            </span>
+            {preview && (
+              <span className="mt-1 block truncate text-[10px] text-white/28">
+                {highlightMatches(preview, query)}
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+
+      {!collapsed && (
+        <button
+          type="button"
+          onClick={event => { event.stopPropagation(); setMenuOpen(value => !value); }}
+          className="mr-1 mt-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white/20 opacity-0 transition group-hover:opacity-100 hover:bg-white/[0.10] hover:text-white/80 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+          aria-label={`Actions for ${session.title}`}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+        >
+          <Ellipsis size={14} />
+        </button>
       )}
-    </button>
+
+      {menuOpen && !collapsed && (
+        <div
+          role="menu"
+          className="absolute right-1 top-9 z-30 w-44 rounded-xl border border-white/[0.10] bg-[#18181f]/[0.98] p-1.5 shadow-2xl backdrop-blur-xl"
+          onClick={event => event.stopPropagation()}
+        >
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setEditing(true); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Edit3 size={12} />Rename</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onTogglePin(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><PinIcon active={Boolean(session.pinned)} />{session.pinned ? 'Unpin' : 'Pin'}</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleFavorite(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Star size={12} fill={session.favorite ? 'currentColor' : 'none'} />{session.favorite ? 'Remove favorite' : 'Favorite'}</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onToggleArchive(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50">{session.archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}{session.archived ? 'Restore' : 'Archive'}</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDuplicate(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Copy size={12} />Duplicate</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onExport(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/65 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"><Download size={12} />Export</button>
+          <div className="my-1 border-t border-white/[0.07]" />
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-red-300/80 transition hover:bg-red-400/[0.10] hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/50"><Trash2 size={12} />Delete</button>
+        </div>
+      )}
+    </div>
   );
+}
+
+function PinIcon({ active }: { active: boolean }) {
+  return <span className={`text-[12px] leading-none ${active ? 'text-violet-200' : 'text-white/65'}`}>⌖</span>;
 }
 
 function SidebarContents({
@@ -135,6 +251,17 @@ function SidebarContents({
   setQuery,
   onNewChat,
   onSelectSession,
+  onRenameSession,
+  onDeleteSession,
+  onTogglePin,
+  onToggleFavorite,
+  onToggleArchive,
+  onDuplicateSession,
+  onExportSession,
+  onUndoDelete,
+  undoTitle,
+  historyNotice,
+  focusSearchRequest,
   onCollapse,
   onCloseMobile,
   disabled,
@@ -146,11 +273,24 @@ function SidebarContents({
   setQuery: (value: string) => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
+  onRenameSession: (sessionId: string, title: string) => void;
+  onDeleteSession: (sessionId: string) => void;
+  onTogglePin: (sessionId: string) => void;
+  onToggleFavorite: (sessionId: string) => void;
+  onToggleArchive: (sessionId: string) => void;
+  onDuplicateSession: (sessionId: string) => void;
+  onExportSession: (sessionId: string) => void;
+  onUndoDelete: () => void;
+  undoTitle?: string | null;
+  historyNotice?: string | null;
+  focusSearchRequest: number;
   onCollapse?: () => void;
   onCloseMobile?: () => void;
   disabled?: boolean;
 }) {
   const [ready, setReady] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSession | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(frame);
@@ -164,16 +304,49 @@ function SidebarContents({
     );
   }, [query, sessions]);
 
+  useEffect(() => {
+    if (!focusSearchRequest) return;
+    if (collapsed) onCollapse?.();
+    window.setTimeout(() => searchRef.current?.focus(), 40);
+  }, [collapsed, focusSearchRequest, onCollapse]);
+
+  const visibleSessions = filteredSessions.filter(session => !session.archived);
+  const archivedSessions = filteredSessions.filter(session => session.archived);
+  const pinned = visibleSessions.filter(session => session.pinned);
+  const favorites = visibleSessions.filter(session => session.favorite && !session.pinned);
+  const regularSessions = visibleSessions.filter(session => !session.favorite && !session.pinned);
+
   const grouped = useMemo(() => {
     const result = new Map<TimeGroup, ChatSession[]>();
-    filteredSessions.forEach(session => {
+    regularSessions.forEach(session => {
       const group = getTimeGroup(session.updatedAt);
       result.set(group, [...(result.get(group) ?? []), session]);
     });
     return GROUP_ORDER
       .filter(group => result.has(group))
       .map(group => ({ group, sessions: result.get(group) ?? [] }));
-  }, [filteredSessions]);
+  }, [regularSessions]);
+
+  const renderRow = (session: ChatSession) => (
+    <SessionRow
+      key={session.id}
+      session={session}
+      active={session.id === activeSessionId}
+      collapsed={collapsed}
+      query={query}
+      onSelect={() => {
+        onSelectSession(session.id);
+        onCloseMobile?.();
+      }}
+      onRename={title => onRenameSession(session.id, title)}
+      onDelete={() => setDeleteTarget(session)}
+      onTogglePin={() => onTogglePin(session.id)}
+      onToggleFavorite={() => onToggleFavorite(session.id)}
+      onToggleArchive={() => onToggleArchive(session.id)}
+      onDuplicate={() => onDuplicateSession(session.id)}
+      onExport={() => onExportSession(session.id)}
+    />
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -242,6 +415,7 @@ function SidebarContents({
           <label className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/15 px-3 py-2 text-white/35 focus-within:border-violet-300/30 focus-within:text-white/65">
             <Search size={13} className="flex-shrink-0" />
             <input
+              ref={searchRef}
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search chats"
@@ -263,7 +437,7 @@ function SidebarContents({
               </div>
             ))}
           </div>
-        ) : grouped.length === 0 ? (
+        ) : favorites.length === 0 && pinned.length === 0 && grouped.length === 0 && archivedSessions.length === 0 ? (
           <div className={`${collapsed ? 'px-1' : 'px-3'} py-10 text-center`}>
             <Clock3 size={18} className="mx-auto mb-3 text-white/15" />
             {!collapsed && (
@@ -273,7 +447,20 @@ function SidebarContents({
             )}
           </div>
         ) : (
-          grouped.map(({ group, sessions: groupSessions }) => (
+          <>
+            {pinned.length > 0 && (
+              <section className="mb-5">
+                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-violet-200/45"><PinIcon active />Pinned</h3>}
+                <div className="space-y-0.5">{pinned.map(renderRow)}</div>
+              </section>
+            )}
+            {favorites.length > 0 && (
+              <section className="mb-5">
+                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-200/45"><Star size={10} fill="currentColor" />Favorites</h3>}
+                <div className="space-y-0.5">{favorites.map(renderRow)}</div>
+              </section>
+            )}
+            {grouped.map(({ group, sessions: groupSessions }) => (
             <section key={group} className="mb-5">
               {!collapsed && (
                 <h3 className="mb-1 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/20">
@@ -281,29 +468,52 @@ function SidebarContents({
                 </h3>
               )}
               <div className="space-y-0.5">
-                {groupSessions.map(session => (
-                  <SessionRow
-                    key={session.id}
-                    session={session}
-                    active={session.id === activeSessionId}
-                    collapsed={collapsed}
-                    query={query}
-                    onSelect={() => {
-                      onSelectSession(session.id);
-                      onCloseMobile?.();
-                    }}
-                  />
-                ))}
+                {groupSessions.map(renderRow)}
               </div>
             </section>
-          ))
+            ))}
+            {archivedSessions.length > 0 && (
+              <section className="mb-5">
+                {!collapsed && <h3 className="mb-1 flex items-center gap-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/25"><Archive size={10} />Archived</h3>}
+                <div className="space-y-0.5">{archivedSessions.map(renderRow)}</div>
+              </section>
+            )}
+          </>
         )}
       </div>
+
+      {(undoTitle || historyNotice) && !collapsed && (
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.045] px-3 py-2 text-[10px] text-white/60" role="status">
+          <span className="min-w-0 flex-1 truncate">{historyNotice ?? `${undoTitle} deleted`}</span>
+          {undoTitle && <button type="button" onClick={onUndoDelete} className="flex items-center gap-1 font-medium text-violet-200 hover:text-white"><Undo2 size={11} />Undo</button>}
+        </div>
+      )}
 
       {!collapsed && (
         <div className="border-t border-white/[0.06] px-4 py-3">
           <p className="text-[9px] uppercase tracking-[0.16em] text-white/20">Local history</p>
           <p className="mt-1 text-[10px] leading-relaxed text-white/25">Saved securely in this browser.</p>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="presentation">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-chat-title"
+            aria-describedby="delete-chat-description"
+            className="w-full max-w-sm rounded-2xl border border-white/[0.10] bg-[#18181f] p-5 shadow-2xl"
+          >
+            <h2 id="delete-chat-title" className="text-[15px] font-semibold text-white/90">Delete conversation?</h2>
+            <p id="delete-chat-description" className="mt-2 text-[12px] leading-relaxed text-white/45">
+              “{deleteTarget.title}” will be removed from this browser. You can undo this action for a few seconds.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg px-3 py-2 text-[11px] text-white/55 hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50">Cancel</button>
+              <button type="button" autoFocus onClick={() => { onDeleteSession(deleteTarget.id); setDeleteTarget(null); }} className="rounded-lg bg-red-400/15 px-3 py-2 text-[11px] font-medium text-red-200 hover:bg-red-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60">Delete</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -317,6 +527,16 @@ export function SingularitySidebar({
   onMobileOpenChange,
   onNewChat,
   onSelectSession,
+  onRenameSession,
+  onDeleteSession,
+  onTogglePin,
+  onToggleFavorite,
+  onToggleArchive,
+  onDuplicateSession,
+  onExportSession,
+  onUndoDelete,
+  undoTitle,
+  historyNotice,
   disabled = false,
 }: SingularitySidebarProps) {
   const [collapsed, setCollapsed] = useState(() => {
@@ -330,7 +550,27 @@ export function SingularitySidebar({
   });
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [focusSearchRequest, setFocusSearchRequest] = useState(0);
   const resizingRef = useRef(false);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const modifier = event.metaKey || event.ctrlKey;
+      if (modifier && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setFocusSearchRequest(value => value + 1);
+        if (window.matchMedia('(max-width: 767px)').matches) {
+          onMobileOpenChange(true);
+        }
+      }
+      if (modifier && event.shiftKey && event.key.toLowerCase() === 'o') {
+        event.preventDefault();
+        onNewChat();
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [onMobileOpenChange, onNewChat]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 180);
@@ -353,6 +593,23 @@ export function SingularitySidebar({
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
   }, [query]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (mobileOpen) {
+        onMobileOpenChange(false);
+        return;
+      }
+      if (query) {
+        setQuery('');
+        return;
+      }
+      if (!collapsed) setCollapsed(true);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [collapsed, mobileOpen, onMobileOpenChange, query]);
 
   useEffect(() => {
     const move = (event: PointerEvent) => {
@@ -387,6 +644,17 @@ export function SingularitySidebar({
     setQuery,
     onNewChat,
     onSelectSession,
+    onRenameSession,
+    onDeleteSession,
+    onTogglePin,
+    onToggleFavorite,
+    onToggleArchive,
+    onDuplicateSession,
+    onExportSession,
+    onUndoDelete,
+    undoTitle,
+    historyNotice,
+    focusSearchRequest,
     disabled,
   };
 
