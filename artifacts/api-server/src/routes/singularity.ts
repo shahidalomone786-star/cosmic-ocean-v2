@@ -10,6 +10,8 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
+const MAX_HISTORY_CHARACTERS = 22_000;
+const MAX_COMPLETION_TOKENS = 1_500;
 const lastSingularityRequestByClient = new Map<string, number>();
 
 function getSingularityClientKey(req: Request): string {
@@ -371,8 +373,44 @@ function sanitiseHistory(history: unknown): HistoryMsg[] {
       role: (m as any).role as 'user' | 'assistant',
       content: (m as any).content.trim(),
       images: sanitiseImageInputs((m as any).images),
-    }))
-    .slice(-6);
+    }));
+}
+
+interface ChatRequestMessage {
+  role: string;
+  content: unknown;
+}
+
+function getMessageCharacterCount(message: ChatRequestMessage): number {
+  if (typeof message.content === 'string') return message.content.length;
+  if (Array.isArray(message.content)) {
+    return message.content.reduce((total, part) => {
+      if (!part || typeof part !== 'object') return total;
+      const text = (part as { text?: unknown }).text;
+      return total + (typeof text === 'string' ? text.length : 0);
+    }, 0);
+  }
+  return 0;
+}
+
+/**
+ * Keep the newest context that fits the input budget. The system prompt and
+ * current user message are assembled outside this window and are never removed.
+ * History is retained in chronological order after the oldest turns are dropped.
+ */
+function trimHistoryWindow(historyMessages: ChatRequestMessage[]): ChatRequestMessage[] {
+  let characters = 0;
+  const retained: ChatRequestMessage[] = [];
+
+  for (let index = historyMessages.length - 1; index >= 0; index -= 1) {
+    const candidate = historyMessages[index];
+    const candidateCharacters = getMessageCharacterCount(candidate);
+    if (characters + candidateCharacters > MAX_HISTORY_CHARACTERS) break;
+    retained.push(candidate);
+    characters += candidateCharacters;
+  }
+
+  return retained.reverse();
 }
 
 // ── POST /api/singularity ─────────────────────────────────────────────────────
@@ -469,11 +507,14 @@ router.post('/singularity', async (req, res) => {
             ]
           : turn.content,
       }));
+  const boundedHistoryMessages = hasImages
+    ? []
+    : trimHistoryWindow(historyMessages);
   // Keep Singularity's persona as the first message for every provider/model.
   // In particular, Qwen vision requests must not bypass the system instruction.
   const messages: { role: string; content: unknown }[] = [
     { role: 'system',    content: SYSTEM_PROMPT },
-    ...historyMessages,
+    ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
   ];
 
@@ -506,7 +547,7 @@ router.post('/singularity', async (req, res) => {
           messages,
           stream:      true,
           temperature: 0.6,
-          max_tokens:  hasImages ? 1500 : 4000,
+           max_tokens:  MAX_COMPLETION_TOKENS,
         }),
       });
 
