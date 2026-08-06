@@ -1,0 +1,377 @@
+========================================================
+SINGULARITY SETTINGS & PERSONALIZATION HUB
+Version 1.0 — Enterprise Control Center
+Append Only
+========================================================
+
+ROLE
+
+You are a Principal Product Designer,
+Principal UX Architect,
+Senior React Engineer,
+Frontend Systems Engineer,
+Accessibility Engineer,
+Performance Engineer,
+and Design Systems Architect.
+
+The application is production-ready.
+
+DO NOT:
+
+• modify backend business logic
+• modify AI streaming
+• modify API contracts
+• modify voice pipeline
+• modify attachment system
+• rewrite architecture
+
+Implement ONLY a flagship Settings & Personalization Hub.
+
+========================================================
+VISION
+========================================================
+
+Create a premium Settings experience comparable to:
+
+• ChatGPT
+• Claude
+• Gemini
+• Apple
+• Linear
+• Notion
+
+The experience should feel:
+
+• Premium
+• Calm
+• Elegant
+• Fast
+• Consistent
+• Enterprise-grade
+
+========================================================
+1. SETTINGS ENTRY
+========================================================
+
+Add a Settings entry in the sidebar.
+
+Desktop:
+
+Bottom-left beside profile.
+
+Mobile:
+
+Inside navigation drawer.
+
+Open a dedicated Settings page or modal.
+
+Never interrupt chat.
+
+========================================================
+2. SETTINGS LAYOUT
+========================================================
+
+Create a two-column layout.
+
+Left:
+
+Navigation categories.
+
+Right:
+
+Scrollable settings content.
+
+Categories:
+
+General
+
+Appearance
+
+Chat
+
+Voice
+
+AI
+
+Notifications
+
+Privacy
+
+Accessibility
+
+About
+
+========================================================
+3. APPEARANCE
+========================================================
+
+Allow users to configure:
+
+• Light
+• Dark
+• System Theme
+
+Accent color selection.
+
+UI density:
+
+• Compact
+• Comfortable
+• Spacious
+
+Message width:
+
+• Narrow
+• Standard
+• Wide
+
+Font size:
+
+Small
+
+Medium
+
+Large
+
+Preview changes instantly.
+
+========================================================
+4. CHAT EXPERIENCE
+========================================================
+
+Allow configuration of:
+
+Streaming speed
+
+Auto-scroll
+
+Markdown rendering
+
+Code block wrapping
+
+Math rendering
+
+Message animations
+
+Typing animation
+
+Timestamp visibility
+
+========================================================
+5. VOICE SETTINGS
+========================================================
+
+Voice output:
+
+Enable/Disable
+
+Voice selection
+
+Speaking speed
+
+Speaking rate
+
+Auto-play replies
+
+Microphone sensitivity
+
+Noise suppression
+
+Echo cancellation
+
+========================================================
+6. AI PREFERENCES
+========================================================
+
+Allow users to configure:
+
+Default model
+
+Reasoning level
+
+Response length
+
+Writing style
+
+Creativity
+
+Temperature
+
+Language preference
+
+Custom system instructions
+
+========================================================
+7. PRODUCTIVITY
+========================================================
+
+Enable:
+
+Keyboard shortcuts
+
+Auto focus composer
+
+Enter to send
+
+Shift+Enter newline
+
+Desktop notifications
+
+========================================================
+8. PRIVACY
+========================================================
+
+Controls:
+
+Clear chat history
+
+Clear local cache
+
+Export chats
+
+Delete stored preferences
+
+Reset application
+
+Confirmation required.
+
+========================================================
+9. ACCESSIBILITY
+========================================================
+
+Support:
+
+Reduced motion
+
+High contrast
+
+Large fonts
+
+Keyboard navigation
+
+Screen readers
+
+ARIA compliance
+
+========================================================
+10. ABOUT
+========================================================
+
+Display:
+
+Application version
+
+Current AI model
+
+Framework versions
+
+License
+
+Release notes
+
+========================================================
+11. DESIGN SYSTEM
+========================================================
+
+Follow existing Singularity theme.
+
+Large spacing.
+
+Elegant typography.
+
+Rounded cards.
+
+Subtle borders.
+
+Soft shadows.
+
+No visual clutter.
+
+========================================================
+12. MICRO INTERACTIONS
+========================================================
+
+Animated page transitions.
+
+Smooth toggles.
+
+Premium switches.
+
+Elegant sliders.
+
+Beautiful segmented controls.
+
+Hover feedback.
+
+========================================================
+13. PERSISTENCE
+========================================================
+
+Persist preferences locally.
+
+Load instantly on startup.
+
+Never lose user preferences.
+
+Gracefully handle missing values.
+
+========================================================
+14. PERFORMANCE
+========================================================
+
+Lazy-load settings modules.
+
+Memoize expensive components.
+
+Avoid unnecessary renders.
+
+Maintain 60 FPS.
+
+========================================================
+15. RESPONSIVENESS
+========================================================
+
+Perfect experience on:
+
+Android
+
+iPhone
+
+Tablet
+
+Desktop
+
+Ultra-wide
+
+No overflow.
+
+No layout shift.
+
+========================================================
+16. CODE QUALITY
+========================================================
+
+Reusable components.
+
+Consistent naming.
+
+Zero duplicated styles.
+
+Maintain project conventions.
+
+========================================================
+SUCCESS CRITERIA
+========================================================
+
+The Settings Hub should feel like the control center of a flagship AI platform.
+
+Users should immediately feel they are using a polished, premium, enterprise-grade product.
+
+Maintain:
+
+• Zero TypeScript errors
+• Zero ESLint warnings
+• Zero console errors
+• Zero regressions
+• Production-ready implementation
+========================================================

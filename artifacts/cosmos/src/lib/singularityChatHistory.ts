@@ -279,6 +279,7 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 let repositoryReady: Promise<void> | null = null;
+let historyDatabase: IDBDatabase | null = null;
 const pendingWrites = new Map<string, ChatSession>();
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let retryAttempt = 0;
@@ -306,7 +307,11 @@ function openHistoryDatabase(): Promise<IDBDatabase> {
       if (summaries && !summaries.indexNames.contains('favorite')) summaries.createIndex('favorite', 'favorite');
       void sessions;
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      historyDatabase = request.result;
+      historyDatabase.onversionchange = () => historyDatabase?.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error ?? new Error('Could not open chat history database.'));
   });
   return databasePromise;
@@ -509,6 +514,35 @@ export async function getChatHistoryStorageMode(): Promise<'indexeddb' | 'locals
   } catch {
     return 'localstorage';
   }
+}
+
+export async function clearChatHistoryStorage(): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(CHAT_HISTORY_FALLBACK_PREFIX)) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Continue to the IndexedDB boundary when localStorage is unavailable.
+  }
+
+  if (!('indexedDB' in window)) return;
+  historyDatabase?.close();
+  historyDatabase = null;
+  databasePromise = null;
+  repositoryReady = null;
+
+  await new Promise<void>((resolve, reject) => {
+    const request = window.indexedDB.deleteDatabase(CHAT_HISTORY_DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error('Could not clear chat history.'));
+    request.onblocked = () => resolve();
+  });
 }
 
 export async function countPinnedChatSessions(): Promise<number> {

@@ -7,6 +7,7 @@ import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, 
 import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 const SingularityChat = lazy(() => import('./components/SingularityChat'));
+const SingularitySettingsPage = lazy(() => import('./components/settings/SingularitySettingsPage'));
 // Heavy modals — code-split so they don't bloat the initial bundle
 const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
 const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
@@ -2302,7 +2303,21 @@ export default function App() {
           </div>
         }
       >
-        <SingularityChat onClose={() => setLocation('/')} />
+        <SingularityChat onClose={() => setLocation('/')} onOpenSettings={() => setLocation('/settings')} />
+      </Suspense>
+    );
+  }
+
+  if (location === '/settings') {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-[100dvh] items-center justify-center bg-[#09090b] text-white/45">
+            <span className="text-[11px] uppercase tracking-[0.22em]">Loading settings…</span>
+          </div>
+        }
+      >
+        <SingularitySettingsPage onBack={() => setLocation('/chat')} />
       </Suspense>
     );
   }

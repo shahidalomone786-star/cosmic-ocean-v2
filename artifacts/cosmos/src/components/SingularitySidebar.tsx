@@ -20,6 +20,7 @@ import {
   Trash2,
   Undo2,
   X,
+  Settings,
 } from 'lucide-react';
 import {
   CHAT_SIDEBAR_COLLAPSED_KEY,
@@ -53,6 +54,7 @@ interface SingularitySidebarProps {
   pendingHistoryWrites?: number;
   isOffline?: boolean;
   disabled?: boolean;
+  onOpenSettings?: () => void;
 }
 
 type TimeGroup = 'Today' | 'Yesterday' | 'Previous 7 Days' | 'Previous 30 Days' | 'This Year' | 'Older';
@@ -284,6 +286,7 @@ function SidebarContents({
   isOffline = false,
   onCollapse,
   onCloseMobile,
+  onOpenSettings,
   disabled,
 }: {
   sessions: Array<ChatSession | ChatSessionSummary>;
@@ -309,6 +312,7 @@ function SidebarContents({
   isOffline?: boolean;
   onCollapse?: () => void;
   onCloseMobile?: () => void;
+  onOpenSettings?: () => void;
   disabled?: boolean;
 }) {
   const [ready, setReady] = useState(false);
@@ -590,6 +594,24 @@ function SidebarContents({
               Sync queued · retrying automatically
             </p>
           )}
+          {onOpenSettings && (
+            <button
+              type="button"
+              data-testid="button-open-settings"
+              onClick={() => { onOpenSettings(); onCloseMobile?.(); }}
+              className="mt-3 flex w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2.5 text-left text-[11px] text-white/55 transition-gpu hover:border-violet-300/30 hover:bg-violet-300/[0.08] hover:text-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55"
+            >
+              <Settings size={14} />
+              <span>Settings</span>
+            </button>
+          )}
+        </div>
+      )}
+      {collapsed && onOpenSettings && (
+        <div className="border-t border-white/[0.07] bg-black/[0.08] px-2 py-2">
+          <button type="button" data-testid="button-open-settings-collapsed" onClick={onOpenSettings} aria-label="Open settings" className="flex h-10 w-full items-center justify-center rounded-xl text-white/40 transition-gpu hover:bg-violet-300/[0.10] hover:text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/55">
+            <Settings size={15} />
+          </button>
         </div>
       )}
 
@@ -653,6 +675,7 @@ export function SingularitySidebar({
   pendingHistoryWrites = 0,
   isOffline = false,
   disabled = false,
+  onOpenSettings,
 }: SingularitySidebarProps) {
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -774,6 +797,7 @@ export function SingularitySidebar({
     pendingHistoryWrites,
     isOffline,
     disabled,
+    onOpenSettings,
   };
 
   return (

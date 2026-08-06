@@ -1350,7 +1350,7 @@ interface SingularityCapabilities {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function SingularityChat({ onClose }: { onClose?: () => void }) {
+export default function SingularityChat({ onClose, onOpenSettings }: { onClose?: () => void; onOpenSettings?: () => void }) {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const stored = loadChatSessions();
     return stored.length > 0 ? [stored[0]] : [createChatSession(INITIAL_MESSAGE)];
@@ -3172,6 +3172,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         pendingHistoryWrites={pendingHistoryWrites}
         isOffline={isOffline}
         disabled={isThinking}
+        onOpenSettings={onOpenSettings}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
