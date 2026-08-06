@@ -13,6 +13,7 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
   Plus,
   Search,
   Star,
@@ -114,6 +115,7 @@ function SessionRow({
   onToggleArchive,
   onDuplicate,
   onExport,
+  deleting = false,
 }: {
   session: ChatSession | ChatSessionSummary;
   active: boolean;
@@ -127,6 +129,7 @@ function SessionRow({
   onToggleArchive: () => void;
   onDuplicate: () => void;
   onExport: (format: 'json' | 'markdown' | 'txt' | 'pdf') => void;
+  deleting?: boolean;
 }) {
   const preview = 'preview' in session ? session.preview : getChatPreview(session);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,11 +162,12 @@ function SessionRow({
   };
 
   return (
-    <div className={`group relative flex w-full items-start rounded-xl transition-all duration-150
+    <div className={`group relative flex w-full items-start rounded-xl transition-all duration-200
       ${active
         ? 'bg-violet-400/[0.12] text-white shadow-[inset_0_1px_0_rgba(196,181,253,0.08)]'
         : 'text-white/55 hover:bg-white/[0.055] hover:text-white/85'}
-      ${collapsed ? 'justify-center' : ''}`}>
+      ${collapsed ? 'justify-center' : ''}
+      ${deleting ? 'pointer-events-none translate-x-1 scale-[0.98] opacity-0' : ''}`}>
       <button
         type="button"
         onClick={onSelect}
@@ -195,8 +199,11 @@ function SessionRow({
                   aria-label={`Rename ${session.title}`}
                 />
               ) : (
-                <span className="truncate text-[12px] font-medium">
-                  {highlightMatches(session.title, query)}
+                <span className="flex min-w-0 items-center gap-1 truncate text-[12px] font-medium">
+                  {session.pinned && (
+                    <Pin size={10} strokeWidth={2.2} className="flex-shrink-0 text-violet-200/80" aria-label="Pinned" />
+                  )}
+                  <span className="truncate">{highlightMatches(session.title, query)}</span>
                 </span>
               )}
               <span className={`flex-shrink-0 text-[9px] ${active ? 'text-violet-200/60' : 'text-white/25'}`}>
@@ -216,7 +223,7 @@ function SessionRow({
         <button
           type="button"
           onClick={event => { event.stopPropagation(); setMenuOpen(value => !value); }}
-          className="mr-1 mt-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white/20 opacity-0 transition group-hover:opacity-100 hover:bg-white/[0.10] hover:text-white/80 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+           className="mr-1 mt-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white/25 opacity-100 transition group-hover:bg-white/[0.08] hover:bg-white/[0.10] hover:text-white/80 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
           aria-label={`Actions for ${session.title}`}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
@@ -306,6 +313,7 @@ function SidebarContents({
 }) {
   const [ready, setReady] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSession | ChatSessionSummary | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [summarySessions, setSummarySessions] = useState<ChatSessionSummary[]>([]);
   const [hasMoreSummaries, setHasMoreSummaries] = useState(false);
   const [summaryCursor, setSummaryCursor] = useState<string | null>(null);
@@ -403,6 +411,7 @@ function SidebarContents({
       onToggleArchive={() => onToggleArchive(session.id)}
       onDuplicate={() => onDuplicateSession(session.id)}
        onExport={format => onExportSession(session.id, format)}
+       deleting={deletingSessionId === session.id}
     />
   );
 
@@ -599,7 +608,22 @@ function SidebarContents({
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg px-3 py-2 text-[11px] text-white/55 hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50">Cancel</button>
-              <button type="button" autoFocus onClick={() => { onDeleteSession(deleteTarget.id); setDeleteTarget(null); }} className="rounded-lg bg-red-400/15 px-3 py-2 text-[11px] font-medium text-red-200 hover:bg-red-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60">Delete</button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  const targetId = deleteTarget.id;
+                  setDeletingSessionId(targetId);
+                  setDeleteTarget(null);
+                  window.setTimeout(() => {
+                    onDeleteSession(targetId);
+                    setDeletingSessionId(current => current === targetId ? null : current);
+                  }, 180);
+                }}
+                className="rounded-lg bg-red-400/15 px-3 py-2 text-[11px] font-medium text-red-200 hover:bg-red-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>

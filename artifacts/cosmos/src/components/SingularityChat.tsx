@@ -9,7 +9,7 @@ import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } fr
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
-  Square, Copy, Check, RotateCcw, ArrowDown, Volume2,
+  Square, Copy, Check, Pencil, RotateCcw, ArrowDown, Volume2,
   BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2, Mic, MicOff,
   ExternalLink,
 } from 'lucide-react';
@@ -438,6 +438,61 @@ const CopyButton = memo(function CopyButton({ text }: { text: string }) {
       {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2} />}
       {copied ? 'Copied' : 'Copy'}
     </button>
+  );
+});
+
+const UserMessageActions = memo(function UserMessageActions({
+  text,
+  onEdit,
+  disabled,
+}: {
+  text: string;
+  onEdit: () => void;
+  disabled?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1800);
+    }).catch(() => {});
+  }, [text]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  return (
+    <div
+      className="absolute right-1 top-full z-10 mt-1 flex items-center gap-0.5 rounded-lg border border-white/[0.09]
+        bg-[#18181f]/95 p-0.5 opacity-100 shadow-xl backdrop-blur-md transition-opacity duration-150
+        sm:pointer-events-none sm:opacity-0 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100
+        sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100"
+      aria-label="Message actions"
+    >
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+        aria-label={copied ? 'Copied message' : 'Copy message'}
+      >
+        {copied ? <Check size={11} strokeWidth={2.5} className="text-emerald-300" /> : <Copy size={11} strokeWidth={2} />}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={disabled}
+        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[10px] text-white/45 transition hover:bg-white/[0.08] hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-300/50"
+        aria-label="Edit message"
+      >
+        <Pencil size={11} strokeWidth={2} />
+        Edit
+      </button>
+    </div>
   );
 });
 
@@ -2025,6 +2080,24 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     generateResponse(lastUser.content, lastUser.attachedImages ?? []);
   }, [messages, isThinking, generateResponse, beginMessageCooldown]);
 
+  const handleEditUserMessage = useCallback((messageId: string) => {
+    if (isThinking) return;
+    const message = messages.find(item => item.id === messageId);
+    if (!message || message.role !== 'user') return;
+    const messageIndex = messages.findIndex(item => item.id === messageId);
+    if (messageIndex < 0) return;
+
+    // Keep the conversation before this turn, then let the user resubmit
+    // the edited prompt through the normal composer/send path.
+    setMessages(previous => previous.slice(0, messageIndex));
+    setInput(message.content);
+    setApiError(null);
+    clearDocument();
+    clearImages();
+    stickToBottomRef.current = true;
+    window.setTimeout(() => textareaRef.current?.focus(), 40);
+  }, [clearDocument, clearImages, isThinking, messages]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
@@ -2185,29 +2258,36 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                       msg.id === 'welcome'
                         ? 'items-center mb-0'
                         : msg.role === 'user'
-                          ? 'items-end mb-6'
+                          ? 'items-end mb-10'
                           : 'items-start mb-8'
-                    }`}
+                    } ${msg.role === 'user' ? 'group' : ''}`}
                   >
                     {/* ── User message: premium glass bubble ──────────────── */}
                     {msg.role === 'user' && (
-                      <div className="bg-white/[0.08] border border-white/[0.13] text-white/93
-                        rounded-2xl rounded-br-[4px] px-4 py-3 max-w-[82%] ml-auto
-                        text-[13.5px] leading-[1.72] font-[450]
-                        shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
-                        {msg.attachedImages?.length ? (
-                          <div className="mb-2.5">
-                            <ImageAttachmentGrid images={msg.attachedImages} readOnly />
-                          </div>
-                        ) : null}
-                        {msg.attachedDocument && (
-                          <DocumentChip
-                            record={msg.attachedDocument}
-                            isThinking={false}
-                            readOnly
-                          />
-                        )}
-                        {msg.content}
+                      <div className="group relative ml-auto max-w-[82%]">
+                        <div className="bg-white/[0.08] border border-white/[0.13] text-white/93
+                          rounded-2xl rounded-br-[4px] px-4 py-3
+                          text-[13.5px] leading-[1.72] font-[450]
+                          shadow-[0_4px_20px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.10)]">
+                          {msg.attachedImages?.length ? (
+                            <div className="mb-2.5">
+                              <ImageAttachmentGrid images={msg.attachedImages} readOnly />
+                            </div>
+                          ) : null}
+                          {msg.attachedDocument && (
+                            <DocumentChip
+                              record={msg.attachedDocument}
+                              isThinking={false}
+                              readOnly
+                            />
+                          )}
+                          {msg.content}
+                        </div>
+                        <UserMessageActions
+                          text={msg.content}
+                          onEdit={() => handleEditUserMessage(msg.id)}
+                          disabled={isThinking}
+                        />
                       </div>
                     )}
 
