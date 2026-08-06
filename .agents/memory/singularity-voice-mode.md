@@ -13,6 +13,8 @@ Voice VAD uses microphone constraints for echo cancellation, noise suppression, 
 
 Voice TTS is mobile-gesture-safe: one reusable inline audio element and AudioContext/media source are primed at entry, playback is sequential and starts the speaking state only after `play()` resolves, failed chunks retry once, and the shared graph is explicitly released at session teardown.
 
+Voice transcription must construct the upload only after both the terminal `dataavailable` and `stop` events arrive. The client rejects empty/tiny or decoded-silent recordings locally, sends only WebM/MP4-compatible media through the existing `audio` multipart field, and quietly restarts Listening after empty or failed transcription. The single server route logs parser, format, payload, and exact Groq failures while returning generic client errors.
+
 **Why:** The existing composer microphone intentionally inserts transcription into the composer and normal chat has a 15-second cooldown; continuous voice needs independent lifecycle ownership and a short voice-only request guard without changing ordinary chat behavior.
 
 **How to apply:** Preserve the separate voice path when changing chat streaming, transcription, or TTS. Interruption must abort the active SSE request, cancel TTS audio/object URLs, and retain a live recording when speech-overlap detection has already begun. Do not reintroduce persistent transcript panels, captions toggles, or per-chunk audio contexts. Keep normal chat streaming and composer recording behavior unchanged.

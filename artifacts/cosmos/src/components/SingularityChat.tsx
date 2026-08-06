@@ -826,7 +826,18 @@ const VoiceWaveform = memo(function VoiceWaveform({
 const formatVoiceTime = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
-async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; filename: string }> {
+async function preprocessRecordedAudio(recording: Blob): Promise<{
+  blob: Blob;
+  filename: string;
+  meaningfulSpeech: boolean;
+}> {
+  if (recording.size < 512) {
+    return {
+      blob: recording,
+      filename: 'singularity-recording.webm',
+      meaningfulSpeech: false,
+    };
+  }
   const fallback = {
     blob: recording,
     filename: recording.type.includes('mp4')
@@ -834,6 +845,7 @@ async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; f
       : recording.type.includes('ogg')
         ? 'singularity-recording.ogg'
         : 'singularity-recording.webm',
+    meaningfulSpeech: true,
   };
   const AudioContextClass = window.AudioContext
     || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -860,10 +872,13 @@ async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; f
     const padding = Math.floor(sampleRate * 0.08);
     start = Math.max(0, start - padding);
     end = Math.min(frameCount, end + padding);
-    if (end - start < Math.floor(sampleRate * 0.08)) return fallback;
+    if (end - start < Math.floor(sampleRate * 0.08)) {
+      return { ...fallback, meaningfulSpeech: false };
+    }
 
     const mono = new Float32Array(end - start);
     let peak = 0;
+    let energy = 0;
     const channelData = Array.from({ length: channels }, (_, channel) => decoded.getChannelData(channel));
     for (let frame = start; frame < end; frame += 1) {
       let sample = 0;
@@ -871,7 +886,10 @@ async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; f
       sample /= Math.max(1, channelData.length);
       mono[frame - start] = sample;
       peak = Math.max(peak, Math.abs(sample));
+      energy += sample * sample;
     }
+    const rms = Math.sqrt(energy / Math.max(1, mono.length));
+    const meaningfulSpeech = peak >= 0.018 && rms >= 0.004;
 
     const gain = peak > 0.001 ? Math.min(1.8, 0.92 / peak) : 1;
     const wavBuffer = new ArrayBuffer(44 + mono.length * 2);
@@ -900,7 +918,7 @@ async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; f
     }
     const normalized = new Blob([wavBuffer], { type: 'audio/wav' });
     return normalized.size <= 16 * 1024 * 1024
-      ? { blob: normalized, filename: 'singularity-recording.wav' }
+      ? { blob: normalized, filename: 'singularity-recording.wav', meaningfulSpeech }
       : fallback;
   } catch {
     return fallback;
@@ -1261,6 +1279,7 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const voiceInterruptRef = useRef<((preserveRecording?: boolean) => void) | null>(null);
   const voiceTurnRef = useRef<(text: string) => void>(() => undefined);
   const voiceRestartTimerRef = useRef<number | null>(null);
+  const voiceRestartRecordingRef = useRef<(sessionId: number) => void>(() => undefined);
   const voiceModeOpenRef = useRef(false);
   const voiceMutedRef = useRef(false);
   const voiceSpeakerEnabledRef = useRef(true);
@@ -1386,22 +1405,65 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       window.clearInterval(voiceRecordingVadTimerRef.current);
       voiceRecordingVadTimerRef.current = null;
     }
-    const chunks = voiceRecordingChunksRef.current;
     const blob = await new Promise<Blob | null>(resolve => {
-      const finish = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
-      recorder.addEventListener('stop', finish, { once: true });
-      recorder.addEventListener('error', () => resolve(null), { once: true });
-      if (recorder.state === 'recording') recorder.stop();
+      let stopSeen = recorder.state === 'inactive';
+      let finalDataSeen = recorder.state === 'inactive';
+      let settled = false;
+      const cleanup = () => {
+        recorder.removeEventListener('dataavailable', onDataAvailable);
+        recorder.removeEventListener('stop', onStop);
+        recorder.removeEventListener('error', onError);
+      };
+      const finish = () => {
+        if (settled || !stopSeen || !finalDataSeen) return;
+        settled = true;
+        cleanup();
+        resolve(new Blob([...voiceRecordingChunksRef.current], {
+          type: recorder.mimeType || 'audio/webm',
+        }));
+      };
+      const onDataAvailable = (event: BlobEvent) => {
+        if (event.data.size > 0 && !voiceRecordingChunksRef.current.includes(event.data)) {
+          voiceRecordingChunksRef.current.push(event.data);
+        }
+        // The MediaRecorder stop event is dispatched after the terminal
+        // dataavailable event. Marking this here ensures the final chunk is
+        // collected before stop resolves the upload blob.
+        finalDataSeen = true;
+        finish();
+      };
+      const onStop = () => {
+        stopSeen = true;
+        finish();
+      };
+      const onError = () => {
+        cleanup();
+        resolve(null);
+      };
+      recorder.addEventListener('dataavailable', onDataAvailable);
+      recorder.addEventListener('stop', onStop, { once: true });
+      recorder.addEventListener('error', onError, { once: true });
+      if (recorder.state === 'recording' || recorder.state === 'paused') recorder.stop();
       else finish();
     });
     stopVoiceModeResources();
     voiceFinalizingRef.current = false;
     voiceFinalizeRef.current = null;
-    if (!blob || blob.size === 0 || blob.size > 16 * 1024 * 1024 || voiceSessionRef.current === 0) {
-      if (voiceModeOpen) {
+    const resumeListening = () => {
+      if (voiceModeOpenRef.current && sessionId === voiceSessionRef.current) {
         setVoiceModeState('listening');
-        setVoiceStatusText('I didn’t catch that. Try again.');
+        setVoiceStatusText('Listening…');
+        if (voiceRestartTimerRef.current !== null) window.clearTimeout(voiceRestartTimerRef.current);
+        voiceRestartTimerRef.current = window.setTimeout(() => {
+          voiceRestartTimerRef.current = null;
+          if (voiceModeOpenRef.current && sessionId === voiceSessionRef.current) {
+            voiceRestartRecordingRef.current(sessionId);
+          }
+        }, 120);
       }
+    };
+    if (!blob || blob.size === 0 || blob.size > 16 * 1024 * 1024) {
+      resumeListening();
       return;
     }
 
@@ -1409,6 +1471,10 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     setVoiceStatusText('Understanding your question…');
     try {
       const preparedAudio = await preprocessRecordedAudio(blob);
+      if (!preparedAudio.meaningfulSpeech) {
+        resumeListening();
+        return;
+      }
       const controller = new AbortController();
       voiceRequestAbortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 30_000);
@@ -1423,20 +1489,21 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
       const result = await response.json().catch(() => ({})) as { text?: unknown; error?: unknown };
       const text = typeof result.text === 'string' ? result.text.trim() : '';
       if (sessionId !== voiceSessionRef.current) return;
-      if (!response.ok || !text) throw new Error(typeof result.error === 'string' ? result.error : 'Transcription failed.');
+      if (!response.ok || !text) {
+        resumeListening();
+        return;
+      }
       setVoiceTranscript(text);
       voiceRequestAbortRef.current = null;
       voiceTurnRef.current(text);
     } catch (error: unknown) {
       if (sessionId !== voiceSessionRef.current) return;
-      setVoiceModeState(navigator.onLine ? 'idle' : 'offline');
-      setVoiceStatusText(error instanceof DOMException && error.name === 'AbortError'
-        ? 'Transcription timed out. Try again.'
-        : error instanceof Error ? error.message : 'I couldn’t understand that. Try again.');
+      console.error('[SingularityChat] Voice Mode transcription pipeline failed:', error);
+      resumeListening();
     } finally {
       voiceRequestAbortRef.current = null;
     }
-  }, [voiceModeOpen, stopVoiceModeResources]);
+  }, [stopVoiceModeResources]);
 
   const startVoiceRecording = useCallback(async (monitorForInterruption = false, expectedSession = voiceSessionRef.current) => {
     if (!voiceModeOpenRef.current || expectedSession !== voiceSessionRef.current || voiceFinalizingRef.current || voiceRecorderRef.current) return;
@@ -1463,7 +1530,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         'audio/webm;codecs=opus',
         'audio/webm',
         'audio/mp4',
-        'audio/ogg;codecs=opus',
       ].find(type => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error('No supported recording format is available.');
       const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128_000 });
@@ -1564,6 +1630,11 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     void startVoiceRecording(false, voiceSessionRef.current);
   }, [startVoiceRecording]);
 
+  voiceRestartRecordingRef.current = (sessionId: number) => {
+    if (!voiceModeOpenRef.current || sessionId !== voiceSessionRef.current) return;
+    void startVoiceRecording(false, sessionId);
+  };
+
   voiceFinalizeRef.current = finishVoiceRecording;
 
   const handleVoiceInterrupt = useCallback((preserveRecording = false) => {
@@ -1658,7 +1729,6 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
         'audio/webm;codecs=opus',
         'audio/webm',
         'audio/mp4',
-        'audio/ogg;codecs=opus',
       ].find(type => MediaRecorder.isTypeSupported(type));
       if (!mimeType) {
         stream.getTracks().forEach(track => track.stop());
@@ -1736,10 +1806,41 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     setVoiceState('processing');
     stopRecordingResources();
     const blob = await new Promise<Blob>((resolve, reject) => {
-      const finish = () => resolve(new Blob(recordingChunksRef.current, { type: recorder.mimeType }));
-      recorder.addEventListener('stop', finish, { once: true });
-      recorder.addEventListener('error', () => reject(new Error('Recording failed.')), { once: true });
-      if (recorder.state === 'recording') recorder.stop();
+      let stopSeen = recorder.state === 'inactive';
+      let finalDataSeen = recorder.state === 'inactive';
+      let settled = false;
+      const cleanup = () => {
+        recorder.removeEventListener('dataavailable', onDataAvailable);
+        recorder.removeEventListener('stop', onStop);
+        recorder.removeEventListener('error', onError);
+      };
+      const finish = () => {
+        if (settled || !stopSeen || !finalDataSeen) return;
+        settled = true;
+        cleanup();
+        resolve(new Blob([...recordingChunksRef.current], {
+          type: recorder.mimeType || 'audio/webm',
+        }));
+      };
+      const onDataAvailable = (event: BlobEvent) => {
+        if (event.data.size > 0 && !recordingChunksRef.current.includes(event.data)) {
+          recordingChunksRef.current.push(event.data);
+        }
+        finalDataSeen = true;
+        finish();
+      };
+      const onStop = () => {
+        stopSeen = true;
+        finish();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error('Recording failed.'));
+      };
+      recorder.addEventListener('dataavailable', onDataAvailable);
+      recorder.addEventListener('stop', onStop, { once: true });
+      recorder.addEventListener('error', onError, { once: true });
+      if (recorder.state === 'recording' || recorder.state === 'paused') recorder.stop();
       else finish();
     }).catch(() => null);
     recorderRef.current = null;

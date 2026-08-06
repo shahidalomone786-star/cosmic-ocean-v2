@@ -64,7 +64,13 @@ function hasAudioSignature(audio: Buffer, contentType: string): boolean {
 async function readMultipartAudio(req: Request): Promise<MultipartAudio> {
   const requestContentType = String(req.headers["content-type"] ?? "");
   const boundaryMatch = requestContentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
-  if (!boundaryMatch) throw new Error("A multipart boundary is required.");
+  if (!boundaryMatch) {
+    console.error("[transcribe] Multipart parsing failure:", {
+      reason: "missing boundary",
+      contentType: requestContentType,
+    });
+    throw new Error("A multipart boundary is required.");
+  }
 
   const boundary = Buffer.from(`--${boundaryMatch[1] ?? boundaryMatch[2]}`, "latin1");
   const chunks: Buffer[] = [];
@@ -99,24 +105,59 @@ async function readMultipartAudio(req: Request): Promise<MultipartAudio> {
 
   const body = Buffer.concat(chunks);
   const firstBoundary = body.indexOf(boundary);
-  if (firstBoundary < 0) throw new Error("Invalid multipart audio payload.");
+  if (firstBoundary < 0) {
+    console.error("[transcribe] Multipart parsing failure:", {
+      reason: "opening boundary not found",
+      bodyBytes: body.length,
+    });
+    throw new Error("Invalid multipart audio payload.");
+  }
 
   const partStart = firstBoundary + boundary.length + 2;
   const nextBoundary = body.indexOf(boundary, partStart);
-  if (nextBoundary < 0) throw new Error("Invalid multipart audio part.");
+  if (nextBoundary < 0) {
+    console.error("[transcribe] Multipart parsing failure:", {
+      reason: "closing boundary not found",
+      bodyBytes: body.length,
+    });
+    throw new Error("Invalid multipart audio part.");
+  }
 
   const part = body.subarray(partStart, Math.max(partStart, nextBoundary - 2));
   const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
-  if (headerEnd < 0) throw new Error("Audio part headers are missing.");
+  if (headerEnd < 0) {
+    console.error("[transcribe] Multipart parsing failure:", {
+      reason: "audio part headers missing",
+      partBytes: part.length,
+    });
+    throw new Error("Audio part headers are missing.");
+  }
 
   const headers = parseHeaderBlock(part.subarray(0, headerEnd));
   const disposition = headers["content-disposition"] ?? "";
   if (getDispositionParameter(disposition, "name") !== "audio") {
+    console.error("[transcribe] Multipart parsing failure:", {
+      reason: "unexpected form field",
+      fieldName: getDispositionParameter(disposition, "name") || "(missing)",
+      expectedField: "audio",
+    });
     throw new Error("The multipart audio field is required.");
   }
 
   const audio = part.subarray(headerEnd + 4);
-  if (audio.length === 0 || audio.length > MAX_AUDIO_BYTES) {
+  if (audio.length === 0) {
+    console.error("[transcribe] Empty audio blob received:", {
+      fieldName: "audio",
+      filename: getDispositionParameter(disposition, "filename") || "(missing)",
+      contentType: headers["content-type"] ?? "(missing)",
+    });
+    throw new Error("Audio recording is empty.");
+  }
+  if (audio.length > MAX_AUDIO_BYTES) {
+    console.error("[transcribe] Audio blob exceeds size limit:", {
+      bytes: audio.length,
+      maxBytes: MAX_AUDIO_BYTES,
+    });
     throw new Error("Audio recording is empty or too large.");
   }
 
@@ -134,13 +175,29 @@ router.post("/transcribe", async (req, res) => {
   }
 
   if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("multipart/form-data")) {
+    console.error("[transcribe] Request parsing failure:", {
+      status: 415,
+      reason: "request is not multipart/form-data",
+      contentType: String(req.headers["content-type"] ?? ""),
+    });
     res.status(415).json({ success: false, error: "Audio must be uploaded as multipart/form-data." });
     return;
   }
 
   try {
     const audio = await readMultipartAudio(req);
-    if (!SUPPORTED_AUDIO_TYPES.has(audio.contentType) || !hasAudioSignature(audio.buffer, audio.contentType)) {
+    const supportedType = SUPPORTED_AUDIO_TYPES.has(audio.contentType);
+    const validSignature = supportedType && hasAudioSignature(audio.buffer, audio.contentType);
+    if (!supportedType || !validSignature) {
+      console.error("[transcribe] Unsupported audio format:", {
+      status: 415,
+        contentType: audio.contentType,
+        filename: audio.filename,
+        bytes: audio.buffer.length,
+        supportedType,
+        validSignature,
+        header: audio.buffer.subarray(0, 16).toString("hex"),
+      });
       res.status(415).json({ success: false, error: "Unsupported audio format." });
       return;
     }
@@ -174,6 +231,11 @@ router.post("/transcribe", async (req, res) => {
     const result = await response.json() as { text?: unknown };
     const text = typeof result.text === "string" ? result.text.trim() : "";
     if (!text) {
+      console.info("[transcribe] Groq returned no meaningful speech:", {
+        status: response.status,
+        filename: audio.filename,
+        bytes: audio.buffer.length,
+      });
       res.status(422).json({ success: false, error: "No speech was detected." });
       return;
     }
@@ -184,7 +246,11 @@ router.post("/transcribe", async (req, res) => {
     const isTimeout =
       (error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError"))
       || /timed out|timeout|aborted/i.test(message);
-    console.error("[transcribe] Request failed:", message);
+    console.error("[transcribe] Request parsing or processing failure:", {
+      status: isTimeout ? 504 : 400,
+      message,
+      contentType: String(req.headers["content-type"] ?? ""),
+    });
     res.status(isTimeout ? 504 : 400).json({
       success: false,
       error: isTimeout ? "Speech upload timed out." : "Could not process this recording.",
