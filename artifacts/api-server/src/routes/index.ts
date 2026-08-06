@@ -11,6 +11,7 @@ import cosmicRouter from "./cosmic";
 import biologyRouter from "./biology";
 import aiSummaryRouter from "./ai-summary";
 import discoveryRouter from "./discovery";
+import transcribeRouter from "./transcribe";
 
 const router: IRouter = Router();
 
@@ -25,6 +26,7 @@ router.use(cosmicRouter);
 router.use(biologyRouter);
 router.use(aiSummaryRouter);
 router.use(discoveryRouter);
+router.use(transcribeRouter);
 router.use(singularityRouter);
 
 

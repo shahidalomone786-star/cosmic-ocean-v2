@@ -1,4 +1,5 @@
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_AUDIO_ENDPOINT = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
 const GROQ_KEYS = [
   process.env.GROQ_KEY_1,
@@ -79,6 +80,41 @@ export async function fetchGroq(init: RequestInit): Promise<Response> {
   // throws before entering the loop, but keep this guard explicit for typing.
   if (lastResponse) return lastResponse;
   throw new Error('No Groq API keys configured on the server.');
+}
+
+/**
+ * Sends a multipart audio request through the same rotating Groq key pool.
+ * The body is intentionally passed through untouched so undici can generate
+ * the multipart boundary and content length correctly.
+ */
+export async function fetchGroqAudio(init: RequestInit): Promise<Response> {
+  let lastResponse: Response | undefined;
+
+  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
+    const apiKey = getRotatedGroqKey();
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${apiKey}`);
+
+    try {
+      const response = await fetch(GROQ_AUDIO_ENDPOINT, {
+        ...init,
+        headers,
+      });
+
+      if (response.ok || attempt === GROQ_KEYS.length - 1) return response;
+
+      lastResponse = response;
+      if (response.body) await response.body.cancel().catch(() => undefined);
+      console.warn(
+        `[groq] audio ${response.status} on key attempt ${attempt + 1}/${GROQ_KEYS.length}; rotating immediately.`,
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  if (lastResponse) return lastResponse;
+  throw new Error('No Groq API keys configured for audio transcription.');
 }
 
 export { GROQ_ENDPOINT };

@@ -4,3 +4,4 @@
 - [Edge Neural TTS](edge-neural-tts.md) — server-side Microsoft Edge synthesis with browser speech fallback; no API keys or paid quota
 - [Singularity multimodal attachments](multimodal-attachments.md) — optimized structured images, capability-gated vision routing, bounded prior-image history, and unchanged text streaming
 - [Singularity chat history](singularity-chat-history.md) — browser-local productivity metadata stays outside streaming; idle smart titles, capped pins, undoable deletion, accessible shortcuts
+- [Singularity voice engine](singularity-voice.md) — browser MediaRecorder capture/preprocessing feeds bounded in-memory Whisper transcription; composer insertion never auto-sends

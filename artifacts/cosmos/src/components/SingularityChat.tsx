@@ -10,7 +10,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Send, Sparkles, BrainCircuit, X, ChevronDown,
   Square, Copy, Check, RotateCcw, ArrowDown, Volume2,
-  BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2,
+  BookmarkPlus, Bookmark, Share2, Wand2, Plus, Image, FileText, Loader2, Mic, MicOff,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -528,6 +528,351 @@ const AudioWave = memo(function AudioWave() {
   );
 });
 
+// ─── Voice composer control ──────────────────────────────────────────────────
+// The control is intentionally transport-agnostic. A parent can own `state` and
+// connect the start/stop callbacks to MediaRecorder, while the uncontrolled
+// mode keeps the interaction demonstrable until that transport is available.
+type MicrophoneState = 'idle' | 'recording' | 'processing' | 'success' | 'error';
+
+interface MicrophoneControlProps {
+  disabled?: boolean;
+  state?: MicrophoneState;
+  errorMessage?: string;
+  onStateChange?: (state: MicrophoneState) => void;
+  onRecordingStart?: () => void | Promise<void>;
+  onRecordingStop?: () => void | Promise<void>;
+  onRetry?: () => void;
+}
+
+const VOICE_WAVE_BARS = [0.42, 0.78, 0.58, 1, 0.68, 0.9, 0.5, 0.74, 0.38];
+
+const VoiceWaveform = memo(function VoiceWaveform({
+  state,
+}: { state: MicrophoneState }) {
+  const active = state === 'recording';
+  const processing = state === 'processing';
+  return (
+    <div className="flex h-3.5 items-center gap-[2px]" aria-hidden="true">
+      {VOICE_WAVE_BARS.map((peak, index) => (
+        <motion.span
+          key={index}
+          className={`w-[2px] origin-center rounded-full ${
+            active ? 'bg-rose-300/90' : processing ? 'bg-sky-300/70' : 'bg-white/35'
+          }`}
+          style={{ height: `${Math.max(3, peak * 13)}px` }}
+          animate={active
+            ? { scaleY: [0.35, peak, 0.5, peak * 0.82, 0.35], opacity: [0.62, 1, 0.7, 1, 0.62] }
+            : processing
+              ? { scaleY: [0.62, 1, 0.62], opacity: [0.45, 0.9, 0.45] }
+              : { scaleY: 0.72, opacity: 0.62 }}
+          transition={active
+            ? { duration: 0.76 + (index % 3) * 0.12, repeat: Infinity, delay: index * 0.045, ease: 'easeInOut' }
+            : processing
+              ? { duration: 0.9, repeat: Infinity, delay: index * 0.06, ease: 'easeInOut' }
+              : { duration: 0.16 }}
+        />
+      ))}
+    </div>
+  );
+});
+
+const formatVoiceTime = (seconds: number) =>
+  `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+async function preprocessRecordedAudio(recording: Blob): Promise<{ blob: Blob; filename: string }> {
+  const fallback = {
+    blob: recording,
+    filename: recording.type.includes('mp4')
+      ? 'singularity-recording.m4a'
+      : recording.type.includes('ogg')
+        ? 'singularity-recording.ogg'
+        : 'singularity-recording.webm',
+  };
+  const AudioContextClass = window.AudioContext
+    || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return fallback;
+
+  const context = new AudioContextClass();
+  try {
+    const decoded = await context.decodeAudioData(await recording.arrayBuffer());
+    const sampleRate = decoded.sampleRate;
+    const frameCount = decoded.length;
+    const channels = decoded.numberOfChannels;
+    const amplitudeAt = (frame: number) => {
+      let peak = 0;
+      for (let channel = 0; channel < channels; channel += 1) {
+        peak = Math.max(peak, Math.abs(decoded.getChannelData(channel)[frame] ?? 0));
+      }
+      return peak;
+    };
+    const silenceThreshold = 0.018;
+    let start = 0;
+    let end = frameCount;
+    while (start < end && amplitudeAt(start) < silenceThreshold) start += 1;
+    while (end > start && amplitudeAt(end - 1) < silenceThreshold) end -= 1;
+    const padding = Math.floor(sampleRate * 0.08);
+    start = Math.max(0, start - padding);
+    end = Math.min(frameCount, end + padding);
+    if (end - start < Math.floor(sampleRate * 0.08)) return fallback;
+
+    const mono = new Float32Array(end - start);
+    let peak = 0;
+    const channelData = Array.from({ length: channels }, (_, channel) => decoded.getChannelData(channel));
+    for (let frame = start; frame < end; frame += 1) {
+      let sample = 0;
+      for (const channel of channelData) sample += channel[frame] ?? 0;
+      sample /= Math.max(1, channelData.length);
+      mono[frame - start] = sample;
+      peak = Math.max(peak, Math.abs(sample));
+    }
+
+    const gain = peak > 0.001 ? Math.min(1.8, 0.92 / peak) : 1;
+    const wavBuffer = new ArrayBuffer(44 + mono.length * 2);
+    const view = new DataView(wavBuffer);
+    const writeString = (offset: number, value: string) => {
+      for (let index = 0; index < value.length; index += 1) {
+        view.setUint8(offset + index, value.charCodeAt(index));
+      }
+    };
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + mono.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, mono.length * 2, true);
+    for (let index = 0; index < mono.length; index += 1) {
+      const sample = Math.max(-1, Math.min(1, mono[index] * gain));
+      view.setInt16(44 + index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    }
+    const normalized = new Blob([wavBuffer], { type: 'audio/wav' });
+    return normalized.size <= 16 * 1024 * 1024
+      ? { blob: normalized, filename: 'singularity-recording.wav' }
+      : fallback;
+  } catch {
+    return fallback;
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
+
+export const MicrophoneControl = memo(function MicrophoneControl({
+  disabled = false,
+  state: controlledState,
+  errorMessage = 'Voice capture failed',
+  onStateChange,
+  onRecordingStart,
+  onRecordingStop,
+  onRetry,
+}: MicrophoneControlProps) {
+  const [localState, setLocalState] = useState<MicrophoneState>('idle');
+  const [elapsed, setElapsed] = useState(0);
+  const state = controlledState ?? localState;
+  const isControlled = controlledState !== undefined;
+  const startedAtRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const settleRef = useRef<number | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdActiveRef = useRef(false);
+  const suppressClickRef = useRef(false);
+
+  const updateState = useCallback((next: MicrophoneState) => {
+    setLocalState(next);
+    onStateChange?.(next);
+  }, [onStateChange]);
+
+  useEffect(() => {
+    if (state !== 'recording') {
+      if (timerRef.current !== null) window.clearInterval(timerRef.current);
+      timerRef.current = null;
+      if (state !== 'success') setElapsed(0);
+      return;
+    }
+
+    startedAtRef.current = Date.now();
+    setElapsed(0);
+    timerRef.current = window.setInterval(() => {
+      if (startedAtRef.current !== null) {
+        setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
+      }
+    }, 250);
+
+    return () => {
+      if (timerRef.current !== null) window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    };
+  }, [state]);
+
+  useEffect(() => () => {
+    if (timerRef.current !== null) window.clearInterval(timerRef.current);
+    if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+    if (holdTimerRef.current !== null) window.clearTimeout(holdTimerRef.current);
+  }, []);
+
+  const handleStart = useCallback(async () => {
+    if (disabled) return;
+    updateState('recording');
+    try {
+      await onRecordingStart?.();
+    } catch {
+      updateState('error');
+    }
+  }, [disabled, onRecordingStart, updateState]);
+
+  const handleStop = useCallback(async () => {
+    if (disabled) return;
+    updateState('processing');
+    try {
+      const callbackResult = onRecordingStop?.();
+      if (callbackResult && typeof (callbackResult as Promise<void>).then === 'function') {
+        await callbackResult;
+      } else if (!isControlled) {
+        await new Promise<void>(resolve => {
+          settleRef.current = window.setTimeout(resolve, 720);
+        });
+      }
+      if (!isControlled) updateState('success');
+    } catch {
+      updateState('error');
+    }
+  }, [disabled, isControlled, onRecordingStop, updateState]);
+
+  const handlePress = useCallback(async () => {
+    if (disabled) return;
+
+    if (state === 'error') {
+      onRetry?.();
+      updateState('idle');
+      return;
+    }
+
+    if (state === 'success') {
+      updateState('idle');
+      return;
+    }
+
+    if (state === 'idle') {
+      await handleStart();
+      return;
+    }
+
+    if (state === 'recording') {
+      await handleStop();
+    }
+  }, [disabled, handleStart, handleStop, onRetry, state, updateState]);
+
+  const handlePointerDown = useCallback(() => {
+    if (disabled || state !== 'idle') return;
+    holdTimerRef.current = window.setTimeout(() => {
+      holdActiveRef.current = true;
+      suppressClickRef.current = true;
+      void handleStart();
+    }, 450);
+  }, [disabled, handleStart, state]);
+
+  const handlePointerUp = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdActiveRef.current) {
+      holdActiveRef.current = false;
+      void handleStop();
+    }
+  }, [handleStop]);
+
+  const handleClick = useCallback(() => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    void handlePress();
+  }, [handlePress]);
+
+  const stateCopy: Record<MicrophoneState, { label: string; detail: string }> = {
+    idle: { label: 'Voice input', detail: 'Tap to speak' },
+    recording: { label: 'Listening', detail: formatVoiceTime(elapsed) },
+    processing: { label: 'Transcribing', detail: 'Working' },
+    success: { label: 'Captured', detail: 'Tap to speak again' },
+    error: { label: 'Voice unavailable', detail: 'Tap to retry' },
+  };
+  const copy = stateCopy[state];
+  const isActive = state === 'recording' || state === 'processing';
+
+  return (
+    <div className="relative flex min-w-0 items-center gap-2" aria-live="polite">
+      <AnimatePresence initial={false} mode="wait">
+        {isActive && (
+          <motion.div
+            key="voice-status"
+            initial={{ opacity: 0, x: 5, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 5, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            className="flex items-center gap-1.5 rounded-full border border-white/[0.08]
+              bg-white/[0.035] px-2.5 py-1.5 sm:flex"
+          >
+            <VoiceWaveform state={state} />
+            <span className="font-mono text-[10px] tabular-nums tracking-[0.08em] text-white/48">
+              {copy.detail}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button
+        type="button"
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={handleClick}
+        disabled={disabled || state === 'processing'}
+        aria-label={`${copy.label}. ${copy.detail}`}
+        aria-pressed={state === 'recording'}
+        title={`${copy.label} · ${copy.detail}`}
+        className={`group relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
+          border transition-all duration-200 active:scale-90
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d12]
+          disabled:cursor-not-allowed disabled:opacity-35 ${
+            state === 'recording'
+              ? 'border-rose-300/45 bg-rose-300/[0.13] text-rose-200 shadow-[0_0_0_4px_rgba(251,113,133,0.07),0_0_20px_rgba(251,113,133,0.16)] focus-visible:ring-rose-300/60'
+              : state === 'processing'
+                ? 'border-sky-300/30 bg-sky-300/[0.09] text-sky-200 focus-visible:ring-sky-300/50'
+                : state === 'success'
+                  ? 'border-emerald-300/30 bg-emerald-300/[0.10] text-emerald-200 focus-visible:ring-emerald-300/50'
+                  : state === 'error'
+                    ? 'border-amber-300/35 bg-amber-300/[0.09] text-amber-200 focus-visible:ring-amber-300/50'
+                    : 'border-white/[0.09] bg-white/[0.045] text-white/42 hover:border-white/[0.17] hover:bg-white/[0.09] hover:text-white/78 focus-visible:ring-white/40'
+          }`}
+      >
+        {state === 'recording'
+          ? <MicOff size={14} strokeWidth={2} />
+          : state === 'processing'
+            ? <VoiceWaveform state={state} />
+            : <Mic size={14} strokeWidth={1.9} />}
+        {state === 'recording' && (
+          <motion.span
+            className="absolute inset-[-4px] rounded-full border border-rose-300/30"
+            animate={{ opacity: [0, 0.7, 0], scale: [0.9, 1.18, 1.3] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+            aria-hidden="true"
+          />
+        )}
+      </button>
+
+      <span className="sr-only">
+        {state === 'error' ? `${errorMessage}. ${copy.detail}.` : `${copy.label}. ${copy.detail}.`}
+      </span>
+    </div>
+  );
+});
+
 // ─── Thinking indicator ───────────────────────────────────────────────────────
 const ThinkingDots = memo(function ThinkingDots() {
   return (
@@ -674,6 +1019,8 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
+  const [voiceState, setVoiceState] = useState<MicrophoneState>('idle');
+  const [voiceError, setVoiceError] = useState('');
   const workspace                       = useWorkspace();
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
@@ -705,6 +1052,16 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
   const thinkingStartRef = useRef<number>(0);
   const stickToBottomRef = useRef(true);
   const cooldownUntilRef = useRef(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingAnalyserRef = useRef<AnalyserNode | null>(null);
+  const recordingAudioContextRef = useRef<AudioContext | null>(null);
+  const recordingVadTimerRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef(0);
+  const recordingSilenceStartedAtRef = useRef<number | null>(null);
+  const recordingFinalizingRef = useRef(false);
+  const voiceResetTimerRef = useRef<number | null>(null);
 
   const prefersReducedMotion = useReducedMotion();
   const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - cooldownNow) / 1000));
@@ -736,6 +1093,190 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
     setCooldownUntil(0);
     setCooldownNow(Date.now());
   }, []);
+
+  const stopRecordingResources = useCallback(() => {
+    if (recordingVadTimerRef.current !== null) {
+      window.clearInterval(recordingVadTimerRef.current);
+      recordingVadTimerRef.current = null;
+    }
+    recordingAnalyserRef.current?.disconnect();
+    recordingAnalyserRef.current = null;
+    void recordingAudioContextRef.current?.close().catch(() => undefined);
+    recordingAudioContextRef.current = null;
+    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
+    recordingStreamRef.current = null;
+  }, []);
+
+  const setVoiceFailure = useCallback((message: string) => {
+    stopRecordingResources();
+    recorderRef.current = null;
+    recordingFinalizingRef.current = false;
+    setVoiceError(message);
+    setVoiceState('error');
+  }, [stopRecordingResources]);
+
+  const handleVoiceStart = useCallback(async () => {
+    setVoiceError('');
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceFailure('This browser does not support microphone recording.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48_000 },
+          sampleSize: { ideal: 16 },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+      ].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) {
+        stream.getTracks().forEach(track => track.stop());
+        setVoiceFailure('No supported recording format is available.');
+        return;
+      }
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128_000,
+      });
+      recordingStreamRef.current = stream;
+      recordingChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
+      recordingSilenceStartedAtRef.current = null;
+      recordingFinalizingRef.current = false;
+      recorderRef.current = recorder;
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+      recorder.start(250);
+
+      const AudioContextClass = window.AudioContext
+        || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const context = new AudioContextClass();
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.78;
+        source.connect(analyser);
+        recordingAudioContextRef.current = context;
+        recordingAnalyserRef.current = analyser;
+        const samples = new Uint8Array(analyser.fftSize);
+        recordingVadTimerRef.current = window.setInterval(() => {
+          const currentRecorder = recorderRef.current;
+          if (!currentRecorder || currentRecorder.state !== 'recording') return;
+          const elapsed = Date.now() - recordingStartedAtRef.current;
+          analyser.getByteTimeDomainData(samples);
+          const rms = Math.sqrt(
+            samples.reduce((sum, sample) => {
+              const normalized = (sample - 128) / 128;
+              return sum + normalized * normalized;
+            }, 0) / samples.length,
+          );
+          if (rms < 0.018 && elapsed > 650) {
+            recordingSilenceStartedAtRef.current ??= Date.now();
+            if (Date.now() - recordingSilenceStartedAtRef.current >= 2_000) {
+              void handleVoiceStop();
+            }
+          } else {
+            recordingSilenceStartedAtRef.current = null;
+          }
+          if (elapsed >= 60_000) void handleVoiceStop();
+        }, 100);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof DOMException && error.name === 'NotAllowedError'
+        ? 'Microphone permission was denied. Allow access and try again.'
+        : error instanceof DOMException && error.name === 'NotFoundError'
+          ? 'No microphone was found on this device.'
+          : 'Microphone could not be started.';
+      setVoiceFailure(message);
+    }
+  }, [setVoiceFailure]);
+
+  const handleVoiceStop = useCallback(async () => {
+    if (recordingFinalizingRef.current) return;
+    const recorder = recorderRef.current;
+    if (!recorder) {
+      setVoiceFailure('No active recording was found.');
+      return;
+    }
+    recordingFinalizingRef.current = true;
+    setVoiceState('processing');
+    stopRecordingResources();
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      const finish = () => resolve(new Blob(recordingChunksRef.current, { type: recorder.mimeType }));
+      recorder.addEventListener('stop', finish, { once: true });
+      recorder.addEventListener('error', () => reject(new Error('Recording failed.')), { once: true });
+      if (recorder.state === 'recording') recorder.stop();
+      else finish();
+    }).catch(() => null);
+    recorderRef.current = null;
+
+    if (!blob || blob.size === 0 || blob.size > 16 * 1024 * 1024) {
+      setVoiceFailure('The recording was empty or too large.');
+      return;
+    }
+
+    setVoiceError('');
+    let timeout: number | null = null;
+    try {
+      const preparedAudio = await preprocessRecordedAudio(blob);
+      const controller = new AbortController();
+      timeout = window.setTimeout(() => controller.abort(), 30_000);
+      const form = new FormData();
+      form.append('audio', preparedAudio.blob, preparedAudio.filename);
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => ({})) as { text?: unknown; error?: unknown };
+      const transcribedText = typeof result.text === 'string' ? result.text.trim() : '';
+      if (!response.ok || !transcribedText) {
+        throw new Error(typeof result.error === 'string' ? result.error : 'Transcription failed.');
+      }
+      setInput(previous => previous.trim() ? `${previous.trim()} ${transcribedText}` : transcribedText);
+      setVoiceState('success');
+      textareaRef.current?.focus();
+      if (voiceResetTimerRef.current !== null) window.clearTimeout(voiceResetTimerRef.current);
+      voiceResetTimerRef.current = window.setTimeout(() => setVoiceState('idle'), 2_200);
+    } catch (error: unknown) {
+      setVoiceFailure(error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')
+        ? 'Transcription timed out. Please try again.'
+        : error instanceof Error ? error.message : 'Transcription failed. Please try again.');
+    } finally {
+      if (timeout !== null) window.clearTimeout(timeout);
+    }
+  }, [setVoiceFailure, stopRecordingResources]);
+
+  useEffect(() => {
+    const stopIfInterrupted = () => {
+      if (recorderRef.current?.state === 'recording') void handleVoiceStop();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') stopIfInterrupted();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', stopIfInterrupted);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', stopIfInterrupted);
+      stopRecordingResources();
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+      if (voiceResetTimerRef.current !== null) window.clearTimeout(voiceResetTimerRef.current);
+    };
+  }, [handleVoiceStop, stopRecordingResources]);
 
   useEffect(() => {
     void prepareChatHistoryRepository().then(async () => {
@@ -1948,6 +2489,18 @@ export default function SingularityChat({ onClose }: { onClose?: () => void }) {
                   leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
                 aria-busy={composerLocked}
+              />
+              <MicrophoneControl
+                disabled={composerLocked || isThinking}
+                state={voiceState}
+                errorMessage={voiceError}
+                onStateChange={setVoiceState}
+                onRecordingStart={handleVoiceStart}
+                onRecordingStop={handleVoiceStop}
+                onRetry={() => {
+                  setVoiceError('');
+                  setVoiceState('idle');
+                }}
               />
               <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
