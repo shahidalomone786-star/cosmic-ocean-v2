@@ -113,7 +113,9 @@ function speakWithBrowser(text: string): Promise<void> {
 const markdownComponents = {
   // ── Block elements ─────────────────────────────────────────────────────────
   p: ({ children }: any) => (
-    <p className="mb-[1.1em] last:mb-0 leading-[1.8] text-white/85">{children}</p>
+    <p className="mb-6 last:mb-0 text-[17px] leading-[1.82] tracking-[0.002em] text-white/85">
+      {children}
+    </p>
   ),
   strong: ({ children }: any) => (
     <strong className="font-semibold text-white/95">{children}</strong>
@@ -131,42 +133,47 @@ const markdownComponents = {
     </a>
   ),
   ul: ({ children }: any) => (
-    <ul className="list-disc ml-6 mb-[1.1em] space-y-[0.45em] marker:text-white/30">{children}</ul>
+    <ul className="my-6 ml-6 list-disc space-y-2.5 marker:text-white/30">{children}</ul>
   ),
   ol: ({ children }: any) => (
-    <ol className="list-decimal ml-6 mb-[1.1em] space-y-[0.45em] marker:text-white/35">{children}</ol>
+    <ol className="my-6 ml-6 list-decimal space-y-2.5 marker:text-white/35">{children}</ol>
   ),
   li: ({ children }: any) => (
-    <li className="leading-[1.8] text-white/83">{children}</li>
+    <li className="pl-1 text-[17px] leading-[1.72] text-white/83">{children}</li>
   ),
   // ── Headings — document-grade hierarchy ───────────────────────────────────
   h1: ({ children }: any) => (
-    <h1 className="text-[22px] font-bold mt-9 mb-4 first:mt-0 text-white
-      tracking-[-0.02em] border-b border-white/[0.08] pb-3">
+    <h1 className="mt-12 mb-6 text-[36px] font-bold leading-[1.15] tracking-[-0.035em]
+      text-white first:mt-0">
       {children}
     </h1>
   ),
   h2: ({ children }: any) => (
-    <h2 className="text-[19px] font-semibold mt-8 mb-3 first:mt-0 text-white/97 tracking-[-0.015em]">
+    <h2 className="mt-12 mb-5 text-[28px] font-semibold leading-[1.2] tracking-[-0.028em]
+      text-white/97 first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }: any) => (
-    <h3 className="text-[16px] font-semibold mt-6 mb-2.5 first:mt-0 text-white/90 tracking-[-0.01em]">
+    <h3 className="mt-9 mb-4 text-[22px] font-semibold leading-[1.3] tracking-[-0.018em]
+      text-white/90 first:mt-0">
       {children}
     </h3>
   ),
   // ── Blockquote — elegant left accent ──────────────────────────────────────
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[3px] border-violet-400/40 pl-5 pr-2 py-1
-      italic text-white/55 my-5 bg-white/[0.015] rounded-r-lg">
+    <blockquote className="my-8 rounded-r-xl border-l-2 border-sky-300/45 bg-white/[0.025]
+      px-5 py-4 text-[16px] leading-[1.75] text-white/66 shadow-[inset_1px_0_rgba(255,255,255,0.02)]">
       {children}
     </blockquote>
   ),
+  hr: () => (
+    <hr className="my-12 border-0 border-t border-white/[0.08]" />
+  ),
   // ── Code blocks — refined dark surface ────────────────────────────────────
   pre: ({ children }: any) => (
-    <pre className="relative bg-[#08080b] border border-white/[0.08] rounded-xl
-      px-5 py-4 overflow-x-auto my-5 text-[13px] leading-[1.7]
+    <pre className="relative my-8 overflow-x-auto rounded-xl border border-white/[0.09]
+      bg-[#08080b] px-5 py-5 text-[14px] leading-[1.7]
       shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {children}
     </pre>
@@ -176,27 +183,33 @@ const markdownComponents = {
     return isBlock ? (
       <code className={`font-mono text-white/80 ${className || ''}`}>{children}</code>
     ) : (
-      <code className="bg-white/[0.07] border border-white/[0.08] text-violet-200/90
-        px-1.5 py-[2px] rounded-md text-[13px] font-mono">
+      <code className="rounded-md border border-white/[0.08] bg-white/[0.07] px-1.5 py-[2px]
+        font-mono text-[14px] text-violet-200/90">
         {children}
       </code>
     );
   },
   // ── Table support ─────────────────────────────────────────────────────────
   table: ({ children }: any) => (
-    <div className="overflow-x-auto my-5 rounded-xl border border-white/[0.07]">
-      <table className="w-full text-[14px]">{children}</table>
+    <div className="my-8 overflow-x-auto rounded-xl border border-white/[0.08]">
+      <table className="w-full min-w-[34rem] text-[15px] leading-[1.6]">{children}</table>
     </div>
   ),
   thead: ({ children }: any) => (
-    <thead className="border-b border-white/[0.07] bg-white/[0.025]">{children}</thead>
+    <thead className="border-b border-white/[0.08] bg-white/[0.035]">{children}</thead>
+  ),
+  tbody: ({ children }: any) => (
+    <tbody className="[&_tr:nth-child(even)]:bg-white/[0.012]">{children}</tbody>
+  ),
+  tr: ({ children }: any) => (
+    <tr className="border-b border-white/[0.045] last:border-b-0">{children}</tr>
   ),
   th: ({ children }: any) => (
-    <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.12em]
-      font-semibold text-white/40">{children}</th>
+    <th className="px-5 py-4 text-left text-[12px] font-semibold uppercase tracking-[0.12em]
+      text-white/48">{children}</th>
   ),
   td: ({ children }: any) => (
-    <td className="px-4 py-3 text-white/80 border-t border-white/[0.04]">{children}</td>
+    <td className="px-5 py-4 align-top text-white/78">{children}</td>
   ),
 };
 
@@ -209,8 +222,8 @@ const MessageContent = memo(function MessageContent({
 }) {
   const visibleContent = sanitizeVisibleResponse(content);
   return (
-    <div className={`text-[15px] leading-[1.75] tracking-[0.005em] text-white/85
-      overflow-x-auto overflow-y-hidden max-w-full ${className}`}>
+    <div className={`mx-auto w-full max-w-[70ch] overflow-x-auto overflow-y-hidden
+      text-white/85 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
