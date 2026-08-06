@@ -11,7 +11,7 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
 const MAX_HISTORY_CHARACTERS = 22_000;
-const MAX_COMPLETION_TOKENS = 1_500;
+const MAX_MESSAGE_ESTIMATED_TOKENS = 6_000;
 const lastSingularityRequestByClient = new Map<string, number>();
 
 function getSingularityClientKey(req: Request): string {
@@ -466,6 +466,34 @@ function trimHistoryWindow(historyMessages: ChatRequestMessage[]): ChatRequestMe
   return retained.reverse();
 }
 
+/**
+ * Apply the final request-size guard after the system prompt, history, and
+ * newest user turn have been assembled. The system prompt and newest user
+ * message are invariants; only the oldest historical message may be removed.
+ *
+ * The estimate intentionally follows the provider-safe rule used for this
+ * route: serialized JSON characters divided by four. Keeping the messages
+ * estimate at or below 6,000 leaves 2,000 estimated tokens for the 1,500-token
+ * completion plus request overhead and safety margin.
+ */
+function estimateMessageTokens(messages: ChatRequestMessage[]): number {
+  return JSON.stringify(messages).length / 4;
+}
+
+function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatRequestMessage[] {
+  const boundedMessages = [...messages];
+
+  while (
+    estimateMessageTokens(boundedMessages) > MAX_MESSAGE_ESTIMATED_TOKENS &&
+    boundedMessages.length > 2
+  ) {
+    // Index 0 is the system prompt and the final item is the newest user turn.
+    boundedMessages.splice(1, 1);
+  }
+
+  return boundedMessages;
+}
+
 // ── POST /api/singularity ─────────────────────────────────────────────────────
 router.post('/singularity', async (req, res) => {
   const { message, history } = req.body ?? {};
@@ -565,14 +593,33 @@ router.post('/singularity', async (req, res) => {
     : trimHistoryWindow(historyMessages);
   // Keep Singularity's persona as the first message for every provider/model.
   // In particular, Qwen vision requests must not bypass the system instruction.
-  const messages: { role: string; content: unknown }[] = [
+  const messages: ChatRequestMessage[] = [
     { role: 'system',    content: FULL_SYSTEM_PROMPT },
     ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
   ];
+  const boundedMessages = trimMessagesToRequestBudget(messages);
+  const estimatedMessageTokens = estimateMessageTokens(boundedMessages);
+
+  // A single system prompt plus the newest user turn can itself be too large
+  // (most commonly with an oversized image payload). Do not send an unsafe
+  // request and rely on Groq to reject it; preserve the newest turn and fail
+  // explicitly before the provider call instead.
+  if (estimatedMessageTokens > MAX_MESSAGE_ESTIMATED_TOKENS) {
+    res.status(413).json({
+      success: false,
+      error: 'This message is too large to process with the current context budget.',
+      status: 413,
+      details: {
+        estimatedMessageTokens: Math.ceil(estimatedMessageTokens),
+        maxEstimatedMessageTokens: MAX_MESSAGE_ESTIMATED_TOKENS,
+      },
+    });
+    return;
+  }
 
   console.log(
-    `[singularity] Request: "${message.slice(0, 60)}…"  history=${hasImages ? 0 : safeHistory.length} turn(s)  model=${model} images=${visionImages.length}`
+    `[singularity] Request: "${message.slice(0, 60)}…"  history=${hasImages ? 0 : safeHistory.length} turn(s)  boundedMessages=${boundedMessages.length} estimatedInputTokens=${Math.ceil(estimatedMessageTokens)} model=${model} images=${visionImages.length}`
   );
 
   const maxAttempts = getGroqKeyCount();
@@ -597,10 +644,10 @@ router.post('/singularity', async (req, res) => {
         signal,
         body: JSON.stringify({
            model,
-          messages,
+           messages: boundedMessages,
           stream:      true,
           temperature: 0.6,
-           max_tokens:  MAX_COMPLETION_TOKENS,
+           max_tokens: 1500,
         }),
       });
 
