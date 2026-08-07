@@ -9,13 +9,6 @@
  *   • RAG:      exportChunks(text, chunkSize) for vector indexing
  */
 
-// ── PDF.js worker setup (Vite local asset — avoids CDN CORS issues) ──────────
-// The '?url' suffix tells Vite to treat the worker as a static asset URL
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
 // ── Supported formats ────────────────────────────────────────────────────────
 
 export const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.csv', '.json', '.pdf'] as const;
@@ -154,6 +147,13 @@ export interface PdfResult {
  * Never uploads the file; all processing is local in the browser.
  */
 export async function extractPdfText(file: File): Promise<PdfResult> {
+  // PDF.js and its 2 MB worker are optional document tooling. Keep both out
+  // of the initial chat bundle and load them only for a real PDF attachment.
+  const [pdfjsLib, workerModule] = await Promise.all([
+    import('pdfjs-dist'),
+    import('pdfjs-dist/build/pdf.worker.mjs?url'),
+  ]);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;

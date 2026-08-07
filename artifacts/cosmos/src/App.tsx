@@ -2,12 +2,19 @@ import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from '
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
 import { useLocation } from 'wouter';
-// NasaSearch has runtime named exports used throughout — keep as static import
-import NasaSearch, { DetailModal, SourceBadge, type UnifiedItem, type WikiItem, type NasaItem, type ArxivItem, type SpaceXItem, type CernItem, type NasaStatus, type SearchSections } from './components/NasaSearch';
-import LibraryView, { type LibrarySharedContext } from './components/LibraryView';
+import type { UnifiedItem, WikiItem, NasaItem, ArxivItem, SpaceXItem, CernItem, NasaStatus, SearchSections } from './components/NasaSearch';
+import type { LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
+// Secondary surfaces are loaded only when their UI is opened or search results
+// need to render. Keeping these out of the entry graph makes the chat shell
+// available without downloading every science tool.
+const NasaSearch = lazy(() => import('./components/NasaSearch'));
+const DetailModal = lazy(async () => ({
+  default: (await import('./components/NasaSearch')).DetailModal,
+}));
 const SingularityChat = lazy(() => import('./components/SingularityChat'));
 const SingularitySettingsPage = lazy(() => import('./components/settings/SingularitySettingsPage'));
+const LibraryView = lazy(() => import('./components/LibraryView'));
 // Heavy modals — code-split so they don't bloat the initial bundle
 const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
 const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
@@ -15,10 +22,11 @@ const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModa
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
 const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
-import VideoPlayerModal, { type VideoItem } from './components/VideoPlayerModal';
+const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
+import type { VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
-import ProfileModal from './components/ProfileModal';
-import SimulationSearch from './components/SimulationSearch';
+const ProfileModal = lazy(() => import('./components/ProfileModal'));
+const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
@@ -899,7 +907,7 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
       )}
       <div className="p-3">
         <div className="flex items-center gap-1.5 mb-1">
-          <SourceBadge source="wiki" />
+          <PortalSourceBadge lm={lm} />
         </div>
         <p className={`text-[12px] font-medium leading-snug tracking-wide truncate mb-1 ${lm ? 'text-slate-900' : 'text-white'}`}>{item.title}</p>
         {snippet && (
@@ -907,6 +915,19 @@ function PortalWikiCard({ item, onSelect, lm }: { item: WikiItem; onSelect: () =
         )}
       </div>
     </motion.div>
+  );
+}
+
+function PortalSourceBadge({ lm }: { lm?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border backdrop-blur-md ${
+      lm
+        ? 'bg-amber-50 border-amber-200 text-amber-700'
+        : 'bg-amber-400/15 border-amber-300/20 text-amber-200/90'
+    }`}>
+      <BookOpen size={9} strokeWidth={2.5} />
+      Wikipedia
+    </span>
   );
 }
 
@@ -1904,6 +1925,7 @@ export default function App() {
   const [isLoadingMore,    setIsLoadingMore]    = useState(false);
   const [selectedCard,     setSelectedCard]     = useState<UnifiedItem | null>(null);
   const [searchSections,   setSearchSections]   = useState<SearchSections | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // ── Recent searches (localStorage) ───────────────────────────────────────
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -1947,6 +1969,10 @@ export default function App() {
   // ── Restore session from httpOnly cookie on mount ────────────────────────
   useEffect(() => {
     useAuthStore.getState().checkSession();
+  }, []);
+
+  useEffect(() => () => {
+    searchAbortRef.current?.abort();
   }, []);
 
   // ── Restore search query from URL on mount (?q=) ─────────────────────────
@@ -2028,6 +2054,9 @@ export default function App() {
       history.replaceState(null, '', url.toString());
     } catch { /* noop */ }
     const everything = mode === 'everything';
+    searchAbortRef.current?.abort();
+    const requestController = new AbortController();
+    searchAbortRef.current = requestController;
     setIsEverythingMode(everything);
     setSearchStatus('loading');
     setSearchResults([]);
@@ -2042,7 +2071,8 @@ export default function App() {
 
     try {
       const resp = await fetch(
-        `/api/search/unified?q=${encodeURIComponent(actualQuery)}&page=1`
+        `/api/search/unified?q=${encodeURIComponent(actualQuery)}&page=1`,
+        { signal: requestController.signal }
       );
       // Non-2xx: try to parse body anyway; if that fails fall back to empty sections
       let data: SearchSections;
@@ -2061,6 +2091,7 @@ export default function App() {
       setSearchStatus('done');
       saveRecentSearch(term);
     } catch (err: unknown) {
+      if (requestController.signal.aborted) return;
       if (import.meta.env.DEV) console.error('[searchAll]', err);
       // Degrade gracefully: show empty results, never crash
       setSearchSections({
@@ -2186,18 +2217,24 @@ export default function App() {
   useEffect(() => {
     const q = nasaQuery.trim();
     if (!q) { setAcSuggestions([]); return; }
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
         const url =
           `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}` +
           `&limit=6&namespace=0&format=json&origin=*`;
-        const res  = await fetch(url);
+        const res  = await fetch(url, { signal: controller.signal });
         const data = await res.json() as [string, string[]];
         // data[1] is the array of suggestion titles
         setAcSuggestions((data[1] ?? []).slice(0, 6));
-      } catch { setAcSuggestions([]); }
+      } catch {
+        if (!controller.signal.aborted) setAcSuggestions([]);
+      }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [nasaQuery]);
 
   // ── Share — copy ?q=… URL to clipboard ──────────────────────────────────
@@ -2763,35 +2800,37 @@ export default function App() {
                     )}
                   </AnimatePresence>
                 </div>
-                <NasaSearch
-                  results={searchResults}
-                  status={searchStatus}
-                  errMsg={searchError}
-                  onClear={clearSearch}
-                  onCardClick={setSelectedCard}
-                  sentinelRef={sentinelRef}
-                  isEverythingMode={isEverythingMode}
-                  isLoadingMore={isLoadingMore}
-                  videoResults={videoResults}
-                  videoStatus={videoStatus}
-                  onVideoClick={setActiveVideo}
-                  lm={lm}
-                  sections={searchSections}
-                  chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
-                  onSectionItemShare={(avatarName, title, desc, src) => {
-                    openChatWithContext(avatarName, {
-                      title,
-                      description: desc,
-                      source: src as 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern',
-                    });
-                  }}
-                  onRelatedTopicSearch={topic => {
-                    setNasaQuery(topic);
-                    searchAll(topic, 'specific');
-                  }}
-                  onLoadMore={loadMore}
-                  shortsHasMore={searchSections?.hasMore ?? true}
-                />
+                <Suspense fallback={null}>
+                  <NasaSearch
+                    results={searchResults}
+                    status={searchStatus}
+                    errMsg={searchError}
+                    onClear={clearSearch}
+                    onCardClick={setSelectedCard}
+                    sentinelRef={sentinelRef}
+                    isEverythingMode={isEverythingMode}
+                    isLoadingMore={isLoadingMore}
+                    videoResults={videoResults}
+                    videoStatus={videoStatus}
+                    onVideoClick={setActiveVideo}
+                    lm={lm}
+                    sections={searchSections}
+                    chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+                    onSectionItemShare={(avatarName, title, desc, src) => {
+                      openChatWithContext(avatarName, {
+                        title,
+                        description: desc,
+                        source: src as 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern',
+                      });
+                    }}
+                    onRelatedTopicSearch={topic => {
+                      setNasaQuery(topic);
+                      searchAll(topic, 'specific');
+                    }}
+                    onLoadMore={loadMore}
+                    shortsHasMore={searchSections?.hasMore ?? true}
+                  />
+                </Suspense>
               </div>
             )}
           </motion.div>
@@ -2964,7 +3003,9 @@ export default function App() {
               </div>
 
               {/* ── Simulation Search ── */}
-              <SimulationSearch lm={lm} />
+              <Suspense fallback={null}>
+                <SimulationSearch lm={lm} />
+              </Suspense>
 
               {/* ── Biology Hub Hero Card ── */}
               <BioHeroCard lm={lm} onOpen={() => setShowBiologyHub(true)} />
@@ -3242,11 +3283,13 @@ export default function App() {
       {/* ── z-30  Library ── */}
       <AnimatePresence>
         {showLibrary && (
-          <LibraryView
-            onClose={() => setShowLibrary(false)}
-            onDiscussWithAvatar={handleLibraryDiscuss}
-            avatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
-          />
+          <Suspense fallback={null}>
+            <LibraryView
+              onClose={() => setShowLibrary(false)}
+              onDiscussWithAvatar={handleLibraryDiscuss}
+              avatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
@@ -3300,7 +3343,11 @@ export default function App() {
 
       {/* ── z-[350]  Profile Modal ── */}
       <AnimatePresence>
-        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} lm={lm} />}
+        {showProfile && (
+          <Suspense fallback={null}>
+            <ProfileModal onClose={() => setShowProfile(false)} lm={lm} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       {/* ── z-[150]  Cosmic Nexus Social Hub ── */}
@@ -3353,28 +3400,32 @@ export default function App() {
       {/* ── z-[350]  Video Player Modal ── */}
       <AnimatePresence>
         {activeVideo && (
-          <VideoPlayerModal
-            video={activeVideo}
-            onClose={() => setActiveVideo(null)}
-            lm={lm}
-          />
+          <Suspense fallback={null}>
+            <VideoPlayerModal
+              video={activeVideo}
+              onClose={() => setActiveVideo(null)}
+              lm={lm}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       {/* ── z-[200]  NASA Detail Modal ── */}
       <AnimatePresence>
         {selectedCard && (
-          <DetailModal
-            item={selectedCard}
-            onClose={() => setSelectedCard(null)}
-            lm={lm}
-            chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
-            onShareToChat={(avatarName) => {
-              const ctx = buildSharedContext(selectedCard);
-              setSelectedCard(null);
-              openChatWithContext(avatarName, ctx);
-            }}
-          />
+          <Suspense fallback={null}>
+            <DetailModal
+              item={selectedCard}
+              onClose={() => setSelectedCard(null)}
+              lm={lm}
+              chatAvatars={AVATARS.map(a => ({ name: a.name, image: a.image }))}
+              onShareToChat={(avatarName) => {
+                const ctx = buildSharedContext(selectedCard);
+                setSelectedCard(null);
+                openChatWithContext(avatarName, ctx);
+              }}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 

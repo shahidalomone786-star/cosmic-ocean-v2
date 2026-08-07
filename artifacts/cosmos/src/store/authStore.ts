@@ -65,7 +65,9 @@ function buildProfile(authUser: SupabaseAuthUser, row?: ProfileRow | null): User
   };
 }
 
-async function fetchOrCreateProfile(authUser: SupabaseAuthUser): Promise<UserProfile> {
+const profileRequests = new Map<string, Promise<UserProfile>>();
+
+async function loadProfile(authUser: SupabaseAuthUser): Promise<UserProfile> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -94,6 +96,17 @@ async function fetchOrCreateProfile(authUser: SupabaseAuthUser): Promise<UserPro
   }
 
   return buildProfile(authUser, data);
+}
+
+function fetchOrCreateProfile(authUser: SupabaseAuthUser): Promise<UserProfile> {
+  const existing = profileRequests.get(authUser.id);
+  if (existing) return existing;
+
+  const request = loadProfile(authUser).finally(() => {
+    profileRequests.delete(authUser.id);
+  });
+  profileRequests.set(authUser.id, request);
+  return request;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
