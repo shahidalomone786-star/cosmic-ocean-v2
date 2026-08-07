@@ -3,6 +3,53 @@ const MIN_CHUNK_LENGTH = 100;
 const MAX_CHUNK_LENGTH = 200;
 const MAX_PREFETCHED_MESSAGES = 24;
 
+async function readTtsAudioResponse(response: Response): Promise<Blob> {
+  const contentType = response.headers.get('content-type') ?? 'unknown';
+  const contentLength = response.headers.get('content-length') ?? 'unknown';
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    const detail = body.trim().slice(0, 240);
+    const message = `Edge TTS request failed (${response.status} ${response.statusText || 'Unknown status'})`
+      + (detail ? `: ${detail}` : '');
+    console.error('[EdgeTTS] Upstream request failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      contentLength,
+      message: detail || response.statusText || 'No response body',
+    });
+    throw new Error(message);
+  }
+
+  if (!contentType.toLowerCase().includes('audio/mpeg')) {
+    const body = await response.text().catch(() => '');
+    const detail = body.trim().slice(0, 240);
+    const message = `Edge TTS returned an unexpected response (${contentType})`
+      + (detail ? `: ${detail}` : '');
+    console.error('[EdgeTTS] Unexpected response format:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      contentLength,
+      message: detail || 'No response body',
+    });
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  if (blob.size === 0) {
+    const message = 'Edge TTS returned an empty audio response.';
+    console.error('[EdgeTTS] Empty audio response:', {
+      status: response.status,
+      contentType,
+      contentLength,
+      receivedBytes: blob.size,
+    });
+    throw new Error(message);
+  }
+  return blob;
+}
+
 export function cleanTtsText(text: string): string {
   return text
     .replace(/\\\[([\s\S]*?)\\\]/g, ' formula ')
@@ -160,18 +207,7 @@ export function prefetchTtsAudio(messageId: string, text: string): void {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: chunk }),
       });
-      if (!response.ok) {
-        let message = `Edge TTS request failed (${response.status})`;
-        try {
-          const body = await response.json() as { error?: string };
-          if (body.error) message = body.error;
-        } catch {
-          // Keep the status-based error when the server did not return JSON.
-        }
-        throw new Error(message);
-      }
-
-      const blob = await response.blob();
+      const blob = await readTtsAudioResponse(response);
       const current = prefetchCache.get(messageId);
       if (current !== record) return;
       record.blobs[index] = blob;
@@ -291,18 +327,7 @@ export class TtsPlaybackQueue {
       body: JSON.stringify({ text: chunk }),
       signal: this.signal,
     });
-    if (!response.ok) {
-      let message = `Edge TTS request failed (${response.status})`;
-      try {
-        const body = await response.json() as { error?: string };
-        if (body.error) message = body.error;
-      } catch {
-        // Keep the status-based error when the server did not return JSON.
-      }
-      throw new Error(message);
-    }
-
-    const blob = await response.blob();
+    const blob = await readTtsAudioResponse(response);
     this.assertActive();
     const url = URL.createObjectURL(blob);
     this.audioCache.set(chunk, url);
@@ -340,18 +365,32 @@ export class TtsPlaybackQueue {
         error ? reject(error) : resolve();
       };
       audio.onended = () => finish();
-      audio.onerror = () => finish(new Error('Edge TTS audio playback failed.'));
+      audio.onerror = () => {
+        const mediaError = audio.error;
+        const detail = mediaError
+          ? ` (media code ${mediaError.code}${mediaError.message ? `: ${mediaError.message}` : ''})`
+          : '';
+        console.error('[EdgeTTS] Listen audio element failed:', {
+          mediaCode: mediaError?.code ?? null,
+          mediaMessage: mediaError?.message ?? null,
+          source: audio.currentSrc || audio.src,
+        });
+        finish(new Error(`Edge TTS audio playback failed${detail}.`));
+      };
       this.signal.addEventListener('abort', () => {
         audio.pause();
         finish(new DOMException('TTS playback aborted', 'AbortError'));
       }, { once: true });
       audio.src = url;
+      audio.load();
       audio.volume = 1;
       audio.play().catch(error => {
         const playbackError = normalizePlaybackError(error);
-        if (playbackError.name === 'NotAllowedError') {
-          console.error('[EdgeTTS] Browser blocked Listen playback:', playbackError);
-        }
+        console.error('[EdgeTTS] Listen audio.play() failed:', {
+          name: playbackError.name,
+          message: playbackError.message,
+          source: audio.currentSrc || audio.src,
+        });
         finish(playbackError);
       });
     }));

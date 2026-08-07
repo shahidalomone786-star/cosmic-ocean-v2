@@ -96,34 +96,58 @@ router.post("/tts", async (req, res) => {
 
   try {
     const edgeTts = new EdgeTTS();
-    // EdgeTTS creates the Microsoft-compatible SSML document internally from
-    // this bounded Unicode-preserving text and the exact multilingual voice.
-    // Forward the provider's audio frames immediately instead of waiting for
-    // the library's buffered synthesize() call to assemble the whole chunk.
-    res.status(200);
-    res.set("Content-Type", "audio/mpeg");
-    res.set("Cache-Control", "no-store");
-    res.flushHeaders();
-
-    for await (const audioChunk of edgeTts.synthesizeStream(speechText, EDGE_VOICE, {
+    // EdgeTTS supplies Microsoft-compatible User-Agent, Origin, cookie, and
+    // Sec-MS-GEC headers internally. Buffer the complete MP3 before sending it:
+    // browsers can reject a MediaElement source when a provider stream ends
+    // without a complete MP3 frame sequence.
+    await edgeTts.synthesize(speechText, EDGE_VOICE, {
       outputFormat: EDGE_OUTPUT_FORMAT,
       rate: EDGE_RATE,
       volume: 0,
       pitch: "+0Hz",
-    })) {
-      if (res.destroyed) return;
-      res.write(Buffer.from(audioChunk));
+    });
+    const audioBuffer = edgeTts.toBuffer();
+    if (!audioBuffer.length) {
+      throw new Error("Edge TTS returned an empty audio buffer.");
     }
-    res.end();
+
+    res.status(200);
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Length": String(audioBuffer.length),
+      "Cache-Control": "no-store",
+      "Content-Disposition": "inline; filename=\"cosmos-tts.mp3\"",
+    });
+    res.send(audioBuffer);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[tts] Edge TTS synthesis failed:", message);
+    const providerError = error as {
+      code?: unknown;
+      status?: unknown;
+      statusCode?: unknown;
+      message?: unknown;
+      response?: { status?: unknown; statusCode?: unknown; statusText?: unknown };
+    };
+    const providerStatus = providerError.response?.status
+      ?? providerError.response?.statusCode
+      ?? providerError.statusCode
+      ?? providerError.status
+      ?? "unknown";
+    const message = typeof providerError.message === "string"
+      ? providerError.message
+      : String(error);
+    req.log.error({
+      provider: "Microsoft Edge TTS",
+      status: providerStatus,
+      code: providerError.code ?? "unknown",
+      message,
+    }, "[tts] Edge TTS synthesis failed");
     if (res.headersSent) {
       res.destroy(error instanceof Error ? error : new Error(message));
     } else {
       res.status(503).json({
         code: "EDGE_TTS_UNAVAILABLE",
         error: "Speech synthesis is temporarily unavailable.",
+        detail: message,
       });
     }
   }
