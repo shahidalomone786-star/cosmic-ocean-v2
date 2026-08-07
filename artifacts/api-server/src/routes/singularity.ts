@@ -168,6 +168,7 @@ interface VisionImage {
 
 function sanitiseImageInputs(value: unknown): VisionImage[] {
   if (!Array.isArray(value)) return [];
+  const seenDataUrls = new Set<string>();
 
   return value.slice(0, 5).flatMap((candidate: ImageInput) => {
     if (!candidate || typeof candidate !== 'object') return [];
@@ -186,6 +187,8 @@ function sanitiseImageInputs(value: unknown): VisionImage[] {
       dataUrl.length > 3_000_000 ||
       !hasSignature
     ) return [];
+    if (seenDataUrls.has(dataUrl)) return [];
+    seenDataUrls.add(dataUrl);
 
     const filename = typeof candidate.filename === 'string'
       ? candidate.filename.replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '_').slice(0, 180) || 'image'
@@ -270,7 +273,6 @@ function splitReasoning(raw: string): { reasoning: string; content: string } {
 interface HistoryMsg {
   role: 'user' | 'assistant';
   content: string;
-  images?: VisionImage[];
 }
 
 function sanitiseHistory(history: unknown): HistoryMsg[] {
@@ -282,11 +284,18 @@ function sanitiseHistory(history: unknown): HistoryMsg[] {
       ((m as any).role === 'user' || (m as any).role === 'assistant')
     )
     .filter(m => typeof (m as any).content === 'string' && (m as any).content.trim().length > 0)
-    .map(m => ({
-      role: (m as any).role as 'user' | 'assistant',
-      content: (m as any).content.trim(),
-      images: sanitiseImageInputs((m as any).images),
-    }));
+    .map(m => {
+      const content = (m as any).content.trim();
+      const hasPreviousImage = Array.isArray((m as any).images) && (m as any).images.length > 0;
+      return {
+        role: (m as any).role as 'user' | 'assistant',
+        // Image bytes are never part of historical context. Keep only a tiny
+        // marker so the model knows that turn included an image.
+        content: hasPreviousImage && !content.includes('[Previous image]')
+          ? `${content}\n[Previous image]`
+          : content,
+      };
+    });
 }
 
 interface ChatRequestMessage {
@@ -308,7 +317,19 @@ function trimHistoryWindow(historyMessages: ChatRequestMessage[]): ChatRequestMe
  * character budget that is logged and checked before the provider call.
  */
 function estimateMessageTokens(messages: ChatRequestMessage[]): number {
-  return JSON.stringify(messages).length / 4;
+  // Base64 image data is transport encoding, not text context. Counting it as
+  // ordinary characters makes one valid image look like thousands of tokens
+  // and rejects otherwise safe vision requests. Estimate the structured
+  // message envelope while replacing each image URL with a small marker.
+  const estimationMessages = messages.map(message => ({
+    ...message,
+    content: Array.isArray(message.content)
+      ? message.content.map((part: any) => part?.type === 'image_url'
+          ? { ...part, image_url: { ...part.image_url, url: '[image]' } }
+          : part)
+      : message.content,
+  }));
+  return JSON.stringify(estimationMessages).length / 4;
 }
 
 function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatRequestMessage[] {
@@ -351,9 +372,8 @@ function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatReques
     }
     if (changed) continue;
 
-    // If the current turn itself is oversized, truncate it rather than
-    // allowing an unsafe request to reach Groq.
-    if (shrinkStringMessage(boundedMessages.length - 1)) continue;
+    // Never truncate the current user message or image. If the system prompt
+    // plus current turn cannot fit, fail explicitly rather than corrupting it.
     break;
   }
 
@@ -398,8 +418,9 @@ router.post('/singularity', async (req, res) => {
   }
 
   const safeHistory = sanitiseHistory(history);
-  const historyHasImages = safeHistory.some(turn => (turn.images?.length ?? 0) > 0);
-  const hasImages = images.length > 0 || historyHasImages;
+  // Only the request's active images are eligible for the vision turn. Any
+  // image information in history has already been reduced to a placeholder.
+  const hasImages = images.length > 0;
   const provider = 'Groq';
   const model = hasImages ? VISION_MODEL : TEXT_MODEL;
 
@@ -423,15 +444,9 @@ router.post('/singularity', async (req, res) => {
       ]
     : message.trim();
   // Vision requests are intentionally stateless at the transport boundary:
-  // retained history can add thousands of input tokens on top of image data.
-  // Reuse the most recent retained image for image follow-ups, but never send
-  // the prior text turns or assistant responses to Qwen.
-  const visionImages = images.length > 0
-    ? images
-    : [...safeHistory]
-        .reverse()
-        .flatMap(turn => turn.images ?? [])
-        .slice(0, 5);
+  // the active image(s) arrive in `images` exactly once, while history only
+  // contains text and "[Previous image]" placeholders.
+  const visionImages = images;
   const visionUserContent = visionImages.length > 0
     ? [
         { type: 'text', text: message.trim() },
@@ -443,18 +458,7 @@ router.post('/singularity', async (req, res) => {
     : message.trim();
   const historyMessages = hasImages
     ? []
-    : safeHistory.map(turn => ({
-        role: turn.role,
-        content: turn.images?.length
-          ? [
-              { type: 'text', text: turn.content },
-              ...turn.images.map(image => ({
-                type: 'image_url',
-                image_url: { url: image.dataUrl },
-              })),
-            ]
-          : turn.content,
-      }));
+    : safeHistory.map(turn => ({ role: turn.role, content: turn.content }));
   const boundedHistoryMessages = hasImages
     ? []
     : trimHistoryWindow(historyMessages);

@@ -2801,24 +2801,16 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     ]);
 
     const currentMessages = messagesRef.current;
-    const latestImageMessageId = [...currentMessages]
-      .reverse()
-      .find(m => m.attachedImages?.length)?.id;
+    // Historical image turns stay as placeholders. Only images attached to
+    // this request are eligible for the structured vision payload.
+    const activeImages = requestImages;
     const safeHistory = currentMessages
       .filter(m => m.id !== 'welcome' && !m.error && m.content.trim().length > 0)
       .slice(-12)
       .map(m => ({
         role: m.role,
         content: m.content.trim(),
-        // Re-send only the latest prior image turn. The UI keeps every image
-        // in history, while the request stays bounded and responsive.
-        ...(m.id === latestImageMessageId && m.attachedImages?.length
-          ? { images: m.attachedImages.map(image => ({
-              filename: image.filename,
-              mimeType: image.mimeType,
-              dataUrl: image.dataUrl,
-            })) }
-          : {}),
+        ...(m.attachedImages?.length ? { content: `${m.content.trim()}\n[Previous image]` } : {}),
       }));
 
     try {
@@ -2829,7 +2821,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
            message: userText,
            history: safeHistory,
            voiceMode,
-           images: requestImages.map(image => ({
+           images: activeImages.map(image => ({
              filename: image.filename,
              mimeType: image.mimeType,
              dataUrl: image.dataUrl,
