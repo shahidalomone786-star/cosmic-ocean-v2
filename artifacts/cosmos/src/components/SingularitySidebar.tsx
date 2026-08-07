@@ -516,7 +516,7 @@ function SidebarContents({
             <Search size={14} />
           </button>
         ) : (
-          <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-white/35 transition-colors focus-within:border-violet-300/35 focus-within:bg-white/[0.025] focus-within:text-white/70">
+          <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-white/35 transition-colors focus-within:border-white/[0.18] focus-within:bg-white/[0.025] focus-within:text-white/70">
             <Search size={13} className="flex-shrink-0" />
             <input
               ref={searchRef}

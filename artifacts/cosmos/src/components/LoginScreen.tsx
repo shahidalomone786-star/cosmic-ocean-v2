@@ -58,7 +58,7 @@ function Field({
         autoComplete={autoComplete}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-white/[0.04] border border-white/[0.10] hover:border-white/[0.20] focus:border-[rgba(147,112,219,0.7)] focus:bg-white/[0.06] rounded-lg px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none transition-all duration-200 font-mono"
+          className="w-full bg-white/[0.04] border border-white/[0.10] hover:border-white/[0.20] focus:border-white/[0.24] focus:bg-white/[0.06] rounded-lg px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none focus:outline-none focus:ring-0 transition-all duration-200 font-mono"
         style={{ backdropFilter: 'blur(4px)' }}
       />
     </div>

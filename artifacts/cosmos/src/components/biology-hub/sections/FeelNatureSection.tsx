@@ -123,6 +123,7 @@ function playScrollSound() {
     gain.connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.04);
+    osc.addEventListener('ended', () => { void audioCtx.close().catch(() => undefined); }, { once: true });
   } catch (_) { /* silent fallback */ }
 }
 

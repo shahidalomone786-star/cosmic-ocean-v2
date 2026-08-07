@@ -2577,7 +2577,7 @@ export default function App() {
                 <div className={`w-full backdrop-blur-[32px] rounded-full px-5 py-3.5 flex items-center gap-3 transition-all duration-300 ${
                   lm
                     ? 'bg-white/[0.60] border border-black/[0.09] shadow-[0_0_0_1px_rgba(0,0,0,0.04),0_8px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] focus-within:border-black/[0.16] focus-within:bg-white/[0.74] focus-within:shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_10px_48px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)]'
-                    : 'bg-white/[0.055] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_8px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-violet-400/[0.28] focus-within:bg-white/[0.075] focus-within:shadow-[0_0_0_1px_rgba(167,139,250,0.10),0_8px_48px_rgba(0,0,0,0.75),0_0_28px_rgba(139,92,246,0.09),inset_0_1px_0_rgba(255,255,255,0.12)]'
+                    : 'bg-white/[0.055] border border-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_8px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.09)] focus-within:border-white/[0.18] focus-within:bg-white/[0.075] focus-within:shadow-[0_8px_48px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.12)]'
                 }`}>
                   <Search
                     size={16}
@@ -2595,7 +2595,7 @@ export default function App() {
                     onBlur={() => setFocused(false)}
                     onChange={e => { setNasaQuery(e.target.value); if (!e.target.value.trim()) clearSearch(); }}
                     onKeyDown={e => { if (e.key === 'Enter') searchAll(nasaQuery); }}
-                    className={`flex-1 bg-transparent outline-none text-[15px] tracking-wide font-light leading-relaxed ${
+                    className={`flex-1 bg-transparent outline-none focus:outline-none focus:ring-0 text-[15px] tracking-wide font-light leading-relaxed ${
                       lm ? 'text-slate-900 placeholder-slate-400/75' : 'text-white/95 placeholder-white/28'
                     }`}
                   />
@@ -2900,7 +2900,7 @@ export default function App() {
                     }
                   }}
                   placeholder="Search everything in the cosmos…"
-                  className="w-full bg-transparent outline-none text-white placeholder-white/35 text-[15px] tracking-wide font-light"
+                  className="w-full bg-transparent outline-none focus:outline-none focus:ring-0 text-white placeholder-white/35 text-[15px] tracking-wide font-light"
                   autoFocus />
               </div>
             </div>
@@ -2937,7 +2937,7 @@ export default function App() {
                     ✦ Singularity Nexus
                   </h2>
                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
-                    DeepSeek R1 AI
+                    GPT-OSS-120B
                   </span>
                 </div>
                 <SingularityLaunchButton />

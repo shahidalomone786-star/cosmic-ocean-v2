@@ -88,6 +88,10 @@ function revokePrefetchRecord(record: TtsPrefetchRecord): void {
   record.urls.forEach(url => {
     if (url) URL.revokeObjectURL(url);
   });
+  // Wake any playback queue that was waiting for a record which has since
+  // been replaced or evicted. It will fall back to a direct request instead
+  // of retaining a promise that can never settle.
+  record.resolveReady.forEach(resolve => resolve());
 }
 
 function trimPrefetchCache(): void {
@@ -298,7 +302,9 @@ export class TtsPlaybackQueue {
       throw new Error(message);
     }
 
-    const url = URL.createObjectURL(await response.blob());
+    const blob = await response.blob();
+    this.assertActive();
+    const url = URL.createObjectURL(blob);
     this.audioCache.set(chunk, url);
     return url;
   }
@@ -464,6 +470,7 @@ export function primeVoiceAudio(): Promise<void> {
   audio.load();
   try {
     sharedVoiceAudioUnlockPromise = audio.play().then(() => {
+      if (sharedVoiceAudio !== audio) return;
       sharedVoiceAudioUnlocked = true;
       audio.pause();
       audio.currentTime = 0;
@@ -472,13 +479,16 @@ export function primeVoiceAudio(): Promise<void> {
       audio.muted = false;
       audio.volume = 1;
     }).catch(error => {
+      if (sharedVoiceAudio !== audio) return;
       const playbackError = normalizePlaybackError(error);
       console.error('[EdgeTTS] Gesture audio unlock failed:', playbackError);
       audio.muted = false;
       audio.volume = 1;
     }).finally(() => {
-      sharedVoiceAudioUnlocking = false;
-      sharedVoiceAudioUnlockPromise = null;
+      if (sharedVoiceAudio === audio) {
+        sharedVoiceAudioUnlocking = false;
+        sharedVoiceAudioUnlockPromise = null;
+      }
     });
   } catch (error) {
     console.error('[EdgeTTS] Gesture audio unlock failed:', normalizePlaybackError(error));
@@ -530,6 +540,8 @@ export class TtsStreamingQueue {
   private speakerEnabled = true;
   private playbackStarted = false;
   private audioUnlockPromise: Promise<void> = Promise.resolve();
+  private retryTimer: number | null = null;
+  private retryWaitResolve: (() => void) | null = null;
 
   constructor(
     private readonly onLevel?: TtsLevelListener,
@@ -574,6 +586,13 @@ export class TtsStreamingQueue {
   stop(): void {
     this.stopped = true;
     this.controller.abort();
+    if (this.retryTimer !== null) {
+      window.clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+      const resolveRetry = this.retryWaitResolve;
+      this.retryWaitResolve = null;
+      resolveRetry?.();
+    }
     this.pending.length = 0;
     this.stopLevelMeter();
     this.playbackStarted = false;
@@ -625,7 +644,18 @@ export class TtsStreamingQueue {
             if (error instanceof DOMException && error.name === 'AbortError') throw error;
             lastError = error instanceof Error ? error : new Error(String(error));
             if (attempt === 0 && !this.stopped) {
-              await new Promise<void>(resolve => window.setTimeout(resolve, 160));
+              await new Promise<void>(resolve => {
+                if (this.stopped) {
+                  resolve();
+                  return;
+                }
+                this.retryWaitResolve = resolve;
+                this.retryTimer = window.setTimeout(() => {
+                  this.retryTimer = null;
+                  this.retryWaitResolve = null;
+                  resolve();
+                }, 160);
+              });
             }
           }
         }

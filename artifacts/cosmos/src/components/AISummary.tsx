@@ -435,7 +435,7 @@ const FollowUpPanel = memo(function FollowUpPanel({ originalQuery, contextSnippe
 
       {/* Input row */}
       <div
-        className="flex items-center gap-2 rounded-2xl px-4 py-3 transition-all duration-200 focus-within:border-violet-400/30"
+        className="flex items-center gap-2 rounded-2xl px-4 py-3 transition-all duration-200 focus-within:border-white/[0.18]"
         style={{
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.09)',

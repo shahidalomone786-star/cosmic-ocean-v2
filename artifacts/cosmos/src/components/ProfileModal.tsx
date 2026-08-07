@@ -429,7 +429,7 @@ function EditView({ onCancel, onSaved, lm }: { onCancel: () => void; onSaved: ()
             placeholder={user.username}
             className={`w-full px-5 py-4 rounded-2xl text-[16px] font-light outline-none transition-all ${
               lm
-                ? 'bg-white border border-gray-200 text-gray-900 placeholder-gray-300 focus:border-purple-400'
+                ? 'bg-white border border-gray-200 text-gray-900 placeholder-gray-300 focus:border-gray-300'
                 : 'bg-transparent text-white'
             }`}
             style={lm ? undefined : {

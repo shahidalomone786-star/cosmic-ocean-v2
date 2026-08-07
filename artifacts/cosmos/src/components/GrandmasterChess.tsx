@@ -51,6 +51,7 @@ function playMoveSound() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + 0.15);
+    oscillator.addEventListener('ended', () => { void ctx.close().catch(() => undefined); }, { once: true });
   } catch { /* silent fail */ }
 }
 

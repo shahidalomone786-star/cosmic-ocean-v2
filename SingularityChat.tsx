@@ -1,10 +1,10 @@
 /**
- * SingularityChat — Premium DeepSeek R1 reasoning chat widget
+ * SingularityChat — Premium GPT-OSS-120B reasoning chat widget
  * ────────────────────────────────────────────────────────────
  * NEW DEPENDENCIES (run in Replit shell before this compiles):
  *   npm install react-markdown remark-gfm remark-math rehype-katex katex
  *
- * PHASE 3 (Groq/DeepSeek wiring) — search this file for "PHASE 3":
+ * PHASE 3 (Groq model wiring) — search this file for "PHASE 3":
  *   1. generateResponse(): swap the mock setTimeout for a real fetch to your
  *      Groq route, reading the stream and calling the same setMessages
  *      calls used here (same shape: { reasoning, content }).
@@ -394,7 +394,7 @@ const generateResponse = useCallback(async (userText: string) => {
             <h2 className="text-[14px] font-semibold tracking-wide text-white/95" style={{ fontFamily: 'var(--app-font-heading)' }}>
               Singularity
             </h2>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Powered by DeepSeek R1</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Powered by GPT-OSS-120B</p>
           </div>
         </div>
         {onClose && (

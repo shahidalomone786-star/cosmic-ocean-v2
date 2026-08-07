@@ -129,7 +129,7 @@ function AvatarPicker({
                 value={customUrl}
                 onChange={e => setCustomUrl(e.target.value)}
                 placeholder="https://example.com/avatar.jpg"
-                className="flex-1 bg-white/[0.04] border border-white/[0.08] focus:border-purple-400/50 rounded-lg px-3 py-2 text-[12px] text-white placeholder-white/20 outline-none font-mono"
+            className="flex-1 bg-white/[0.04] border border-white/[0.08] focus:border-white/[0.22] rounded-lg px-3 py-2 text-[12px] text-white placeholder-white/20 outline-none focus:outline-none focus:ring-0 font-mono"
               />
               <motion.button
                 whileTap={{ scale: 0.96 }}

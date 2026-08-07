@@ -1,5 +1,5 @@
 /**
- * SingularityChat — Full-screen immersive DeepSeek R1 chat
+ * SingularityChat — Full-screen immersive GPT-OSS-120B chat
  * ─────────────────────────────────────────────────────────
  * Full-screen solid dark background (bg-[#09090b]), centered max-w-3xl
  * content column, neural TTS "Listen" button on every AI message.
@@ -365,7 +365,7 @@ const WelcomeHero = memo(function WelcomeHero({ reducedMotion }: { reducedMotion
     >
       <h1
         id="singularity-hero-title"
-        className="text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold leading-[0.94]
+        className="pt-1 text-[clamp(2.75rem,8vw,5.25rem)] font-extrabold leading-[1.05]
           tracking-[-0.07em] text-white"
         style={{ fontFamily: 'var(--app-font-heading)' }}
       >
@@ -1459,6 +1459,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const recordingStartedAtRef = useRef(0);
   const recordingSilenceStartedAtRef = useRef<number | null>(null);
   const recordingFinalizingRef = useRef(false);
+  const recordingRequestAbortRef = useRef<AbortController | null>(null);
+  const recordingTranscriptionTimeoutRef = useRef<number | null>(null);
   const voiceResetTimerRef = useRef<number | null>(null);
   const voiceRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceRecordingStreamRef = useRef<MediaStream | null>(null);
@@ -1478,6 +1480,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const voicePlaybackGuardUntilRef = useRef(0);
   const voiceSessionRef = useRef(0);
   const voiceRequestAbortRef = useRef<AbortController | null>(null);
+  const voiceTranscriptionTimeoutRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
   const voiceTtsQueueRef = useRef<TtsStreamingQueue | null>(null);
   const voiceSentenceBufferRef = useRef('');
   const voiceLastAssistantContentRef = useRef('');
@@ -1618,6 +1622,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   }, []);
 
   const setVoiceFailure = useCallback((message: string) => {
+    if (!mountedRef.current) return;
     stopRecordingResources();
     recorderRef.current = null;
     recordingFinalizingRef.current = false;
@@ -1760,6 +1765,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       const controller = new AbortController();
       voiceRequestAbortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 30_000);
+      voiceTranscriptionTimeoutRef.current = timeout;
       const form = new FormData();
       form.append('audio', preparedAudio.blob, preparedAudio.filename);
       const response = await fetch('/api/transcribe', {
@@ -1768,6 +1774,9 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         signal: controller.signal,
       });
       window.clearTimeout(timeout);
+      if (voiceTranscriptionTimeoutRef.current === timeout) {
+        voiceTranscriptionTimeoutRef.current = null;
+      }
       const result = await response.json().catch(() => ({})) as { text?: unknown; error?: unknown };
       const text = typeof result.text === 'string' ? result.text.trim() : '';
       if (sessionId !== voiceSessionRef.current) return;
@@ -1783,6 +1792,10 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       console.error('[SingularityChat] Voice Mode transcription pipeline failed:', error);
       resumeListening();
     } finally {
+      if (voiceTranscriptionTimeoutRef.current !== null) {
+        window.clearTimeout(voiceTranscriptionTimeoutRef.current);
+        voiceTranscriptionTimeoutRef.current = null;
+      }
       voiceRequestAbortRef.current = null;
     }
   }, [stopVoiceModeResources]);
@@ -2138,16 +2151,20 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
 
     setVoiceError('');
     let timeout: number | null = null;
+    let controller: AbortController | null = null;
     try {
       const preparedAudio = await preprocessRecordedAudio(blob);
-      const controller = new AbortController();
-      timeout = window.setTimeout(() => controller.abort(), 30_000);
+      const requestController = new AbortController();
+      controller = requestController;
+      recordingRequestAbortRef.current = requestController;
+      timeout = window.setTimeout(() => requestController.abort(), 30_000);
+      recordingTranscriptionTimeoutRef.current = timeout;
       const form = new FormData();
       form.append('audio', preparedAudio.blob, preparedAudio.filename);
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: form,
-        signal: controller.signal,
+        signal: requestController.signal,
       });
       const result = await response.json().catch(() => ({})) as { text?: unknown; error?: unknown };
       const transcribedText = typeof result.text === 'string' ? result.text.trim() : '';
@@ -2160,15 +2177,23 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       if (voiceResetTimerRef.current !== null) window.clearTimeout(voiceResetTimerRef.current);
       voiceResetTimerRef.current = window.setTimeout(() => setVoiceState('idle'), 2_200);
     } catch (error: unknown) {
+      if (!mountedRef.current) return;
       setVoiceFailure(error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')
         ? 'Transcription timed out. Please try again.'
         : error instanceof Error ? error.message : 'Transcription failed. Please try again.');
     } finally {
       if (timeout !== null) window.clearTimeout(timeout);
+      if (recordingTranscriptionTimeoutRef.current === timeout) {
+        recordingTranscriptionTimeoutRef.current = null;
+      }
+      if (recordingRequestAbortRef.current === controller) {
+        recordingRequestAbortRef.current = null;
+      }
     }
   }, [setVoiceFailure, stopRecordingResources]);
 
   useEffect(() => {
+    mountedRef.current = true;
     const stopIfInterrupted = () => {
       if (recorderRef.current?.state === 'recording') void handleVoiceStop();
     };
@@ -2178,11 +2203,30 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('pagehide', stopIfInterrupted);
     return () => {
+      mountedRef.current = false;
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', stopIfInterrupted);
+      recordingRequestAbortRef.current?.abort();
+      recordingRequestAbortRef.current = null;
+      if (recordingTranscriptionTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTranscriptionTimeoutRef.current);
+        recordingTranscriptionTimeoutRef.current = null;
+      }
+      const recorder = recorderRef.current;
+      if (recorder) {
+        recorder.ondataavailable = null;
+        if (recorder.state === 'recording' || recorder.state === 'paused') {
+          try {
+            recorder.stop();
+          } catch {
+            // The recorder may already be inactive during page teardown.
+          }
+        }
+      }
+      recorderRef.current = null;
       stopRecordingResources();
-      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
       if (voiceResetTimerRef.current !== null) window.clearTimeout(voiceResetTimerRef.current);
+      voiceResetTimerRef.current = null;
     };
   }, [handleVoiceStop, stopRecordingResources]);
 
@@ -2226,11 +2270,24 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   useEffect(() => () => {
     voiceSessionRef.current += 1;
     voiceRequestAbortRef.current?.abort();
+    voiceRequestAbortRef.current = null;
+    if (voiceTranscriptionTimeoutRef.current !== null) {
+      window.clearTimeout(voiceTranscriptionTimeoutRef.current);
+      voiceTranscriptionTimeoutRef.current = null;
+    }
     voiceTtsQueueRef.current?.stop();
+    voiceTtsQueueRef.current = null;
+    if (voiceRestartTimerRef.current !== null) {
+      window.clearTimeout(voiceRestartTimerRef.current);
+      voiceRestartTimerRef.current = null;
+    }
     releaseVoiceAudio();
     if (voiceRecordingStreamRef.current) {
       voiceRecordingStreamRef.current.getTracks().forEach(track => track.stop());
       voiceRecordingStreamRef.current = null;
+    }
+    if (voiceRecorderRef.current) {
+      voiceRecorderRef.current.ondataavailable = null;
     }
     stopVoiceModeResources();
   }, [stopVoiceModeResources]);
@@ -3470,7 +3527,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
               className={`relative rounded-2xl border bg-[#0d0d12] transition-gpu ${
                 isDragOver
                   ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
-                  : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_0_0_1px_rgba(139,92,246,0.13),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                 : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
               }`}
               onDragOver={handleDragOver}
               onDragEnter={handleDragOver}
@@ -3612,8 +3669,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                 }
                 rows={1}
                 disabled={composerLocked}
-                className="w-full min-w-0 flex-1 resize-none bg-transparent pl-10 text-left text-[14px] text-white/90
-                  placeholder:text-white/22 outline-none max-h-[160px] min-h-[26px]
+                 className="w-full min-w-0 flex-1 resize-none bg-transparent pl-10 text-left text-[14px] text-white/90
+                   placeholder:text-white/22 outline-none focus:outline-none focus:ring-0 max-h-[160px] min-h-[26px]
                   leading-relaxed py-[2px] disabled:opacity-60"
                 aria-label="Message Singularity"
                 aria-busy={composerLocked}

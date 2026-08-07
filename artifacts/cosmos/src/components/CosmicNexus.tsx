@@ -673,8 +673,8 @@ function CommentModal({ post, lm, onClose, onRefresh }: {
             style={{ resize: 'none' }}
             className={`flex-1 px-3.5 py-2.5 rounded-xl border text-[13px] leading-relaxed outline-none transition-all ${
               lm
-                ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
-                : 'bg-white/[0.05] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/60 focus:bg-white/[0.07]'
+                 ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:bg-gray-50'
+                 : 'bg-white/[0.05] border-white/[0.09] text-white placeholder-white/25 focus:border-white/[0.22] focus:bg-white/[0.07]'
             }`}
           />
           <motion.button
@@ -848,8 +848,8 @@ function CreatePostModal({ onClose, onSuccess, lm }: {
               rows={4}
               className={`w-full px-4 py-3 rounded-xl border text-[14px] leading-relaxed outline-none resize-none transition-all ${
                 lm
-                  ? 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
-                  : 'bg-white/[0.05] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/60 focus:bg-white/[0.07]'
+                   ? 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:bg-white'
+                   : 'bg-white/[0.05] border-white/[0.09] text-white placeholder-white/25 focus:border-white/[0.22] focus:bg-white/[0.07]'
               }`}
             />
             {/* Character counter */}
@@ -1727,13 +1727,13 @@ function SearchTab({ posts, loading, lm, onComment, onRefresh, onViewUser }: {
       {/* Sticky controls */}
       <div className={`px-4 pt-4 pb-3 border-b ${lm ? 'bg-gray-50 border-gray-100' : 'bg-[#080810] border-white/[0.05]'}`}>
         {/* Search input */}
-        <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${lm ? 'bg-white border-gray-200 shadow-sm focus-within:border-purple-300 focus-within:shadow-md' : 'bg-white/[0.06] border-white/[0.10] focus-within:border-white/[0.22] focus-within:bg-white/[0.09]'}`}>
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${lm ? 'bg-white border-gray-200 shadow-sm focus-within:border-gray-300' : 'bg-white/[0.06] border-white/[0.10] focus-within:border-white/[0.22] focus-within:bg-white/[0.09]'}`}>
           <svg viewBox="0 0 24 24" className={`w-4 h-4 flex-shrink-0 ${lm ? 'stroke-gray-400' : 'stroke-white/30'}`} fill="none" strokeWidth={2.5}>
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
           <input value={q} onChange={e => setQ(e.target.value)}
             placeholder={active === 'users' ? 'Search by username…' : 'Search the cosmos…'}
-            className={`flex-1 bg-transparent outline-none text-[14px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`} />
+             className={`flex-1 bg-transparent outline-none focus:outline-none focus:ring-0 text-[14px] ${lm ? 'text-gray-900 placeholder-gray-400' : 'text-white placeholder-white/25'}`} />
           {q && (
             <button onClick={() => setQ('')} className={`text-[18px] leading-none ${lm ? 'text-gray-400 hover:text-gray-600' : 'text-white/30 hover:text-white/60'}`}>×</button>
           )}
@@ -2199,8 +2199,8 @@ function DirectMessageModal({ peer, lm, onClose }: {
           style={{ resize: 'none' }}
           className={`flex-1 px-3.5 py-2.5 rounded-2xl border text-[13px] leading-relaxed outline-none transition-all ${
             lm
-              ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
-              : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/50 focus:bg-white/[0.08]'
+               ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:bg-gray-50'
+               : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-white/[0.22] focus:bg-white/[0.08]'
           }`}
         />
         <motion.button
@@ -2363,8 +2363,8 @@ function ChatTab({ lm }: { lm?: boolean }) {
           style={{ resize: 'none' }}
           className={`flex-1 px-3.5 py-2.5 rounded-2xl border text-[13px] leading-relaxed outline-none transition-all ${
             lm
-              ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-purple-400 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.1)]'
-              : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-violet-500/50 focus:bg-white/[0.08]'
+              ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-gray-300 focus:bg-gray-50'
+              : 'bg-white/[0.06] border-white/[0.09] text-white placeholder-white/25 focus:border-white/[0.22] focus:bg-white/[0.08]'
           }`}
         />
         <motion.button

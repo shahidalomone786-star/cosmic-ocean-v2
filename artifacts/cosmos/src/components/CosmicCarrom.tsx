@@ -124,6 +124,7 @@ function playCoinSound() {
     gain.gain.setValueAtTime(0.18, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.13);
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.16);
+    osc.addEventListener('ended', () => { void ctx.close().catch(() => undefined); }, { once: true });
   } catch { /* silent */ }
 }
 
@@ -138,6 +139,7 @@ function playPocketSound() {
     gain.gain.setValueAtTime(0.24, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.42);
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.48);
+    osc.addEventListener('ended', () => { void ctx.close().catch(() => undefined); }, { once: true });
   } catch { /* silent */ }
 }
 
