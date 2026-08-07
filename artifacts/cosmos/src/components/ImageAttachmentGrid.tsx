@@ -42,6 +42,8 @@ export const ImageAttachmentGrid = memo(function ImageAttachmentGrid({
             alt={image.filename}
             loading="lazy"
             decoding="async"
+            width={image.width}
+            height={image.height}
             className="block aspect-[4/3] w-full object-cover"
           />
           <figcaption className="flex items-center gap-1.5 border-t border-white/[0.08] px-2 py-1.5">

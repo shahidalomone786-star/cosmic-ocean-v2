@@ -716,7 +716,6 @@ body {
  * overflow-anchor: none prevents scroll-anchoring reflows on append.
  */
 .perf-scroll {
-  will-change: scroll-position;
   overflow-anchor: none;
   -webkit-overflow-scrolling: touch; /* momentum scroll on iOS */
 }

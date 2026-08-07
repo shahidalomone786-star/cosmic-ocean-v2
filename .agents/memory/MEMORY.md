@@ -12,3 +12,4 @@
 - [Singularity design system](singularity-design-system.md) — shared tokens and primitives own timing, focus, elevation, and reduced-motion behavior
 - [Singularity settings hub](singularity-settings-hub.md) — versioned local preferences stay isolated from chat transport; destructive history actions clear IndexedDB and localStorage
 - [Singularity Workspace canvas](singularity-workspace-canvas.md) — browser-local editorial artifacts stay separate from original chat messages and backend contracts
+- [Singularity scroll performance](singularity-scroll-performance.md) — keep native content-visibility, frame-coalesced scroll metrics, and bottom-only auto-follow

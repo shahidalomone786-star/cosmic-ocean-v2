@@ -1198,7 +1198,7 @@ const ThinkingDots = memo(function ThinkingDots() {
 
 interface MessageRowProps {
   message: Message;
-  isThinking: boolean;
+  isUserActionDisabled: boolean;
   isLastAssistant: boolean;
   isGenerating: boolean;
   showActions: boolean;
@@ -1212,7 +1212,7 @@ interface MessageRowProps {
 
 const MessageRow = memo(function MessageRow({
   message: msg,
-  isThinking,
+  isUserActionDisabled,
   isLastAssistant,
   isGenerating,
   showActions,
@@ -1245,7 +1245,7 @@ const MessageRow = memo(function MessageRow({
         <UserMessageActions
           text={msg.content}
           onEdit={handleEdit}
-          disabled={isThinking}
+          disabled={isUserActionDisabled}
         >
           <div className="bg-white/[0.075] border border-white/[0.14] text-white/92
             rounded-2xl rounded-br-[4px] px-4 py-3.5
@@ -1441,6 +1441,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   } = useImageAttachments();
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
+  const messagesContentRef = useRef<HTMLDivElement>(null);
   const scrollBoxRef     = useRef<HTMLDivElement>(null);
   const textareaRef      = useRef<HTMLTextAreaElement>(null);
   const composerShellRef = useRef<HTMLDivElement>(null);
@@ -1487,6 +1488,9 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const composerFocusTimerRef = useRef<number | null>(null);
   const composerScrollTimerRef = useRef<number | null>(null);
   const streamUpdateFrameRef = useRef<number | null>(null);
+  const scrollMetricsFrameRef = useRef<number | null>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
+  const showScrollButtonRef = useRef(false);
   const pendingStreamUpdateRef = useRef<{
     messageId: string;
     reasoning?: string;
@@ -1523,11 +1527,20 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       const index = previous.findIndex(message => message.id === update.messageId);
       if (index < 0) return previous;
       const message = previous[index];
+      const nextReasoning = update.reasoning ?? message.reasoning ?? '';
+      const nextContent = update.content ?? message.content ?? '';
+      if (
+        message.reasoning === nextReasoning
+        && message.content === nextContent
+        && message.reasoningSeconds === update.reasoningSeconds
+      ) {
+        return previous;
+      }
       const next = [...previous];
       next[index] = {
         ...message,
-        reasoning: update.reasoning ?? message.reasoning ?? '',
-        content: update.content ?? message.content ?? '',
+        reasoning: nextReasoning,
+        content: nextContent,
         reasoningSeconds: update.reasoningSeconds,
       };
       return next;
@@ -2620,22 +2633,67 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Smart auto-scroll — instant during streaming to prevent jitter.
-  // scrollIntoView(smooth) re-triggers on every token update and fights itself;
-  // direct scrollTop assignment is jitter-free and respects the stick-to-bottom gate.
-  useEffect(() => {
-    if (!stickToBottomRef.current) return;
-    const el = scrollBoxRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isThinking]);
-
-  const handleScroll = useCallback(() => {
+  const updateScrollMetrics = useCallback(() => {
+    scrollMetricsFrameRef.current = null;
     const el = scrollBoxRef.current;
     if (!el) return;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     stickToBottomRef.current = dist < 80;
-    setShowScrollBtn(dist > 160);
+    const shouldShow = dist > 160;
+    if (showScrollButtonRef.current !== shouldShow) {
+      showScrollButtonRef.current = shouldShow;
+      setShowScrollBtn(shouldShow);
+    }
   }, []);
+
+  // Scroll events can arrive faster than React can render. Keep the listener
+  // passive and do one layout read per animation frame instead of one per event.
+  const handleScroll = useCallback(() => {
+    if (scrollMetricsFrameRef.current !== null) return;
+    scrollMetricsFrameRef.current = window.requestAnimationFrame(updateScrollMetrics);
+  }, [updateScrollMetrics]);
+
+  useEffect(() => {
+    const el = scrollBoxRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    updateScrollMetrics();
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      if (scrollMetricsFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollMetricsFrameRef.current);
+        scrollMetricsFrameRef.current = null;
+      }
+    };
+  }, [handleScroll, updateScrollMetrics]);
+
+  // Smart auto-scroll — one compositor-aligned write per frame while the user
+  // is at the bottom. This follows streamed layout growth without fighting a
+  // user who has scrolled up.
+  const requestAutoScroll = useCallback(() => {
+    if (!stickToBottomRef.current || autoScrollFrameRef.current !== null) return;
+    autoScrollFrameRef.current = window.requestAnimationFrame(() => {
+      autoScrollFrameRef.current = null;
+      if (!stickToBottomRef.current) return;
+      const el = scrollBoxRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, []);
+
+  useEffect(() => {
+    requestAutoScroll();
+  }, [messages, isThinking, requestAutoScroll]);
+
+  // Markdown, KaTeX, code blocks, and lazy images can expand after the React
+  // commit. Follow those layout changes only when the user is already at the
+  // bottom, without polling or forcing layout reads on every streamed token.
+  useEffect(() => {
+    const content = messagesContentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(requestAutoScroll);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [requestAutoScroll]);
 
   const scrollToBottom = useCallback(() => {
     stickToBottomRef.current = true;
@@ -2654,6 +2712,12 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     }
     if (streamUpdateFrameRef.current !== null) {
       window.cancelAnimationFrame(streamUpdateFrameRef.current);
+    }
+    if (scrollMetricsFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollMetricsFrameRef.current);
+    }
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
     }
     pendingStreamUpdateRef.current = null;
   }, []);
@@ -3304,12 +3368,11 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       <div className="relative flex-1 min-h-0">
         <div
           ref={scrollBoxRef}
-          onScroll={handleScroll}
-          className="h-full overflow-y-auto px-1 scrollbar-hide sm:px-0"
+          className="perf-scroll h-full overflow-y-auto px-1 scrollbar-hide sm:px-0"
           aria-live="polite"
         >
           {/* Centered column */}
-          <div className={`mx-auto flex w-full max-w-4xl flex-col gap-0 px-4 py-7 sm:px-8 sm:py-8 ${
+          <div ref={messagesContentRef} className={`mx-auto flex w-full max-w-4xl flex-col gap-0 px-4 py-7 sm:px-8 sm:py-8 ${
             messages.length === 1 && messages[0]?.id === 'welcome' && !isThinking
               ? 'min-h-full items-center justify-center'
               : ''
@@ -3328,7 +3391,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                   <MessageRow
                     key={message.id}
                     message={message}
-                    isThinking={isThinking}
+                    isUserActionDisabled={message.role === 'user' && isThinking}
                     isLastAssistant={isLastAssistant}
                     isGenerating={isGenerating}
                     showActions={showActions}
