@@ -7,6 +7,7 @@
 import { Router, type Request } from 'express';
 import { fetchGroq, getGroqKeyCount, hasGroqKeys } from '../lib/groq';
 import { COOKIE_NAME, verifyToken } from '../lib/jwt';
+import { stmts } from '../lib/db';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
@@ -73,8 +74,82 @@ function claimSingularityCooldown(req: Request, voiceMode = false): number {
   return 0;
 }
 
+// ── Identity context ──────────────────────────────────────────────────────────
+// Creator and user identity are deliberately separate. The creator is a stable
+// product fact; a user's name must come from a trusted account or an explicit
+// statement in the current conversation and must never be inferred from the
+// creator attribution.
+const CREATOR_NAME = 'Shahid';
+
+interface SingularityIdentity {
+  creatorName: string;
+  userName: string | null;
+  userNameSource: 'account' | 'explicit' | 'unknown';
+}
+
+function getAuthenticatedUserName(req: Request): string | null {
+  const token = req.cookies?.[COOKIE_NAME] as string | undefined;
+  if (!token) return null;
+  const payload = verifyToken(token);
+  if (!payload) return null;
+  const user = stmts.getUserById.get(payload.sub);
+  const username = user?.username?.trim();
+  return username ? username.slice(0, 80) : null;
+}
+
+function extractExplicitUserName(texts: string[]): string | null {
+  const namePattern = /\b(?:my name is|i am|i'm)\s+([A-Za-z][A-Za-z0-9'-]*(?:\s+[A-Za-z][A-Za-z0-9'-]*){0,3})(?=\s+(?:and|but|because|from|who|which)\b|[.!?,;\n]|$)/gi;
+  for (const text of texts.slice().reverse()) {
+    let match: RegExpExecArray | null;
+    while ((match = namePattern.exec(text)) !== null) {
+      const candidate = match[1].replace(/\s+/g, ' ').trim();
+      if (candidate && !/^(?:a|an|the|just|not|here|looking|wondering)\b/i.test(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
+function resolveSingularityIdentity(req: Request, userMessages: string[], currentMessage: string): SingularityIdentity {
+  const explicitName = extractExplicitUserName([...userMessages, currentMessage]);
+  if (explicitName) {
+    return { creatorName: CREATOR_NAME, userName: explicitName, userNameSource: 'explicit' };
+  }
+  const accountName = getAuthenticatedUserName(req);
+  if (accountName) {
+    return { creatorName: CREATOR_NAME, userName: accountName, userNameSource: 'account' };
+  }
+  return { creatorName: CREATOR_NAME, userName: null, userNameSource: 'unknown' };
+}
+
+function isCreatorIdentityQuestion(text: string): boolean {
+  return /\b(?:who\s+(?:created|made|developed|built)\s+(?:you|singularity|this\s+ai|the\s+ai|this\s+portal)|who\s+is\s+your\s+creator|creator(?:'s)?\s+name|who\s+is\s+shahid|are\s+you\s+shahid)\b/i.test(text);
+}
+
+function buildIdentitySystemInstruction(identity: SingularityIdentity, currentMessage: string): string {
+  const userName = identity.userName ?? 'unknown';
+  const creatorContext = isCreatorIdentityQuestion(currentMessage)
+    ? `
+The creator identity is relevant to this request:
+- creatorName: ${identity.creatorName}
+If asked who created, built, or developed Singularity, answer that it was created/developed by ${identity.creatorName}.
+If asked whether you are ${identity.creatorName}, answer that you are Singularity and ${identity.creatorName} is your creator, not you.`
+    : `
+Creator attribution is not relevant to this request. Do not volunteer it or mention the creator.`;
+  return `━━━ IDENTITY BOUNDARY (AUTHORITATIVE) ━━━
+Creator identity and current-user identity are completely separate.
+- userName: ${userName}
+- userNameSource: ${identity.userNameSource}
+
+Never assume the current user is the creator. Never greet or address the user as the creator unless that person's identity is independently established as the current user's name. Do not volunteer creator information in greetings or unrelated answers.
+If the user asks for their name and userName is unknown, answer naturally: "I don't know your name yet." Never guess a name.
+If the user explicitly states a name in this conversation, that name may be used as the user's name and must not be replaced with creatorName.
+${creatorContext}`;
+}
+
 // ── System prompt ─────────────────────────────────────────────────────────────
-const CORE_SYSTEM_PROMPT = `You are **Singularity**—a premium AI research assistant built into this portal by **Shahid**. The user's name is Shahid.
+const CORE_SYSTEM_PROMPT = `You are **Singularity**—a premium AI research assistant built into this portal.
 
 Your purpose is to help users think clearly, reason rigorously, solve problems accurately, and explore ideas with intellectual honesty.
 
@@ -124,7 +199,7 @@ $$
 ...
 $$
 
-If asked who created or built you, briefly credit **Shahid**.
+If asked who created or built you, follow the authoritative identity boundary supplied with this request.
 
 If asked whether you are an AI, answer honestly.
 
@@ -394,7 +469,22 @@ function sanitiseHistory(history: unknown): HistoryMsg[] {
           ? `${content}\n[Previous image]`
           : content,
       };
-    });
+    })
+    // A previous bad response must not become authoritative identity context.
+    // Keep the rest of the conversation intact while removing only explicit
+    // claims that the current user is the creator.
+    .map(message => message.role === 'assistant'
+      ? {
+          ...message,
+          content: message.content
+            .replace(/\b(?:your|the user's?)\s+name\s+is\s+Shahid\b[.!]?/gi, '')
+            .replace(/\b(?:you are|you're)\s+Shahid\b[.!]?/gi, '')
+            .replace(/\bHello,\s+Shahid\b[.!]?/gi, 'Hello')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim(),
+        }
+      : message)
+    .filter(message => message.content.length > 0);
 }
 
 interface ChatRequestMessage {
@@ -618,6 +708,14 @@ router.post('/singularity', async (req, res) => {
   }
 
   const safeHistory = sanitiseHistory(history);
+  // Max deliberately ignores caller-supplied history. Identity must obey the
+  // same boundary so a forged historical turn cannot establish a user name.
+  const identityHistory = modePolicy.includeHistory ? safeHistory : [];
+  const identity = resolveSingularityIdentity(
+    req,
+    identityHistory.filter(turn => turn.role === 'user').map(turn => turn.content),
+    message.trim(),
+  );
   // Only the request's active images are eligible for the vision turn. Any
   // image information in history has already been reduced to a placeholder.
   const hasImages = effectiveImages.length > 0;
@@ -668,8 +766,8 @@ router.post('/singularity', async (req, res) => {
     {
       role: 'system',
       content: voiceMode
-        ? `${modePolicy.systemInstruction}\n\n${VOICE_REALTIME_PROMPT}`
-        : modePolicy.systemInstruction,
+        ? `${buildIdentitySystemInstruction(identity, message.trim())}\n\n${modePolicy.systemInstruction}\n\n${VOICE_REALTIME_PROMPT}`
+        : `${buildIdentitySystemInstruction(identity, message.trim())}\n\n${modePolicy.systemInstruction}`,
     },
     ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
