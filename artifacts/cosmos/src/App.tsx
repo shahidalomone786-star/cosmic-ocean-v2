@@ -3,6 +3,7 @@ import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { UnifiedItem, WikiItem, NasaItem, ArxivItem, SpaceXItem, CernItem, NasaStatus, SearchSections } from './components/NasaSearch';
+import type { SearchImage } from './components/SearchHeroCarousel';
 import type { LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 // Secondary surfaces are loaded only when their UI is opened or search results
@@ -1909,6 +1910,7 @@ export default function App() {
   const [portalQuery, setPortalQuery]= useState('');
   const [activeChat,       setActiveChat]       = useState<ChatTarget | null>(null);
   const [chatSharedCtx,    setChatSharedCtx]    = useState<SharedContext | undefined>(undefined);
+  const [pendingChatImage, setPendingChatImage] = useState<SearchImage | undefined>(undefined);
   const [chatInputFocused, setChatInputFocused] = useState(false);
   const [sceneIdx,         setSceneIdx]         = useState(() => Math.floor(Math.random() * cosmicScenes.length));
   const overlayControls = useAnimation();
@@ -2300,6 +2302,11 @@ export default function App() {
     setActiveChat(avatar);
   }, []);
 
+  const handleSearchImageShare = useCallback((image: SearchImage) => {
+    setPendingChatImage(image);
+    setLocation('/chat');
+  }, [setLocation]);
+
   // Open chat WITH shared context (from "Discuss with a Scientist")
   const openChatWithContext = useCallback((avatarName: string, ctx: SharedContext) => {
     const av = AVATARS.find(a => a.name === avatarName);
@@ -2340,7 +2347,15 @@ export default function App() {
           </div>
         }
       >
-        <SingularityChat onClose={() => setLocation('/')} onOpenSettings={() => setLocation('/settings')} />
+        <SingularityChat
+          pendingImage={pendingChatImage}
+          onPendingImageConsumed={() => setPendingChatImage(undefined)}
+          onClose={() => {
+            setPendingChatImage(undefined);
+            setLocation('/');
+          }}
+          onOpenSettings={() => setLocation('/settings')}
+        />
       </Suspense>
     );
   }
@@ -2827,6 +2842,7 @@ export default function App() {
                       setNasaQuery(topic);
                       searchAll(topic, 'specific');
                     }}
+                    onSearchImageShare={handleSearchImageShare}
                     onLoadMore={loadMore}
                     shortsHasMore={searchSections?.hasMore ?? true}
                   />

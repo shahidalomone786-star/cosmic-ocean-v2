@@ -28,6 +28,7 @@ import { buildDocumentPrompt } from '@/lib/promptBuilder';
 import type { DocumentRecord } from '@/lib/documentStore';
 import type { ImageAttachment } from '@/lib/attachmentTypes';
 import type { VisualReferencesState } from '@/lib/visualReferences';
+import type { SearchImage } from './SearchHeroCarousel';
 import { sanitizeVisibleResponse } from '@/lib/responseSanitizer';
 import {
   chunkTtsText,
@@ -1460,7 +1461,17 @@ interface SingularityCapabilities {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function SingularityChat({ onClose, onOpenSettings }: { onClose?: () => void; onOpenSettings?: () => void }) {
+export default function SingularityChat({
+  onClose,
+  onOpenSettings,
+  pendingImage,
+  onPendingImageConsumed,
+}: {
+  onClose?: () => void;
+  onOpenSettings?: () => void;
+  pendingImage?: SearchImage;
+  onPendingImageConsumed?: () => void;
+}) {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const stored = loadChatSessions();
     return stored.length > 0 ? [stored[0]] : [createChatSession(INITIAL_MESSAGE)];
@@ -1506,6 +1517,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const attachRef                       = useRef<HTMLDivElement>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
   const imageInputRef                   = useRef<HTMLInputElement>(null);
+  const pendingImageIdRef               = useRef<string | null>(null);
 
   const {
     processFile,
@@ -1524,6 +1536,33 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     clearImages,
     clearError: clearImageError,
   } = useImageAttachments();
+
+  // A search result enters through the same optimized attachment pipeline as a
+  // local upload. It is consumed once and remains a draft until the user sends.
+  useEffect(() => {
+    if (!pendingImage || pendingImageIdRef.current === pendingImage.id) return;
+    pendingImageIdRef.current = pendingImage.id;
+    let cancelled = false;
+    const attachSearchImage = async () => {
+      try {
+        const response = await fetch(pendingImage.proxyUrl || pendingImage.imageUrl);
+        if (!response.ok) throw new Error(`Image download returned ${response.status}`);
+        const blob = await response.blob();
+        if (cancelled) return;
+        const type = blob.type.startsWith('image/') ? blob.type : 'image/jpeg';
+        const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+        const file = new File([blob], `singularity-search-${pendingImage.id}.${extension}`, { type });
+        await processImageFiles([file]);
+      } catch {
+        // The attachment hook owns visible processing errors. A failed remote
+        // fetch should not block the normal composer or chat transport.
+      } finally {
+        if (!cancelled) onPendingImageConsumed?.();
+      }
+    };
+    void attachSearchImage();
+    return () => { cancelled = true; };
+  }, [onPendingImageConsumed, pendingImage, processImageFiles]);
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
   const messagesContentRef = useRef<HTMLDivElement>(null);
