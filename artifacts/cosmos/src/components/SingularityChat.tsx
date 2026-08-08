@@ -1224,7 +1224,7 @@ export const MicrophoneControl = memo(function MicrophoneControl({
         aria-label={`${copy.label}. ${copy.detail}`}
         aria-pressed={state === 'recording'}
         title={`${copy.label} · ${copy.detail}`}
-        className={`singularity-composer-mic-button group relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
+        className={`singularity-composer-mic-button is-${state} group relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
           border transition-all duration-200 active:scale-90
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d12]
           disabled:cursor-not-allowed disabled:opacity-35 ${
