@@ -8,7 +8,7 @@ const router = Router();
 // browser voice.
 const EDGE_VOICE = "en-US-AvaMultilingualNeural";
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
-const EDGE_RATE = "+15%";
+const EDGE_RATE = "-10%";
 
 const LATEX_SPOKEN_WORDS: Record<string, string> = {
   alpha: "alpha",

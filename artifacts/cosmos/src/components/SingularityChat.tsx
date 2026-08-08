@@ -1365,13 +1365,6 @@ const MessageRow = memo(function MessageRow({
               <ModeResponseSignature metadata={msg.modeMetadata} onFollowUp={onFollowUp} />
             )}
 
-            {!isGenerating && msg.content.trim() && (
-              <VisualReferences
-                state={msg.visualReferences}
-                reducedMotion={Boolean(prefersReducedMotion)}
-              />
-            )}
-
             {!isGenerating && (
               <div className="w-full border-b border-white/[0.05] mt-1 mb-3" />
             )}
@@ -3195,7 +3188,6 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         // intentionally independent from the Listen queue so a later click
         // can consume the first cached MP3 immediately.
         prefetchTtsAudio(msgId, streamedContent);
-        void loadVisualReferences(msgId, userText, streamedContent);
       }
       if (voiceMode) {
         const queue = voiceTtsQueueRef.current;
