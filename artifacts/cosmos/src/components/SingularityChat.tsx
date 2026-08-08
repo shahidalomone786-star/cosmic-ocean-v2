@@ -1967,7 +1967,9 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
            if (voiceRecordingModeRef.current === 'turn' && voiceSpeechStartedRef.current && !voiceMutedRef.current) {
              if (voiceMicLevelRef.current < 0.045) {
                voiceSilenceStartedAtRef.current ??= Date.now();
-               if (Date.now() - voiceSilenceStartedAtRef.current >= 2_500) void finishVoiceRecording();
+                // Keep the hold long enough for natural word boundaries, but
+                // do not make every turn wait multiple seconds before STT.
+                if (Date.now() - voiceSilenceStartedAtRef.current >= 1_200) void finishVoiceRecording();
              } else if (voiceMicLevelRef.current > 0.065) {
                voiceSilenceStartedAtRef.current = null;
              }

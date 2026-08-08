@@ -564,10 +564,11 @@ export function releaseVoiceAudio(): void {
  */
 export class TtsStreamingQueue {
   private readonly controller = new AbortController();
-  private readonly pending: string[] = [];
+  private readonly pending: Array<{ text: string; audio?: Promise<Blob> }> = [];
   private currentAudio: HTMLAudioElement | null = null;
   private currentUrl: string | null = null;
   private processing = false;
+  private playing = false;
   private stopped = false;
   private finished = false;
   private finishPromise: Promise<void> | null = null;
@@ -606,7 +607,14 @@ export class TtsStreamingQueue {
     if (this.stopped || this.finished) return;
     const cleaned = cleanTtsText(text);
     if (!cleaned) return;
-    this.pending.push(cleaned);
+    const item: { text: string; audio?: Promise<Blob> } = { text: cleaned };
+    this.pending.push(item);
+    // If the current phrase is already audible, begin fetching the next
+    // phrase immediately. The process loop still consumes items strictly in
+    // order, so this cannot overlap or reorder playback.
+    if (this.playing && this.pending.length === 1) {
+      item.audio = this.fetchAudioWithRetry(cleaned);
+    }
     void this.process();
   }
 
@@ -655,50 +663,36 @@ export class TtsStreamingQueue {
     try {
       await this.audioUnlockPromise;
       while (this.pending.length > 0 && !this.stopped) {
-        const text = this.pending.shift();
-        if (!text) continue;
-        let lastError: Error | null = null;
-        for (let attempt = 0; attempt < 2 && !this.stopped; attempt += 1) {
-          try {
-            const response = await fetch('/api/tts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text }),
-              signal: this.signal,
-            });
-            if (!response.ok) {
-              let message = `Edge TTS request failed (${response.status})`;
-              try {
-                const body = await response.json() as { error?: string };
-                if (body.error) message = body.error;
-              } catch {
-                // Keep the status-based error when the server did not return JSON.
-              }
-              throw new Error(message);
-            }
-            await this.playResponse(response);
-            lastError = null;
-            break;
-          } catch (error: unknown) {
-            if (error instanceof DOMException && error.name === 'AbortError') throw error;
-            lastError = error instanceof Error ? error : new Error(String(error));
-            if (attempt === 0 && !this.stopped) {
-              await new Promise<void>(resolve => {
-                if (this.stopped) {
-                  resolve();
-                  return;
-                }
-                this.retryWaitResolve = resolve;
-                this.retryTimer = window.setTimeout(() => {
-                  this.retryTimer = null;
-                  this.retryWaitResolve = null;
-                  resolve();
-                }, 160);
-              });
-            }
-          }
+        const item = this.pending.shift();
+        if (!item) continue;
+
+        // Fetch the following phrase while the current phrase is decoded and
+        // played. This is the key gap-reduction path for streamed responses.
+        const following = this.pending[0];
+        if (following && !following.audio) {
+          following.audio = this.fetchAudioWithRetry(following.text);
         }
-        if (lastError) throw lastError;
+
+        let audio: Blob;
+        try {
+          audio = await (item.audio ?? this.fetchAudioWithRetry(item.text));
+        } catch (error: unknown) {
+          if (error instanceof DOMException && error.name === 'AbortError') throw error;
+          // One failed phrase must not discard later valid phrases or strand
+          // Voice Mode. Report it, then continue in the original order.
+          this.onError?.(error instanceof Error ? error : new Error(String(error)));
+          continue;
+        }
+
+        try {
+          this.playing = true;
+          await this.playBlob(audio);
+        } catch (error: unknown) {
+          if (error instanceof DOMException && error.name === 'AbortError') throw error;
+          this.onError?.(error instanceof Error ? error : new Error(String(error)));
+        } finally {
+          this.playing = false;
+        }
       }
     } catch (error: unknown) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
@@ -707,11 +701,61 @@ export class TtsStreamingQueue {
       this.pending.length = 0;
     } finally {
       this.processing = false;
+      this.playing = false;
       if (this.pending.length === 0 && (this.finished || this.stopped || Boolean(this.finishResolve))) {
         this.finishResolve?.();
         this.finishResolve = null;
       }
     }
+  }
+
+  private async fetchAudioWithRetry(text: string): Promise<Blob> {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2 && !this.stopped; attempt += 1) {
+      try {
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+          signal: this.signal,
+        });
+        if (!response.ok) {
+          let message = `Edge TTS request failed (${response.status})`;
+          try {
+            const body = await response.json() as { error?: string };
+            if (body.error) message = body.error;
+          } catch {
+            // Keep the status-based error when the server did not return JSON.
+          }
+          throw new Error(message);
+        }
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.toLowerCase().includes('audio/mpeg')) {
+          throw new Error(`Edge TTS returned an unexpected response (${contentType || 'unknown'})`);
+        }
+        const blob = await response.blob();
+        if (blob.size === 0) throw new Error('Edge TTS returned an empty audio response.');
+        return blob;
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') throw error;
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt === 0 && !this.stopped) {
+          await new Promise<void>(resolve => {
+            if (this.stopped) {
+              resolve();
+              return;
+            }
+            this.retryWaitResolve = resolve;
+            this.retryTimer = window.setTimeout(() => {
+              this.retryTimer = null;
+              this.retryWaitResolve = null;
+              resolve();
+            }, 100);
+          });
+        }
+      }
+    }
+    throw lastError ?? new Error('Edge TTS request failed.');
   }
 
   private async playBlob(blob: Blob): Promise<void> {
@@ -761,132 +805,6 @@ export class TtsStreamingQueue {
         }
         finish(playbackError);
       });
-    });
-  }
-
-  private async playResponse(response: Response): Promise<void> {
-    if (
-      !response.body
-      || typeof MediaSource === 'undefined'
-      || !MediaSource.isTypeSupported('audio/mpeg')
-    ) {
-      await this.playBlob(await response.blob());
-      return;
-    }
-
-    if (this.stopped) throw new DOMException('TTS playback aborted', 'AbortError');
-
-    const mediaSource = new MediaSource();
-    const url = URL.createObjectURL(mediaSource);
-    const audio = this.audio;
-    this.currentUrl = url;
-    this.currentAudio = audio;
-    audio.src = url;
-    audio.volume = this.speakerEnabled ? 1 : 0;
-    this.startLevelMeter(audio);
-
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      let started = false;
-      let sourceBuffer: SourceBuffer | null = null;
-      let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-      const markPlaybackStarted = () => {
-        if (this.stopped || this.playbackStarted) return;
-        this.playbackStarted = true;
-        this.onPlaybackStart?.();
-      };
-
-      const finish = (error?: Error) => {
-        if (settled) return;
-        settled = true;
-        audio.onended = null;
-        audio.onplaying = null;
-        audio.onerror = null;
-        this.stopLevelMeter();
-        if (this.currentAudio === audio) this.currentAudio = null;
-        if (this.currentUrl === url) this.currentUrl = null;
-        reader?.cancel().catch(() => undefined);
-        if (mediaSource.readyState === 'open') {
-          try {
-            mediaSource.endOfStream();
-          } catch {
-            // The media source may already be closing during cancellation.
-          }
-        }
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        URL.revokeObjectURL(url);
-        error ? reject(error) : resolve();
-      };
-
-      const startPlayback = () => {
-        if (started || this.stopped) return;
-        started = true;
-        audio.play().catch(error => {
-          const playbackError = normalizePlaybackError(error);
-          if (playbackError.name === 'NotAllowedError') {
-            console.error('[EdgeTTS] Browser blocked TTS playback:', playbackError);
-          }
-          finish(playbackError);
-        });
-      };
-
-      audio.onended = () => finish();
-      audio.onplaying = markPlaybackStarted;
-      audio.onerror = () => finish(new Error('Edge TTS audio playback failed.'));
-      this.signal.addEventListener('abort', () => {
-        audio.pause();
-        finish(new DOMException('TTS playback aborted', 'AbortError'));
-      }, { once: true });
-
-      mediaSource.addEventListener('sourceopen', () => {
-        if (settled || this.stopped) return;
-        try {
-          sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-          reader = response.body!.getReader();
-          void (async () => {
-            let receivedAudio = false;
-            while (!settled && !this.stopped) {
-              const { done, value } = await reader!.read();
-              if (done) break;
-              if (!value?.byteLength) continue;
-              receivedAudio = true;
-              await new Promise<void>((appendResolve, appendReject) => {
-                const append = () => {
-                  if (settled || this.stopped || !sourceBuffer) {
-                    appendReject(new DOMException('TTS playback aborted', 'AbortError'));
-                    return;
-                  }
-                  try {
-                    const appendBytes = new Uint8Array(value.byteLength);
-                    appendBytes.set(value);
-                    sourceBuffer.addEventListener('updateend', () => {
-                      appendResolve();
-                      if (!started) startPlayback();
-                    }, { once: true });
-                    sourceBuffer.appendBuffer(appendBytes.buffer);
-                  } catch (error) {
-                    appendReject(error instanceof Error ? error : new Error(String(error)));
-                  }
-                };
-                if (sourceBuffer!.updating) {
-                  sourceBuffer!.addEventListener('updateend', append, { once: true });
-                } else {
-                  append();
-                }
-              });
-            }
-            if (!receivedAudio) {
-              finish(new Error('Edge TTS returned an empty audio stream.'));
-              return;
-            }
-            if (mediaSource.readyState === 'open') mediaSource.endOfStream();
-          })().catch(error => finish(error instanceof Error ? error : new Error(String(error))));
-        } catch (error) {
-          finish(error instanceof Error ? error : new Error(String(error)));
-        }
-      }, { once: true });
     });
   }
 
