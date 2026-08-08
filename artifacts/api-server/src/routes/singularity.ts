@@ -10,11 +10,22 @@ import { COOKIE_NAME, verifyToken } from '../lib/jwt';
 
 const router = Router();
 const MESSAGE_COOLDOWN_MS = 15_000;
-const MAX_MESSAGE_ESTIMATED_TOKENS = 5_000;
-const MAX_MESSAGE_SERIALIZED_CHARACTERS = MAX_MESSAGE_ESTIMATED_TOKENS * 4;
+const MODE_REQUEST_TOKEN_BUDGET = 8_000;
 const lastSingularityRequestByClient = new Map<string, number>();
 
 type SingularityMode = 'pro' | 'max' | 'flash' | 'research';
+type ResponseMetadataKind = 'followups' | 'evidence' | null;
+type EvidenceLevel = 'high' | 'medium' | 'low' | 'not-assessed';
+
+type SingularityResponseMetadata =
+  | { kind: 'followups'; questions: string[] }
+  | {
+      kind: 'evidence';
+      confidence: Exclude<EvidenceLevel, 'not-assessed'>;
+      assumptions: string[];
+      evidenceQuality: EvidenceLevel;
+      uncertainty: string;
+    };
 
 interface SingularityModePolicy {
   mode: SingularityMode;
@@ -24,25 +35,9 @@ interface SingularityModePolicy {
   historyLimit: number;
   maxTokens: number;
   researchStyle: boolean;
+  inputTokenBudget: number;
+  responseMetadata: ResponseMetadataKind;
 }
-
-const MAX_MODE_SYSTEM_INSTRUCTION = `You are Singularity. The user's name is Shahid.
-Provide exceptionally detailed, rigorous, comprehensive responses.
-Explore the subject deeply and explain important reasoning, assumptions, examples,
-and implications when useful. Do not unnecessarily shorten the response.
-Follow all platform, application, safety, authentication, authorization, and
-server-side security controls. Never reveal secrets or claim evidence that was
-not provided or verified.`;
-
-const FLASH_MODE_INSTRUCTION = `Answer directly and efficiently. Be concise and
-avoid unnecessary explanation unless the user asks for it. Never sacrifice
-correctness, safety, or important qualifications for brevity.`;
-
-const RESEARCH_MODE_INSTRUCTION = `Work like a rigorous research analyst. Prioritize
-primary sources and evidence when they are available in the supplied context or
-through approved tools. State assumptions, distinguish evidence from inference,
-compare plausible explanations, and make uncertainty explicit. Never fabricate
-citations, sources, data, or tool results.`;
 
 function resolveSingularityMode(value: unknown): SingularityMode {
   if (value === undefined || value === null || value === '') return 'pro';
@@ -79,7 +74,7 @@ function claimSingularityCooldown(req: Request, voiceMode = false): number {
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are **Singularity**—a premium AI research assistant built into this portal by **Shahid**.
+const CORE_SYSTEM_PROMPT = `You are **Singularity**—a premium AI research assistant built into this portal by **Shahid**. The user's name is Shahid.
 
 Your purpose is to help users think clearly, reason rigorously, solve problems accurately, and explore ideas with intellectual honesty.
 
@@ -180,42 +175,71 @@ Maintain clean, concise prose with smooth transitions, minimal repetition, and c
 const VOICE_REALTIME_PROMPT =
   'You are speaking out loud in a real-time voice conversation. Keep your response highly conversational, direct, and concise (1 to 3 sentences maximum) unless asked for a detailed explanation.';
 
+// Keep these overrides intentionally small. The shared scientific identity above is
+// included once, while only the active mode signature is appended at runtime.
+const MODE_OVERRIDES: Record<SingularityMode, string> = {
+  pro: `Offer 2 or 3 useful next questions based on your answer. At the very end,
+emit them only as <singularity-followups>["question 1","question 2","question 3"]</singularity-followups>.
+Keep each question short and never mention this control line.`,
+  max: `Give a deep, complete answer. For substantial responses, use clear headings such
+as Executive Summary, Core Idea, Technical Detail, and Key Takeaways. Do not carry
+unnecessary old context.`,
+  flash: `Answer directly in a one-screen format. Use no long preamble and do not expand
+unless asked. Preserve necessary caveats and correctness.`,
+  research: `Prioritize primary or high-quality evidence. Separate fact, inference, and
+speculation; state material assumptions and uncertainty. At the end, emit only this
+compact control line: <singularity-evidence>{"confidence":"high|medium|low","assumptions":["..."],"evidenceQuality":"high|medium|low|not-assessed","uncertainty":"..."}</singularity-evidence>.
+Use honest values and never mention this control line.`,
+};
+
+function buildModeSystemInstruction(mode: SingularityMode): string {
+  return `${CORE_SYSTEM_PROMPT}\n\n${MODE_OVERRIDES[mode]}`;
+}
+
 const SINGULARITY_MODE_POLICIES: Record<SingularityMode, SingularityModePolicy> = {
   pro: {
     mode: 'pro',
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: buildModeSystemInstruction('pro'),
     includeHistory: true,
     includeAttachments: true,
     historyLimit: 4,
     maxTokens: 1500,
     researchStyle: false,
+    inputTokenBudget: 5_000,
+    responseMetadata: 'followups',
   },
   max: {
     mode: 'max',
-    systemInstruction: MAX_MODE_SYSTEM_INSTRUCTION,
+    systemInstruction: buildModeSystemInstruction('max'),
     includeHistory: false,
     includeAttachments: false,
     historyLimit: 0,
-    maxTokens: 7000,
+    maxTokens: 5_200,
     researchStyle: false,
+    inputTokenBudget: 2_800,
+    responseMetadata: null,
   },
   flash: {
     mode: 'flash',
-    systemInstruction: `${SYSTEM_PROMPT}\n\n${FLASH_MODE_INSTRUCTION}`,
+    systemInstruction: buildModeSystemInstruction('flash'),
     includeHistory: true,
     includeAttachments: true,
     historyLimit: 2,
     maxTokens: 700,
     researchStyle: false,
+    inputTokenBudget: 2_600,
+    responseMetadata: null,
   },
   research: {
     mode: 'research',
-    systemInstruction: `${SYSTEM_PROMPT}\n\n${RESEARCH_MODE_INSTRUCTION}`,
+    systemInstruction: buildModeSystemInstruction('research'),
     includeHistory: true,
     includeAttachments: true,
     historyLimit: 4,
     maxTokens: 3000,
     researchStyle: true,
+    inputTokenBudget: 5_000,
+    responseMetadata: 'evidence',
   },
 };
 
@@ -407,7 +431,10 @@ function estimateMessageTokens(messages: ChatRequestMessage[]): number {
   return JSON.stringify(estimationMessages).length / 4;
 }
 
-function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatRequestMessage[] {
+function trimMessagesToRequestBudget(
+  messages: ChatRequestMessage[],
+  inputTokenBudget: number,
+): ChatRequestMessage[] {
   // Index 0 is always the system prompt. Keep the newest four historical
   // messages, then append the current user turn.
   const boundedMessages = [
@@ -420,7 +447,7 @@ function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatReques
     const candidate = boundedMessages[index];
     if (!candidate || typeof candidate.content !== 'string' || candidate.content.length === 0) return false;
     const currentCharacters = JSON.stringify(boundedMessages).length;
-    const excessCharacters = currentCharacters - MAX_MESSAGE_SERIALIZED_CHARACTERS;
+    const excessCharacters = currentCharacters - inputTokenBudget * 4;
     const nextLength = Math.max(
       0,
       candidate.content.length - Math.max(64, Math.ceil(excessCharacters * 1.1)),
@@ -430,7 +457,7 @@ function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatReques
     return true;
   };
 
-  while (estimateMessageTokens(boundedMessages) > MAX_MESSAGE_ESTIMATED_TOKENS) {
+  while (estimateMessageTokens(boundedMessages) > inputTokenBudget) {
     // First preserve the system prompt and current turn by trimming the
     // oldest retained history strings. This keeps the newest context useful.
     let changed = false;
@@ -453,6 +480,90 @@ function trimMessagesToRequestBudget(messages: ChatRequestMessage[]): ChatReques
   }
 
   return boundedMessages;
+}
+
+function stripModeControlTags(content: string): string {
+  return content
+    .replace(/<singularity-followups>[\s\S]*?<\/singularity-followups>/gi, '')
+    .replace(/<singularity-evidence>[\s\S]*?<\/singularity-evidence>/gi, '')
+    .replace(/<singularity-(?:followups|evidence)>[\s\S]*$/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanMetadataString(value: unknown, maxLength: number): string {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : '';
+}
+
+function extractResponseMetadata(
+  content: string,
+  mode: SingularityMode,
+): SingularityResponseMetadata | null {
+  if (mode === 'pro') {
+    const match = content.match(/<singularity-followups>([\s\S]*?)<\/singularity-followups>/i);
+    if (!match) return null;
+    try {
+      const parsed: unknown = JSON.parse(match[1]);
+      if (!Array.isArray(parsed)) return null;
+      const questions = parsed
+        .filter((question): question is string => typeof question === 'string')
+        .map(question => cleanMetadataString(question, 180))
+        .filter(Boolean)
+        .slice(0, 3);
+      return questions.length > 0 ? { kind: 'followups', questions } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (mode !== 'research') return null;
+
+  const match = content.match(/<singularity-evidence>([\s\S]*?)<\/singularity-evidence>/i);
+  if (!match) {
+    return {
+      kind: 'evidence',
+      confidence: 'medium',
+      assumptions: [],
+      evidenceQuality: 'not-assessed',
+      uncertainty: 'No structured evidence note was returned.',
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+    const confidence = parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
+      ? parsed.confidence
+      : 'medium';
+    const evidenceQuality: EvidenceLevel =
+      parsed.evidenceQuality === 'high'
+      || parsed.evidenceQuality === 'medium'
+      || parsed.evidenceQuality === 'low'
+      || parsed.evidenceQuality === 'not-assessed'
+        ? parsed.evidenceQuality
+        : 'not-assessed';
+    const assumptions = Array.isArray(parsed.assumptions)
+      ? parsed.assumptions
+        .filter((assumption): assumption is string => typeof assumption === 'string')
+        .map(assumption => cleanMetadataString(assumption, 180))
+        .filter(Boolean)
+        .slice(0, 3)
+      : [];
+    return {
+      kind: 'evidence',
+      confidence,
+      assumptions,
+      evidenceQuality,
+      uncertainty: cleanMetadataString(parsed.uncertainty, 240) || 'No additional uncertainty note.',
+    };
+  } catch {
+    return {
+      kind: 'evidence',
+      confidence: 'medium',
+      assumptions: [],
+      evidenceQuality: 'not-assessed',
+      uncertainty: 'The evidence note could not be structured reliably.',
+    };
+  }
 }
 
 // ── POST /api/singularity ─────────────────────────────────────────────────────
@@ -563,21 +674,21 @@ router.post('/singularity', async (req, res) => {
     ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
   ];
-  const boundedMessages = trimMessagesToRequestBudget(messages);
+  const boundedMessages = trimMessagesToRequestBudget(messages, modePolicy.inputTokenBudget);
   const estimatedMessageTokens = estimateMessageTokens(boundedMessages);
 
   // A single system prompt plus the newest user turn can itself be too large
   // (most commonly with an oversized image payload). Do not send an unsafe
   // request and rely on Groq to reject it; preserve the newest turn and fail
   // explicitly before the provider call instead.
-  if (estimatedMessageTokens > MAX_MESSAGE_ESTIMATED_TOKENS) {
+  if (estimatedMessageTokens > modePolicy.inputTokenBudget) {
     res.status(413).json({
       success: false,
       error: 'This message is too large to process with the current context budget.',
       status: 413,
       details: {
         estimatedMessageTokens: Math.ceil(estimatedMessageTokens),
-        maxEstimatedMessageTokens: MAX_MESSAGE_ESTIMATED_TOKENS,
+         maxEstimatedMessageTokens: modePolicy.inputTokenBudget,
       },
     });
     return;
@@ -612,7 +723,9 @@ router.post('/singularity', async (req, res) => {
            messages: boundedMessages,
           stream:      true,
           temperature: 0.6,
-            max_tokens: voiceMode ? 320 : modePolicy.maxTokens,
+            max_tokens: voiceMode
+              ? 320
+              : Math.min(modePolicy.maxTokens, MODE_REQUEST_TOKEN_BUDGET - modePolicy.inputTokenBudget),
         }),
       });
 
@@ -701,7 +814,7 @@ router.post('/singularity', async (req, res) => {
               if (!delta) continue;
               rawBuffer += delta;
               const { reasoning, content } = splitReasoning(rawBuffer);
-              res.write(`data: ${JSON.stringify({ reasoning, content })}\n\n`);
+              res.write(`data: ${JSON.stringify({ reasoning, content: stripModeControlTags(content) })}\n\n`);
             } catch {
               // partial/malformed JSON chunk — log and skip
               console.warn('[singularity] Malformed SSE payload skipped:', payload.slice(0, 100));
@@ -719,6 +832,15 @@ router.post('/singularity', async (req, res) => {
       }
 
       if (!res.writableEnded) {
+        const final = splitReasoning(rawBuffer);
+        const metadata = modePolicy.responseMetadata
+          ? extractResponseMetadata(final.content, mode)
+          : null;
+        res.write(`data: ${JSON.stringify({
+          reasoning: final.reasoning,
+          content: stripModeControlTags(final.content),
+          ...(metadata ? { metadata } : {}),
+        })}\n\n`);
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
       }

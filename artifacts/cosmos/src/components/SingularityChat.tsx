@@ -45,6 +45,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   loadSingularityMode,
   saveSingularityMode,
+  type SingularityResponseMetadata,
   type SingularityMode,
 } from '@/lib/singularityModes';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
@@ -79,8 +80,10 @@ interface Message {
   reasoningSeconds?: number;
   error?: boolean;
   visualReferences?: VisualReferencesState;
+  modeMetadata?: SingularityResponseMetadata;
   ts: number;
 }
+
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -354,6 +357,59 @@ const VisualReferences = memo(function VisualReferences({
           </article>
         ))}
       </div>
+    </section>
+  );
+});
+
+const ModeResponseSignature = memo(function ModeResponseSignature({
+  metadata,
+  onFollowUp,
+}: {
+  metadata?: SingularityResponseMetadata;
+  onFollowUp: (question: string) => void;
+}) {
+  if (!metadata) return null;
+
+  if (metadata.kind === 'followups') {
+    return (
+      <section className="mx-auto mt-5 w-full max-w-[70ch]" aria-label="Suggested follow-up questions">
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-sky-200/45">
+          Continue exploring
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {metadata.questions.map(question => (
+            <button
+              key={question}
+              type="button"
+              onClick={() => onFollowUp(question)}
+              className="rounded-full border border-sky-200/[0.16] bg-sky-200/[0.045] px-3 py-2 text-left text-[11px] leading-4 text-sky-100/65 transition-colors hover:border-sky-200/35 hover:bg-sky-200/[0.09] hover:text-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200/45"
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="mx-auto mt-5 w-full max-w-[70ch] rounded-xl border border-emerald-200/[0.13] bg-emerald-200/[0.035] px-4 py-3"
+      aria-label="Research evidence summary"
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] uppercase tracking-[0.14em] text-emerald-100/48">
+        <span>Evidence note</span>
+        <span>Confidence: <strong className="font-medium text-emerald-100/75">{metadata.confidence}</strong></span>
+        <span>Quality: <strong className="font-medium text-emerald-100/75">{metadata.evidenceQuality}</strong></span>
+      </div>
+      {metadata.assumptions.length > 0 && (
+        <p className="mt-2 text-[11px] leading-4 text-white/48">
+          <span className="text-white/65">Assumptions:</span> {metadata.assumptions.join(' · ')}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] leading-4 text-white/48">
+        <span className="text-white/65">Uncertainty:</span> {metadata.uncertainty}
+      </p>
     </section>
   );
 });
@@ -1214,6 +1270,7 @@ interface MessageRowProps {
   onRegenerate: () => void;
   onSave: (content: string) => void;
   onOpenWorkspace: (content: string) => void;
+  onFollowUp: (question: string) => void;
 }
 
 const MessageRow = memo(function MessageRow({
@@ -1228,6 +1285,7 @@ const MessageRow = memo(function MessageRow({
   onRegenerate,
   onSave,
   onOpenWorkspace,
+  onFollowUp,
 }: MessageRowProps) {
   const handleEdit = useCallback(() => onEdit(msg.id), [msg.id, onEdit]);
   const handleSave = useCallback(() => onSave(msg.content), [msg.content, onSave]);
@@ -1302,6 +1360,10 @@ const MessageRow = memo(function MessageRow({
             <div className={`w-full pt-1 pb-2 ${isGenerating ? 'stream-pulse-text' : 'animate-cosmos-fade'}`}>
               <MessageContent content={msg.content || (isGenerating ? '' : '…')} />
             </div>
+
+            {!isGenerating && msg.content.trim() && (
+              <ModeResponseSignature metadata={msg.modeMetadata} onFollowUp={onFollowUp} />
+            )}
 
             {!isGenerating && msg.content.trim() && (
               <VisualReferences
@@ -3069,6 +3131,11 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
             typeof data.content === 'string' ? sanitizeVisibleResponse(data.content) : undefined,
             seconds,
           );
+          if (data.metadata && (data.metadata.kind === 'followups' || data.metadata.kind === 'evidence')) {
+            setMessages(previous => previous.map(message =>
+              message.id === msgId ? { ...message, modeMetadata: data.metadata as SingularityResponseMetadata } : message
+            ));
+          }
           if (typeof data.content === 'string') {
             streamedContent = sanitizeVisibleResponse(data.content);
             if (voiceMode) {
@@ -3481,6 +3548,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                     onRegenerate={handleRegenerate}
                     onSave={workspace.save}
                     onOpenWorkspace={workspace.openWithContent}
+                   onFollowUp={handleSend}
                   />
                 );
               })}

@@ -1,4 +1,15 @@
 export type SingularityMode = 'pro' | 'max' | 'flash' | 'research';
+export type SingularityEvidenceLevel = 'high' | 'medium' | 'low' | 'not-assessed';
+
+export type SingularityResponseMetadata =
+  | { kind: 'followups'; questions: string[] }
+  | {
+      kind: 'evidence';
+      confidence: Exclude<SingularityEvidenceLevel, 'not-assessed'>;
+      assumptions: string[];
+      evidenceQuality: SingularityEvidenceLevel;
+      uncertainty: string;
+    };
 
 export interface SingularityModeOption {
   id: SingularityMode;
@@ -14,25 +25,25 @@ export const SINGULARITY_MODES: readonly SingularityModeOption[] = [
     id: 'pro',
     name: 'SINGULARITY PRO',
     shortLabel: 'Pro',
-    description: 'Full intelligence & full context',
+    description: 'Balanced answers with smart follow-ups',
   },
   {
     id: 'max',
     name: 'SINGULARITY MAX',
     shortLabel: 'Max',
-    description: 'Deep, extended responses',
+    description: 'Deep, structured long-form answers',
   },
   {
     id: 'flash',
     name: 'SINGULARITY FLASH',
     shortLabel: 'Flash',
-    description: 'Fast & concise',
+    description: 'Fast, one-screen answers',
   },
   {
     id: 'research',
     name: 'SINGULARITY RESEARCH',
     shortLabel: 'Research',
-    description: 'Rigorous analysis & evidence',
+    description: 'Evidence notes and uncertainty',
   },
 ];
 
