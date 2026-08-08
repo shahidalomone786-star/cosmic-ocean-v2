@@ -25,25 +25,25 @@ export const SINGULARITY_MODES: readonly SingularityModeOption[] = [
     id: 'pro',
     name: 'SINGULARITY PRO',
     shortLabel: 'Pro',
-    description: 'Balanced answers with smart follow-ups',
+    description: 'Full intelligence & full context',
   },
   {
     id: 'max',
     name: 'SINGULARITY MAX',
     shortLabel: 'Max',
-    description: 'Deep, structured long-form answers',
+    description: 'Deep, extended responses',
   },
   {
     id: 'flash',
     name: 'SINGULARITY FLASH',
     shortLabel: 'Flash',
-    description: 'Fast, one-screen answers',
+    description: 'Fast & concise',
   },
   {
     id: 'research',
     name: 'SINGULARITY RESEARCH',
     shortLabel: 'Research',
-    description: 'Evidence notes and uncertainty',
+    description: 'Rigorous analysis & evidence',
   },
 ];
 
