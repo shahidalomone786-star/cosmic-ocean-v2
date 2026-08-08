@@ -1194,7 +1194,7 @@ export const MicrophoneControl = memo(function MicrophoneControl({
   const isActive = state === 'recording' || state === 'processing';
 
   return (
-    <div className="relative flex min-w-0 items-center gap-2" aria-live="polite">
+    <div className="singularity-composer-mic relative flex min-w-0 items-center gap-2" aria-live="polite">
       <AnimatePresence initial={false} mode="wait">
         {isActive && (
           <motion.div
@@ -1203,7 +1203,7 @@ export const MicrophoneControl = memo(function MicrophoneControl({
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 5, scale: 0.96 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-center gap-1.5 rounded-full border border-white/[0.08]
+            className="singularity-composer-voice-status flex items-center gap-1.5 rounded-full border
               bg-white/[0.035] px-2.5 py-1.5 sm:flex"
           >
             <VoiceWaveform state={state} />
@@ -1224,7 +1224,7 @@ export const MicrophoneControl = memo(function MicrophoneControl({
         aria-label={`${copy.label}. ${copy.detail}`}
         aria-pressed={state === 'recording'}
         title={`${copy.label} · ${copy.detail}`}
-        className={`group relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
+        className={`singularity-composer-mic-button group relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full
           border transition-all duration-200 active:scale-90
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d12]
           disabled:cursor-not-allowed disabled:opacity-35 ${
@@ -3641,11 +3641,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       </div>
 
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
-      <div
-        className="flex-shrink-0 border-t border-white/[0.04] pb-safe"
-        style={{ background: 'linear-gradient(to top, #09090b 70%, transparent)' }}
-      >
-        <div className="mx-auto w-full max-w-3xl px-3 pb-2 pt-3 sm:px-6 sm:pb-3 sm:pt-4">
+      <div className="singularity-composer-region flex-shrink-0 border-t pb-safe">
+        <div className="singularity-composer-region-inner mx-auto w-full max-w-3xl">
 
           {/* Hidden file input — triggered by "Upload Document" button or Replace */}
           <input
@@ -3671,10 +3668,10 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
           {/* ── Unified input shell: chips + textarea + send ─────────────── */}
             <div
               ref={composerShellRef}
-              className={`relative rounded-2xl border bg-[#0d0d12] transition-gpu ${
+              className={`singularity-composer-shell relative border transition-gpu ${
                 isDragOver
-                  ? 'border-sky-400/40 shadow-[0_0_0_2px_rgba(56,189,248,0.12),0_8px_40px_rgba(0,0,0,0.55)]'
-                 : 'border-white/[0.09] shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-white/[0.16] focus-within:shadow-[0_-1px_0_rgba(255,255,255,0.025),0_8px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                  ? 'is-drag-over'
+                  : ''
               }`}
               onDragOver={handleDragOver}
               onDragEnter={handleDragOver}
@@ -3728,17 +3725,16 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
             </AnimatePresence>
 
             {/* Textarea + controls row */}
-            <div className="relative flex min-w-0 items-end gap-2.5 px-3 py-3">
+            <div className="singularity-composer-row relative flex min-w-0 items-end">
 
               {/* ── Attachment '+' button with popover ── */}
-              <div ref={attachRef} className="absolute bottom-3 left-3 z-20">
+              <div ref={attachRef} className="singularity-composer-attach relative z-20">
                 <button
                   onClick={() => setAttachOpen(o => !o)}
                   disabled={composerLocked}
-                  className="w-8 h-8 rounded-full flex items-center justify-center
-                    text-white/35 hover:text-white/85 hover:bg-white/[0.09]
-                    transition-gpu active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
-                    disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="singularity-composer-attach-button flex items-center justify-center rounded-full
+                    text-white/45 transition-gpu active:scale-95 focus-visible:outline-none
+                    focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed"
                   aria-label="Attach file"
                   aria-expanded={attachOpen}
                   aria-haspopup="menu"
@@ -3755,8 +3751,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.92, y: 6 }}
                       transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute bottom-full left-0 z-50 mb-2 w-52
-                        rounded-2xl border border-white/[0.11] bg-[#171720]/[0.98] shadow-[0_16px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl
+                      className="singularity-composer-attachment-popover absolute bottom-full left-0 z-50 mb-2
+                        rounded-2xl border bg-[#171720]/[0.98] shadow-[0_16px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl
                         overflow-hidden"
                     >
                       <div className="px-1 py-1">
@@ -3816,49 +3812,50 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                 }
                 rows={1}
                 disabled={composerLocked}
-                 className="w-full min-w-0 flex-1 resize-none bg-transparent pl-10 text-left text-[14px] text-white/90
-                   placeholder:text-white/22 outline-none focus:outline-none focus:ring-0 max-h-[160px] min-h-[26px]
-                  leading-relaxed py-[2px] disabled:opacity-60"
+                 className="singularity-composer-textarea w-full min-w-0 flex-1 resize-none bg-transparent text-left
+                   text-white/90 placeholder:text-white/22 outline-none focus:outline-none focus:ring-0
+                   disabled:opacity-60"
                 aria-label="Message Singularity"
                 aria-busy={composerLocked}
               />
-              <MicrophoneControl
-                disabled={composerLocked || isThinking}
-                state={voiceState}
-                errorMessage={voiceError}
-                onStateChange={setVoiceState}
-                onRecordingStart={handleVoiceStart}
-                onRecordingStop={handleVoiceStop}
-                onRetry={() => {
-                  setVoiceError('');
-                  setVoiceState('idle');
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleOpenVoiceMode}
-                disabled={composerLocked || isThinking}
-                className="flex-shrink-0 mb-0.5 flex h-8 items-center gap-1.5 rounded-full border border-violet-300/[0.18]
-                  bg-violet-300/[0.06] px-2.5 text-[10px] font-medium tracking-[0.04em] text-violet-100/65
-                  transition-gpu hover:border-violet-200/40 hover:bg-violet-200/[0.12] hover:text-violet-50
-                  active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
-                  disabled:cursor-not-allowed disabled:opacity-30"
-                aria-label="Open immersive Voice Mode"
-                data-testid="button-open-voice-mode"
-              >
-                <Mic2 size={13} strokeWidth={1.8} />
-                <span className="hidden sm:inline">Voice Mode</span>
-              </button>
-              <button
+              <div className="singularity-composer-actions flex items-center">
+                <MicrophoneControl
+                  disabled={composerLocked || isThinking}
+                  state={voiceState}
+                  errorMessage={voiceError}
+                  onStateChange={setVoiceState}
+                  onRecordingStart={handleVoiceStart}
+                  onRecordingStop={handleVoiceStop}
+                  onRetry={() => {
+                    setVoiceError('');
+                    setVoiceState('idle');
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleOpenVoiceMode}
+                  disabled={composerLocked || isThinking}
+                  className="singularity-composer-voice-mode flex flex-shrink-0 items-center justify-center gap-1.5 rounded-full border
+                    bg-violet-300/[0.06] text-violet-100/65 transition-gpu
+                    hover:border-violet-200/40 hover:bg-violet-200/[0.12] hover:text-violet-50
+                    active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
+                    disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label="Open immersive Voice Mode"
+                  data-testid="button-open-voice-mode"
+                >
+                  <Mic2 size={15} strokeWidth={1.8} />
+                  <span className="hidden sm:inline">Voice Mode</span>
+                </button>
+                <button
                 onClick={() => (isThinking ? handleStop() : handleSend())}
                 disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                  transition-gpu mb-0.5 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
+                className={`singularity-composer-send flex-shrink-0 rounded-full flex items-center justify-center
+                  transition-gpu active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
                   isThinking
-                    ? 'bg-white/90 text-black shadow-[0_0_16px_rgba(255,255,255,0.22)]'
+                    ? 'is-thinking'
                     : ((input.trim() || images.length > 0) && !composerLocked && !(visionSupported === false && images.length > 0))
-                      ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.28)]'
-                      : 'bg-white/[0.06] text-white/18 cursor-not-allowed'
+                      ? 'is-ready'
+                      : 'is-idle'
                 }`}
                 aria-label={
                   isThinking
@@ -3867,7 +3864,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                       ? `Recharging, ${cooldownRemaining} seconds remaining`
                       : 'Send message'
                 }
-              >
+                >
                 {isProcessingAttachment
                   ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
                   : isMessageCooldownActive
@@ -3876,7 +3873,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                     ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
                     : <Send size={13} strokeWidth={2.5} className={(input.trim() && !isProcessing) ? 'ml-[1px]' : ''} />
                 }
-              </button>
+                </button>
+              </div>
             </div>
 
             <AnimatePresence>

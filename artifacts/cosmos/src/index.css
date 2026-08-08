@@ -530,6 +530,231 @@
   }
 }
 
+/* ── Singularity composer ─────────────────────────────────────────────────────
+   Kept local to the chat input so the rest of the application retains its
+   existing surfaces and interaction language. */
+.singularity-composer-region {
+  --composer-surface: rgba(14, 15, 21, 0.86);
+  --composer-line: rgba(255, 255, 255, 0.105);
+  --composer-line-strong: rgba(255, 255, 255, 0.18);
+  --composer-muted: rgba(239, 239, 247, 0.46);
+  position: relative;
+  background:
+    linear-gradient(to top, rgba(7, 8, 12, 0.98) 58%, rgba(7, 8, 12, 0.76) 82%, transparent);
+}
+
+.singularity-composer-region-inner {
+  padding: 0.75rem 0.75rem calc(0.65rem + env(safe-area-inset-bottom));
+}
+
+.singularity-composer-shell {
+  overflow: visible;
+  border-color: var(--composer-line);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 34%),
+    var(--composer-surface);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.045),
+    0 12px 36px rgba(0, 0, 0, 0.42),
+    0 2px 10px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(22px) saturate(120%);
+  transition:
+    border-color var(--duration-standard) var(--ease-standard),
+    box-shadow var(--duration-emphasis) var(--ease-standard),
+    background-color var(--duration-standard) var(--ease-standard);
+}
+
+.singularity-composer-shell:focus-within {
+  border-color: var(--composer-line-strong);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.055),
+    0 16px 42px rgba(0, 0, 0, 0.5),
+    0 0 0 3px rgba(210, 218, 255, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.singularity-composer-shell.is-drag-over {
+  border-color: rgba(145, 211, 235, 0.48);
+  box-shadow:
+    0 0 0 2px rgba(145, 211, 235, 0.1),
+    0 16px 42px rgba(0, 0, 0, 0.5);
+}
+
+.singularity-composer-row {
+  min-height: 4.25rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.65rem;
+}
+
+.singularity-composer-attach {
+  flex: 0 0 auto;
+}
+
+.singularity-composer-attach-button,
+.singularity-composer-mic-button,
+.singularity-composer-send {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.singularity-composer-attach-button {
+  border: 1px solid transparent;
+  background: transparent;
+  transition:
+    color var(--duration-standard) var(--ease-standard),
+    background-color var(--duration-standard) var(--ease-standard),
+    border-color var(--duration-standard) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.singularity-composer-attach-button:hover:not(:disabled),
+.singularity-composer-attach-button[aria-expanded='true'] {
+  border-color: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.singularity-composer-attach-button:disabled {
+  opacity: 0.3;
+}
+
+.singularity-composer-textarea {
+  min-height: 2.75rem;
+  max-height: 10rem;
+  padding: 0.66rem 0.15rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  caret-color: rgba(224, 231, 255, 0.9);
+}
+
+.singularity-composer-textarea::placeholder {
+  color: rgba(239, 239, 247, 0.31);
+}
+
+.singularity-composer-actions {
+  flex: 0 0 auto;
+  gap: 0.22rem;
+}
+
+.singularity-composer-mic {
+  gap: 0.35rem;
+}
+
+.singularity-composer-mic-button {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.singularity-composer-mic-button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.singularity-composer-voice-status {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.singularity-composer-voice-mode {
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.7rem;
+  border-color: rgba(205, 195, 255, 0.2);
+  font-size: 0.66rem;
+  font-weight: 550;
+  letter-spacing: 0.035em;
+}
+
+.singularity-composer-send {
+  border: 1px solid transparent;
+  transition:
+    color var(--duration-standard) var(--ease-standard),
+    background-color var(--duration-standard) var(--ease-standard),
+    border-color var(--duration-standard) var(--ease-standard),
+    box-shadow var(--duration-emphasis) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.singularity-composer-send.is-ready,
+.singularity-composer-send.is-thinking {
+  color: #111217;
+  background: rgba(244, 244, 247, 0.96);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 5px 18px rgba(255, 255, 255, 0.12);
+}
+
+.singularity-composer-send.is-ready:hover,
+.singularity-composer-send.is-thinking:hover {
+  background: #fff;
+  box-shadow: 0 7px 22px rgba(255, 255, 255, 0.18);
+}
+
+.singularity-composer-send.is-idle {
+  color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.04);
+  cursor: not-allowed;
+}
+
+.singularity-composer-attachment-popover {
+  width: min(13.75rem, calc(100vw - 2rem));
+  padding: 0.28rem;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.singularity-composer-attachment-popover button {
+  min-height: 2.75rem;
+  color: rgba(239, 239, 247, 0.68);
+  transition:
+    color var(--duration-standard) var(--ease-standard),
+    background-color var(--duration-standard) var(--ease-standard);
+}
+
+.singularity-composer-attachment-popover button:hover {
+  color: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+@media (max-width: 640px) {
+  .singularity-composer-region-inner {
+    padding: 0.55rem 0.65rem calc(0.55rem + env(safe-area-inset-bottom));
+  }
+
+  .singularity-composer-row {
+    min-height: 3.95rem;
+    gap: 0.35rem;
+    padding: 0.45rem 0.4rem 0.45rem 0.45rem;
+  }
+
+  .singularity-composer-actions {
+    gap: 0.08rem;
+  }
+
+  .singularity-composer-textarea {
+    padding-top: 0.62rem;
+    padding-bottom: 0.62rem;
+    font-size: 0.9rem;
+  }
+
+  .singularity-composer-voice-status {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .singularity-composer-shell,
+  .singularity-composer-send,
+  .singularity-composer-attach-button,
+  .singularity-composer-attachment-popover button {
+    transition-duration: 1ms;
+  }
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.
