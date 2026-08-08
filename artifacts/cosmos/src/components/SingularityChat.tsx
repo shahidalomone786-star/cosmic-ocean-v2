@@ -926,6 +926,29 @@ const VoiceWaveform = memo(function VoiceWaveform({
 const formatVoiceTime = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
+interface VoiceLatencyTiming {
+  speechEndedAt: number;
+  sttResultAt?: number;
+  llmRequestAt?: number;
+  firstTokenAt?: number;
+  ttsStartAt?: number;
+  firstAudioAt?: number;
+  audibleAt?: number;
+}
+
+function logVoiceLatency(timing: VoiceLatencyTiming, event: string): void {
+  const duration = (start?: number, end?: number) =>
+    start !== undefined && end !== undefined ? Math.round(end - start) : undefined;
+  console.info(`[VoiceMode timing] ${event}`, {
+    speech_end_to_stt_complete_ms: duration(timing.speechEndedAt, timing.sttResultAt),
+    stt_complete_to_llm_request_ms: duration(timing.sttResultAt, timing.llmRequestAt),
+    llm_request_to_first_token_ms: duration(timing.llmRequestAt, timing.firstTokenAt),
+    first_token_to_tts_start_ms: duration(timing.firstTokenAt, timing.ttsStartAt),
+    tts_start_to_first_audio_ready_ms: duration(timing.ttsStartAt, timing.firstAudioAt),
+    first_audio_ready_to_first_audio_play_ms: duration(timing.firstAudioAt, timing.audibleAt),
+  });
+}
+
 async function preprocessRecordedAudio(recording: Blob): Promise<{
   blob: Blob;
   filename: string;
@@ -1543,6 +1566,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const voiceSessionRef = useRef(0);
   const voiceRequestAbortRef = useRef<AbortController | null>(null);
   const voiceTranscriptionTimeoutRef = useRef<number | null>(null);
+  const voiceLatencyTimingRef = useRef<VoiceLatencyTiming | null>(null);
   const mountedRef = useRef(true);
   const voiceTtsQueueRef = useRef<TtsStreamingQueue | null>(null);
   const voiceSentenceBufferRef = useRef('');
@@ -1749,6 +1773,9 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     const recorder = voiceRecorderRef.current;
     if (!recorder) return;
     const sessionId = voiceSessionRef.current;
+    const timing: VoiceLatencyTiming = { speechEndedAt: performance.now() };
+    voiceLatencyTimingRef.current = timing;
+    logVoiceLatency(timing, 'speech_end');
     voiceFinalizingRef.current = true;
     if (voiceRecordingVadTimerRef.current !== null) {
       window.clearInterval(voiceRecordingVadTimerRef.current);
@@ -1846,6 +1873,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         resumeListening();
         return;
       }
+      timing.sttResultAt = performance.now();
+      logVoiceLatency(timing, 'stt_complete');
       setVoiceTranscript(text);
       voiceRequestAbortRef.current = null;
       voiceTurnRef.current(text);
@@ -1962,7 +1991,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                voiceSilenceStartedAtRef.current ??= Date.now();
                 // Keep the hold long enough for natural word boundaries, but
                 // do not make every turn wait multiple seconds before STT.
-                if (Date.now() - voiceSilenceStartedAtRef.current >= 1_200) void finishVoiceRecording();
+                if (Date.now() - voiceSilenceStartedAtRef.current >= 800) void finishVoiceRecording();
              } else if (voiceMicLevelRef.current > 0.065) {
                voiceSilenceStartedAtRef.current = null;
              }
@@ -2956,10 +2985,29 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         },
         () => {
           if (voiceMode && voiceSessionRef.current > 0 && voiceModeOpenRef.current) {
+            const timing = voiceLatencyTimingRef.current;
+            if (timing) {
+              timing.audibleAt = performance.now();
+              logVoiceLatency(timing, 'first_audio_play');
+            }
             setVoiceModeState('speaking');
             setVoiceStatusText('Speaking…');
             voicePlaybackGuardUntilRef.current = Date.now() + 350;
             void startVoiceRecording(true);
+          }
+        },
+        () => {
+          const timing = voiceLatencyTimingRef.current;
+          if (timing) {
+            timing.ttsStartAt = performance.now();
+              logVoiceLatency(timing, 'tts_start');
+          }
+        },
+        () => {
+          const timing = voiceLatencyTimingRef.current;
+          if (timing) {
+            timing.firstAudioAt = performance.now();
+              logVoiceLatency(timing, 'first_audio_ready');
           }
         },
       );
@@ -3000,6 +3048,13 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       }));
 
     try {
+      if (voiceMode) {
+        const timing = voiceLatencyTimingRef.current;
+        if (timing) {
+          timing.llmRequestAt = performance.now();
+          logVoiceLatency(timing, 'llm_request');
+        }
+      }
       const res = await fetch('/api/singularity', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3110,6 +3165,11 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
           if (data.done) continue;
 
           if (!sawFirstToken) {
+            const timing = voiceLatencyTimingRef.current;
+            if (voiceMode && timing) {
+              timing.firstTokenAt = performance.now();
+              logVoiceLatency(timing, 'first_token');
+            }
             if (voiceMode) {
               setVoiceModeState('generating');
               setVoiceStatusText('Thinking…');
@@ -3197,6 +3257,8 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
           voiceSentenceBufferRef.current = '';
         }
         if (queue) await queue.finish();
+        const timing = voiceLatencyTimingRef.current;
+        if (timing) logVoiceLatency(timing, 'response_complete');
         if (voiceSessionRef.current > 0 && voiceModeOpenRef.current && !requestController.signal.aborted) {
           const wasInterrupted = voiceWasInterruptedRef.current;
           if (!wasInterrupted) stopVoiceModeResources();

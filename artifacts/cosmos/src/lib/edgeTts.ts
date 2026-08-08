@@ -582,11 +582,15 @@ export class TtsStreamingQueue {
   private audioUnlockPromise: Promise<void> = Promise.resolve();
   private retryTimer: number | null = null;
   private retryWaitResolve: (() => void) | null = null;
+  private ttsStarted = false;
+  private firstAudioReady = false;
 
   constructor(
     private readonly onLevel?: TtsLevelListener,
     private readonly onError?: (error: Error) => void,
     private readonly onPlaybackStart?: () => void,
+    private readonly onTtsStart?: () => void,
+    private readonly onFirstAudioReady?: () => void,
   ) {}
 
   get signal(): AbortSignal {
@@ -713,6 +717,10 @@ export class TtsStreamingQueue {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < 2 && !this.stopped; attempt += 1) {
       try {
+        if (!this.ttsStarted) {
+          this.ttsStarted = true;
+          this.onTtsStart?.();
+        }
         const response = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -767,6 +775,30 @@ export class TtsStreamingQueue {
     audio.src = url;
     audio.volume = this.speakerEnabled ? 1 : 0;
     this.startLevelMeter(audio);
+    try {
+      await this.waitForAudioReady(audio);
+    } catch (error) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      if (this.currentAudio === audio) this.currentAudio = null;
+      if (this.currentUrl === url) this.currentUrl = null;
+      URL.revokeObjectURL(url);
+      throw error;
+    }
+    if (this.stopped || this.signal.aborted) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      if (this.currentAudio === audio) this.currentAudio = null;
+      if (this.currentUrl === url) this.currentUrl = null;
+      URL.revokeObjectURL(url);
+      throw new DOMException('TTS playback aborted', 'AbortError');
+    }
+    if (!this.firstAudioReady) {
+      this.firstAudioReady = true;
+      this.onFirstAudioReady?.();
+    }
 
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -805,6 +837,38 @@ export class TtsStreamingQueue {
         }
         finish(playbackError);
       });
+    });
+  }
+
+  private waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
+    if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => {
+        audio.removeEventListener('loadeddata', onReady);
+        audio.removeEventListener('canplay', onReady);
+        audio.removeEventListener('error', onError);
+        this.signal.removeEventListener('abort', onAbort);
+      };
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        error ? reject(error) : resolve();
+      };
+      const onReady = () => {
+        if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) finish();
+      };
+      const onError = () => finish(new Error('Edge TTS audio could not be decoded.'));
+      const onAbort = () => finish(new DOMException('TTS playback aborted', 'AbortError'));
+
+      audio.addEventListener('loadeddata', onReady);
+      audio.addEventListener('canplay', onReady);
+      audio.addEventListener('error', onError);
+      this.signal.addEventListener('abort', onAbort, { once: true });
+      audio.load();
+      onReady();
     });
   }
 
