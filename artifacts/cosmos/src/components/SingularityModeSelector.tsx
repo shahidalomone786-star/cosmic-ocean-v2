@@ -16,28 +16,28 @@ const modeIcons = {
 
 const modeAccents = {
   pro: {
-    icon: 'text-sky-200',
-    dot: 'bg-sky-200',
-    active: 'border-sky-200/25 bg-sky-200/[0.075]',
-    glow: 'shadow-[0_0_22px_rgba(125,211,252,0.08)]',
+    icon: 'text-white/45',
+    selectedIcon: 'text-white/90',
+    active: 'border-white/[0.22] bg-white/[0.075]',
+    glow: 'shadow-[0_0_22px_rgba(255,255,255,0.07)]',
   },
   max: {
-    icon: 'text-violet-200',
-    dot: 'bg-violet-200',
-    active: 'border-violet-200/25 bg-violet-200/[0.075]',
-    glow: 'shadow-[0_0_22px_rgba(196,181,253,0.08)]',
+    icon: 'text-white/45',
+    selectedIcon: 'text-white/90',
+    active: 'border-white/[0.22] bg-white/[0.075]',
+    glow: 'shadow-[0_0_22px_rgba(255,255,255,0.07)]',
   },
   flash: {
-    icon: 'text-amber-200',
-    dot: 'bg-amber-200',
-    active: 'border-amber-200/25 bg-amber-200/[0.075]',
-    glow: 'shadow-[0_0_22px_rgba(253,230,138,0.08)]',
+    icon: 'text-white/45',
+    selectedIcon: 'text-white/90',
+    active: 'border-white/[0.22] bg-white/[0.075]',
+    glow: 'shadow-[0_0_22px_rgba(255,255,255,0.07)]',
   },
   research: {
-    icon: 'text-emerald-200',
-    dot: 'bg-emerald-200',
-    active: 'border-emerald-200/25 bg-emerald-200/[0.075]',
-    glow: 'shadow-[0_0_22px_rgba(167,243,208,0.08)]',
+    icon: 'text-white/45',
+    selectedIcon: 'text-white/90',
+    active: 'border-white/[0.22] bg-white/[0.075]',
+    glow: 'shadow-[0_0_22px_rgba(255,255,255,0.07)]',
   },
 } as const;
 
@@ -142,17 +142,17 @@ export default function SingularityModeSelector({
         className={`group flex min-h-11 max-w-[11rem] items-center gap-2 rounded-xl border px-2.5 py-2
           text-left transition-[background-color,border-color,box-shadow,transform] duration-[180ms]
           hover:-translate-y-px hover:bg-white/[0.06] focus-visible:outline-none
-          focus-visible:ring-2 focus-visible:ring-sky-200/40 disabled:cursor-not-allowed
+          focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed
           disabled:opacity-50 sm:max-w-none ${selectedAccent.active} ${selectedAccent.glow}`}
       >
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] ${selectedAccent.icon}`}>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] ${selectedAccent.selectedIcon}`}>
           <ModeIcon mode={selected.id} size={13} />
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-white/78">
+          <span className="block truncate font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-white/88">
             {selected.name}
           </span>
-          <span className="hidden truncate text-[10px] leading-4 text-white/35 sm:block">
+          <span className="hidden truncate text-[10px] leading-4 text-white/42 sm:block">
             {selected.description}
           </span>
         </span>
@@ -178,8 +178,8 @@ export default function SingularityModeSelector({
             onKeyDown={handleMenuKeyDown}
             className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-[min(20rem,calc(100vw-2rem))]
               max-h-[min(28rem,calc(100dvh-5.5rem))] overflow-x-hidden overflow-y-auto overscroll-contain
-              rounded-2xl border border-white/[0.11] bg-[#111117]/[0.98]
-              p-1.5 shadow-[0_22px_70px_rgba(0,0,0,0.52),inset_0_1px_0_rgba(255,255,255,0.06)]
+              rounded-2xl border border-white/[0.13] bg-[#111117]/[0.98]
+              p-1.5 shadow-[0_22px_70px_rgba(0,0,0,0.52),0_0_28px_rgba(255,255,255,0.025),inset_0_1px_0_rgba(255,255,255,0.06)]
               backdrop-blur-xl"
           >
             <div className="flex items-center gap-2 px-3 pb-2 pt-2">
@@ -203,10 +203,10 @@ export default function SingularityModeSelector({
                   onClick={() => selectMode(mode)}
                   className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 py-3 text-left
                     transition-[background-color,border-color,transform] duration-150
-                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200/35
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25
                     ${isSelected ? `${accent.active} ${accent.glow}` : 'border-transparent hover:border-white/[0.08] hover:bg-white/[0.045]'}`}
                 >
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.055] ${accent.icon}`}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.055] ${isSelected ? accent.selectedIcon : accent.icon}`}>
                     <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -217,7 +217,7 @@ export default function SingularityModeSelector({
                       {mode.description}
                     </span>
                   </span>
-                  {isSelected && <Check size={14} className={accent.icon} strokeWidth={2.2} aria-hidden="true" />}
+                  {isSelected && <Check size={14} className={accent.selectedIcon} strokeWidth={2.2} aria-hidden="true" />}
                 </button>
               );
             })}
