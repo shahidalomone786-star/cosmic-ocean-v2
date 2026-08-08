@@ -627,6 +627,17 @@
   gap: 0.08rem;
 }
 
+.singularity-composer-action-slot {
+  display: grid;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-items: end;
+}
+
+.singularity-composer-action-slot > * {
+  grid-area: 1 / 1;
+}
+
 .singularity-composer-mic {
   gap: 0.25rem;
 }

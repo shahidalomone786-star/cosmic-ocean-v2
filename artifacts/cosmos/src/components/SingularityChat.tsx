@@ -3430,6 +3430,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const attachmentError = imageError || docError;
   const isMessageCooldownActive = cooldownRemaining > 0;
   const composerLocked = isProcessingAttachment || isMessageCooldownActive;
+  const showSendControl = isThinking || input.trim().length > 0 || images.length > 0;
 
   return (
     <motion.div
@@ -3641,7 +3642,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       </div>
 
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
-      <div className="singularity-composer-region flex-shrink-0 border-t pb-safe">
+      <div className="singularity-composer-region flex-shrink-0 pb-safe">
         <div className="singularity-composer-region-inner mx-auto w-full max-w-3xl">
 
           {/* Hidden file input — triggered by "Upload Document" button or Replace */}
@@ -3831,49 +3832,71 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                     setVoiceState('idle');
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={handleOpenVoiceMode}
-                  disabled={composerLocked || isThinking}
-                  className="singularity-composer-voice-mode flex flex-shrink-0 items-center justify-center gap-1.5 rounded-full border
-                    bg-violet-300/[0.06] text-violet-100/65 transition-gpu
-                    hover:border-violet-200/40 hover:bg-violet-200/[0.12] hover:text-violet-50
-                    active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
-                    disabled:cursor-not-allowed disabled:opacity-30"
-                  aria-label="Open immersive Voice Mode"
-                  data-testid="button-open-voice-mode"
+                <motion.div
+                  layout
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="singularity-composer-action-slot"
                 >
-                  <Mic2 size={15} strokeWidth={1.8} />
-                  <span className="hidden sm:inline">Voice Mode</span>
-                </button>
-                <button
-                onClick={() => (isThinking ? handleStop() : handleSend())}
-                disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
-                className={`singularity-composer-send flex-shrink-0 rounded-full flex items-center justify-center
-                  transition-gpu active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
-                  isThinking
-                    ? 'is-thinking'
-                    : ((input.trim() || images.length > 0) && !composerLocked && !(visionSupported === false && images.length > 0))
-                      ? 'is-ready'
-                      : 'is-idle'
-                }`}
-                aria-label={
-                  isThinking
-                    ? 'Stop generating'
-                    : isMessageCooldownActive
-                      ? `Recharging, ${cooldownRemaining} seconds remaining`
-                      : 'Send message'
-                }
-                >
-                {isProcessingAttachment
-                  ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
-                  : isMessageCooldownActive
-                    ? <span className="text-[10px] font-semibold tabular-nums">{cooldownRemaining}s</span>
-                  : isThinking
-                    ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
-                    : <Send size={13} strokeWidth={2.5} className={(input.trim() && !isProcessing) ? 'ml-[1px]' : ''} />
-                }
-                </button>
+                  <AnimatePresence initial={false} mode="wait">
+                    {!showSendControl ? (
+                      <motion.button
+                        key="voice-mode"
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.94 }}
+                        transition={{ duration: 0.17, ease: 'easeOut' }}
+                        onClick={handleOpenVoiceMode}
+                        disabled={composerLocked || isThinking}
+                        className="singularity-composer-voice-mode flex flex-shrink-0 items-center justify-center gap-1.5 rounded-full border
+                          bg-violet-300/[0.06] text-violet-100/65 transition-gpu
+                          hover:border-violet-200/40 hover:bg-violet-200/[0.12] hover:text-violet-50
+                          active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50
+                          disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label="Open immersive Voice Mode"
+                        data-testid="button-open-voice-mode"
+                      >
+                        <Mic2 size={15} strokeWidth={1.8} />
+                        <span className="hidden sm:inline">Voice Mode</span>
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        key="send"
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.94 }}
+                        transition={{ duration: 0.17, ease: 'easeOut' }}
+                        onClick={() => (isThinking ? handleStop() : handleSend())}
+                        disabled={!isThinking && ((!input.trim() && images.length === 0) || composerLocked || visionSupported === false && images.length > 0)}
+                        className={`singularity-composer-send flex-shrink-0 rounded-full flex items-center justify-center
+                          transition-gpu active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
+                          isThinking
+                            ? 'is-thinking'
+                            : ((input.trim() || images.length > 0) && !composerLocked && !(visionSupported === false && images.length > 0))
+                              ? 'is-ready'
+                              : 'is-idle'
+                        }`}
+                        aria-label={
+                          isThinking
+                            ? 'Stop generating'
+                            : isMessageCooldownActive
+                              ? `Recharging, ${cooldownRemaining} seconds remaining`
+                              : 'Send message'
+                        }
+                      >
+                        {isProcessingAttachment
+                          ? <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
+                          : isMessageCooldownActive
+                            ? <span className="text-[10px] font-semibold tabular-nums">{cooldownRemaining}s</span>
+                          : isThinking
+                            ? <Square size={11} strokeWidth={2.5} fill="currentColor" />
+                            : <Send size={13} strokeWidth={2.5} className={(input.trim() && !isProcessing) ? 'ml-[1px]' : ''} />
+                        }
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               </div>
             </div>
 
