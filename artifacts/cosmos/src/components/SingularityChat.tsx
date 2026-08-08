@@ -40,7 +40,13 @@ import {
   TtsStreamingQueue,
 } from '@/lib/edgeTts';
 import VoiceModeOverlay, { type VoiceModeState } from './VoiceModeOverlay';
+import SingularityModeSelector from './SingularityModeSelector';
 import { toast } from '@/hooks/use-toast';
+import {
+  loadSingularityMode,
+  saveSingularityMode,
+  type SingularityMode,
+} from '@/lib/singularityModes';
 import { MobileHistoryButton, SingularitySidebar } from './SingularitySidebar';
 import {
   createChatSession,
@@ -1406,6 +1412,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
+  const [mode, setMode] = useState<SingularityMode>(() => loadSingularityMode());
   const [voiceState, setVoiceState] = useState<MicrophoneState>('idle');
   const [voiceError, setVoiceError] = useState('');
   const [voiceModeOpen, setVoiceModeOpen] = useState(false);
@@ -2922,6 +2929,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     ]);
 
     const currentMessages = messagesRef.current;
+    const requestMode = mode;
     // Historical image turns stay as placeholders. Only images attached to
     // this request are eligible for the structured vision payload.
     const activeImages = requestImages;
@@ -2938,15 +2946,20 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
       const res = await fetch('/api/singularity', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-         body:    JSON.stringify({
+           body:    JSON.stringify({
            message: userText,
-           history: safeHistory,
+            mode: requestMode,
+            ...(requestMode === 'max' ? {} : { history: safeHistory }),
            voiceMode,
-           images: activeImages.map(image => ({
-             filename: image.filename,
-             mimeType: image.mimeType,
-             dataUrl: image.dataUrl,
-           })),
+            ...(requestMode === 'max'
+              ? {}
+              : {
+                  images: activeImages.map(image => ({
+                    filename: image.filename,
+                    mimeType: image.mimeType,
+                    dataUrl: image.dataUrl,
+                  })),
+                }),
          }),
          signal:  requestController.signal,
       });
@@ -3177,7 +3190,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         if (voiceRequestAbortRef.current === requestController) voiceRequestAbortRef.current = null;
       }
     }
-  }, [beginMessageCooldown, clearMessageCooldown, flushStreamUpdate, loadVisualReferences, scheduleStreamUpdate, startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
+  }, [beginMessageCooldown, clearMessageCooldown, flushStreamUpdate, loadVisualReferences, mode, scheduleStreamUpdate, startVoiceRecording, stopVoiceModeResources, voiceModeOpen]);
 
   const handleVoiceTurn = useCallback((text: string) => {
     if (!voiceModeOpen || !text.trim() || voiceRequestAbortRef.current) return;
@@ -3213,7 +3226,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     // Build the enriched AI prompt — document context injected here, never in the textarea.
     // The user's visible message is always the clean, unmodified `text`.
     let aiPrompt = text;
-    if (latestDocument && latestDocument.chunks.length > 0) {
+    if (mode !== 'max' && latestDocument && latestDocument.chunks.length > 0) {
       const relevantChunks = selectRelevantChunks(text, latestDocument.chunks);
       aiPrompt = buildDocumentPrompt(text, relevantChunks, latestDocument.filename);
     }
@@ -3235,7 +3248,12 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
     stickToBottomRef.current = true;
     beginMessageCooldown();
     generateResponse(aiPrompt, currentImages);
-  }, [beginMessageCooldown, clearDocument, clearImages, generateResponse]);
+  }, [beginMessageCooldown, clearDocument, clearImages, generateResponse, mode]);
+
+  const handleModeChange = useCallback((nextMode: SingularityMode) => {
+    setMode(nextMode);
+    saveSingularityMode(nextMode);
+  }, []);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -3339,7 +3357,7 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
         bg-[#09090b]/[0.96] backdrop-blur-md
         shadow-[0_1px_0_rgba(255,255,255,0.03)]">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-start px-4 py-3.5 sm:px-6">
-          <div className="flex items-center gap-3">
+           <div className="flex min-w-0 flex-1 items-center gap-3">
             <MobileHistoryButton onClick={() => setMobileHistoryOpen(true)} />
             {/* Icon — layered glow ring */}
             <div className="relative flex h-9 w-9 items-center justify-center rounded-full
@@ -3379,7 +3397,12 @@ export default function SingularityChat({ onClose, onOpenSettings }: { onClose?:
                  Workspace
                </button>
              )}
-          </div>
+             </div>
+             <SingularityModeSelector
+               value={mode}
+               onChange={handleModeChange}
+               disabled={isThinking}
+             />
 
         </div>
       </div>

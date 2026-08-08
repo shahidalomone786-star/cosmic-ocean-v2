@@ -8,6 +8,7 @@
 - [Singularity immersive voice mode](singularity-voice-mode.md) — continuous voice sessions append to chat history while owning independent VAD, SSE abort, and cancellable sentence-fed TTS lifecycles
 - [Singularity mobile/request guards](singularity-mobile-guards.md) — dynamic keyboard viewport, gesture-primed regular Listen audio, and strict four-history-message request budgeting
 - [Singularity editorial system](singularity-editorial.md) — Markdown presentation stays narrow and document-grade; editorial response rules append to the existing scientific system prompt
+- [Singularity AI modes](singularity-modes.md) — server-owned Pro/Max/Flash/Research policies; Max strips request context without mutating stored chat history
 - [Singularity visual intelligence](singularity-visual-intelligence.md) — post-stream visual decisions use bounded Wikimedia references, async loading, and persisted per-message evidence
 - [Singularity design system](singularity-design-system.md) — shared tokens and primitives own timing, focus, elevation, and reduced-motion behavior
 - [Singularity settings hub](singularity-settings-hub.md) — versioned local preferences stay isolated from chat transport; destructive history actions clear IndexedDB and localStorage

@@ -14,6 +14,42 @@ const MAX_MESSAGE_ESTIMATED_TOKENS = 5_000;
 const MAX_MESSAGE_SERIALIZED_CHARACTERS = MAX_MESSAGE_ESTIMATED_TOKENS * 4;
 const lastSingularityRequestByClient = new Map<string, number>();
 
+type SingularityMode = 'pro' | 'max' | 'flash' | 'research';
+
+interface SingularityModePolicy {
+  mode: SingularityMode;
+  systemInstruction: string;
+  includeHistory: boolean;
+  includeAttachments: boolean;
+  historyLimit: number;
+  maxTokens: number;
+  researchStyle: boolean;
+}
+
+const MAX_MODE_SYSTEM_INSTRUCTION = `You are Singularity. The user's name is Shahid.
+Provide exceptionally detailed, rigorous, comprehensive responses.
+Explore the subject deeply and explain important reasoning, assumptions, examples,
+and implications when useful. Do not unnecessarily shorten the response.
+Follow all platform, application, safety, authentication, authorization, and
+server-side security controls. Never reveal secrets or claim evidence that was
+not provided or verified.`;
+
+const FLASH_MODE_INSTRUCTION = `Answer directly and efficiently. Be concise and
+avoid unnecessary explanation unless the user asks for it. Never sacrifice
+correctness, safety, or important qualifications for brevity.`;
+
+const RESEARCH_MODE_INSTRUCTION = `Work like a rigorous research analyst. Prioritize
+primary sources and evidence when they are available in the supplied context or
+through approved tools. State assumptions, distinguish evidence from inference,
+compare plausible explanations, and make uncertainty explicit. Never fabricate
+citations, sources, data, or tool results.`;
+
+function resolveSingularityMode(value: unknown): SingularityMode {
+  if (value === undefined || value === null || value === '') return 'pro';
+  if (value === 'pro' || value === 'max' || value === 'flash' || value === 'research') return value;
+  throw new Error('mode must be one of: pro, max, flash, research');
+}
+
 function getSingularityClientKey(req: Request): string {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined;
   const userId = token ? verifyToken(token)?.sub : null;
@@ -143,6 +179,45 @@ For detailed responses, conclude with a concise **Key Takeaways** section contai
 Maintain clean, concise prose with smooth transitions, minimal repetition, and consistent terminology. Match the reader's knowledge level naturally without explicitly announcing difficulty levels. Every paragraph should contribute meaningful information; avoid filler, redundancy, dramatic language, excessive emphasis, or decorative formatting.`;
 const VOICE_REALTIME_PROMPT =
   'You are speaking out loud in a real-time voice conversation. Keep your response highly conversational, direct, and concise (1 to 3 sentences maximum) unless asked for a detailed explanation.';
+
+const SINGULARITY_MODE_POLICIES: Record<SingularityMode, SingularityModePolicy> = {
+  pro: {
+    mode: 'pro',
+    systemInstruction: SYSTEM_PROMPT,
+    includeHistory: true,
+    includeAttachments: true,
+    historyLimit: 4,
+    maxTokens: 1500,
+    researchStyle: false,
+  },
+  max: {
+    mode: 'max',
+    systemInstruction: MAX_MODE_SYSTEM_INSTRUCTION,
+    includeHistory: false,
+    includeAttachments: false,
+    historyLimit: 0,
+    maxTokens: 7000,
+    researchStyle: false,
+  },
+  flash: {
+    mode: 'flash',
+    systemInstruction: `${SYSTEM_PROMPT}\n\n${FLASH_MODE_INSTRUCTION}`,
+    includeHistory: true,
+    includeAttachments: true,
+    historyLimit: 2,
+    maxTokens: 700,
+    researchStyle: false,
+  },
+  research: {
+    mode: 'research',
+    systemInstruction: `${SYSTEM_PROMPT}\n\n${RESEARCH_MODE_INSTRUCTION}`,
+    includeHistory: true,
+    includeAttachments: true,
+    historyLimit: 4,
+    maxTokens: 3000,
+    researchStyle: true,
+  },
+};
 
 const TEXT_MODEL = 'openai/gpt-oss-120b';
 const VISION_MODEL = 'qwen/qwen3.6-27b';
@@ -385,6 +460,20 @@ router.post('/singularity', async (req, res) => {
   const { message, history } = req.body ?? {};
   const voiceMode = req.body?.voiceMode === true;
   const images = sanitiseImageInputs(req.body?.images);
+  let mode: SingularityMode;
+  try {
+    mode = resolveSingularityMode(req.body?.mode);
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Invalid Singularity mode.',
+      status: 400,
+      details: null,
+    });
+    return;
+  }
+  const modePolicy = SINGULARITY_MODE_POLICIES[mode];
+  const effectiveImages = modePolicy.includeAttachments ? images : [];
 
   if (!message || typeof message !== 'string' || !message.trim()) {
     res.status(400).json({
@@ -394,7 +483,7 @@ router.post('/singularity', async (req, res) => {
     return;
   }
 
-  if (Array.isArray(req.body?.images) && req.body.images.length > 0 && images.length === 0) {
+  if (modePolicy.includeAttachments && Array.isArray(req.body?.images) && req.body.images.length > 0 && images.length === 0) {
     res.status(400).json({
       success: false,
       error: 'The attached image payload is invalid or too large.',
@@ -420,7 +509,7 @@ router.post('/singularity', async (req, res) => {
   const safeHistory = sanitiseHistory(history);
   // Only the request's active images are eligible for the vision turn. Any
   // image information in history has already been reduced to a placeholder.
-  const hasImages = images.length > 0;
+  const hasImages = effectiveImages.length > 0;
   const provider = 'Groq';
   const model = hasImages ? VISION_MODEL : TEXT_MODEL;
 
@@ -434,10 +523,10 @@ router.post('/singularity', async (req, res) => {
     return;
   }
 
-  const userContent = images.length > 0
+  const userContent = effectiveImages.length > 0
     ? [
         { type: 'text', text: message.trim() },
-        ...images.map(image => ({
+        ...effectiveImages.map(image => ({
           type: 'image_url',
           image_url: { url: image.dataUrl },
         })),
@@ -446,7 +535,7 @@ router.post('/singularity', async (req, res) => {
   // Vision requests are intentionally stateless at the transport boundary:
   // the active image(s) arrive in `images` exactly once, while history only
   // contains text and "[Previous image]" placeholders.
-  const visionImages = images;
+  const visionImages = effectiveImages;
   const visionUserContent = visionImages.length > 0
     ? [
         { type: 'text', text: message.trim() },
@@ -456,18 +545,20 @@ router.post('/singularity', async (req, res) => {
         })),
       ]
     : message.trim();
-  const historyMessages = hasImages
+  const historyMessages = !modePolicy.includeHistory || hasImages
     ? []
     : safeHistory.map(turn => ({ role: turn.role, content: turn.content }));
-  const boundedHistoryMessages = hasImages
+  const boundedHistoryMessages = !modePolicy.includeHistory || hasImages
     ? []
-    : trimHistoryWindow(historyMessages);
+    : historyMessages.slice(-modePolicy.historyLimit);
   // Keep Singularity's persona as the first message for every provider/model.
   // In particular, Qwen vision requests must not bypass the system instruction.
   const messages: ChatRequestMessage[] = [
     {
       role: 'system',
-      content: voiceMode ? `${SYSTEM_PROMPT}\n\n${VOICE_REALTIME_PROMPT}` : SYSTEM_PROMPT,
+      content: voiceMode
+        ? `${modePolicy.systemInstruction}\n\n${VOICE_REALTIME_PROMPT}`
+        : modePolicy.systemInstruction,
     },
     ...boundedHistoryMessages,
     { role: 'user',      content: hasImages ? visionUserContent : userContent },
@@ -493,7 +584,7 @@ router.post('/singularity', async (req, res) => {
   }
 
   console.log(
-    `[singularity] Request: "${message.slice(0, 60)}…"  history=${hasImages ? 0 : safeHistory.length} turn(s)  boundedMessages=${boundedMessages.length} estimatedInputTokens=${Math.ceil(estimatedMessageTokens)} model=${model} images=${visionImages.length}`
+    `[singularity] Request: "${message.slice(0, 60)}…"  mode=${mode} history=${modePolicy.includeHistory && !hasImages ? safeHistory.length : 0} turn(s)  boundedMessages=${boundedMessages.length} estimatedInputTokens=${Math.ceil(estimatedMessageTokens)} model=${model} images=${visionImages.length} research=${modePolicy.researchStyle}`
   );
 
   const maxAttempts = getGroqKeyCount();
@@ -521,7 +612,7 @@ router.post('/singularity', async (req, res) => {
            messages: boundedMessages,
           stream:      true,
           temperature: 0.6,
-            max_tokens: voiceMode ? 320 : 1500,
+            max_tokens: voiceMode ? 320 : modePolicy.maxTokens,
         }),
       });
 
