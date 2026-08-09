@@ -66,6 +66,7 @@ function SearchHeroCarousel({
     }
 
     const controller = new AbortController();
+    let timedOut = false;
     const timer = window.setTimeout(async () => {
       setStatus('loading');
       setImages([]);
@@ -84,15 +85,22 @@ function SearchHeroCarousel({
         setImages(nextImages);
         setStatus(nextImages.length > 0 ? 'ready' : 'error');
       } catch {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted || timedOut) {
           setImages([]);
           setStatus('error');
         }
+      } finally {
+        window.clearTimeout(timeoutTimer);
       }
     }, 120);
+    const timeoutTimer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 4_500);
 
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(timeoutTimer);
       controller.abort();
     };
   }, [query]);
@@ -143,15 +151,15 @@ function SearchHeroCarousel({
             : 'border-white/[0.11] bg-[#0b0b18]/85 shadow-[0_14px_42px_rgba(0,0,0,0.52),0_0_34px_rgba(109,72,202,0.07)]'
         }`}
         aria-label={`Loading image results for ${query || 'your search'}`}
-        aria-busy="true"
+        aria-busy={status === 'idle' || status === 'loading'}
       >
         <div className="relative aspect-[16/9] w-full overflow-hidden">
-          <ImageSkeleton lm={lm} />
-          {status === 'error' && (
-            <div className={`absolute inset-x-0 bottom-0 px-4 py-3 text-center text-[9px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/45'}`}>
-              Visual index unavailable
+          {status === 'error' ? (
+            <div className={`absolute inset-0 flex flex-col items-center justify-center gap-2 ${lm ? 'bg-slate-100 text-slate-500' : 'bg-[#0b0b18] text-white/45'}`}>
+              <span className="text-[10px] uppercase tracking-[0.22em]">Visual index unavailable</span>
+              <span className="text-[9px] tracking-wide opacity-70">Try another search to explore images</span>
             </div>
-          )}
+          ) : <ImageSkeleton lm={lm} />}
         </div>
       </motion.section>
     );

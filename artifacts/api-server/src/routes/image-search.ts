@@ -17,6 +17,17 @@ export interface SearchImage {
 }
 
 const REJECT_PATTERN = /\b(logo|watermark|watermarked|meme|poster|collage|screenshot|thumbnail|low[- ]?res|pinterest|blog)\b/i;
+const IMAGE_HOSTS = new Set(["upload.wikimedia.org", "commons.wikimedia.org"]);
+
+function isUsableImageUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && IMAGE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function cleanText(value: string): string {
   return value
@@ -56,7 +67,7 @@ async function searchWikimedia(query: string): Promise<SearchImage[]> {
       Accept: "application/json",
       "User-Agent": "Cosmos-Singularity/1.0 image search",
     },
-    signal: AbortSignal.timeout(7_000),
+    signal: AbortSignal.timeout(4_500),
   });
   if (!response.ok) throw new Error(`Wikimedia Commons returned ${response.status}`);
 
@@ -93,7 +104,7 @@ async function searchWikimedia(query: string): Promise<SearchImage[]> {
       if (
         !page.pageid ||
         !title ||
-        !imageUrl ||
+        !isUsableImageUrl(imageUrl) ||
         !info?.mime?.startsWith("image/") ||
         width < 640 ||
         height < 360 ||

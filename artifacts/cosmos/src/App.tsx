@@ -1953,6 +1953,7 @@ export default function App() {
   const [activeVideo,      setActiveVideo]      = useState<VideoItem | null>(null);
 
   const hasSearchResults = searchStatus !== 'idle';
+  const showSearchHero = nasaQuery.trim().length > 0 && hasSearchResults;
 
   // Theme is applied directly to the outermost wrapper div via Tailwind class;
   // no document.body manipulation needed.
@@ -2573,7 +2574,7 @@ export default function App() {
               animate={{ y: hasSearchResults ? 0 : focused ? -120 : 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 28 }}
               className={`flex flex-col items-center gap-5 pointer-events-auto px-6 w-full ${
-                hasSearchResults ? 'max-w-2xl' : 'max-w-md'
+                hasSearchResults ? 'max-w-4xl' : 'max-w-md'
               }`}
             >
               {/* Search pill + recent searches dropdown wrapper */}
@@ -2703,13 +2704,15 @@ export default function App() {
               </div>
 
               {/* Search visuals replace the legacy category pills in this slot. */}
-              <div className="w-full max-w-2xl px-6">
-                <SearchHeroCarousel
-                  query={nasaQuery}
-                  lm={lm}
-                  onShareToSingularity={handleSearchImageShare}
-                />
-              </div>
+              {showSearchHero && (
+                <div className="pointer-events-auto w-full max-w-4xl px-4 sm:px-6">
+                  <SearchHeroCarousel
+                    query={nasaQuery}
+                    lm={lm}
+                    onShareToSingularity={handleSearchImageShare}
+                  />
+                </div>
+              )}
 
               {!hasSearchResults && (
                 <motion.button
