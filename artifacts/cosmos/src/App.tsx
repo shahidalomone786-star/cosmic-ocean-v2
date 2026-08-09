@@ -22,6 +22,7 @@ const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
 const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModal'));
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
 const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
+const CosmicAtelier         = lazy(() => import('./components/cosmic-atelier/CosmicAtelier'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
 import type { VideoItem } from './components/VideoPlayerModal';
@@ -30,6 +31,7 @@ const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
+import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 import { TtsPlaybackQueue } from './lib/edgeTts';
@@ -1946,6 +1948,7 @@ export default function App() {
   const [showProfile,      setShowProfile]      = useState(false);
   const [showNexus,        setShowNexus]        = useState(false);
   const [showBiologyHub,   setShowBiologyHub]   = useState(false);
+  const [showCosmicAtelier, setShowCosmicAtelier] = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
@@ -2031,7 +2034,7 @@ export default function App() {
   });
 
   const isAnimationPaused =
-    !show3D || showIntro || focused || showPortal || showLibrary || langOpen ||
+    !show3D || showIntro || focused || showPortal || showLibrary || showCosmicAtelier || langOpen ||
     activeChat !== null || chatInputFocused ||
     hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess || activeVideo !== null;
 
@@ -2991,6 +2994,9 @@ export default function App() {
               {/* ── Biology Hub Hero Card ── */}
               <BioHeroCard lm={lm} onOpen={() => setShowBiologyHub(true)} />
 
+              {/* ── Cosmic Atelier Store Entry ── */}
+              <CosmicAtelierEntry lm={lm} onOpen={() => setShowCosmicAtelier(true)} />
+
               {/* ── Quantum Lab ── */}
               <div className="mb-6 cv-section">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -3348,6 +3354,18 @@ export default function App() {
               lm={lm}
               onToggleLm={() => setIsLightMode((v) => !v)}
               onClose={() => setShowBiologyHub(false)}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[170]  Cosmic Atelier ── */}
+      <AnimatePresence>
+        {showCosmicAtelier && (
+          <Suspense fallback={null}>
+            <CosmicAtelier
+              lm={lm}
+              onClose={() => setShowCosmicAtelier(false)}
             />
           </Suspense>
         )}
