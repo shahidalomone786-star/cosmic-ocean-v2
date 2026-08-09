@@ -3,7 +3,7 @@ import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { UnifiedItem, WikiItem, NasaItem, ArxivItem, SpaceXItem, CernItem, NasaStatus, SearchSections } from './components/NasaSearch';
-import type { SearchImage } from './components/SearchHeroCarousel';
+import SearchHeroCarousel, { type SearchImage } from './components/SearchHeroCarousel';
 import type { LibrarySharedContext } from './components/LibraryView';
 import WarpIntro from './components/WarpIntro';
 // Secondary surfaces are loaded only when their UI is opened or search results
@@ -46,8 +46,6 @@ const cosmicScenes = [
 ];
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TAGS        = ['Quantum Mechanics', 'General Relativity', 'String Theory', 'Astrophysics', 'Everything'];
-
 const TYPEWRITER_PHRASES = [
   'Search the cosmos…',
   'Search Quantum Mechanics…',
@@ -58,15 +56,6 @@ const TYPEWRITER_PHRASES = [
   'Search the Multiverse…',
   'Search String Theory…',
 ];
-
-// Map each TAGS entry to its Lucide icon component
-const TAG_ICON_MAP: Record<string, React.FC<{ size?: number; strokeWidth?: number; className?: string }>> = {
-  'Quantum Mechanics':  Atom,
-  'General Relativity': Orbit,
-  'String Theory':      Waves,
-  'Astrophysics':       Star,
-  'Everything':         Sparkles,
-};
 
 const EVERYTHING_TERMS = [
   'nebula', 'galaxy', 'cosmos', 'supernova', 'aurora', 'jupiter', 'saturn',
@@ -2713,39 +2702,13 @@ export default function App() {
                 </AnimatePresence>
               </div>
 
-              <div className="flex flex-wrap justify-center gap-2.5">
-                {TAGS.map(tag => {
-                  const isEverything = tag === 'Everything';
-                  return (
-                    <button key={tag}
-                      onClick={() => {
-                        if (isEverything) {
-                          setNasaQuery('cosmos');
-                          searchAll('cosmos', 'everything');
-                        } else {
-                          setNasaQuery(tag);
-                          searchAll(tag, 'specific');
-                          setIsEverythingMode(false);
-                        }
-                      }}
-                      className={`text-[11px] uppercase tracking-[0.13em] backdrop-blur-[18px] px-4 py-2 rounded-full transition-all duration-250 ease-out cursor-pointer hover:-translate-y-px active:translate-y-0 active:scale-[0.97] ${
-                        lm
-                          ? isEverything
-                            ? 'text-slate-800 bg-black/[0.08] border border-black/[0.13] shadow-[0_2px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.82)] hover:bg-black/[0.12] hover:text-slate-900 hover:border-black/[0.20] hover:shadow-[0_4px_22px_rgba(0,0,0,0.13),inset_0_1px_0_rgba(255,255,255,0.90)] font-medium'
-                            : 'text-slate-500 bg-black/[0.04] border border-black/[0.08] shadow-[0_1px_8px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-black/[0.08] hover:text-slate-800 hover:border-black/[0.14] hover:shadow-[0_2px_14px_rgba(0,0,0,0.10),inset_0_1px_0_rgba(255,255,255,0.80)]'
-                          : isEverything
-                            ? 'text-white/88 bg-white/[0.08] border border-white/[0.16] shadow-[0_2px_16px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.09)] hover:bg-white/[0.12] hover:text-white hover:border-violet-300/[0.24] hover:shadow-[0_4px_22px_rgba(0,0,0,0.55),0_0_18px_rgba(139,92,246,0.12),inset_0_1px_0_rgba(255,255,255,0.13)] font-medium'
-                            : 'text-white/48 bg-white/[0.035] border border-white/[0.07] shadow-[0_1px_8px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.045)] hover:bg-white/[0.075] hover:text-white/82 hover:border-white/[0.13] hover:shadow-[0_2px_14px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.07)]'
-                      }`}>
-                      {(() => { const TagIcon = TAG_ICON_MAP[tag]; return (
-                        <span className="flex items-center gap-1.5">
-                          {TagIcon && <TagIcon size={11} strokeWidth={1.8} className="flex-shrink-0" />}
-                          {tag}
-                        </span>
-                      ); })()}
-                    </button>
-                  );
-                })}
+              {/* Search visuals replace the legacy category pills in this slot. */}
+              <div className="w-full max-w-2xl px-6">
+                <SearchHeroCarousel
+                  query={nasaQuery}
+                  lm={lm}
+                  onShareToSingularity={handleSearchImageShare}
+                />
               </div>
 
               {!hasSearchResults && (
@@ -2842,7 +2805,6 @@ export default function App() {
                       setNasaQuery(topic);
                       searchAll(topic, 'specific');
                     }}
-                    onSearchImageShare={handleSearchImageShare}
                     onLoadMore={loadMore}
                     shortsHasMore={searchSections?.hasMore ?? true}
                   />

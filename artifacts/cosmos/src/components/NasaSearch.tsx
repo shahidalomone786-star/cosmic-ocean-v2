@@ -20,7 +20,6 @@ import {
   PopularPapers,
 } from './SearchKnowledgePanel';
 import AISummary from './AISummary';
-import SearchHeroCarousel, { type SearchImage } from './SearchHeroCarousel';
 import SavedPapersDrawer from './SavedPapersDrawer';
 import { useSavedPapers, stableItemId } from '../hooks/useSavedPapers';
 import DiscoveryPanel from './DiscoveryPanel';
@@ -1786,7 +1785,6 @@ interface Props {
   chatAvatars?:          { name: string; image?: string }[];
   onSectionItemShare?:   (avatarName: string, title: string, description: string, source: string) => void;
   onRelatedTopicSearch?: (topic: string) => void;
-  onSearchImageShare?: (image: SearchImage) => void;
   // ── Shorts infinite scroll ──
   onLoadMore?:    () => void;
   shortsHasMore?: boolean;
@@ -1799,7 +1797,6 @@ function NasaSearch({
   videoResults = [], videoStatus = 'idle', onVideoClick,
   lm,
   sections, chatAvatars, onSectionItemShare, onRelatedTopicSearch,
-  onSearchImageShare,
   onLoadMore, shortsHasMore = true,
 }: Props) {
   const [selectedSectionItem, setSelectedSectionItem] = useState<SectionItem | null>(null);
@@ -2076,15 +2073,6 @@ function NasaSearch({
                 onChange={setSortOrder}
                 hasCitations={hasAnyCitations}
                 lm={lm}
-              />
-            )}
-
-            {/* Visual search is intentionally separate from AI Overview streaming. */}
-            {sections?.query && !isLoading && hasAny && (
-              <SearchHeroCarousel
-                query={sections.query}
-                lm={lm}
-                onShareToSingularity={onSearchImageShare}
               />
             )}
 
