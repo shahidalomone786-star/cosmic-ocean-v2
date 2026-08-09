@@ -11,7 +11,7 @@ paths = [ "/" ]
 localPort = 5173
 
 [services.development]
-run = "pnpm --filter @workspace/cosmos run dev"
+run = "VITE_SUPABASE_URL=\"$VITE_SUPABASE_URL\" VITE_SUPABASE_ANON_KEY=\"$VITE_SUPABASE_ANON_KEY\" pnpm --filter @workspace/cosmos run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/cosmos", "run", "build" ]

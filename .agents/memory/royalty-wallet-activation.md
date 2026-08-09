@@ -14,3 +14,9 @@ An unauthenticated local preview cannot prove the final authenticated UI read: i
 **Why:** The preview browser starts signed out, and creating a disposable production account solely for verification would add live user data without the user's explicit approval.
 
 **How to apply:** Report the authenticated UI step as pending when the preview has no session; do not claim Royalty balances were displayed unless the balance cards and browser console were observed while signed in.
+
+Royalty avatar purchases must use a server-owned catalog plus one security-definer RPC that locks the buyer wallet, checks ownership and funds, deducts, and records ownership in one transaction. The browser may submit only the avatar id.
+
+**Why:** Client-provided prices, balances, or separate debit/insert calls can create discounts, negative balances, duplicate charges, or partial ownership.
+
+**How to apply:** Apply the full Royalty migration before testing a live purchase; verify the authenticated result, refreshed wallet balance, persisted ownership, duplicate request behavior, and cross-user RLS isolation.

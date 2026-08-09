@@ -3,10 +3,17 @@ import { EdgeTTS } from "@andresaya/edge-tts";
 
 const router = Router();
 
-// This exact supported voice is required for consistent multilingual
-// English/Hindi and mixed-language playback. Do not silently substitute a
-// browser voice.
+// This remains the default for chat and every existing TTS caller. Atelier
+// may opt into one of the verified Edge voices below without changing the
+// Voice Mode streaming pipeline.
 const EDGE_VOICE = "en-US-AvaMultilingualNeural";
+const ATELIER_VOICE_IDS = new Set([
+  "en-US-EmmaNeural",
+  "en-US-BrianMultilingualNeural",
+  "en-US-ChristopherNeural",
+  "en-US-AriaNeural",
+  "en-US-GuyNeural",
+]);
 const EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 const EDGE_RATE = "-10%";
 
@@ -86,11 +93,16 @@ export function sanitizeTextForTTS(input: string): string {
 }
 
 router.post("/tts", async (req, res) => {
-  const { text } = req.body as { text?: string };
+  const { text, voice } = req.body as { text?: string; voice?: string };
   const speechText = text ? sanitizeTextForTTS(text) : "";
 
   if (!speechText) {
     res.status(400).json({ error: "text is required" });
+    return;
+  }
+
+  if (voice && !ATELIER_VOICE_IDS.has(voice)) {
+    res.status(400).json({ error: "voice is not an available Cosmic Atelier voice" });
     return;
   }
 
@@ -100,7 +112,7 @@ router.post("/tts", async (req, res) => {
     // Sec-MS-GEC headers internally. Buffer the complete MP3 before sending it:
     // browsers can reject a MediaElement source when a provider stream ends
     // without a complete MP3 frame sequence.
-    await edgeTts.synthesize(speechText, EDGE_VOICE, {
+    await edgeTts.synthesize(speechText, voice || EDGE_VOICE, {
       outputFormat: EDGE_OUTPUT_FORMAT,
       rate: EDGE_RATE,
       volume: 0,

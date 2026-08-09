@@ -263,6 +263,8 @@ export class TtsPlaybackQueue {
   private currentAudio: HTMLAudioElement | null = null;
   private stopped = false;
 
+  constructor(private readonly voice?: string) {}
+
   get signal(): AbortSignal {
     return this.controller.signal;
   }
@@ -324,7 +326,7 @@ export class TtsPlaybackQueue {
     const response = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: chunk }),
+      body: JSON.stringify({ text: chunk, ...(this.voice ? { voice: this.voice } : {}) }),
       signal: this.signal,
     });
     const blob = await readTtsAudioResponse(response);

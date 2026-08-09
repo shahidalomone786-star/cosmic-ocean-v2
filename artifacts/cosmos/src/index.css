@@ -103,7 +103,8 @@
 .cosmic-atelier-intro h1 {
   margin: 0;
   font-family: var(--app-font-heading);
-  font-size: clamp(4.3rem, 10.8vw, 9.6rem);
+  max-width: 100%;
+  font-size: clamp(4rem, 7vw, 6.5rem);
   font-weight: 350;
   letter-spacing: -.09em;
   line-height: .81;
@@ -186,7 +187,7 @@
 .cosmic-avatar-card-image-wrap {
   position: relative;
   display: block;
-  aspect-ratio: 1 / 1.16;
+  aspect-ratio: 1 / 1.03;
   overflow: hidden;
   background: rgba(20, 22, 33, .75);
 }
@@ -231,28 +232,29 @@
   transition: opacity 220ms ease, transform 220ms ease;
 }
 .cosmic-avatar-card:hover .cosmic-avatar-card-open, .cosmic-avatar-card:focus-visible .cosmic-avatar-card-open { opacity: 1; transform: translate(0,0); }
-.cosmic-avatar-card-copy { display: block; padding: 1.05rem 1.1rem 1.2rem; }
+.cosmic-avatar-card-copy { display: block; padding: .82rem .9rem .92rem; }
 .cosmic-avatar-card-name-row { display: flex; align-items: center; gap: .6rem; }
 .cosmic-avatar-card-name {
   flex: 0 0 auto;
   font-family: var(--app-font-heading);
-  font-size: clamp(1rem, 1.7vw, 1.25rem);
+  font-size: clamp(.98rem, 1.55vw, 1.17rem);
   font-weight: 450;
   letter-spacing: -.045em;
 }
 .cosmic-avatar-card-rule { height: 1px; flex: 1; background: var(--atelier-line); }
 .cosmic-avatar-card-descriptor {
   display: block;
-  min-height: 2.5rem;
-  margin-top: .48rem;
-  font-size: .7rem;
-  line-height: 1.55;
+  min-height: 2.15rem;
+  margin-top: .34rem;
+  font-size: .66rem;
+  line-height: 1.45;
 }
 .cosmic-avatar-card-price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: .45rem;
-  margin-top: .9rem;
+  margin-top: .62rem;
   font-family: var(--app-font-mono);
   font-size: .73rem;
   letter-spacing: -.02em;
@@ -286,31 +288,59 @@
 .cosmic-avatar-specs span { color: var(--atelier-muted); font-size: .55rem; letter-spacing: .16em; text-transform: uppercase; }
 .cosmic-avatar-specs strong { margin-top: .32rem; font-size: .7rem; font-weight: 500; line-height: 1.5; }
 .cosmic-avatar-specs em { color: var(--atelier-muted); font-size: .58rem; font-style: normal; font-weight: 400; }
-.cosmic-avatar-future-buy { display: flex; align-items: center; gap: .85rem; margin-top: 1.5rem; border: 1px solid; border-radius: .95rem; padding: .85rem; }
-.cosmic-avatar-future-buy-icon { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center; border: 1px solid var(--atelier-line); border-radius: 50%; color: var(--atelier-muted); }
-.cosmic-avatar-future-buy-copy { min-width: 0; flex: 1; }
-.cosmic-avatar-future-buy-copy strong, .cosmic-avatar-future-buy-copy span { display: block; }
-.cosmic-avatar-future-buy-copy strong { font-size: .7rem; font-weight: 550; }
-.cosmic-avatar-future-buy-copy span { margin-top: .15rem; color: var(--atelier-muted); font-size: .62rem; line-height: 1.4; }
-.cosmic-avatar-buy-button { border: 1px solid var(--atelier-line); border-radius: .6rem; padding: .55rem .8rem; color: var(--atelier-muted); font-size: .64rem; opacity: .62; cursor: not-allowed; }
+.cosmic-avatar-purchase { display: flex; align-items: center; gap: .85rem; margin-top: 1.5rem; border: 1px solid; border-radius: .95rem; padding: .85rem; transition: border-color 220ms ease, background-color 220ms ease; }
+.cosmic-avatar-purchase-success { border-color: rgba(123, 208, 186, .42) !important; }
+.cosmic-avatar-purchase-icon { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center; border: 1px solid var(--atelier-line); border-radius: 50%; color: var(--atelier-muted); }
+.cosmic-avatar-purchase-success .cosmic-avatar-purchase-icon { color: #7bd0ba; border-color: rgba(123, 208, 186, .4); background: rgba(123, 208, 186, .08); }
+.cosmic-avatar-purchase-copy { min-width: 0; flex: 1; }
+.cosmic-avatar-purchase-copy strong, .cosmic-avatar-purchase-copy span, .cosmic-avatar-purchase-copy small { display: block; }
+.cosmic-avatar-purchase-copy strong { font-size: .7rem; font-weight: 550; }
+.cosmic-avatar-purchase-copy span { margin-top: .15rem; color: var(--atelier-muted); font-size: .62rem; line-height: 1.4; }
+.cosmic-avatar-purchase-copy small { margin-top: .4rem; color: var(--atelier-muted); font-size: .55rem; line-height: 1.3; }
+.cosmic-avatar-buy-button { min-height: 44px; min-width: 4.5rem; border: 1px solid rgba(191,164,255,.45); border-radius: .6rem; padding: .55rem .8rem; color: var(--atelier-ink); background: rgba(191,164,255,.12); font-size: .64rem; font-weight: 600; transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease; }
+.cosmic-avatar-buy-button:hover:not(:disabled) { border-color: rgba(191,164,255,.75); background: rgba(191,164,255,.2); transform: translateY(-1px); }
+.cosmic-avatar-buy-button:disabled { border-color: var(--atelier-line); color: var(--atelier-muted); background: transparent; cursor: default; opacity: .8; }
+.cosmic-avatar-buy-button-owned { color: #7bd0ba !important; border-color: rgba(123, 208, 186, .4) !important; }
+.cosmic-avatar-spinner { animation: cosmic-avatar-spin 900ms linear infinite; }
+@keyframes cosmic-avatar-spin { to { transform: rotate(360deg); } }
 .cosmic-avatar-detail-note { display: flex; align-items: center; gap: .45rem; margin-top: 1rem; color: var(--atelier-muted); font-size: .59rem; }
+.cosmic-avatar-voice-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  margin-top: .85rem;
+  border: 1px solid var(--atelier-line);
+  border-radius: .6rem;
+  padding: .55rem .7rem;
+  color: var(--atelier-muted);
+  font-size: .62rem;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+.cosmic-avatar-voice-preview:hover {
+  border-color: rgba(191,164,255,.43);
+  color: var(--atelier-ink);
+  background: rgba(191,164,255,.07);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-avatar-voice-preview { transition: none; }
+}
 @media (max-width: 767px) {
   .cosmic-atelier-shell { padding-right: 1rem; padding-left: 1rem; }
   .cosmic-atelier-header { min-height: 64px; }
   .cosmic-atelier-breadcrumb { display: none; }
   .cosmic-atelier-intro { display: block; padding: 3.7rem 0 3.3rem; }
-  .cosmic-atelier-intro h1 { font-size: clamp(4rem, 19vw, 6rem); }
+  .cosmic-atelier-intro h1 { font-size: clamp(3rem, 13vw, 5.2rem); }
   .cosmic-atelier-intro-aside { margin-top: 2.6rem; }
   .cosmic-atelier-section-heading { align-items: start; }
   .cosmic-atelier-section-heading p { display: none; }
   .cosmic-avatar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
   .cosmic-avatar-grid > *, .cosmic-avatar-grid > *:nth-child(4), .cosmic-avatar-grid > *:nth-child(5) { grid-column: auto; }
   .cosmic-avatar-grid > *:last-child { grid-column: 1 / -1; max-width: calc(50% - .35rem); }
-  .cosmic-avatar-card-copy { padding: .8rem .75rem .95rem; }
-  .cosmic-avatar-card-name { font-size: .94rem; }
-  .cosmic-avatar-card-descriptor { min-height: 3.1rem; font-size: .62rem; }
-  .cosmic-avatar-card-price { display: block; margin-top: .65rem; line-height: 1.45; }
-  .cosmic-avatar-card-currency { display: block; }
+  .cosmic-avatar-card-image-wrap { aspect-ratio: 1 / 1.03; }
+  .cosmic-avatar-card-copy { padding: .68rem .68rem .78rem; }
+  .cosmic-avatar-card-name { font-size: .9rem; }
+  .cosmic-avatar-card-descriptor { min-height: 2.7rem; font-size: .6rem; }
+  .cosmic-avatar-card-price { margin-top: .5rem; line-height: 1.35; }
   .cosmic-atelier-footer { flex-wrap: wrap; font-size: .5rem; }
   .cosmic-atelier-footer span:last-child { width: 100%; }
   .cosmic-avatar-detail-topbar { min-height: 64px; }
@@ -321,8 +351,9 @@
   .cosmic-avatar-detail-copy h1 { font-size: clamp(3.2rem, 16vw, 5rem); }
   .cosmic-avatar-specs { grid-template-columns: 1fr; }
   .cosmic-avatar-specs div:last-child { grid-column: auto; }
-  .cosmic-avatar-future-buy { align-items: flex-start; }
+  .cosmic-avatar-purchase { align-items: flex-start; }
   .cosmic-avatar-buy-button { margin-left: auto; }
+  .cosmic-avatar-voice-preview { width: 100%; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cosmic-avatar-card-image, .cosmic-avatar-card-open, .cosmic-atelier-quiet-button, .cosmic-atelier-close-button { transition: none; }
