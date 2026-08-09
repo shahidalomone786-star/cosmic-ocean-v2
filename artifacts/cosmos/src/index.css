@@ -2,6 +2,332 @@
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
 
+/* ── Cosmic Atelier / private observatory catalog ─────────────────────────── */
+.cosmic-atelier-surface {
+  --atelier-ink: #f2efff;
+  --atelier-muted: rgba(232, 228, 247, .58);
+  --atelier-line: rgba(220, 212, 255, .11);
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  min-height: 100dvh;
+  overflow-y: auto;
+  background:
+    radial-gradient(ellipse 60% 42% at 78% -4%, rgba(157, 129, 255, .19), transparent 70%),
+    radial-gradient(ellipse 47% 58% at -9% 82%, rgba(92, 196, 188, .075), transparent 72%),
+    #090b14;
+  font-family: var(--app-font-sans);
+}
+.cosmic-atelier-light {
+  --atelier-ink: #342950;
+  --atelier-muted: rgba(52, 41, 80, .62);
+  --atelier-line: rgba(75, 54, 121, .15);
+  background:
+    radial-gradient(ellipse 66% 48% at 76% -8%, rgba(185, 150, 255, .19), transparent 70%),
+    radial-gradient(ellipse 48% 58% at -10% 86%, rgba(89, 177, 176, .08), transparent 72%),
+    #eeedf4;
+}
+.cosmic-atelier-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
+}
+.cosmic-atelier-shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1440px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 4vw, 4.75rem) 1.75rem;
+}
+.cosmic-atelier-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 76px;
+  border-bottom: 1px solid var(--atelier-line);
+}
+.cosmic-atelier-header > :last-child { justify-self: end; }
+.cosmic-atelier-quiet-button, .cosmic-atelier-close-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  color: var(--atelier-muted);
+  font-size: .68rem;
+  letter-spacing: .06em;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+.cosmic-atelier-quiet-button {
+  padding: .55rem .75rem .55rem .1rem;
+}
+.cosmic-atelier-quiet-button:hover { color: var(--atelier-ink); }
+.cosmic-atelier-quiet-button:hover svg { transform: translateX(-3px); }
+.cosmic-atelier-close-button {
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid var(--atelier-line);
+  border-radius: 999px;
+}
+.cosmic-atelier-close-button:hover { color: var(--atelier-ink); background: rgba(255,255,255,.06); transform: rotate(-4deg); }
+.cosmic-atelier-breadcrumb {
+  display: flex;
+  gap: .65rem;
+  color: var(--atelier-muted);
+  font-size: .58rem;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+.cosmic-atelier-breadcrumb i { opacity: .4; font-style: normal; }
+.cosmic-atelier-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, .75fr);
+  gap: 3rem;
+  align-items: end;
+  padding: clamp(3.6rem, 9vw, 8rem) 0 clamp(3rem, 6vw, 5rem);
+}
+.cosmic-atelier-brandline {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1.65rem;
+  color: var(--atelier-muted);
+  font-size: .61rem;
+  font-weight: 550;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+}
+.cosmic-atelier-intro h1 {
+  margin: 0;
+  font-family: var(--app-font-heading);
+  font-size: clamp(4.3rem, 10.8vw, 9.6rem);
+  font-weight: 350;
+  letter-spacing: -.09em;
+  line-height: .81;
+}
+.cosmic-atelier-intro h1 em {
+  color: #bfa4ff;
+  font-style: normal;
+}
+.cosmic-atelier-intro-aside {
+  max-width: 310px;
+  padding-bottom: .55rem;
+}
+.cosmic-atelier-overline {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  color: var(--atelier-muted);
+  font-size: .57rem;
+  font-weight: 560;
+  letter-spacing: .23em;
+  text-transform: uppercase;
+}
+.cosmic-atelier-pulse {
+  display: inline-block;
+  width: .32rem;
+  height: .32rem;
+  border-radius: 50%;
+  background: #bfa4ff;
+  box-shadow: 0 0 14px rgba(191,164,255,.75);
+}
+.cosmic-atelier-intro-aside p {
+  margin: 1.25rem 0 0;
+  color: var(--atelier-muted);
+  font-size: .83rem;
+  line-height: 1.85;
+}
+.cosmic-atelier-catalog {
+  padding-bottom: clamp(3rem, 7vw, 6.5rem);
+}
+.cosmic-atelier-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.65rem;
+}
+.cosmic-atelier-section-heading h2 {
+  margin: .5rem 0 0;
+  font-family: var(--app-font-heading);
+  font-size: clamp(1.6rem, 3vw, 2.65rem);
+  font-weight: 400;
+  letter-spacing: -.065em;
+}
+.cosmic-atelier-section-heading p {
+  margin: 0 0 .15rem;
+  color: var(--atelier-muted);
+  font-size: .65rem;
+  line-height: 1.55;
+  text-align: right;
+}
+.cosmic-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(.75rem, 1.65vw, 1.45rem);
+}
+.cosmic-avatar-grid > * { grid-column: span 4; }
+.cosmic-avatar-grid > *:nth-child(4) { grid-column: 3 / span 4; }
+.cosmic-avatar-grid > *:nth-child(5) { grid-column: 7 / span 4; }
+.cosmic-avatar-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 1.2rem;
+  text-align: left;
+  transition: border-color 260ms ease, box-shadow 260ms ease;
+}
+.cosmic-avatar-card:hover { border-color: rgba(191,164,255,.43) !important; }
+.cosmic-avatar-card-image-wrap {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1.16;
+  overflow: hidden;
+  background: rgba(20, 22, 33, .75);
+}
+.cosmic-avatar-card-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 24%;
+  filter: saturate(.8) contrast(1.04);
+  transition: transform 700ms cubic-bezier(.16,1,.3,1), filter 500ms ease;
+}
+.cosmic-avatar-card:hover .cosmic-avatar-card-image { transform: scale(1.045); filter: saturate(.98) contrast(1.04); }
+.cosmic-avatar-card-image-wash {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10,10,18,.03) 35%, rgba(7,9,18,.66) 100%);
+}
+.cosmic-avatar-card-index {
+  position: absolute;
+  top: .9rem;
+  left: .95rem;
+  color: rgba(255,255,255,.7);
+  font-family: var(--app-font-mono);
+  font-size: .58rem;
+  letter-spacing: .12em;
+}
+.cosmic-avatar-card-open {
+  position: absolute;
+  top: .72rem;
+  right: .72rem;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 50%;
+  color: rgba(255,255,255,.8);
+  opacity: 0;
+  transform: translate(-3px, 3px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.cosmic-avatar-card:hover .cosmic-avatar-card-open, .cosmic-avatar-card:focus-visible .cosmic-avatar-card-open { opacity: 1; transform: translate(0,0); }
+.cosmic-avatar-card-copy { display: block; padding: 1.05rem 1.1rem 1.2rem; }
+.cosmic-avatar-card-name-row { display: flex; align-items: center; gap: .6rem; }
+.cosmic-avatar-card-name {
+  flex: 0 0 auto;
+  font-family: var(--app-font-heading);
+  font-size: clamp(1rem, 1.7vw, 1.25rem);
+  font-weight: 450;
+  letter-spacing: -.045em;
+}
+.cosmic-avatar-card-rule { height: 1px; flex: 1; background: var(--atelier-line); }
+.cosmic-avatar-card-descriptor {
+  display: block;
+  min-height: 2.5rem;
+  margin-top: .48rem;
+  font-size: .7rem;
+  line-height: 1.55;
+}
+.cosmic-avatar-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  margin-top: .9rem;
+  font-family: var(--app-font-mono);
+  font-size: .73rem;
+  letter-spacing: -.02em;
+}
+.cosmic-avatar-card-currency { color: var(--atelier-muted); font-family: var(--app-font-sans); font-size: .55rem; letter-spacing: .05em; }
+.cosmic-atelier-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid;
+  padding-top: 1.05rem;
+  font-size: .56rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.cosmic-avatar-detail { min-height: calc(100dvh - 77px); }
+.cosmic-avatar-detail-topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 72px; }
+.cosmic-avatar-detail-topbar > :last-child { justify-self: end; }
+.cosmic-avatar-detail-location { color: var(--atelier-muted); font-size: .56rem; letter-spacing: .2em; text-transform: uppercase; }
+.cosmic-avatar-detail-grid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2.5rem, 8vw, 8.5rem); max-width: 1150px; min-height: calc(100dvh - 150px); margin: 0 auto; padding: 1.5rem 0 4rem; }
+.cosmic-avatar-detail-portrait { position: relative; overflow: hidden; width: min(100%, 470px); aspect-ratio: 4 / 5; margin: 0 auto; border: 1px solid; border-radius: 1.5rem; box-shadow: 0 26px 70px rgba(0,0,0,.22); }
+.cosmic-avatar-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 22%; filter: saturate(.83) contrast(1.03); }
+.cosmic-avatar-detail-portrait-caption { position: absolute; right: 1rem; bottom: 1rem; left: 1rem; display: flex; justify-content: space-between; gap: .5rem; color: rgba(255,255,255,.67); font-family: var(--app-font-mono); font-size: .5rem; letter-spacing: .04em; text-transform: uppercase; }
+.cosmic-avatar-detail-copy { max-width: 560px; }
+.cosmic-avatar-detail-copy h1 { margin: 1.15rem 0 .9rem; font-family: var(--app-font-heading); font-size: clamp(3rem, 6vw, 6.1rem); font-weight: 350; letter-spacing: -.09em; line-height: .9; }
+.cosmic-avatar-detail-intro { margin: 0; color: var(--atelier-muted); font-size: .94rem; line-height: 1.8; }
+.cosmic-avatar-disclaimer { margin: 1.35rem 0 0; border-left: 1px solid rgba(191,164,255,.6); padding-left: .85rem; color: var(--atelier-muted); font-size: .67rem; line-height: 1.65; }
+.cosmic-avatar-specs { display: grid; grid-template-columns: 1fr 1.4fr; gap: .9rem 1.5rem; margin-top: 2rem; border-top: 1px solid; padding-top: 1rem; }
+.cosmic-avatar-specs div:last-child { grid-column: 1 / -1; }
+.cosmic-avatar-specs span, .cosmic-avatar-specs strong { display: block; }
+.cosmic-avatar-specs span { color: var(--atelier-muted); font-size: .55rem; letter-spacing: .16em; text-transform: uppercase; }
+.cosmic-avatar-specs strong { margin-top: .32rem; font-size: .7rem; font-weight: 500; line-height: 1.5; }
+.cosmic-avatar-specs em { color: var(--atelier-muted); font-size: .58rem; font-style: normal; font-weight: 400; }
+.cosmic-avatar-future-buy { display: flex; align-items: center; gap: .85rem; margin-top: 1.5rem; border: 1px solid; border-radius: .95rem; padding: .85rem; }
+.cosmic-avatar-future-buy-icon { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center; border: 1px solid var(--atelier-line); border-radius: 50%; color: var(--atelier-muted); }
+.cosmic-avatar-future-buy-copy { min-width: 0; flex: 1; }
+.cosmic-avatar-future-buy-copy strong, .cosmic-avatar-future-buy-copy span { display: block; }
+.cosmic-avatar-future-buy-copy strong { font-size: .7rem; font-weight: 550; }
+.cosmic-avatar-future-buy-copy span { margin-top: .15rem; color: var(--atelier-muted); font-size: .62rem; line-height: 1.4; }
+.cosmic-avatar-buy-button { border: 1px solid var(--atelier-line); border-radius: .6rem; padding: .55rem .8rem; color: var(--atelier-muted); font-size: .64rem; opacity: .62; cursor: not-allowed; }
+.cosmic-avatar-detail-note { display: flex; align-items: center; gap: .45rem; margin-top: 1rem; color: var(--atelier-muted); font-size: .59rem; }
+@media (max-width: 767px) {
+  .cosmic-atelier-shell { padding-right: 1rem; padding-left: 1rem; }
+  .cosmic-atelier-header { min-height: 64px; }
+  .cosmic-atelier-breadcrumb { display: none; }
+  .cosmic-atelier-intro { display: block; padding: 3.7rem 0 3.3rem; }
+  .cosmic-atelier-intro h1 { font-size: clamp(4rem, 19vw, 6rem); }
+  .cosmic-atelier-intro-aside { margin-top: 2.6rem; }
+  .cosmic-atelier-section-heading { align-items: start; }
+  .cosmic-atelier-section-heading p { display: none; }
+  .cosmic-avatar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+  .cosmic-avatar-grid > *, .cosmic-avatar-grid > *:nth-child(4), .cosmic-avatar-grid > *:nth-child(5) { grid-column: auto; }
+  .cosmic-avatar-grid > *:last-child { grid-column: 1 / -1; max-width: calc(50% - .35rem); }
+  .cosmic-avatar-card-copy { padding: .8rem .75rem .95rem; }
+  .cosmic-avatar-card-name { font-size: .94rem; }
+  .cosmic-avatar-card-descriptor { min-height: 3.1rem; font-size: .62rem; }
+  .cosmic-avatar-card-price { display: block; margin-top: .65rem; line-height: 1.45; }
+  .cosmic-avatar-card-currency { display: block; }
+  .cosmic-atelier-footer { flex-wrap: wrap; font-size: .5rem; }
+  .cosmic-atelier-footer span:last-child { width: 100%; }
+  .cosmic-avatar-detail-topbar { min-height: 64px; }
+  .cosmic-avatar-detail-location { display: none; }
+  .cosmic-avatar-detail-grid { display: block; min-height: 0; padding: 1.3rem 0 3rem; }
+  .cosmic-avatar-detail-portrait { width: min(100%, 360px); aspect-ratio: 4 / 4.7; }
+  .cosmic-avatar-detail-copy { padding-top: 2.3rem; }
+  .cosmic-avatar-detail-copy h1 { font-size: clamp(3.2rem, 16vw, 5rem); }
+  .cosmic-avatar-specs { grid-template-columns: 1fr; }
+  .cosmic-avatar-specs div:last-child { grid-column: auto; }
+  .cosmic-avatar-future-buy { align-items: flex-start; }
+  .cosmic-avatar-buy-button { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-avatar-card-image, .cosmic-avatar-card-open, .cosmic-atelier-quiet-button, .cosmic-atelier-close-button { transition: none; }
+}
+
 /* ── Singularity Settings: a quiet, mineral-dark control center ───────────── */
 .settings-surface {
   --settings-bg: #0b0d14;
