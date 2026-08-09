@@ -10,11 +10,20 @@ import { COSMIC_ATELIER_CATALOG } from './cosmicAtelierCatalog';
 interface CosmicAtelierProps {
   lm: boolean;
   onClose: () => void;
+  ownedAvatarIds: ReadonlySet<string>;
+  ownershipSyncing: boolean;
+  onOwnershipConfirmed: (avatarId: string) => void;
 }
 
 const atelierEase = [0.16, 1, 0.3, 1] as const;
 
-const CosmicAtelier = ({ lm, onClose }: CosmicAtelierProps) => {
+const CosmicAtelier = ({
+  lm,
+  onClose,
+  ownedAvatarIds,
+  ownershipSyncing,
+  onOwnershipConfirmed,
+}: CosmicAtelierProps) => {
   const shouldReduceMotion = useReducedMotion();
   const [selectedAvatar, setSelectedAvatar] = useState<CosmicAvatarDefinition | null>(null);
 
@@ -72,6 +81,7 @@ const CosmicAtelier = ({ lm, onClose }: CosmicAtelierProps) => {
                 key="detail"
                 avatar={selectedAvatar}
                 lm={lm}
+                onOwnershipConfirmed={onOwnershipConfirmed}
                 onBack={() => setSelectedAvatar(null)}
                 onClose={onClose}
               />
@@ -106,8 +116,16 @@ const CosmicAtelier = ({ lm, onClose }: CosmicAtelierProps) => {
                     <p>Browse each study<br />at your own pace.</p>
                   </div>
                   <div className="cosmic-avatar-grid">
-                    {COSMIC_ATELIER_CATALOG.map((avatar, index) => (
-                      <CosmicAvatarCard key={avatar.id} avatar={avatar} lm={lm} index={index} onOpen={setSelectedAvatar} />
+                     {COSMIC_ATELIER_CATALOG.map((avatar, index) => (
+                       <CosmicAvatarCard
+                         key={avatar.id}
+                         avatar={avatar}
+                         lm={lm}
+                         index={index}
+                         owned={ownedAvatarIds.has(avatar.id)}
+                         syncing={ownershipSyncing}
+                         onOpen={setSelectedAvatar}
+                       />
                     ))}
                   </div>
                 </section>

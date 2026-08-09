@@ -7,10 +7,12 @@ interface CosmicAvatarCardProps {
   avatar: CosmicAvatarDefinition;
   lm: boolean;
   index: number;
+  owned: boolean;
+  syncing: boolean;
   onOpen: (avatar: CosmicAvatarDefinition) => void;
 }
 
-const CosmicAvatarCard = ({ avatar, lm, index, onOpen }: CosmicAvatarCardProps) => {
+const CosmicAvatarCard = ({ avatar, lm, index, owned, syncing, onOpen }: CosmicAvatarCardProps) => {
   const shouldReduceMotion = useReducedMotion();
   const ink = lm ? '#342950' : '#f2efff';
   const muted = lm ? 'rgba(52, 41, 80, .62)' : 'rgba(232, 228, 247, .64)';
@@ -61,6 +63,13 @@ const CosmicAvatarCard = ({ avatar, lm, index, onOpen }: CosmicAvatarCardProps) 
           <span className="cosmic-avatar-card-rule" aria-hidden="true" />
         </span>
         <span className="cosmic-avatar-card-descriptor" style={{ color: muted }}>{avatar.descriptor}</span>
+          <span
+            className="cosmic-avatar-card-status"
+            data-testid={`status-avatar-${avatar.id}`}
+            style={{ color: owned && !syncing ? '#79d8c9' : muted }}
+          >
+            {syncing ? 'Verifying ownership…' : owned ? 'Owned · available in Avatar section' : 'Locked · not purchased'}
+          </span>
         <span className="cosmic-avatar-card-price" data-testid={`text-avatar-price-${avatar.id}`}>
           <span>{formatAvatarPrice(avatar)}</span>
           <span className="cosmic-avatar-card-currency">{avatar.currency}</span>

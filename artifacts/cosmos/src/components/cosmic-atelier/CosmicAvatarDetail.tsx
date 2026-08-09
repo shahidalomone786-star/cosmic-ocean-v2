@@ -12,11 +12,18 @@ import type { RoyaltyCurrencyKey, WalletBalance } from '@/features/royalty/royal
 interface CosmicAvatarDetailProps {
   avatar: CosmicAvatarDefinition | null;
   lm: boolean;
+  onOwnershipConfirmed: (avatarId: string) => void;
   onBack: () => void;
   onClose: () => void;
 }
 
-const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailProps) => {
+const CosmicAvatarDetail = ({
+  avatar,
+  lm,
+  onOwnershipConfirmed,
+  onBack,
+  onClose,
+}: CosmicAvatarDetailProps) => {
   const shouldReduceMotion = useReducedMotion();
   const voiceQueueRef = useRef<TtsPlaybackQueue | null>(null);
   const purchaseInFlightRef = useRef(false);
@@ -50,7 +57,6 @@ const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailP
       supabase
         .from('cosmic_avatar_ownerships')
         .select('ownership_id')
-        .eq('user_id', user.id)
         .eq('avatar_id', avatar?.id ?? '')
         .maybeSingle(),
     ]).then(([nextWallet, ownership]) => {
@@ -60,6 +66,7 @@ const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailP
       if (ownership.data?.ownership_id) {
         setPurchaseId(ownership.data.ownership_id);
         setPurchaseState('already-owned');
+        onOwnershipConfirmed(avatar?.id ?? '');
       } else {
         setPurchaseState('ready');
       }
@@ -70,7 +77,7 @@ const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailP
     });
 
     return () => { active = false; };
-  }, [avatar?.id, isAuthenticated, user?.id]);
+  }, [avatar?.id, isAuthenticated, onOwnershipConfirmed, user?.id]);
 
   if (!avatar) return null;
   const ink = lm ? '#342950' : '#f2efff';
@@ -115,11 +122,6 @@ const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailP
       // snapshot is never used to authorize or calculate the charge.
       const currentWallet = await fetchOrCreateWallet(user.id);
       setWallet(currentWallet);
-      if (currentWallet[avatarCurrencyKey(avatar.currency)] < avatar.price) {
-        setPurchaseState('insufficient');
-        return;
-      }
-
       const { data, error } = await supabase.rpc('purchase_cosmic_avatar', {
         p_avatar_id: avatar.id,
       });
@@ -135,6 +137,7 @@ const CosmicAvatarDetail = ({ avatar, lm, onBack, onClose }: CosmicAvatarDetailP
       });
       setPurchaseId(result.ownership_id);
       setPurchaseState(result.status === 'already_owned' ? 'already-owned' : 'purchased');
+       onOwnershipConfirmed(avatar.id);
     } catch (reason: unknown) {
       const message = reason instanceof Error ? reason.message : String(reason);
       if (message.includes('INSUFFICIENT_BALANCE')) {

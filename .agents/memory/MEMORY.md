@@ -16,3 +16,4 @@
 - [Singularity scroll performance](singularity-scroll-performance.md) — keep native content-visibility, frame-coalesced scroll metrics, and bottom-only auto-follow
 - [Cosmos performance optimization](performance-optimization.md) — keep chat/auth critical, defer secondary tools and PDF parsing, and cancel obsolete client requests
 - [Royalty wallet activation](royalty-wallet-activation.md) — Supabase wallet persistence requires applying the migration; browser reads are RLS-scoped and balance writes are server-owned
+- [Royalty inventory sync](royalty-inventory-sync.md) — Atelier ownership hydrates from authenticated RLS-scoped Supabase IDs into the existing Avatar flow with session-safe syncing

@@ -32,10 +32,12 @@ const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 import BannerCarousel from './components/BannerCarousel';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
+import { COSMIC_ATELIER_CATALOG, type CosmicAvatarDefinition } from './components/cosmic-atelier/cosmicAtelierCatalog';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 import { TtsPlaybackQueue } from './lib/edgeTts';
 import { toast } from './hooks/use-toast';
+import { fetchOwnedCosmicAvatarIds } from './features/royalty/ownership';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -221,9 +223,29 @@ function getInitialGreeting(name: string): string {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type ChatTarget    = { name: string; role: string; image: string };
+type ChatTarget = {
+  name: string;
+  role: string;
+  image: string;
+  voice?: string;
+  avatarId?: string;
+  model?: string;
+  personality?: string;
+};
 type Message       = { role: 'user' | 'model'; text: string };
 type SharedContext = { title: string; description: string; source: 'nasa' | 'wiki' | 'arxiv' | 'spacex' | 'cern' };
+
+function atelierAvatarToChatTarget(avatar: CosmicAvatarDefinition): ChatTarget {
+  return {
+    name: avatar.name,
+    role: avatar.descriptor,
+    image: avatar.image,
+    voice: avatar.voice.id,
+    avatarId: avatar.id,
+    model: avatar.model,
+    personality: avatar.personality,
+  };
+}
 
 // ─── Google Translate helpers ─────────────────────────────────────────────────
 declare global {
@@ -661,7 +683,7 @@ function ChatModal({ avatar, language, sharedContext, onClose, onInputFocus, onI
     }
 
     stopAll();
-    const queue = new TtsPlaybackQueue();
+    const queue = new TtsPlaybackQueue(avatar.voice);
     ttsQueueRef.current = queue;
     setPlayingIdx(idx);
     setIsPlaying(true);
@@ -1780,8 +1802,13 @@ function ArcadeModal({ game, onClose, lm }: { game: FunGameItem; onClose: () => 
 }
 
 // ─── Glassmorphism Avatar Card ────────────────────────────────────────────────
-const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm }: {
-  name: string; subtitle: string; image?: string; onChat: () => void; lm?: boolean;
+const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm, availability }: {
+  name: string;
+  subtitle: string;
+  image?: string;
+  onChat: () => void;
+  lm?: boolean;
+  availability: 'free' | 'owned';
 }) {
   return (
     <motion.div
@@ -1810,7 +1837,7 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm 
       <div className="p-3">
         <p className={`text-sm font-medium tracking-wide truncate ${lm ? 'text-slate-900' : 'text-white'}`}>{name}</p>
         <p className={`text-[10px] tracking-wider uppercase mt-0.5 truncate ${lm ? 'text-slate-500' : 'text-white/40'}`}>{subtitle}</p>
-        <div className="mt-2.5 flex gap-1.5">
+        <div className="mt-2.5 flex items-center gap-1.5">
           <button onClick={onChat}
             className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors duration-200 ${
               lm
@@ -1822,7 +1849,7 @@ const AvatarCard = memo(function AvatarCard({ name, subtitle, image, onChat, lm 
           <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
             lm ? 'text-slate-500 bg-slate-50 border border-slate-200' : 'text-white/50 bg-white/5 border border-white/10'
           }`}>
-            Explore
+            {availability === 'owned' ? 'Owned' : 'Free'}
           </span>
         </div>
       </div>
@@ -1950,6 +1977,18 @@ export default function App() {
   const [showBiologyHub,   setShowBiologyHub]   = useState(false);
   const [showCosmicAtelier, setShowCosmicAtelier] = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
+  const [sessionVerified, setSessionVerified] = useState(false);
+  const [ownedAtelierAvatarIds, setOwnedAtelierAvatarIds] = useState<Set<string>>(() => new Set());
+  const [avatarOwnershipStatus, setAvatarOwnershipStatus] = useState<'idle' | 'syncing' | 'ready' | 'error'>('idle');
+  const ownershipRequestRef = useRef(0);
+  const confirmAtelierOwnership = useCallback((avatarId: string) => {
+    setOwnedAtelierAvatarIds(previous => {
+      const next = new Set(previous);
+      next.add(avatarId);
+      return next;
+    });
+    setAvatarOwnershipStatus('ready');
+  }, []);
   // ── Video Media Hub ─────────────────────────────────────────────────────────
   const [videoResults,     setVideoResults]     = useState<VideoItem[]>([]);
   const [videoStatus,      setVideoStatus]      = useState<'idle'|'loading'|'done'|'error'>('idle');
@@ -1963,8 +2002,63 @@ export default function App() {
 
   // ── Restore session from httpOnly cookie on mount ────────────────────────
   useEffect(() => {
-    useAuthStore.getState().checkSession();
+    let active = true;
+    void useAuthStore.getState().checkSession().finally(() => {
+      if (active) setSessionVerified(true);
+    });
+    return () => { active = false; };
   }, []);
+
+  // Inventory is server-owned. Clear immediately on auth changes so a prior
+  // user's premium avatars cannot flash while the next session is syncing.
+  useEffect(() => {
+    const requestId = ++ownershipRequestRef.current;
+    if (!sessionVerified) {
+      setAvatarOwnershipStatus('idle');
+      setOwnedAtelierAvatarIds(new Set());
+      return;
+    }
+    if (!isAuthenticated || !user?.id) {
+      setOwnedAtelierAvatarIds(new Set());
+      setAvatarOwnershipStatus('ready');
+      return;
+    }
+
+    setOwnedAtelierAvatarIds(new Set());
+    setAvatarOwnershipStatus('syncing');
+    void fetchOwnedCosmicAvatarIds()
+      .then(ids => {
+        if (requestId !== ownershipRequestRef.current) return;
+        setOwnedAtelierAvatarIds(ids);
+        setAvatarOwnershipStatus('ready');
+      })
+      .catch(error => {
+        if (requestId !== ownershipRequestRef.current) return;
+        console.warn('[Royalty] Could not sync avatar ownership:', error);
+        setOwnedAtelierAvatarIds(new Set());
+        setAvatarOwnershipStatus('error');
+      });
+  }, [isAuthenticated, sessionVerified, user?.id]);
+
+  // Revalidate when the catalog opens so a purchase made on another device
+  // becomes visible without relying on a cached browser snapshot.
+  useEffect(() => {
+    if (!showCosmicAtelier || !sessionVerified || !isAuthenticated || !user?.id) return;
+    const requestId = ++ownershipRequestRef.current;
+    setOwnedAtelierAvatarIds(new Set());
+    setAvatarOwnershipStatus('syncing');
+    void fetchOwnedCosmicAvatarIds()
+      .then(ids => {
+        if (requestId !== ownershipRequestRef.current) return;
+        setOwnedAtelierAvatarIds(ids);
+        setAvatarOwnershipStatus('ready');
+      })
+      .catch(error => {
+        if (requestId !== ownershipRequestRef.current) return;
+        console.warn('[Royalty] Could not refresh avatar ownership:', error);
+        setAvatarOwnershipStatus('error');
+      });
+  }, [isAuthenticated, sessionVerified, showCosmicAtelier, user?.id]);
 
   useEffect(() => () => {
     searchAbortRef.current?.abort();
@@ -2294,6 +2388,16 @@ export default function App() {
     setChatSharedCtx(undefined);
     setActiveChat(avatar);
   }, []);
+
+  const ownedAtelierChatAvatars: ChatTarget[] = ownedAtelierAvatarIds.size === 0
+    ? []
+    : COSMIC_ATELIER_CATALOG
+      .filter(avatar => ownedAtelierAvatarIds.has(avatar.id))
+      .map(atelierAvatarToChatTarget);
+
+  const avatarSectionTargets: ChatTarget[] = avatarOwnershipStatus === 'ready'
+    ? [...AVATARS, ...ownedAtelierChatAvatars]
+    : [...AVATARS];
 
   const handleSearchImageShare = useCallback((image: SearchImage) => {
     setPendingChatImage(image);
@@ -2931,20 +3035,28 @@ export default function App() {
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
                   <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>✦ Cosmic Pix</h2>
-                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>AI Avatars</span>
+                   <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>
+                     {avatarOwnershipStatus === 'ready' ? `${avatarSectionTargets.length} available` : 'Syncing collection…'}
+                   </span>
                 </div>
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {AVATARS.map(av => (
+                   {avatarSectionTargets.map(av => (
                     <AvatarCard
-                      key={av.name}
+                       key={av.avatarId ?? av.name}
                       name={av.name}
                       subtitle={av.role}
                       image={av.image}
                       onChat={() => openChat(av)}
                       lm={lm}
+                       availability={av.avatarId ? 'owned' : 'free'}
                     />
                   ))}
                 </div>
+                 {avatarOwnershipStatus === 'error' && (
+                   <p className={`mt-2 text-[10px] ${lm ? 'text-amber-700' : 'text-amber-200/70'}`}>
+                     Your collection could not be synced. Premium avatars are hidden until ownership is verified.
+                   </p>
+                 )}
               </div>
 
               {/* ── Banner Carousel ── */}
@@ -3366,6 +3478,9 @@ export default function App() {
             <CosmicAtelier
               lm={lm}
               onClose={() => setShowCosmicAtelier(false)}
+              ownedAvatarIds={ownedAtelierAvatarIds}
+              ownershipSyncing={!sessionVerified || avatarOwnershipStatus === 'syncing'}
+              onOwnershipConfirmed={confirmAtelierOwnership}
             />
           </Suspense>
         )}

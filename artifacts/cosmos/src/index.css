@@ -260,6 +260,7 @@
   letter-spacing: -.02em;
 }
 .cosmic-avatar-card-currency { color: var(--atelier-muted); font-family: var(--app-font-sans); font-size: .55rem; letter-spacing: .05em; }
+.cosmic-avatar-card-status { display: block; margin-top: .45rem; font-family: var(--app-font-sans); font-size: .55rem; letter-spacing: .04em; line-height: 1.35; }
 .cosmic-atelier-footer {
   display: flex;
   justify-content: space-between;
