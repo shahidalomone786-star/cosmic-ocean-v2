@@ -387,6 +387,9 @@ const INTERNAL_SECTION_START =
   /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:draft response(?:\s*\(\s*mental refinement\s*\))?|mental refinement|internal (?:monologue|reasoning)|scratchpad|rule[- ]?checking?|check against rules)\s*:?\s*(?:\*\*)?\s*/i;
 const FINAL_RESPONSE_MARKER =
   /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:final response|final answer)\s*:?\s*(?:\*\*)?\s*/gi;
+const THINK_OPEN = /<think\b[^>]*>/i;
+const THINK_CLOSE = /<\/think\s*>/i;
+const THINK_OPEN_PREFIX = '<think';
 
 /**
  * Models sometimes emit an untagged planning transcript before the answer.
@@ -398,7 +401,8 @@ function sanitiseFinalResponse(content: string): string {
   if (!content) return '';
 
   let cleaned = content
-    .replace(/<\/?think>/gi, '')
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think\s*>/gi, '')
+    .replace(/<\/?think\b[^>]*>/gi, '')
     .trim();
 
   const internalStart = cleaned.search(INTERNAL_SECTION_START);
@@ -430,16 +434,43 @@ function sanitiseFinalResponse(content: string): string {
 // Returns { reasoning: '', content: raw } when no <think> tags found,
 // so plain-text models (gpt-oss-120b) stream directly into content.
 function splitReasoning(raw: string): { reasoning: string; content: string } {
-  const openIdx = raw.indexOf('<think>');
-  if (openIdx === -1) return { reasoning: '', content: sanitiseFinalResponse(raw) };
-  const before   = raw.slice(0, openIdx);
-  const closeIdx = raw.indexOf('</think>');
-  if (closeIdx === -1) {
-    return { reasoning: raw.slice(openIdx + 7), content: sanitiseFinalResponse(before) };
+  if (!raw) return { reasoning: '', content: '' };
+
+  let remaining = raw;
+  const reasoningParts: string[] = [];
+  let visible = '';
+
+  while (remaining) {
+    const openMatch = remaining.match(THINK_OPEN);
+    if (!openMatch || openMatch.index === undefined) {
+      const lower = remaining.toLowerCase();
+      let suffixLength = 0;
+      for (let length = Math.min(remaining.length, THINK_OPEN_PREFIX.length); length > 0; length -= 1) {
+        if (lower.endsWith(THINK_OPEN_PREFIX.slice(0, length))) {
+          suffixLength = length;
+          break;
+        }
+      }
+      visible += suffixLength > 0 ? remaining.slice(0, -suffixLength) : remaining;
+      break;
+    }
+
+    visible += remaining.slice(0, openMatch.index);
+    const afterOpen = remaining.slice(openMatch.index + openMatch[0].length);
+    const closeMatch = afterOpen.match(THINK_CLOSE);
+    if (!closeMatch || closeMatch.index === undefined) {
+      reasoningParts.push(afterOpen);
+      remaining = '';
+      break;
+    }
+
+    reasoningParts.push(afterOpen.slice(0, closeMatch.index));
+    remaining = afterOpen.slice(closeMatch.index + closeMatch[0].length);
   }
+
   return {
-    reasoning: raw.slice(openIdx + 7, closeIdx).trim(),
-    content:   sanitiseFinalResponse(before + raw.slice(closeIdx + 8)),
+    reasoning: reasoningParts.join('\n').replace(/<\/?think\b[^>]*>/gi, '').trim(),
+    content: sanitiseFinalResponse(visible),
   };
 }
 
@@ -890,6 +921,8 @@ router.post('/singularity', async (req, res) => {
       const reader  = (completionRes.body as ReadableStream<Uint8Array>).getReader();
       const decoder = new TextDecoder('utf-8');
       let rawBuffer  = '';
+       let providerReasoning = '';
+       let providerSseBuffer = '';
 
       try {
         while (true) {
@@ -899,25 +932,44 @@ router.post('/singularity', async (req, res) => {
             return;
           }
           const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
+           providerSseBuffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+           const lines = providerSseBuffer.split('\n');
+           providerSseBuffer = lines.pop() ?? '';
+           if (done && providerSseBuffer.trim()) {
+             lines.push(providerSseBuffer);
+             providerSseBuffer = '';
+           }
 
-          for (const line of chunk.split('\n')) {
+           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             const payload = line.slice(6).trim();
             if (!payload || payload === '[DONE]') continue;
             try {
               const parsed = JSON.parse(payload);
-              const delta: string = parsed.choices?.[0]?.delta?.content ?? '';
-              if (!delta) continue;
-              rawBuffer += delta;
-              const { reasoning, content } = splitReasoning(rawBuffer);
-              res.write(`data: ${JSON.stringify({ reasoning, content: stripModeControlTags(content) })}\n\n`);
+               const choice = parsed.choices?.[0] ?? {};
+               const deltaContent =
+                 typeof choice.delta?.content === 'string' ? choice.delta.content : '';
+               const deltaReasoning =
+                 typeof choice.delta?.reasoning_content === 'string'
+                   ? choice.delta.reasoning_content
+                   : typeof choice.delta?.reasoning === 'string'
+                     ? choice.delta.reasoning
+                     : '';
+               if (!deltaContent && !deltaReasoning) continue;
+               providerReasoning += deltaReasoning;
+               rawBuffer += deltaContent;
+               const split = splitReasoning(rawBuffer);
+               const reasoning = [providerReasoning, split.reasoning].filter(Boolean).join('\n').trim();
+               res.write(`data: ${JSON.stringify({
+                 reasoning,
+                 content: stripModeControlTags(split.content),
+               })}\n\n`);
             } catch {
               // partial/malformed JSON chunk — log and skip
               console.warn('[singularity] Malformed SSE payload skipped:', payload.slice(0, 100));
             }
           }
+           if (done) break;
         }
       } catch (streamErr: unknown) {
         const streamMsg = (streamErr as Error)?.message ?? String(streamErr);
@@ -935,7 +987,7 @@ router.post('/singularity', async (req, res) => {
           ? extractResponseMetadata(final.content, mode)
           : null;
         res.write(`data: ${JSON.stringify({
-          reasoning: final.reasoning,
+           reasoning: [providerReasoning, final.reasoning].filter(Boolean).join('\n').trim(),
           content: stripModeControlTags(final.content),
           ...(metadata ? { metadata } : {}),
         })}\n\n`);

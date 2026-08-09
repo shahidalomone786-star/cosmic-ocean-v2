@@ -2,13 +2,18 @@ const INTERNAL_SECTION_START =
   /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:draft response(?:\s*\(\s*mental refinement\s*\))?|mental refinement|internal (?:monologue|reasoning)|scratchpad|rule[- ]?checking?|check against rules)\s*:?\s*(?:\*\*)?\s*/i;
 const FINAL_RESPONSE_MARKER =
   /(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:final response|final answer)\s*:?\s*(?:\*\*)?\s*/gi;
+const THINK_OPEN_PREFIX = '<think';
 
 /** Defense-in-depth cleanup for any response content that reaches the UI. */
 export function sanitizeVisibleResponse(content: string): string {
   if (!content) return '';
 
-  let cleaned = content
-    .replace(/<\/?think>/gi, '')
+  let cleaned = content.trim();
+  const thinkBlocks = /<think\b[^>]*>[\s\S]*?<\/think\s*>/gi;
+  cleaned = cleaned
+    .replace(thinkBlocks, '')
+    .replace(/<\/?think\b[^>]*>/gi, '')
+    .replace(new RegExp(`${THINK_OPEN_PREFIX}$`, 'i'), '')
     .trim();
 
   const internalStart = cleaned.search(INTERNAL_SECTION_START);

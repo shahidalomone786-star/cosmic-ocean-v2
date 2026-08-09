@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, PRESET_AVATARS } from '../store/authStore';
 import { supabase } from '../lib/supabase';
+import { RoyaltyView } from '../features/royalty/RoyaltyView';
+import { RoyaltyCrown } from '../features/royalty/RoyaltyIcons';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function compressImage(file: File): Promise<string> {
@@ -467,9 +469,9 @@ function EditView({ onCancel, onSaved, lm }: { onCancel: () => void; onSaved: ()
 // PROFILE VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 function ProfileView({
-  onEdit, onViewHistory, onClose, lm,
+  onEdit, onViewHistory, onViewRoyalty, onClose, lm,
 }: {
-  onEdit: () => void; onViewHistory: () => void; onClose: () => void; lm?: boolean;
+  onEdit: () => void; onViewHistory: () => void; onViewRoyalty: () => void; onClose: () => void; lm?: boolean;
 }) {
   const { user, logout } = useAuthStore();
   if (!user) return null;
@@ -551,6 +553,28 @@ function ProfileView({
             </svg>
           </button>
 
+          {/* Royalty */}
+          <button
+            onClick={onViewRoyalty}
+            className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl text-[13px] font-mono uppercase tracking-[0.15em] transition-all group ${
+              lm
+                ? 'bg-black/[0.03] border border-black/[0.07] hover:bg-black/[0.06]'
+                : ''
+            }`}
+            style={lm ? undefined : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <span className="flex items-center gap-3">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${lm ? 'bg-amber-100/70 text-amber-700 group-hover:bg-amber-100' : 'bg-amber-300/10 text-amber-200 group-hover:bg-amber-300/15'}`}>
+                <RoyaltyCrown size={19} />
+              </span>
+              <span className={`transition-colors ${lm ? 'text-gray-600 group-hover:text-gray-900' : 'text-white/55 group-hover:text-white'}`}>Royalty</span>
+            </span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+              className={`transition-colors ${lm ? 'text-gray-300 group-hover:text-gray-600' : 'text-white/20 group-hover:text-white/60'}`}>
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+
           <HR lm={lm} />
 
           {/* Sign out */}
@@ -573,7 +597,7 @@ function ProfileView({
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOT
 // ─────────────────────────────────────────────────────────────────────────────
-type View = 'profile' | 'edit' | 'history';
+type View = 'profile' | 'edit' | 'history' | 'royalty';
 
 export default function ProfileModal({ onClose, lm }: { onClose: () => void; lm?: boolean }) {
   const [view, setView] = useState<View>('profile');
@@ -586,6 +610,7 @@ export default function ProfileModal({ onClose, lm }: { onClose: () => void; lm?
           lm={lm}
           onEdit={() => setView('edit')}
           onViewHistory={() => setView('history')}
+          onViewRoyalty={() => setView('royalty')}
           onClose={onClose}
         />
       )}
@@ -601,6 +626,14 @@ export default function ProfileModal({ onClose, lm }: { onClose: () => void; lm?
         <HistoryView
           key="history"
           lm={lm}
+          onBack={() => setView('profile')}
+        />
+      )}
+      {view === 'royalty' && (
+        <RoyaltyView
+          key="royalty"
+          lm={lm}
+          userId={useAuthStore.getState().user?.id ?? ''}
           onBack={() => setView('profile')}
         />
       )}

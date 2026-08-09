@@ -15,3 +15,4 @@
 - [Singularity Workspace canvas](singularity-workspace-canvas.md) — browser-local editorial artifacts stay separate from original chat messages and backend contracts
 - [Singularity scroll performance](singularity-scroll-performance.md) — keep native content-visibility, frame-coalesced scroll metrics, and bottom-only auto-follow
 - [Cosmos performance optimization](performance-optimization.md) — keep chat/auth critical, defer secondary tools and PDF parsing, and cancel obsolete client requests
+- [Royalty wallet activation](royalty-wallet-activation.md) — Supabase wallet persistence requires applying the migration; browser reads are RLS-scoped and balance writes are server-owned

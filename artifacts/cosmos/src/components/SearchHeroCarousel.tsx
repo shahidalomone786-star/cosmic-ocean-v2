@@ -55,6 +55,7 @@ function SearchHeroCarousel({
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const didDragRef = useRef(false);
   const queryRef = useRef('');
+  const preloadCacheRef = useRef(new Map<string, Promise<boolean>>());
 
   useEffect(() => {
     const term = query.trim();
@@ -112,15 +113,63 @@ function SearchHeroCarousel({
     setFirstImageFailed(false);
   }, [images.length]);
 
+  const preloadImage = useCallback((url: string): Promise<boolean> => {
+    const cached = preloadCacheRef.current.get(url);
+    if (cached) return cached;
+
+    const promise = new Promise<boolean>(resolve => {
+      const image = new window.Image();
+      let settled = false;
+      const finish = (loaded: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(loaded);
+      };
+      image.onload = () => finish(true);
+      image.onerror = () => finish(false);
+      image.src = url;
+      if (image.complete) finish(image.naturalWidth > 0);
+    });
+    preloadCacheRef.current.set(url, promise);
+    return promise;
+  }, []);
+
   useEffect(() => {
     if (images.length < 2 || isPaused || lightboxImage) return;
-    const timer = window.setInterval(() => {
-      setActiveIndex(index => (index + 1) % images.length);
-      setFirstImageLoaded(false);
-      setFirstImageFailed(false);
-    }, 5_000);
-    return () => window.clearInterval(timer);
-  }, [images.length, isPaused, lightboxImage]);
+    let cancelled = false;
+    const nextImage = images[(activeIndex + 1) % images.length];
+    const nextImageUrl = nextImage.proxyUrl || nextImage.imageUrl;
+
+    // Start downloading immediately, but do not switch slides until the
+    // five-second mark and the next image's load event have both completed.
+    void preloadImage(nextImageUrl);
+
+    const advanceWhenReady = async () => {
+      while (!cancelled) {
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, 5_000);
+        });
+        if (cancelled) return;
+
+        const ready = await preloadImage(nextImageUrl);
+        if (cancelled) return;
+        if (!ready) {
+          // Do not show an empty slide. Drop the failed promise and retry on
+          // the next cadence in case the remote image was temporarily slow.
+          preloadCacheRef.current.delete(nextImageUrl);
+          continue;
+        }
+
+        setActiveIndex(index => (index + 1) % images.length);
+        setFirstImageLoaded(false);
+        setFirstImageFailed(false);
+        return;
+      }
+    };
+
+    void advanceWhenReady();
+    return () => { cancelled = true; };
+  }, [activeIndex, images, isPaused, lightboxImage, preloadImage]);
 
   useEffect(() => {
     if (!lightboxImage) return;

@@ -779,6 +779,204 @@
   }
 }
 
+/* ── Royalty wallet ───────────────────────────────────────────────────────── */
+.royalty-surface {
+  --royalty-bg: #090c14;
+  --royalty-panel: rgba(255, 255, 255, 0.045);
+  --royalty-panel-hover: rgba(255, 255, 255, 0.065);
+  --royalty-line: rgba(215, 225, 255, 0.12);
+  --royalty-text: #f2f3f8;
+  --royalty-muted: rgba(227, 232, 247, 0.52);
+  --royalty-faint: rgba(227, 232, 247, 0.3);
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--royalty-text);
+  background:
+    radial-gradient(ellipse 70% 50% at 84% -15%, rgba(115, 101, 190, 0.16), transparent 68%),
+    radial-gradient(ellipse 60% 70% at -10% 105%, rgba(39, 119, 155, 0.09), transparent 70%),
+    var(--royalty-bg);
+  font-family: var(--app-font-sans);
+}
+
+.royalty-surface::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  opacity: .025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='royalty-noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23royalty-noise)' opacity='.7'/%3E%3C/svg%3E");
+}
+
+.royalty-topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 64px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--royalty-line);
+  background: rgba(9, 12, 20, .62);
+  backdrop-filter: blur(18px);
+}
+
+.royalty-back-button,
+.royalty-topbar-title {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: .55rem;
+}
+
+.royalty-back-button {
+  padding: .5rem .75rem .5rem .25rem;
+  color: var(--royalty-muted);
+  border-radius: .75rem;
+  font: 500 .67rem/1 var(--app-font-mono);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  transition: color 180ms ease, background-color 180ms ease, transform 120ms ease;
+}
+.royalty-back-button:hover { color: var(--royalty-text); background: rgba(255,255,255,.06); }
+.royalty-back-button:active { transform: scale(.98); }
+.royalty-topbar-title {
+  color: rgba(239, 235, 255, .78);
+  font: 600 .68rem/1 var(--app-font-mono);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+.royalty-topbar-title svg { color: #d7be83; }
+.royalty-topbar-spacer { width: 4.5rem; }
+
+.royalty-content {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 2rem, 760px);
+  margin: 0 auto;
+  padding: clamp(2rem, 6vw, 5rem) 0 4rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.royalty-content::-webkit-scrollbar { display: none; }
+.royalty-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.royalty-eyebrow,
+.royalty-section-label,
+.royalty-loading-label,
+.royalty-balance-rarity {
+  font: 600 .59rem/1.4 var(--app-font-mono);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+.royalty-eyebrow { margin: 0 0 .9rem; color: #a9a2d7; }
+.royalty-heading h1 {
+  margin: 0;
+  color: var(--royalty-text);
+  font-size: clamp(2.5rem, 8vw, 4.7rem);
+  font-weight: 450;
+  letter-spacing: -.075em;
+  line-height: .98;
+}
+.royalty-subtitle {
+  margin: .7rem 0 0;
+  color: var(--royalty-muted);
+  font-size: clamp(.95rem, 2.5vw, 1.1rem);
+  letter-spacing: -.01em;
+}
+.royalty-crown-mark {
+  position: relative;
+  display: grid;
+  width: clamp(4.5rem, 14vw, 6.5rem);
+  height: clamp(4.5rem, 14vw, 6.5rem);
+  flex-shrink: 0;
+  place-items: center;
+  color: #d9c68d;
+  border: 1px solid rgba(216, 192, 131, .32);
+  border-radius: 50%;
+  background: rgba(216, 192, 131, .06);
+  box-shadow: inset 0 0 24px rgba(216, 192, 131, .04), 0 16px 40px rgba(0,0,0,.15);
+}
+.royalty-crown-mark::before,
+.royalty-crown-mark::after {
+  position: absolute;
+  inset: 10px;
+  content: '';
+  border: 1px solid rgba(216, 192, 131, .15);
+  border-radius: 50%;
+}
+.royalty-crown-mark::after { inset: -7px; opacity: .35; }
+.royalty-crown-mark span { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #e0c98b; transform: translate(35px, -27px); }
+.royalty-rule { height: 1px; margin: clamp(2rem, 6vw, 3.3rem) 0 clamp(1.5rem, 4vw, 2.4rem); background: var(--royalty-line); }
+.royalty-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .85rem; }
+.royalty-section-label { margin: 0; color: var(--royalty-faint); }
+.royalty-loading-label { color: #a9a2d7; animation: royalty-sync-pulse 1.4s ease-in-out infinite; }
+.royalty-balance-list { display: grid; gap: .7rem; }
+.royalty-balance-list-loading { opacity: .72; }
+.royalty-balance-card {
+  position: relative;
+  display: flex;
+  min-height: 100px;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  overflow: hidden;
+  border: 1px solid var(--royalty-line);
+  border-radius: 1.1rem;
+  background: var(--royalty-panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+.royalty-balance-card::before { position: absolute; inset: 0 auto 0 0; width: 2px; content: ''; background: var(--royalty-accent); opacity: .8; }
+.royalty-balance-card:hover { border-color: color-mix(in srgb, var(--royalty-accent) 35%, var(--royalty-line)); background: var(--royalty-panel-hover); transform: translateY(-1px); }
+.royalty-balance-icon { display: grid; width: 64px; height: 64px; flex-shrink: 0; place-items: center; color: var(--royalty-accent); border: 1px solid color-mix(in srgb, var(--royalty-accent) 32%, transparent); border-radius: .9rem; background: var(--royalty-accent-soft); }
+.royalty-balance-name { margin: 0; color: var(--royalty-text); font-size: .92rem; font-weight: 550; letter-spacing: -.01em; }
+.royalty-balance-description { max-width: 30rem; margin: .35rem 0 0; color: var(--royalty-muted); font-size: .7rem; line-height: 1.45; }
+.royalty-balance-rarity { flex-shrink: 0; color: var(--royalty-accent); font-size: .5rem; letter-spacing: .13em; }
+.royalty-balance-value { min-width: 3rem; margin: 0 0 0 auto; color: var(--royalty-text); font: 500 clamp(1.25rem, 3vw, 1.55rem)/1 var(--app-font-heading); letter-spacing: -.04em; text-align: right; }
+.royalty-footnote { max-width: 32rem; margin: 2rem 0 0; color: var(--royalty-faint); font-size: .68rem; line-height: 1.65; }
+.royalty-state { padding: 2rem; border: 1px solid var(--royalty-line); border-radius: 1rem; background: var(--royalty-panel); }
+.royalty-error-state p { margin: 0; color: var(--royalty-text); font-size: .9rem; }
+.royalty-error-state span { display: block; margin-top: .45rem; color: var(--royalty-muted); font-size: .7rem; }
+.royalty-error-state button { min-height: 44px; margin-top: 1.25rem; padding: .65rem .9rem; color: #e8e1c4; border: 1px solid rgba(216, 192, 131, .3); border-radius: .7rem; background: rgba(216, 192, 131, .08); font: 600 .63rem/1 var(--app-font-mono); letter-spacing: .13em; text-transform: uppercase; }
+@keyframes royalty-sync-pulse { 50% { opacity: .45; } }
+
+.royalty-surface-light {
+  --royalty-bg: #f5f7fb;
+  --royalty-panel: rgba(255,255,255,.78);
+  --royalty-panel-hover: rgba(255,255,255,.98);
+  --royalty-line: rgba(42, 55, 84, .12);
+  --royalty-text: #1c2435;
+  --royalty-muted: rgba(38, 52, 79, .58);
+  --royalty-faint: rgba(38, 52, 79, .42);
+  background: radial-gradient(ellipse 70% 50% at 84% -15%, rgba(133, 116, 211, .13), transparent 68%), var(--royalty-bg);
+}
+.royalty-surface-light .royalty-topbar { background: rgba(245,247,251,.72); }
+.royalty-surface-light .royalty-topbar-title { color: rgba(52, 62, 85, .75); }
+
+@media (max-width: 560px) {
+  .royalty-content { width: min(100% - 1.25rem, 760px); padding-top: 1.6rem; }
+  .royalty-heading { gap: 1rem; }
+  .royalty-crown-mark { width: 4.15rem; height: 4.15rem; }
+  .royalty-crown-mark svg { width: 38px; height: 38px; }
+  .royalty-crown-mark span { transform: translate(22px, -21px); }
+  .royalty-balance-card { min-height: 92px; gap: .7rem; padding: .8rem .75rem .8rem .9rem; }
+  .royalty-balance-icon { width: 49px; height: 49px; border-radius: .75rem; }
+  .royalty-balance-icon svg { width: 38px; height: 38px; }
+  .royalty-balance-name { font-size: .8rem; }
+  .royalty-balance-description { font-size: .63rem; }
+  .royalty-balance-rarity { display: none; }
+  .royalty-balance-value { font-size: 1.18rem; }
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.
