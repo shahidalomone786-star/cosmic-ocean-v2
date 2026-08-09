@@ -118,7 +118,7 @@ function SearchHeroCarousel({
       setActiveIndex(index => (index + 1) % images.length);
       setFirstImageLoaded(false);
       setFirstImageFailed(false);
-    }, 3_000);
+    }, 5_000);
     return () => window.clearInterval(timer);
   }, [images.length, isPaused, lightboxImage]);
 

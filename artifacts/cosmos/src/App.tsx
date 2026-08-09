@@ -2705,7 +2705,7 @@ export default function App() {
 
               {/* Search visuals replace the legacy category pills in this slot. */}
               {showSearchHero && (
-                <div className="pointer-events-auto w-full max-w-4xl px-4 sm:px-6">
+                <div className="pointer-events-auto w-full max-w-4xl -mx-6">
                   <SearchHeroCarousel
                     query={nasaQuery}
                     lm={lm}
