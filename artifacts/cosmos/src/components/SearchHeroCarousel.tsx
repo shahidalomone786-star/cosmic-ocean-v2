@@ -131,7 +131,31 @@ function SearchHeroCarousel({
   }, [activeIndex, goTo, lightboxImage]);
 
   const activeImage = images[activeIndex];
-  if (status === 'idle' || status === 'error' || !activeImage) return null;
+  if (status === 'idle' || status === 'loading' || status === 'error' || !activeImage) {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className={`relative mb-5 w-full overflow-hidden rounded-[22px] border ${
+          lm
+            ? 'border-slate-200 bg-white shadow-[0_10px_34px_rgba(15,23,42,0.08)]'
+            : 'border-white/[0.11] bg-[#0b0b18]/85 shadow-[0_14px_42px_rgba(0,0,0,0.52),0_0_34px_rgba(109,72,202,0.07)]'
+        }`}
+        aria-label={`Loading image results for ${query || 'your search'}`}
+        aria-busy="true"
+      >
+        <div className="relative aspect-[16/9] w-full overflow-hidden">
+          <ImageSkeleton lm={lm} />
+          {status === 'error' && (
+            <div className={`absolute inset-x-0 bottom-0 px-4 py-3 text-center text-[9px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/45'}`}>
+              Visual index unavailable
+            </div>
+          )}
+        </div>
+      </motion.section>
+    );
+  }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     dragStartRef.current = { x: event.clientX, y: event.clientY };
