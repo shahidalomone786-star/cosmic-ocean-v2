@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { createAuthenticatedSupabaseClient, supabase } from '../../lib/supabase';
 import type { WalletBalance } from '../royalty/royalty';
 import { normalizeWallet, type WalletRow } from '../royalty/wallet';
 import type { DailyReward, Mission } from './MissionCenter';
@@ -46,6 +46,13 @@ type QuizRow = {
 type QuizAnswerRow = QuizRow & {
   reward_planetary?: number | string;
   reward_stars?: number | string;
+};
+
+type SupabaseErrorLike = {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
 };
 
 function asNumber(value: number | string | null | undefined) {
@@ -105,7 +112,7 @@ const QUIZ_QUESTION_TOTAL = 100;
 async function requireActiveSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error) {
-    throw new Error(`Authentication session unavailable: ${error.message}`);
+    throw new Error(`RPC Error: AUTHENTICATION_REQUIRED — ${error.message}`);
   }
 
   let session = data.session;
@@ -113,14 +120,42 @@ async function requireActiveSession() {
   if (!session?.access_token || (expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000))) {
     const refreshed = await supabase.auth.refreshSession();
     if (refreshed.error || !refreshed.data.session?.access_token) {
-      throw new Error('Your Cosmic Ocean session has expired. Sign in again to continue.');
+      throw new Error('RPC Error: AUTHENTICATION_REQUIRED — Your Cosmic Ocean session has expired. Sign in again to continue.');
     }
     session = refreshed.data.session;
   }
 
-  // Supabase uses the active session above to attach the Authorization header
-  // to the following RPC request. Do not expose or log the access token.
-  return session;
+  return session.access_token;
+}
+
+function formatRpcError(error: SupabaseErrorLike | null | undefined): Error {
+  const message = error?.message?.trim() || 'The database function did not return a message.';
+  const code = error?.code?.trim();
+  const suffix = error?.details?.trim() ? ` — ${error.details.trim()}` : '';
+  // PostgreSQL function exceptions use the exception text as the useful
+  // application code (for example AUTHENTICATION_REQUIRED or MISSION_INCOMPLETE).
+  // Keep it intact so the user can act on the exact failure.
+  return new Error(`RPC Error: ${code && code !== 'P0001' ? `${code} — ` : ''}${message}${suffix}`);
+}
+
+async function protectedRpc<T>(
+  functionName: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  const accessToken = await requireActiveSession();
+  const authenticatedSupabase = createAuthenticatedSupabaseClient(accessToken);
+  try {
+    const { data, error } = await authenticatedSupabase.rpc(functionName, args);
+    if (error) throw formatRpcError(error);
+    return data as T;
+  } catch (reason) {
+    if (reason instanceof Error && reason.message.startsWith('RPC Error:')) throw reason;
+    if (reason && typeof reason === 'object' && 'message' in reason
+      && ('code' in reason || 'details' in reason || 'hint' in reason)) {
+      throw formatRpcError(reason as SupabaseErrorLike);
+    }
+    throw new Error(`Network Error: ${reason instanceof Error ? reason.message : 'The request could not reach Supabase.'}`);
+  }
 }
 
 export async function claimDailyReward(): Promise<{
@@ -128,9 +163,7 @@ export async function claimDailyReward(): Promise<{
   wallet: WalletBalance;
   status: 'claimed' | 'already_claimed';
 }> {
-  await requireActiveSession();
-  const { data, error } = await supabase.rpc('claim_daily_reward');
-  if (error) throw error;
+  const data = await protectedRpc<DailyRewardRow | DailyRewardRow[]>('claim_daily_reward');
   const row = firstRow(data as DailyRewardRow | DailyRewardRow[] | null);
   if (!row) throw new Error('Daily reward response was empty.');
   return {
@@ -145,23 +178,20 @@ export async function fetchMissionCenter(): Promise<{
   dailyReward: DailyReward;
   wallet: WalletBalance;
 }> {
-  await requireActiveSession();
-  const [missionsResult, dailyResult, walletResult] = await Promise.all([
-    supabase.rpc('get_mission_center'),
-    supabase.rpc('get_daily_reward_state'),
-    supabase.from('wallets').select('planetary_coins, star_tokens, universal_coins').maybeSingle(),
+  const [missionsData, dailyData] = await Promise.all([
+    protectedRpc<MissionRow[] | MissionRow>('get_mission_center'),
+    protectedRpc<DailyRewardRow | DailyRewardRow[]>('get_daily_reward_state'),
   ]);
-  if (missionsResult.error) throw missionsResult.error;
-  if (dailyResult.error) throw dailyResult.error;
-  if (walletResult.error) throw walletResult.error;
 
-  const daily = firstRow(dailyResult.data as DailyRewardRow | DailyRewardRow[] | null);
+  const daily = firstRow(dailyData as DailyRewardRow | DailyRewardRow[] | null);
   if (!daily) throw new Error('Daily reward state was empty.');
 
   return {
-    missions: ((missionsResult.data ?? []) as MissionRow[]).map(normalizeMission),
+    missions: (Array.isArray(missionsData) ? missionsData : [missionsData]).map(normalizeMission),
     dailyReward: { claimed: Boolean(daily.claimed), rewardDate: daily.reward_date },
-    wallet: walletResult.data ? normalizeWallet(walletResult.data as WalletRow) : normalizeWalletFromRpc(daily),
+    // get_daily_reward_state is security-definer and returns the authoritative
+    // account wallet; avoid a second browser table read that can clobber it.
+    wallet: normalizeWalletFromRpc(daily),
   };
 }
 
@@ -169,9 +199,9 @@ export async function claimMission(missionId: string): Promise<{
   wallet: WalletBalance;
   status: 'claimed' | 'already_claimed';
 }> {
-  await requireActiveSession();
-  const { data, error } = await supabase.rpc('claim_mission', { p_mission_id: missionId });
-  if (error) throw error;
+  const data = await protectedRpc<Record<string, unknown> | Record<string, unknown>[]>('claim_mission', {
+    p_mission_id: missionId,
+  });
   const row = firstRow(data as Record<string, unknown> | Record<string, unknown>[] | null);
   if (!row) throw new Error('Mission reward response was empty.');
   const typedRow = row as {
@@ -203,30 +233,24 @@ function normalizeQuiz(row: QuizRow): PhysicsQuizState {
 }
 
 export async function fetchPhysicsQuiz(): Promise<PhysicsQuizState> {
-  await requireActiveSession();
-  const { data, error } = await supabase.rpc('get_physics_quiz_state');
-  if (error) throw error;
+  const data = await protectedRpc<QuizRow | QuizRow[]>('get_physics_quiz_state');
   const row = firstRow(data as QuizRow | QuizRow[] | null);
   if (!row) throw new Error('Physics quiz response was empty.');
   return normalizeQuiz(row);
 }
 
 export async function submitPhysicsAnswer(questionId: string, answerIndex: number): Promise<PhysicsQuizState> {
-  await requireActiveSession();
-  const { data, error } = await supabase.rpc('submit_physics_quiz_answer', {
+  const data = await protectedRpc<QuizAnswerRow | QuizAnswerRow[]>('submit_physics_quiz_answer', {
     p_question_id: questionId,
     p_answer_index: answerIndex,
   });
-  if (error) throw error;
   const row = firstRow(data as QuizAnswerRow | QuizAnswerRow[] | null);
   if (!row) throw new Error('Physics answer response was empty.');
   return normalizeQuiz(row);
 }
 
 export async function invalidatePhysicsRun(): Promise<PhysicsQuizState> {
-  await requireActiveSession();
-  const { error } = await supabase.rpc('invalidate_physics_quiz_run');
-  if (error) throw error;
+  await protectedRpc('invalidate_physics_quiz_run');
   // The invalidation RPC intentionally returns only the new run/question
   // identity. Re-read the full state so wallet totals and question_count
   // cannot regress to client-side zero defaults after a background reset.

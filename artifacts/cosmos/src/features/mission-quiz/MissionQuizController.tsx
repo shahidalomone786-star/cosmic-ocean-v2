@@ -15,6 +15,10 @@ import {
 
 const BACKGROUND_INVALIDATION_THRESHOLD_MS = 30_000;
 
+function errorMessage(reason: unknown, fallback: string) {
+  return reason instanceof Error ? reason.message : fallback;
+}
+
 export function MissionQuizController({
   mode,
   lm,
@@ -67,7 +71,7 @@ export function MissionQuizController({
       }
     } catch (reason) {
       if (requestId !== requestRef.current) return;
-      setError(reason instanceof Error ? reason.message : 'The mission signal is unavailable.');
+      setError(errorMessage(reason, 'Network Error: The mission signal is unavailable.'));
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -81,6 +85,7 @@ export function MissionQuizController({
     setSubmitting(true);
     try {
       const result = await claimDailyReward();
+      setError(null);
       setDailyReward(result.dailyReward);
       setWallet(result.wallet);
       toast({
@@ -93,6 +98,7 @@ export function MissionQuizController({
         setDailyReward(refreshed.dailyReward);
         setWallet(refreshed.wallet);
       } catch (reason) {
+        setError(errorMessage(reason, 'Network Error: The mission board could not refresh.'));
         toast({
           title: 'Daily signal secured',
           description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
@@ -100,17 +106,26 @@ export function MissionQuizController({
         });
       }
     } catch (reason) {
-      toast({ title: 'Daily signal unavailable', description: reason instanceof Error ? reason.message : 'Please try again.', variant: 'destructive' });
+      const message = errorMessage(reason, 'Network Error: Please try again.');
+      setError(message);
+      toast({ title: 'Daily signal unavailable', description: message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
   }, []);
 
   const handleClaimMission = useCallback(async (missionId: string) => {
+    if (submitting) return;
     setSubmitting(true);
     try {
       const result = await claimMission(missionId);
+      setError(null);
       setWallet(result.wallet);
+      // Patch the initiating card immediately. The follow-up fetch is only a
+      // consistency check and is never required to make the reward visible.
+      setMissions(previous => previous?.map(mission => mission.missionId === missionId
+        ? { ...mission, status: 'claimed', claimedAt: new Date().toISOString() }
+        : mission) ?? null);
       toast({
         title: result.status === 'claimed' ? 'Mission reward secured' : 'Mission reward already secured',
         description: result.status === 'claimed' ? 'Your Royalty reserve has been updated.' : 'This mission reward is already in your reserve.',
@@ -121,6 +136,7 @@ export function MissionQuizController({
         setDailyReward(refreshed.dailyReward);
         setWallet(refreshed.wallet);
       } catch (reason) {
+        setError(errorMessage(reason, 'Network Error: The mission board could not refresh.'));
         toast({
           title: 'Mission reward secured',
           description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
@@ -128,11 +144,13 @@ export function MissionQuizController({
         });
       }
     } catch (reason) {
-      toast({ title: 'Mission cannot be claimed', description: reason instanceof Error ? reason.message : 'Complete the objective first.', variant: 'destructive' });
+      const message = errorMessage(reason, 'RPC Error: MISSION_INCOMPLETE — Complete the objective first.');
+      setError(message);
+      toast({ title: 'Mission cannot be claimed', description: message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
-  }, []);
+  }, [submitting]);
 
   const handleAnswer = useCallback(async (answerId: string) => {
     if (!quiz || submitting || quiz.status === 'cooldown' || !quiz.questionId) return;
@@ -141,6 +159,7 @@ export function MissionQuizController({
     setSubmitting(true);
     try {
       const nextQuiz = await submitPhysicsAnswer(quiz.questionId, answerIndex);
+      setError(null);
       setQuiz(nextQuiz);
       setWallet(previous => ({ ...previous, planetary_coins: nextQuiz.planetaryCoins, star_tokens: nextQuiz.starTokens }));
       if (nextQuiz.status === 'wrong') {
@@ -149,8 +168,9 @@ export function MissionQuizController({
         toast({ title: 'Cycle complete', description: '+50 Star Tokens secured. The next cycle opens in four days.' });
       }
     } catch (reason) {
-      toast({ title: 'Answer not recorded', description: reason instanceof Error ? reason.message : 'Refresh the question and try again.', variant: 'destructive' });
-      await refresh();
+      const message = errorMessage(reason, 'Network Error: Refresh the question and try again.');
+      setError(message);
+      toast({ title: 'Answer not recorded', description: message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
