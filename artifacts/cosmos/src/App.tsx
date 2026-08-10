@@ -23,6 +23,7 @@ const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModa
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
 const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
 const CosmicAtelier         = lazy(() => import('./components/cosmic-atelier/CosmicAtelier'));
+const MissionQuizController = lazy(() => import('./features/mission-quiz/MissionQuizController'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
 import type { VideoItem } from './components/VideoPlayerModal';
@@ -1976,6 +1977,8 @@ export default function App() {
   const [showNexus,        setShowNexus]        = useState(false);
   const [showBiologyHub,   setShowBiologyHub]   = useState(false);
   const [showCosmicAtelier, setShowCosmicAtelier] = useState(false);
+  const [showMissionCenter, setShowMissionCenter] = useState(false);
+  const [showPhysicsQuiz, setShowPhysicsQuiz] = useState(false);
   const { isAuthenticated, recordChessResult, user, logout } = useAuthStore();
   const [sessionVerified, setSessionVerified] = useState(false);
   const [ownedAtelierAvatarIds, setOwnedAtelierAvatarIds] = useState<Set<string>>(() => new Set());
@@ -2128,7 +2131,7 @@ export default function App() {
   });
 
   const isAnimationPaused =
-    !show3D || showIntro || focused || showPortal || showLibrary || showCosmicAtelier || langOpen ||
+    !show3D || showIntro || focused || showPortal || showLibrary || showCosmicAtelier || showMissionCenter || showPhysicsQuiz || langOpen ||
     activeChat !== null || chatInputFocused ||
     hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess || activeVideo !== null;
 
@@ -3109,6 +3112,20 @@ export default function App() {
               {/* ── Cosmic Atelier Store Entry ── */}
               <CosmicAtelierEntry lm={lm} onOpen={() => setShowCosmicAtelier(true)} />
 
+              {/* ── Physics Quiz directly below the Store ── */}
+              <div className="mission-quiz-entry-stack" aria-label="Cosmic Ocean learning and rewards">
+                <button type="button" className={`mission-quiz-entry mission-quiz-entry-quiz ${lm ? 'is-light' : ''}`} onClick={() => setShowPhysicsQuiz(true)}>
+                  <span className="mission-quiz-entry-symbol"><Atom size={18} /></span>
+                  <span><strong>Quiz</strong><small>100 levels of conceptual physics</small></span>
+                  <ChevronDown size={16} className="mission-quiz-entry-arrow" />
+                </button>
+                <button type="button" className={`mission-quiz-entry mission-quiz-entry-missions ${lm ? 'is-light' : ''}`} onClick={() => setShowMissionCenter(true)}>
+                  <span className="mission-quiz-entry-symbol"><Target size={18} /></span>
+                  <span><strong>Mission Center</strong><small>Earn Royalty through meaningful fieldwork</small></span>
+                  <ChevronDown size={16} className="mission-quiz-entry-arrow" />
+                </button>
+              </div>
+
               {/* ── Quantum Lab ── */}
               <div className="mb-6 cv-section">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -3481,6 +3498,22 @@ export default function App() {
               ownedAvatarIds={ownedAtelierAvatarIds}
               ownershipSyncing={!sessionVerified || avatarOwnershipStatus === 'syncing'}
               onOwnershipConfirmed={confirmAtelierOwnership}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[180]  Mission Center / Physics Quiz ── */}
+      <AnimatePresence>
+        {(showMissionCenter || showPhysicsQuiz) && (
+          <Suspense fallback={null}>
+            <MissionQuizController
+              mode={showPhysicsQuiz ? 'quiz' : 'missions'}
+              lm={lm}
+              onBack={() => {
+                setShowMissionCenter(false);
+                setShowPhysicsQuiz(false);
+              }}
             />
           </Suspense>
         )}

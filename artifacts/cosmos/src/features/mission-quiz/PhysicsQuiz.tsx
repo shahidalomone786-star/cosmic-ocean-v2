@@ -80,8 +80,11 @@ export function PhysicsQuiz({
   const unauthenticated = !state && !loading && !error;
   const cooldown = isCooldown(state?.cooldownUntil);
   const status = state?.status ?? 'ready';
-  const answered = status === 'correct' || status === 'wrong' || status === 'answered';
-  const completed = status === 'completed' || status === 'complete';
+  // The server returns `correct` and `wrong` together with the next
+  // authoritative question. Only an explicit answered state should lock the
+  // current options.
+  const answered = status === 'answered';
+  const completed = status === 'completed' || status === 'complete' || status === 'cycle_completed';
 
   return (
     <motion.main className={`mission-quiz-surface physics-quiz-surface ${lm ? 'mission-quiz-surface-light' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} aria-labelledby="physics-quiz-title">
@@ -114,10 +117,10 @@ export function PhysicsQuiz({
             <AnimatePresence mode="wait">
               {backgroundInvalidated ? (
                 <motion.section className="mission-quiz-state mission-quiz-error-state physics-quiz-invalidated" key="invalidated" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><RotateCcw size={21} /><div><h2>This run has moved on.</h2><p>The question was updated elsewhere. Refresh to receive the current assessment.</p></div><button type="button" onClick={onRetry} className="mission-quiz-secondary-button"><RefreshCw size={14} /> Refresh run</button></motion.section>
+              ) : completed ? (
+                <motion.section className="physics-quiz-complete" key="complete" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div className="physics-quiz-complete-mark"><Check size={26} /></div><p className="mission-quiz-section-index">Assessment complete / Cycle {state.cycleNumber}</p><h2>Good observation.</h2><p>Your reasoning has been logged. The next challenge will open with the next cycle.</p><div className="physics-quiz-earned"><span><RoyaltyCurrencyIcon currency="planetary_coins" size={27} /> <b>+500</b> Planetary Coins</span><span><RoyaltyCurrencyIcon currency="star_tokens" size={27} /> <b>+50</b> Star Tokens</span></div><p className="physics-quiz-cooldown-copy"><Clock3 size={14} /> {cooldownLabel(state.cooldownUntil)}</p></motion.section>
               ) : cooldown ? (
                 <motion.section className="physics-quiz-cooldown" key="cooldown" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div className="physics-quiz-cooldown-mark"><Clock3 size={25} /></div><p className="mission-quiz-section-index">Assessment chamber / Hold</p><h2>Let the result settle.</h2><p>{cooldownLabel(state.cooldownUntil)}</p><div className="physics-quiz-cooldown-line" /></motion.section>
-              ) : completed ? (
-                <motion.section className="physics-quiz-complete" key="complete" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div className="physics-quiz-complete-mark"><Check size={26} /></div><p className="mission-quiz-section-index">Assessment complete / Cycle {state.cycleNumber}</p><h2>Good observation.</h2><p>Your reasoning has been logged. The next challenge will open with the next cycle.</p><div className="physics-quiz-earned"><span><RoyaltyCurrencyIcon currency="planetary_coins" size={27} /> <b>{state.planetaryCoins}</b> Planetary Coins</span><span><RoyaltyCurrencyIcon currency="star_tokens" size={27} /> <b>{state.starTokens}</b> Star Tokens</span></div></motion.section>
               ) : (
                 <motion.section className="physics-quiz-question" key={state.questionId} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
                   <div className="physics-quiz-question-meta"><span>Question {String(state.questionCount).padStart(2, '0')}</span><span>Run {state.runId ? state.runId.slice(0, 8).toUpperCase() : 'LOCAL'}</span></div>
@@ -132,7 +135,6 @@ export function PhysicsQuiz({
                     })}
                   </div>
                   {submitting && <p className="physics-quiz-submitting" role="status">Recording your reasoning…</p>}
-                  {answered && <p className={`physics-quiz-feedback ${status === 'correct' ? 'is-correct' : 'is-wrong'}`} role="status">{status === 'correct' ? 'Correct. The model holds.' : 'Not quite. Review the relationship, then continue.'}</p>}
                 </motion.section>
               )}
             </AnimatePresence>

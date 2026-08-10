@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   CalendarClock,
@@ -15,7 +16,7 @@ import {
 import type { WalletBalance, RoyaltyCurrencyKey } from '../royalty/royalty';
 import { RoyaltyCurrencyIcon } from '../royalty/RoyaltyIcons';
 
-export type MissionStatus = 'available' | 'in_progress' | 'completed' | 'claimed' | 'locked' | string;
+export type MissionStatus = 'available' | 'in_progress' | 'complete' | 'completed' | 'claimed' | 'locked' | string;
 
 export type Mission = {
   missionId: string;
@@ -67,7 +68,7 @@ function formatDate(value?: string | null) {
 
 function statusLabel(status: MissionStatus) {
   if (status === 'in_progress') return 'In progress';
-  if (status === 'completed') return 'Ready to claim';
+  if (status === 'complete' || status === 'completed') return 'Ready to claim';
   if (status === 'claimed') return 'Claimed';
   return status.replace(/_/g, ' ');
 }
@@ -91,7 +92,7 @@ function MissionCard({
 }) {
   const cappedProgress = Math.min(Math.max(mission.progress, 0), Math.max(mission.targetCount, 1));
   const percentage = Math.round((cappedProgress / Math.max(mission.targetCount, 1)) * 100);
-  const completed = mission.status === 'completed';
+  const completed = mission.status === 'complete' || mission.status === 'completed';
   const claimed = mission.status === 'claimed' || Boolean(mission.claimedAt);
   const locked = mission.status === 'locked';
   const actionable = completed && !claimed && !locked;
@@ -150,8 +151,16 @@ export function MissionCenter({
   onBack,
   onRetry,
 }: MissionCenterProps) {
+  const [category, setCategory] = useState('daily');
   const unauthenticated = !wallet && !loading && !error;
   const availableMissions = missions ?? [];
+  const categories = ['daily', 'weekly', 'exploration', 'science', 'special', 'completed'];
+  const filteredMissions = useMemo(() => {
+    if (category === 'completed') {
+      return availableMissions.filter(mission => mission.status === 'claimed' || Boolean(mission.claimedAt));
+    }
+    return availableMissions.filter(mission => mission.category === category && mission.status !== 'claimed' && !mission.claimedAt);
+  }, [availableMissions, category]);
 
   return (
     <motion.main
@@ -219,15 +228,22 @@ export function MissionCenter({
             <section className="mission-quiz-missions-section" aria-labelledby="active-missions-heading">
               <div className="mission-quiz-section-heading">
                 <div><p className="mission-quiz-section-index">01 / Active fieldwork</p><h2 id="active-missions-heading">Your missions</h2></div>
-                <span>{loading ? 'Syncing telemetry' : `${availableMissions.length} ${availableMissions.length === 1 ? 'mission' : 'missions'}`}</span>
+                 <span>{loading ? 'Syncing telemetry' : `${filteredMissions.length} ${filteredMissions.length === 1 ? 'mission' : 'missions'}`}</span>
               </div>
+               <div className="mission-quiz-category-tabs" role="tablist" aria-label="Mission categories">
+                 {categories.map(item => (
+                   <button key={item} type="button" role="tab" aria-selected={category === item} className={category === item ? 'is-active' : ''} onClick={() => setCategory(item)}>
+                     {item}
+                   </button>
+                 ))}
+               </div>
               <AnimatePresence mode="wait">
-                {loading ? <MissionSkeleton /> : availableMissions.length === 0 ? (
+                 {loading ? <MissionSkeleton /> : filteredMissions.length === 0 ? (
                   <motion.div className="mission-quiz-empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                    <div className="mission-quiz-empty-mark"><Orbit size={22} /></div><h3>The board is quiet.</h3><p>There are no field missions assigned to this cycle. Check back after the next orbit.</p>
+                     <div className="mission-quiz-empty-mark"><Orbit size={22} /></div><h3>{category === 'completed' ? 'Nothing completed yet.' : 'The board is quiet.'}</h3><p>{category === 'completed' ? 'Claimed missions will remain in your completed log.' : 'There are no missions in this category right now.'}</p>
                   </motion.div>
                 ) : (
-                  <div className="mission-quiz-mission-list">{availableMissions.map((mission, index) => <MissionCard key={mission.missionId} mission={mission} index={index} onClaim={onClaimMission} />)}</div>
+                   <div className="mission-quiz-mission-list">{filteredMissions.map((mission, index) => <MissionCard key={`${mission.missionId}-${mission.periodKey}`} mission={mission} index={index} onClaim={onClaimMission} />)}</div>
                 )}
               </AnimatePresence>
             </section>

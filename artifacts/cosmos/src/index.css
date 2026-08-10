@@ -94,6 +94,26 @@
 @media (max-width: 430px) { .mission-quiz-shell { padding-left: 1rem; padding-right: 1rem; }.mission-quiz-topbar { min-height: 66px; }.mission-quiz-back-button span, .mission-quiz-wordmark i, .mission-quiz-topbar-index { display: none; }.mission-quiz-wordmark { font-size: .61rem; }.mission-quiz-intro, .physics-quiz-heading { padding-top: 3.1rem; }.mission-quiz-intro h1, .physics-quiz-heading h1 { font-size: 2.65rem; }.mission-quiz-daily-card { min-height: 20rem; }.mission-quiz-daily-orbit { right: -7rem; }.mission-quiz-state { align-items: start; flex-wrap: wrap; }.mission-quiz-state .mission-quiz-secondary-button { margin-left: 2.1rem; }.mission-quiz-footer { flex-direction: column; gap: .4rem; }.physics-quiz-status-bar { grid-template-columns: repeat(3, 1fr); }.physics-quiz-coins { grid-column: 1 / -1; align-items: start; padding-top: .75rem; border-top: 1px solid var(--mq-line); border-right: 0 !important; }.physics-quiz-question { margin-top: 3rem; }.physics-quiz-option { min-height: 4.3rem; }.physics-quiz-cooldown, .physics-quiz-complete { margin-top: 3rem; padding: 2rem 1.2rem; }.physics-quiz-earned { flex-direction: column; align-items: center; } }
 @media (prefers-reduced-motion: reduce) { .mission-quiz-surface *, .mission-quiz-surface *::before, .mission-quiz-surface *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 
+.mission-quiz-category-tabs { display: flex; gap: .35rem; overflow-x: auto; padding-bottom: .8rem; scrollbar-width: none; }
+.mission-quiz-category-tabs::-webkit-scrollbar { display: none; }
+.mission-quiz-category-tabs button { flex: 0 0 auto; padding: .55rem .72rem; border: 1px solid var(--mq-line); color: var(--mq-muted); background: transparent; font: .55rem/1 var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease; }
+.mission-quiz-category-tabs button:hover, .mission-quiz-category-tabs button.is-active { border-color: color-mix(in srgb, var(--mq-aqua) 55%, transparent); color: var(--mq-aqua); background: color-mix(in srgb, var(--mq-aqua) 8%, transparent); }
+.physics-quiz-cooldown-copy { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; color: var(--mq-gold) !important; font: .65rem/1.4 var(--app-font-mono) !important; }
+
+/* ── Observatory entries / mission control ─────────────────────────────────── */
+.mission-quiz-entry-stack { display: grid; gap: .6rem; margin: .25rem 0 1.5rem; }
+.mission-quiz-entry { display: flex; align-items: center; gap: .85rem; width: 100%; padding: 1rem 1.15rem; border: 1px solid rgba(214, 205, 255, .13); border-radius: 1.25rem; color: #f2efff; background: linear-gradient(110deg, rgba(19, 18, 33, .94), rgba(13, 17, 31, .92)); box-shadow: 0 14px 35px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255,255,255,.045); text-align: left; transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease; }
+.mission-quiz-entry:hover { transform: translateY(-2px); border-color: rgba(120, 216, 209, .4); box-shadow: 0 17px 42px rgba(0, 0, 0, .27), inset 0 1px 0 rgba(255,255,255,.065); }
+.mission-quiz-entry.is-light { border-color: rgba(84, 64, 133, .16); color: #342950; background: linear-gradient(110deg, rgba(252,250,255,.98), rgba(239,244,248,.95)); box-shadow: 0 10px 28px rgba(57, 37, 103, .08); }
+.mission-quiz-entry-symbol { display: grid; place-items: center; flex: 0 0 2.3rem; width: 2.3rem; height: 2.3rem; border: 1px solid rgba(120, 216, 209, .24); border-radius: .8rem; color: #79c9c4; background: rgba(120, 216, 209, .08); }
+.mission-quiz-entry-quiz .mission-quiz-entry-symbol { border-color: rgba(216, 182, 117, .28); color: #d9b978; background: rgba(216, 182, 117, .08); }
+.mission-quiz-entry span:nth-child(2) { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.mission-quiz-entry strong { font: 500 1rem/1 var(--app-font-heading); letter-spacing: -.025em; }
+.mission-quiz-entry small { color: rgba(230, 225, 247, .5); font-size: .66rem; line-height: 1.3; }
+.mission-quiz-entry.is-light small { color: rgba(52, 41, 80, .56); }
+.mission-quiz-entry-arrow { margin-left: auto; flex: 0 0 auto; transform: rotate(-90deg); color: rgba(230, 225, 247, .35); }
+.mission-quiz-entry.is-light .mission-quiz-entry-arrow { color: rgba(52, 41, 80, .38); }
+
 /* ── Cosmic Atelier / private observatory catalog ─────────────────────────── */
 .cosmic-atelier-surface {
   --atelier-ink: #f2efff;
