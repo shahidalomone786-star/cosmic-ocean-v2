@@ -23,7 +23,7 @@ export type PhysicsQuizState = {
   options: PhysicsQuizOption[];
   cooldownUntil?: string | null;
   runId?: string | null;
-  questionCount: number;
+  questionTotal: number;
   planetaryCoins: number;
   starTokens: number;
 };
@@ -110,7 +110,7 @@ export function PhysicsQuiz({
             <section className="physics-quiz-status-bar" aria-label="Quiz progress">
               <div><span>Cycle</span><strong>{String(state.cycleNumber).padStart(2, '0')}</strong></div>
               <div><span>Level</span><strong>{String(state.level).padStart(2, '0')}</strong></div>
-              <div className="physics-quiz-question-progress"><span>Question</span><strong>{String(state.questionCount).padStart(2, '0')}</strong></div>
+              <div className="physics-quiz-question-progress"><span>Question / {state.questionTotal}</span><strong>{String(state.level).padStart(2, '0')}</strong></div>
               <div className="physics-quiz-coins"><span>Earned this run</span><strong><RoyaltyCurrencyIcon currency="planetary_coins" size={20} /> {state.planetaryCoins}<RoyaltyCurrencyIcon currency="star_tokens" size={20} /> {state.starTokens}</strong></div>
             </section>
 
@@ -123,7 +123,7 @@ export function PhysicsQuiz({
                 <motion.section className="physics-quiz-cooldown" key="cooldown" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div className="physics-quiz-cooldown-mark"><Clock3 size={25} /></div><p className="mission-quiz-section-index">Assessment chamber / Hold</p><h2>Let the result settle.</h2><p>{cooldownLabel(state.cooldownUntil)}</p><div className="physics-quiz-cooldown-line" /></motion.section>
               ) : (
                 <motion.section className="physics-quiz-question" key={state.questionId} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
-                  <div className="physics-quiz-question-meta"><span>Question {String(state.questionCount).padStart(2, '0')}</span><span>Run {state.runId ? state.runId.slice(0, 8).toUpperCase() : 'LOCAL'}</span></div>
+                  <div className="physics-quiz-question-meta"><span>Question {String(state.level).padStart(2, '0')} / {state.questionTotal}</span><span>Run {state.runId ? state.runId.slice(0, 8).toUpperCase() : 'LOCAL'}</span></div>
                   <h2>{state.prompt}</h2>
                   <div className="physics-quiz-options" role="radiogroup" aria-label="Answer options">
                     {state.options.map((option, index) => {

@@ -83,9 +83,22 @@ export function MissionQuizController({
       const result = await claimDailyReward();
       setDailyReward(result.dailyReward);
       setWallet(result.wallet);
-      toast({ title: 'Daily signal secured', description: '+3,000 Planetary Coins added to your reserve.' });
-      const refreshed = await fetchMissionCenter();
-      setMissions(refreshed.missions);
+      toast({
+        title: result.status === 'claimed' ? 'Daily signal secured' : 'Daily signal already secured',
+        description: result.status === 'claimed' ? '+3,000 Planetary Coins added to your reserve.' : 'Today’s 3,000 Planetary Coin signal is already in your reserve.',
+      });
+      try {
+        const refreshed = await fetchMissionCenter();
+        setMissions(refreshed.missions);
+        setDailyReward(refreshed.dailyReward);
+        setWallet(refreshed.wallet);
+      } catch (reason) {
+        toast({
+          title: 'Daily signal secured',
+          description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
+          variant: 'destructive',
+        });
+      }
     } catch (reason) {
       toast({ title: 'Daily signal unavailable', description: reason instanceof Error ? reason.message : 'Please try again.', variant: 'destructive' });
     } finally {
@@ -96,11 +109,24 @@ export function MissionQuizController({
   const handleClaimMission = useCallback(async (missionId: string) => {
     setSubmitting(true);
     try {
-      const nextWallet = await claimMission(missionId);
-      setWallet(nextWallet);
-      const refreshed = await fetchMissionCenter();
-      setMissions(refreshed.missions);
-      toast({ title: 'Mission reward secured', description: 'Your Royalty reserve has been updated.' });
+      const result = await claimMission(missionId);
+      setWallet(result.wallet);
+      toast({
+        title: result.status === 'claimed' ? 'Mission reward secured' : 'Mission reward already secured',
+        description: result.status === 'claimed' ? 'Your Royalty reserve has been updated.' : 'This mission reward is already in your reserve.',
+      });
+      try {
+        const refreshed = await fetchMissionCenter();
+        setMissions(refreshed.missions);
+        setDailyReward(refreshed.dailyReward);
+        setWallet(refreshed.wallet);
+      } catch (reason) {
+        toast({
+          title: 'Mission reward secured',
+          description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
+          variant: 'destructive',
+        });
+      }
     } catch (reason) {
       toast({ title: 'Mission cannot be claimed', description: reason instanceof Error ? reason.message : 'Complete the objective first.', variant: 'destructive' });
     } finally {

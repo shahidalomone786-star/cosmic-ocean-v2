@@ -18,6 +18,7 @@ type MissionRow = {
 };
 
 type DailyRewardRow = {
+  status?: 'claimed' | 'already_claimed' | string;
   reward_date: string;
   claimed: boolean;
   planetary_coins: number | string;
@@ -34,7 +35,10 @@ type QuizRow = {
   options: unknown;
   cooldown_until: string | null;
   run_id: string | null;
-  question_count: number | string;
+  // The answer/invalidation RPCs do not return question_count. The quiz
+  // always contains the 100-question cycle, so normalization supplies the
+  // stable total when those narrower payloads are returned.
+  question_count?: number | string | null;
   planetary_coins: number | string;
   star_tokens: number | string;
 };
@@ -96,7 +100,35 @@ function firstRow<T>(data: T | T[] | null): T | null {
   return Array.isArray(data) ? data[0] ?? null : data;
 }
 
-export async function claimDailyReward(): Promise<{ dailyReward: DailyReward; wallet: WalletBalance }> {
+const QUIZ_QUESTION_TOTAL = 100;
+
+async function requireActiveSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    throw new Error(`Authentication session unavailable: ${error.message}`);
+  }
+
+  let session = data.session;
+  const expiresAt = session?.expires_at ?? 0;
+  if (!session?.access_token || (expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000))) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error || !refreshed.data.session?.access_token) {
+      throw new Error('Your Cosmic Ocean session has expired. Sign in again to continue.');
+    }
+    session = refreshed.data.session;
+  }
+
+  // Supabase uses the active session above to attach the Authorization header
+  // to the following RPC request. Do not expose or log the access token.
+  return session;
+}
+
+export async function claimDailyReward(): Promise<{
+  dailyReward: DailyReward;
+  wallet: WalletBalance;
+  status: 'claimed' | 'already_claimed';
+}> {
+  await requireActiveSession();
   const { data, error } = await supabase.rpc('claim_daily_reward');
   if (error) throw error;
   const row = firstRow(data as DailyRewardRow | DailyRewardRow[] | null);
@@ -104,6 +136,7 @@ export async function claimDailyReward(): Promise<{ dailyReward: DailyReward; wa
   return {
     dailyReward: { claimed: true, rewardDate: row.reward_date },
     wallet: normalizeWalletFromRpc(row),
+    status: row.status === 'already_claimed' ? 'already_claimed' : 'claimed',
   };
 }
 
@@ -112,6 +145,7 @@ export async function fetchMissionCenter(): Promise<{
   dailyReward: DailyReward;
   wallet: WalletBalance;
 }> {
+  await requireActiveSession();
   const [missionsResult, dailyResult, walletResult] = await Promise.all([
     supabase.rpc('get_mission_center'),
     supabase.rpc('get_daily_reward_state'),
@@ -131,16 +165,25 @@ export async function fetchMissionCenter(): Promise<{
   };
 }
 
-export async function claimMission(missionId: string): Promise<WalletBalance> {
+export async function claimMission(missionId: string): Promise<{
+  wallet: WalletBalance;
+  status: 'claimed' | 'already_claimed';
+}> {
+  await requireActiveSession();
   const { data, error } = await supabase.rpc('claim_mission', { p_mission_id: missionId });
   if (error) throw error;
   const row = firstRow(data as Record<string, unknown> | Record<string, unknown>[] | null);
   if (!row) throw new Error('Mission reward response was empty.');
-  return normalizeWalletFromRpc(row as {
+  const typedRow = row as {
+    status?: string;
     planetary_coins?: number | string;
     star_tokens?: number | string;
     universal_coins?: number | string;
-  });
+  };
+  return {
+    wallet: normalizeWalletFromRpc(typedRow),
+    status: typedRow.status === 'already_claimed' ? 'already_claimed' : 'claimed',
+  };
 }
 
 function normalizeQuiz(row: QuizRow): PhysicsQuizState {
@@ -153,13 +196,14 @@ function normalizeQuiz(row: QuizRow): PhysicsQuizState {
     options: parseOptions(row.options),
     cooldownUntil: row.cooldown_until,
     runId: row.run_id,
-    questionCount: asNumber(row.question_count),
+    questionTotal: asNumber(row.question_count ?? QUIZ_QUESTION_TOTAL),
     planetaryCoins: asNumber(row.planetary_coins),
     starTokens: asNumber(row.star_tokens),
   };
 }
 
 export async function fetchPhysicsQuiz(): Promise<PhysicsQuizState> {
+  await requireActiveSession();
   const { data, error } = await supabase.rpc('get_physics_quiz_state');
   if (error) throw error;
   const row = firstRow(data as QuizRow | QuizRow[] | null);
@@ -168,6 +212,7 @@ export async function fetchPhysicsQuiz(): Promise<PhysicsQuizState> {
 }
 
 export async function submitPhysicsAnswer(questionId: string, answerIndex: number): Promise<PhysicsQuizState> {
+  await requireActiveSession();
   const { data, error } = await supabase.rpc('submit_physics_quiz_answer', {
     p_question_id: questionId,
     p_answer_index: answerIndex,
@@ -179,6 +224,7 @@ export async function submitPhysicsAnswer(questionId: string, answerIndex: numbe
 }
 
 export async function invalidatePhysicsRun(): Promise<PhysicsQuizState> {
+  await requireActiveSession();
   const { error } = await supabase.rpc('invalidate_physics_quiz_run');
   if (error) throw error;
   // The invalidation RPC intentionally returns only the new run/question
