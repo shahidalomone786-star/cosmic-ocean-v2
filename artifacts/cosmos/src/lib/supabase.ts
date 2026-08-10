@@ -29,5 +29,13 @@ export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKe
 export function createAuthenticatedSupabaseClient(accessToken: string) {
   return createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
     accessToken: async () => accessToken,
+    // Keep the JWT explicit on every PostgREST request. The accessToken
+    // callback is the auth-client mechanism, while this header makes the
+    // security-definer RPC pass-through unambiguous for a per-request client.
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
   });
 }

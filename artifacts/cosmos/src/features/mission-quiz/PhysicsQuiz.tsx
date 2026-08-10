@@ -110,7 +110,7 @@ export function PhysicsQuiz({
             <section className="physics-quiz-status-bar" aria-label="Quiz progress">
               <div><span>Cycle</span><strong>{String(state.cycleNumber).padStart(2, '0')}</strong></div>
               <div><span>Level</span><strong>{String(state.level).padStart(2, '0')}</strong></div>
-              <div className="physics-quiz-question-progress"><span>Question / {state.questionTotal}</span><strong>{String(state.level).padStart(2, '0')}</strong></div>
+              <div className="physics-quiz-question-progress"><span>Question</span><strong>{String(state.level).padStart(2, '0')} / {state.questionTotal}</strong></div>
               <div className="physics-quiz-coins"><span>Earned this run</span><strong><RoyaltyCurrencyIcon currency="planetary_coins" size={20} /> {state.planetaryCoins}<RoyaltyCurrencyIcon currency="star_tokens" size={20} /> {state.starTokens}</strong></div>
             </section>
 

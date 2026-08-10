@@ -19,6 +19,10 @@ function errorMessage(reason: unknown, fallback: string) {
   return reason instanceof Error ? reason.message : fallback;
 }
 
+function isAuthenticationError(reason: unknown) {
+  return errorMessage(reason, '').includes('AUTHENTICATION_REQUIRED');
+}
+
 export function MissionQuizController({
   mode,
   lm,
@@ -28,7 +32,7 @@ export function MissionQuizController({
   lm: boolean;
   onBack: () => void;
 }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
   const [missions, setMissions] = useState<Mission[] | null>(null);
   const [dailyReward, setDailyReward] = useState<DailyReward | null>(null);
   const [wallet, setWallet] = useState<WalletBalance>(EMPTY_WALLET);
@@ -92,27 +96,15 @@ export function MissionQuizController({
         title: result.status === 'claimed' ? 'Daily signal secured' : 'Daily signal already secured',
         description: result.status === 'claimed' ? '+3,000 Planetary Coins added to your reserve.' : 'Today’s 3,000 Planetary Coin signal is already in your reserve.',
       });
-      try {
-        const refreshed = await fetchMissionCenter();
-        setMissions(refreshed.missions);
-        setDailyReward(refreshed.dailyReward);
-        setWallet(refreshed.wallet);
-      } catch (reason) {
-        setError(errorMessage(reason, 'Network Error: The mission board could not refresh.'));
-        toast({
-          title: 'Daily signal secured',
-          description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
-          variant: 'destructive',
-        });
-      }
     } catch (reason) {
       const message = errorMessage(reason, 'Network Error: Please try again.');
       setError(message);
       toast({ title: 'Daily signal unavailable', description: message, variant: 'destructive' });
+      if (isAuthenticationError(reason)) void logout();
     } finally {
       setSubmitting(false);
     }
-  }, []);
+  }, [logout]);
 
   const handleClaimMission = useCallback(async (missionId: string) => {
     if (submitting) return;
@@ -130,27 +122,15 @@ export function MissionQuizController({
         title: result.status === 'claimed' ? 'Mission reward secured' : 'Mission reward already secured',
         description: result.status === 'claimed' ? 'Your Royalty reserve has been updated.' : 'This mission reward is already in your reserve.',
       });
-      try {
-        const refreshed = await fetchMissionCenter();
-        setMissions(refreshed.missions);
-        setDailyReward(refreshed.dailyReward);
-        setWallet(refreshed.wallet);
-      } catch (reason) {
-        setError(errorMessage(reason, 'Network Error: The mission board could not refresh.'));
-        toast({
-          title: 'Mission reward secured',
-          description: `Your balance was updated, but the mission board could not refresh: ${reason instanceof Error ? reason.message : 'please retry.'}`,
-          variant: 'destructive',
-        });
-      }
     } catch (reason) {
       const message = errorMessage(reason, 'RPC Error: MISSION_INCOMPLETE — Complete the objective first.');
       setError(message);
       toast({ title: 'Mission cannot be claimed', description: message, variant: 'destructive' });
+      if (isAuthenticationError(reason)) void logout();
     } finally {
       setSubmitting(false);
     }
-  }, [submitting]);
+  }, [logout, submitting]);
 
   const handleAnswer = useCallback(async (answerId: string) => {
     if (!quiz || submitting || quiz.status === 'cooldown' || !quiz.questionId) return;
@@ -171,10 +151,11 @@ export function MissionQuizController({
       const message = errorMessage(reason, 'Network Error: Refresh the question and try again.');
       setError(message);
       toast({ title: 'Answer not recorded', description: message, variant: 'destructive' });
+      if (isAuthenticationError(reason)) void logout();
     } finally {
       setSubmitting(false);
     }
-  }, [quiz, refresh, submitting]);
+  }, [logout, quiz, submitting]);
 
   useEffect(() => {
     if (mode !== 'quiz' || !isAuthenticated) return;
@@ -192,11 +173,14 @@ export function MissionQuizController({
           setQuiz(nextQuiz);
           setBackgroundInvalidated(false);
         })
-        .catch(() => setError('The current run could not be invalidated. Refresh before continuing.'));
+        .catch(reason => {
+          setError(errorMessage(reason, 'The current run could not be invalidated. Refresh before continuing.'));
+          if (isAuthenticationError(reason)) void logout();
+        });
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [isAuthenticated, mode, quiz]);
+  }, [isAuthenticated, logout, mode, quiz]);
 
   if (mode === 'missions') {
     return (
