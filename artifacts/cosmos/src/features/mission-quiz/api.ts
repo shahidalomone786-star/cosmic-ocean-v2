@@ -179,9 +179,10 @@ export async function submitPhysicsAnswer(questionId: string, answerIndex: numbe
 }
 
 export async function invalidatePhysicsRun(): Promise<PhysicsQuizState> {
-  const { data, error } = await supabase.rpc('invalidate_physics_quiz_run');
+  const { error } = await supabase.rpc('invalidate_physics_quiz_run');
   if (error) throw error;
-  const row = firstRow(data as QuizRow | QuizRow[] | null);
-  if (!row) throw new Error('Physics invalidation response was empty.');
-  return normalizeQuiz(row);
+  // The invalidation RPC intentionally returns only the new run/question
+  // identity. Re-read the full state so wallet totals and question_count
+  // cannot regress to client-side zero defaults after a background reset.
+  return fetchPhysicsQuiz();
 }
