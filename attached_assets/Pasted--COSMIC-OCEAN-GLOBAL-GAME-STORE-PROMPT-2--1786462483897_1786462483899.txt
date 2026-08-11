@@ -1,0 +1,232 @@
+========================================================
+COSMIC OCEAN — GLOBAL GAME STORE
+PROMPT 2: PURCHASE + OWNERSHIP
+========================================================
+
+ROLE
+Principal Full-Stack Engineer.
+
+OBJECTIVE
+Implement ONLY the paid-game purchase, ownership and
+persistence system for the Global Game Store created in
+Prompt 1.
+
+Do NOT redesign the UI or modify unrelated features.
+
+========================================================
+1. PURCHASE FLOW
+========================================================
+
+Paid Game:
+
+BUY
+→ Premium confirmation
+→ Check Planetary Coin balance
+→ Secure purchase
+→ Deduct exact price
+→ Save ownership
+→ Unlock game
+→ Show it in PREMIUM GAMES
+
+Use the EXISTING Royalty wallet/currency system.
+
+Do NOT create another wallet or currency system.
+
+========================================================
+2. SUPABASE OWNERSHIP
+========================================================
+
+Supabase should persist only the necessary purchase/
+ownership information.
+
+Use authenticated user ID + stable game ID.
+
+Required data should include:
+
+• user_id
+• game_id
+• purchase price
+• currency
+• purchased_at
+
+Use the existing gameCatalog from Prompt 1.
+
+Do NOT store game files/gameplay in Supabase.
+
+========================================================
+3. SECURITY
+========================================================
+
+Frontend must NEVER be trusted to directly modify:
+
+• wallet balance
+• ownership
+• purchase status
+• purchase price
+
+Purchase validation and balance deduction must happen
+through the existing secure/server-authoritative Royalty
+system.
+
+Protect against:
+
+• double-click purchase
+• duplicate ownership
+• refresh exploit
+• multi-tab requests
+• negative balance
+• manipulated price
+• unauthorized user ownership
+• partial/failed transactions
+
+Use Supabase RLS and authenticated user IDs correctly.
+
+========================================================
+4. DUPLICATE PURCHASE
+========================================================
+
+If the user already owns a game:
+
+→ Do NOT charge again.
+→ Show OWNED.
+→ Allow PLAY.
+
+Ownership must have a unique constraint such as:
+
+(user_id, game_id)
+
+so duplicate requests cannot create duplicate ownership.
+
+========================================================
+5. INSUFFICIENT BALANCE
+========================================================
+
+If Planetary Coins < game price:
+
+→ No deduction
+→ No ownership record
+→ Keep game locked
+→ Show a clear premium message
+
+Never allow negative balance.
+
+========================================================
+6. PREMIUM GAMES SYNC
+========================================================
+
+After successful purchase:
+
+→ Immediately show the game in PREMIUM GAMES.
+
+Ownership must persist after:
+
+✓ Refresh
+✓ Logout/login
+✓ Browser restart
+✓ Another device
+✓ Another session
+
+When the user logs in, load ownership from Supabase and
+reconcile it with the existing gameCatalog.
+
+Do NOT duplicate game metadata.
+
+========================================================
+7. TRANSACTION SAFETY
+========================================================
+
+Purchase must behave atomically:
+
+IF purchase succeeds:
+    balance deducted
+    ownership created
+    game unlocked
+
+IF purchase fails:
+    no ownership
+    no incorrect deduction
+
+Prevent race conditions when two purchase requests happen
+at nearly the same time.
+
+Never trust a client-supplied price.
+
+Always resolve the authoritative price from the game catalog/
+server-side data.
+
+========================================================
+8. EXISTING FEATURES — DO NOT BREAK
+========================================================
+
+Do NOT modify or rewrite:
+
+• Royalty wallet architecture
+• Planetary Coins
+• Star Tokens
+• Universal Coins
+• Avatar Store
+• Avatar ownership
+• Mission Center
+• Physics Quiz
+• Existing Arcade Zone
+• Authentication
+• Chat
+• Voice Mode
+• Navigation
+• Existing free games
+
+Reuse existing APIs/components wherever possible.
+
+========================================================
+9. QA
+========================================================
+
+Test the ACTUAL application.
+
+Verify:
+
+✓ Correct price is charged
+✓ Exact Planetary Coins deducted
+✓ Successful ownership is saved
+✓ Duplicate purchase is impossible
+✓ Insufficient balance cannot purchase
+✓ Refresh preserves ownership
+✓ Logout/login preserves ownership
+✓ Another device sees owned games
+✓ Multi-tab purchase is safe
+✓ Failed purchase does not corrupt balance
+✓ Premium Games updates immediately
+✓ BUY becomes OWNED/PLAY
+✓ No existing feature is broken
+
+Run:
+
+• TypeScript/typecheck
+• Production build
+• Runtime checks
+
+IMPORTANT:
+Do not report success only because the build passes.
+Inspect the rendered application and verify the actual
+purchase flow.
+
+========================================================
+FINAL RULE
+========================================================
+
+This sprint is ONLY:
+
+ROYALTY PURCHASE
++
+SUPABASE OWNERSHIP
++
+PREMIUM GAME UNLOCK
+
+Do not add new games, redesign the store, or modify
+unrelated systems.
+
+START BY INSPECTING THE EXISTING ROYALTY WALLET,
+SUPABASE SCHEMA, AUTHENTICATION AND GAME CATALOG FROM
+PROMPT 1, THEN IMPLEMENT THIS ON TOP OF THE EXISTING
+ARCHITECTURE.
+========================================================

@@ -3218,7 +3218,14 @@ export default function App() {
                 </div>
               </div>
 
-              <GameStore freeGames={FREE_GAME_CATALOG} paidGames={PAID_GAME_CATALOG} lm={lm} />
+              <GameStore
+                freeGames={FREE_GAME_CATALOG}
+                paidGames={PAID_GAME_CATALOG}
+                lm={lm}
+                isAuthenticated={isAuthenticated}
+                sessionVerified={sessionVerified}
+                userId={user?.id}
+              />
 
               {/* ── Grandmaster Chess ── */}
               <div className="mb-4">
