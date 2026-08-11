@@ -14,14 +14,14 @@ type OwnedGameRow = {
 
 type PurchaseGameRow = {
   status: 'purchased' | 'already_owned' | string;
-  game_id: string;
-  ownership_id: string;
+  game_id: string | null;
+  ownership_id: string | null;
   price: number | string;
-  currency: string;
+  currency: string | null;
   planetary_coins: number | string;
   star_tokens: number | string;
   universal_coins: number | string;
-  purchased_at: string;
+  purchased_at: string | null;
 };
 
 export type GamePurchaseResult = {
@@ -44,6 +44,10 @@ function formatRpcError(error: SupabaseErrorLike | null | undefined): Error {
   const code = error?.code?.trim();
   const suffix = error?.details?.trim() ? ` — ${error.details.trim()}` : '';
   return new Error(`RPC Error: ${code && code !== 'P0001' ? `${code} — ` : ''}${message}${suffix}`);
+}
+
+function purchaseErrorText(error: SupabaseErrorLike | null | undefined) {
+  return [error?.message, error?.details, error?.code].filter(Boolean).join(' ').toUpperCase();
 }
 
 async function requireActiveSession() {
@@ -90,13 +94,31 @@ export async function purchaseGlobalGame(gameId: string): Promise<GamePurchaseRe
     p_game_id: gameId,
   });
 
-  if (error) throw formatRpcError(error);
+  if (error) {
+    const errorText = purchaseErrorText(error);
+    if (errorText.includes('INSUFFICIENT_BALANCE')) {
+      throw new Error('RPC Error: INSUFFICIENT_BALANCE — The wallet does not have enough Planetary Coins.');
+    }
+    if (errorText.includes('AUTHENTICATION_REQUIRED')) {
+      throw new Error('RPC Error: AUTHENTICATION_REQUIRED — Sign in again to continue.');
+    }
+    if (errorText.includes('GAME_NOT_FOUND')) {
+      throw new Error('RPC Error: GAME_NOT_FOUND — This game is not in the active catalog.');
+    }
+    throw formatRpcError(error);
+  }
 
   const row = firstRow(data as PurchaseGameRow | PurchaseGameRow[] | null);
   if (!row) throw new Error('The purchase did not return a confirmation.');
+  if (row.status !== 'purchased' && row.status !== 'already_owned') {
+    throw new Error('The purchase returned an unknown status.');
+  }
+  if (!row.game_id || !row.ownership_id || !row.currency || !row.purchased_at) {
+    throw new Error('The purchase confirmation was incomplete.');
+  }
 
   return {
-    status: row.status === 'already_owned' ? 'already_owned' : 'purchased',
+    status: row.status,
     gameId: row.game_id,
     ownershipId: row.ownership_id,
     price: asNumber(row.price),

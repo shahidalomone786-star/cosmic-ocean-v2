@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Coins, Gamepad2, LockKeyhole, Orbit, Sparkles, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Coins, Gamepad2, LockKeyhole, Orbit, Sparkles, X } from 'lucide-react';
 import type { GameItem } from '../../data/gameCatalog';
 import { fetchOwnedGameIds, purchaseGlobalGame, type GamePurchaseResult } from './api';
+
+const INITIAL_GLOBAL_STORE_LIMIT = 15;
 
 type GameStoreProps = {
   freeGames: GameItem[];
@@ -51,7 +53,7 @@ function StoreSectionHeading({
 
 function GameThumbnail({ game, lm }: { game: GameItem; lm: boolean }) {
   return (
-    <div className="relative aspect-[16/9] overflow-hidden bg-slate-950">
+    <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
       <img
         src={game.thumbnail}
         alt=""
@@ -66,14 +68,14 @@ function GameThumbnail({ game, lm }: { game: GameItem; lm: boolean }) {
         aria-hidden="true"
       />
       <span
-        className={`absolute left-3 top-3 inline-flex min-h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[9px] font-medium uppercase tracking-[0.13em] ${
+        className={`absolute left-2 top-2 inline-flex min-h-6 items-center gap-1 rounded-full border px-2 text-[8px] font-medium uppercase tracking-[0.1em] ${
           lm
             ? 'border-white/70 bg-white/80 text-slate-700'
             : 'border-white/15 bg-black/30 text-white/75 backdrop-blur-md'
         }`}
         data-testid={`status-game-${game.id}`}
       >
-        <Gamepad2 size={11} strokeWidth={1.8} />
+        <Gamepad2 size={10} strokeWidth={1.8} />
         Free
       </span>
     </div>
@@ -91,23 +93,23 @@ function FreeGameCard({ game, lm }: { game: GameItem; lm: boolean }) {
       data-testid={`card-free-game-${game.id}`}
     >
       <GameThumbnail game={game} lm={lm} />
-      <div className="min-h-[126px] p-3.5">
-        <div className="mb-1 flex items-start justify-between gap-2">
+      <div className="min-h-[104px] p-2.5">
+        <div className="mb-0.5 flex items-start justify-between gap-1">
           <h3
-            className={`min-w-0 truncate text-[13px] font-medium ${lm ? 'text-slate-900' : 'text-white/90'}`}
+            className={`min-w-0 truncate text-[11px] font-medium ${lm ? 'text-slate-900' : 'text-white/90'}`}
             data-testid={`text-game-title-${game.id}`}
           >
             {game.title}
           </h3>
-          <span className={`shrink-0 text-[10px] uppercase tracking-[0.12em] ${lm ? 'text-cyan-700' : 'text-cyan-300/75'}`}>
+          <span className={`shrink-0 text-[8px] uppercase tracking-[0.08em] ${lm ? 'text-cyan-700' : 'text-cyan-300/75'}`}>
             {game.category}
           </span>
         </div>
-        <p className={`line-clamp-2 text-[11px] leading-relaxed ${lm ? 'text-slate-500' : 'text-white/42'}`}>
+        <p className={`line-clamp-2 text-[9px] leading-snug ${lm ? 'text-slate-500' : 'text-white/42'}`}>
           {game.description}
         </p>
-        <div className={`mt-3 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] ${lm ? 'text-slate-400' : 'text-white/30'}`}>
-          <Sparkles size={11} strokeWidth={1.7} />
+        <div className={`mt-2 flex items-center gap-1 text-[8px] uppercase tracking-[0.08em] ${lm ? 'text-slate-400' : 'text-white/30'}`}>
+          <Sparkles size={10} strokeWidth={1.7} />
           Verified source
         </div>
       </div>
@@ -131,7 +133,7 @@ function LockedGameCard({
       }`}
       data-testid={`card-locked-game-${game.id}`}
     >
-      <div className="relative aspect-[16/9] overflow-hidden bg-slate-950">
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <img
           src={game.thumbnail}
           alt=""
@@ -142,25 +144,25 @@ function LockedGameCard({
         <div className="absolute inset-0 bg-[#060911]/45" aria-hidden="true" />
         <div className="absolute inset-0 flex items-center justify-center">
           <span
-            className={`flex h-11 w-11 items-center justify-center rounded-full border ${
+             className={`flex h-9 w-9 items-center justify-center rounded-full border ${
               lm ? 'border-white/80 bg-white/80 text-slate-700' : 'border-white/20 bg-black/30 text-white/80'
             }`}
             aria-label="Locked game"
           >
-            <LockKeyhole size={17} strokeWidth={1.7} />
+             <LockKeyhole size={15} strokeWidth={1.7} />
           </span>
         </div>
       </div>
-      <div className="min-h-[156px] p-3">
-        <div className="flex items-start justify-between gap-2">
+       <div className="min-h-[132px] p-2.5">
+         <div className="flex items-start justify-between gap-1">
           <h3
-            className={`min-w-0 truncate text-[12px] font-medium ${lm ? 'text-slate-800' : 'text-white/75'}`}
+             className={`min-w-0 truncate text-[11px] font-medium ${lm ? 'text-slate-800' : 'text-white/75'}`}
             data-testid={`text-game-title-${game.id}`}
           >
             {game.title}
           </h3>
           <span
-            className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[8px] uppercase tracking-[0.12em] ${
+             className={`shrink-0 rounded-full border px-1 py-0.5 text-[7px] uppercase tracking-[0.08em] ${
               lm ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-violet-300/20 bg-violet-400/10 text-violet-200/75'
             }`}
             data-testid={`badge-locked-${game.id}`}
@@ -168,27 +170,27 @@ function LockedGameCard({
             Locked
           </span>
         </div>
-        <p className={`mt-1 line-clamp-2 text-[10px] leading-relaxed ${lm ? 'text-slate-500' : 'text-white/32'}`}>
+         <p className={`mt-1 line-clamp-1 text-[9px] leading-snug ${lm ? 'text-slate-500' : 'text-white/32'}`}>
           {game.description}
         </p>
         <div
-          className={`mt-2.5 flex items-center gap-1.5 text-[10px] font-medium ${lm ? 'text-amber-700' : 'text-amber-200/80'}`}
+           className={`mt-2 flex items-center gap-1 text-[9px] font-medium ${lm ? 'text-amber-700' : 'text-amber-200/80'}`}
           data-testid={`text-price-${game.id}`}
         >
-          <Coins size={12} strokeWidth={1.8} />
+           <Coins size={11} strokeWidth={1.8} />
           {game.price.toLocaleString()} {game.currency}
         </div>
         <button
           type="button"
           onClick={onBuy}
-          className={`mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-medium uppercase tracking-[0.16em] transition-colors ${
+           className={`mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-[9px] font-medium uppercase tracking-[0.1em] transition-colors ${
             lm
               ? 'border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-300 hover:bg-violet-100'
               : 'border-violet-300/20 bg-violet-400/[0.10] text-violet-100 hover:border-violet-200/40 hover:bg-violet-400/[0.18]'
           }`}
           data-testid={`button-buy-game-${game.id}`}
         >
-          <Coins size={13} strokeWidth={1.8} />
+           <Coins size={12} strokeWidth={1.8} />
           Buy
         </button>
       </div>
@@ -214,7 +216,7 @@ function OwnedGameCard({
       }`}
       data-testid={`card-owned-game-${game.id}`}
     >
-      <div className="relative aspect-[16/9] overflow-hidden bg-slate-950">
+       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <img
           src={game.thumbnail}
           alt=""
@@ -224,39 +226,39 @@ function OwnedGameCard({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06100d]/75 via-transparent to-transparent" aria-hidden="true" />
         <span
-          className="absolute left-3 top-3 inline-flex min-h-7 items-center gap-1.5 rounded-full border border-emerald-200/30 bg-emerald-950/45 px-2.5 text-[9px] font-medium uppercase tracking-[0.13em] text-emerald-100 backdrop-blur-md"
+           className="absolute left-2 top-2 inline-flex min-h-6 items-center gap-1 rounded-full border border-emerald-200/30 bg-emerald-950/45 px-2 text-[8px] font-medium uppercase tracking-[0.1em] text-emerald-100 backdrop-blur-md"
           data-testid={`badge-owned-${game.id}`}
         >
-          <Sparkles size={11} strokeWidth={1.8} />
+           <Sparkles size={10} strokeWidth={1.8} />
           Owned
         </span>
       </div>
-      <div className="min-h-[126px] p-3.5">
-        <div className="flex items-start justify-between gap-2">
+       <div className="min-h-[116px] p-2.5">
+         <div className="flex items-start justify-between gap-1">
           <h3
-            className={`min-w-0 truncate text-[13px] font-medium ${lm ? 'text-slate-900' : 'text-white/90'}`}
+             className={`min-w-0 truncate text-[11px] font-medium ${lm ? 'text-slate-900' : 'text-white/90'}`}
             data-testid={`text-owned-game-title-${game.id}`}
           >
             {game.title}
           </h3>
-          <span className={`shrink-0 text-[10px] uppercase tracking-[0.12em] ${lm ? 'text-emerald-700' : 'text-emerald-200/75'}`}>
+           <span className={`shrink-0 text-[8px] uppercase tracking-[0.08em] ${lm ? 'text-emerald-700' : 'text-emerald-200/75'}`}>
             {game.category}
           </span>
         </div>
-        <p className={`mt-1 line-clamp-2 text-[11px] leading-relaxed ${lm ? 'text-slate-500' : 'text-white/42'}`}>
+         <p className={`mt-1 line-clamp-1 text-[9px] leading-snug ${lm ? 'text-slate-500' : 'text-white/42'}`}>
           {game.description}
         </p>
         <button
           type="button"
           onClick={onPlay}
-          className={`mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-medium uppercase tracking-[0.16em] transition-colors ${
+           className={`mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-[9px] font-medium uppercase tracking-[0.1em] transition-colors ${
             lm
               ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
               : 'border-emerald-300/20 bg-emerald-400/[0.10] text-emerald-100 hover:bg-emerald-400/[0.18]'
           }`}
           data-testid={`button-play-game-${game.id}`}
         >
-          <Gamepad2 size={13} strokeWidth={1.8} />
+           <Gamepad2 size={12} strokeWidth={1.8} />
           Play
         </button>
       </div>
@@ -387,6 +389,7 @@ export default function GameStore({
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchaseResult, setPurchaseResult] = useState<GamePurchaseResult | null>(null);
   const [playNotice, setPlayNotice] = useState<string | null>(null);
+  const [isGlobalStoreExpanded, setIsGlobalStoreExpanded] = useState(false);
   const ownershipRequestRef = useRef(0);
   const purchaseInFlightRef = useRef(false);
 
@@ -474,6 +477,8 @@ export default function GameStore({
 
   const ownedGames = paidGames.filter(game => ownedGameIds.has(game.id));
   const lockedGames = paidGames.filter(game => !ownedGameIds.has(game.id));
+  const visibleLockedGames = isGlobalStoreExpanded ? lockedGames : lockedGames.slice(0, INITIAL_GLOBAL_STORE_LIMIT);
+  const hasMoreLockedGames = lockedGames.length > INITIAL_GLOBAL_STORE_LIMIT;
 
   return (
     <section className="game-store-shell mt-8 space-y-9" data-testid="global-game-store">
@@ -484,7 +489,7 @@ export default function GameStore({
           icon={<Gamepad2 size={16} strokeWidth={1.7} />}
           lm={lm}
         />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="free-games-grid">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6" data-testid="free-games-grid">
           {freeGames.map(game => <FreeGameCard key={game.id} game={game} lm={lm} />)}
         </div>
       </div>
@@ -492,7 +497,7 @@ export default function GameStore({
       <div data-testid="global-store-section">
         <StoreSectionHeading
           label="Global Game Store"
-          detail={`${lockedGames.length} locked catalog slots`}
+          detail={`${paidGames.length} total games · ${ownedGames.length} owned`}
           icon={<Orbit size={16} strokeWidth={1.7} />}
           lm={lm}
         />
@@ -522,9 +527,34 @@ export default function GameStore({
             Your saved collection could not be synced. Purchases remain server-authoritative; please refresh and try again.
           </p>
         )}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="paid-games-grid">
-          {lockedGames.map(game => <LockedGameCard key={game.id} game={game} lm={lm} onBuy={() => openPurchase(game)} />)}
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6" data-testid="paid-games-grid">
+          {visibleLockedGames.map(game => <LockedGameCard key={game.id} game={game} lm={lm} onBuy={() => openPurchase(game)} />)}
         </div>
+        {hasMoreLockedGames && (
+          <button
+            type="button"
+            onClick={() => setIsGlobalStoreExpanded(expanded => !expanded)}
+            className={`mx-auto mt-4 flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.14em] transition-colors ${
+              lm
+                ? 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800'
+                : 'border-white/10 bg-white/[0.04] text-white/65 hover:border-violet-300/30 hover:bg-violet-400/[0.10] hover:text-violet-100'
+            }`}
+            aria-expanded={isGlobalStoreExpanded}
+            data-testid="button-toggle-global-games"
+          >
+            {isGlobalStoreExpanded ? (
+              <>
+                <ChevronUp size={14} strokeWidth={1.8} />
+                Show Less
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} strokeWidth={1.8} />
+                View All Games ({paidGames.length})
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <div data-testid="premium-games-section">
@@ -535,7 +565,7 @@ export default function GameStore({
           lm={lm}
         />
         {ownedGames.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="owned-games-grid">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6" data-testid="owned-games-grid">
             {ownedGames.map(game => <OwnedGameCard key={game.id} game={game} lm={lm} onPlay={() => handlePlay(game)} />)}
           </div>
         ) : (

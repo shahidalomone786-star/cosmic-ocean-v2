@@ -1,0 +1,58 @@
+========================================================
+COSMIC OCEAN — GLOBAL GAME STORE
+PROMPT 3: VERIFICATION + COMPACT CARD UI & PAGINATION
+========================================================
+
+ROLE
+Principal Full-Stack Engineer + Premium UI Designer.
+
+OBJECTIVE
+1. Verify Supabase SQL migration execution (ownership table + purchase_global_game RPC).
+2. Refactor Game Store UI to make cards significantly smaller and more compact.
+3. Limit initial display of Global Game Store cards to 15, with a "Show More" option to expand the full catalog.
+
+========================================================
+1. SQL & PURCHASE VERIFICATION
+========================================================
+
+• Ensure `src/features/game-store/api.ts` handles the response from `purchase_global_game` RPC correctly.
+• Ensure proper error handling if SQL migration is live (insufficient balance, owned, missing catalog).
+
+========================================================
+2. COMPACT CARD DESIGN (SMALL CARDS)
+========================================================
+
+• Reduce the overall size of the game cards in `GameStore.tsx`:
+  - Decrease thumbnail height/aspect ratio to a compact, sleek size.
+  - Reduce padding, typography size, and spacing to fit more cards comfortably on screen.
+  - Maintain 44px+ touch targets for action buttons (BUY/OWNED/PLAY).
+  - Use a responsive multi-column grid layout (e.g., 3-4 columns on mobile/tablet, 5-6 columns on desktop).
+
+========================================================
+3. 15-CARD INITIAL LIMIT + "SHOW MORE" BUTTON
+========================================================
+
+• Global Game Store Section:
+  - By default, show ONLY the first 15 paid/locked game cards.
+  - Place a sleek, minimal "Show More" / "View All Games (90)" button directly beneath the 15-card grid.
+  - Clicking "Show More" reveals all remaining games smoothly without full page reload.
+  - Option to collapse back or remain expanded.
+
+========================================================
+4. DO NOT BREAK
+========================================================
+
+• Preserve Free Games section (10 games).
+• Preserve Premium Games section logic.
+• Do NOT modify Royalty Wallet balance math or unrelated app features.
+
+========================================================
+5. QA
+========================================================
+
+✓ TypeScript and production build pass cleanly.
+✓ Cards render significantly smaller and cleaner across mobile (390px-430px) and desktop (1440px).
+✓ Exactly 15 cards load initially in Global Store with working "Show More" toggle.
+✓ No horizontal scroll overflow.
+
+PROCEED WITH THESE UI UPDATES NOW.
