@@ -35,7 +35,7 @@ import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
 import { COSMIC_ATELIER_CATALOG, type CosmicAvatarDefinition } from './components/cosmic-atelier/cosmicAtelierCatalog';
 import GameStore from './features/game-store/GameStore';
-import { FREE_GAME_CATALOG, PAID_GAME_CATALOG } from './data/gameCatalog';
+import { GAME_CATALOG } from './data/gameCatalog';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 import { TtsPlaybackQueue } from './lib/edgeTts';
@@ -3219,12 +3219,8 @@ export default function App() {
               </div>
 
               <GameStore
-                freeGames={FREE_GAME_CATALOG}
-                paidGames={PAID_GAME_CATALOG}
+                games={GAME_CATALOG}
                 lm={lm}
-                isAuthenticated={isAuthenticated}
-                sessionVerified={sessionVerified}
-                userId={user?.id}
               />
 
               {/* ── Grandmaster Chess ── */}
