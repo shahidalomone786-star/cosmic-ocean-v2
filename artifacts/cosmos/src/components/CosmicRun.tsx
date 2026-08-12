@@ -8,6 +8,10 @@ type CosmicRunApi = {
   };
 };
 
+type CosmicRunModule = {
+  default?: CosmicRunApi;
+};
+
 type CosmicRunWindow = Window & {
   CosmicRun?: CosmicRunApi;
   THREE?: typeof Three;
@@ -35,10 +39,19 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
         // The source engine is intentionally kept as a plain browser script
         // outside the React bundle; Vite serves it as a lazy module.
         // @ts-expect-error Cosmic Run is a JavaScript engine without a TS surface.
-        await import('../../../../cosmic-run/cosmic-run.js');
-        if (cancelled || !containerRef.current || !gameWindow.CosmicRun) return;
+        const engineModule = (await import('../../../../cosmic-run/cosmic-run.js')) as CosmicRunModule;
+        const engine = gameWindow.CosmicRun ?? engineModule.default;
+        const container = containerRef.current;
+        if (cancelled || !container) return;
+        if (!engine) throw new Error('Cosmic Run engine API was not exported by the lazy module');
 
-        game = gameWindow.CosmicRun.startGame(containerRef.current);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (cancelled || !container.isConnected) return;
+
+        game = engine.startGame(container);
+        if (!container.querySelector('canvas')) {
+          throw new Error('Cosmic Run renderer did not append a canvas to its container');
+        }
         if (!cancelled) setStatus('ready');
       } catch (error) {
         if (!cancelled) {
@@ -64,7 +77,7 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
       aria-label="Cosmic Run"
       data-testid="cosmic-run-modal"
     >
-      <div ref={containerRef} className="cosmic-run-surface absolute inset-0 overflow-hidden" />
+      <div ref={containerRef} className="cosmic-run-surface absolute inset-0 h-full w-full min-h-0 min-w-0 overflow-hidden" />
 
       <button
         type="button"

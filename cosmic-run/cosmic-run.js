@@ -2095,6 +2095,7 @@ class CosmicRunGame {
     this.animFrame = null;
     this._deathTimer = null;
     this._destroyed = false;
+    this._resizeObserver = null;
     this.progress = this._loadProgress();
     this.settings = this._loadSettings();
 
@@ -2109,7 +2110,11 @@ class CosmicRunGame {
 
   _initRenderer() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const width = this.container.clientWidth || window.innerWidth;
+    const height = this.container.clientHeight || window.innerHeight;
+    this.renderer.setSize(width, height, false);
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -2119,6 +2124,10 @@ class CosmicRunGame {
 
     this._resizeHandler = () => this._onResize();
     window.addEventListener('resize', this._resizeHandler);
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver = new ResizeObserver(this._resizeHandler);
+      this._resizeObserver.observe(this.container);
+    }
   }
 
   _initScene() {
@@ -2456,9 +2465,11 @@ class CosmicRunGame {
 
   _onResize() {
     if (!this.camera || !this.renderer) return;
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const width = this.container.clientWidth || window.innerWidth;
+    const height = this.container.clientHeight || window.innerHeight;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height, false);
   }
 
   _loadProgress() {
@@ -2696,6 +2707,8 @@ class CosmicRunGame {
     this.ui?.destroy();
     this.ui = null;
     if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer.domElement.remove();
