@@ -18,6 +18,7 @@ const SingularitySettingsPage = lazy(() => import('./components/settings/Singula
 const LibraryView = lazy(() => import('./components/LibraryView'));
 // Heavy modals — code-split so they don't bloat the initial bundle
 const GrandmasterChessModal = lazy(() => import('./components/GrandmasterChess'));
+const CosmicRunModal        = lazy(() => import('./components/CosmicRun'));
 const CosmicCarromModal     = lazy(() => import('./components/CosmicCarrom'));
 const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModal'));
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
@@ -35,7 +36,8 @@ import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
 import { COSMIC_ATELIER_CATALOG, type CosmicAvatarDefinition } from './components/cosmic-atelier/cosmicAtelierCatalog';
 import GameStore from './features/game-store/GameStore';
-import { GAME_CATALOG } from './data/gameCatalog';
+import { GameCard } from './features/game-store/GameStore';
+import { COSMIC_RUN_GAME, GAME_CATALOG } from './data/gameCatalog';
 import SingularityLaunchButton from './components/SingularityLaunchButton';
 import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStore';
 import { TtsPlaybackQueue } from './lib/edgeTts';
@@ -1973,6 +1975,7 @@ export default function App() {
   const [advModal,         setAdvModal]         = useState<AdvSimItem | null>(null);
   const [arcadeModal,      setArcadeModal]      = useState<FunGameItem | null>(null);
   const [showChess,        setShowChess]        = useState(false);
+  const [showCosmicRun,    setShowCosmicRun]    = useState(false);
   const [showCarrom,       setShowCarrom]       = useState(false);
   const [masterpieceModal, setMasterpieceModal] = useState<MasterpieceItem | null>(null);
   const [showProfile,      setShowProfile]      = useState(false);
@@ -2135,7 +2138,7 @@ export default function App() {
   const isAnimationPaused =
     !show3D || showIntro || focused || showPortal || showLibrary || showCosmicAtelier || showMissionCenter || showPhysicsQuiz || langOpen ||
     activeChat !== null || chatInputFocused ||
-    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess || activeVideo !== null;
+    hasSearchResults || selectedCard !== null || simulationModal !== null || advModal !== null || arcadeModal !== null || showChess || showCosmicRun || activeVideo !== null;
 
   const searchAll = useCallback(async (q: string, mode: 'specific' | 'everything' = 'specific') => {
     const term = q.trim();
@@ -3223,6 +3226,22 @@ export default function App() {
                 lm={lm}
               />
 
+              {/* ── Cosmic Run ── */}
+              <div className="mb-6" data-testid="cosmic-run-free-game">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <h2 className={`text-[15px] font-medium tracking-wide ${lm ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: 'var(--app-font-heading)' }}>Cosmic Run</h2>
+                  <span className={`text-[11px] uppercase tracking-[0.18em] ${lm ? 'text-slate-500' : 'text-white/30'}`}>3D Parkour Adventure</span>
+                </div>
+                <div className="max-w-[260px]">
+                  <GameCard
+                    game={COSMIC_RUN_GAME}
+                    index={0}
+                    lm={lm}
+                    onPlay={() => setShowCosmicRun(true)}
+                  />
+                </div>
+              </div>
+
               {/* ── Grandmaster Chess ── */}
               <div className="mb-4">
                 <div className="flex items-baseline gap-3 mb-3">
@@ -3522,6 +3541,15 @@ export default function App() {
                 setShowPhysicsQuiz(false);
               }}
             />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* ── z-[300]  Grandmaster Chess Modal ── */}
+      <AnimatePresence>
+        {showCosmicRun && (
+          <Suspense fallback={null}>
+            <CosmicRunModal onClose={() => setShowCosmicRun(false)} />
           </Suspense>
         )}
       </AnimatePresence>

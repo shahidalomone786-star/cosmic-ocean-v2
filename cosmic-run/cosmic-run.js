@@ -5,6 +5,11 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
+// The standalone reference loads Three.js before this file. The Cosmic Ocean
+// host assigns its bundled Three.js module to globalThis before lazy loading
+// this engine.
+const THREE = typeof globalThis !== 'undefined' ? globalThis.THREE : undefined;
+
 // ─── Configuration ───
 const CONFIG = {
   gravity: -35,
@@ -176,6 +181,7 @@ class InputManager {
     this.keys = {};
     this.touch = { active: false, dx: 0, dy: 0, jump: false, sprint: false, slide: false };
     this.mouse = { x: 0, y: 0, locked: false };
+    this._keyboardHandlers = [];
     this._setupKeyboard();
     this._touchSetup = false;
   }
@@ -187,15 +193,24 @@ class InputManager {
   }
 
   _setupKeyboard() {
-    window.addEventListener('keydown', (e) => {
+    const keydown = (e) => {
       this.keys[e.code] = true;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
-    });
-    window.addEventListener('keyup', (e) => {
+    };
+    const keyup = (e) => {
       this.keys[e.code] = false;
-    });
+    };
+    this._keyboardHandlers = [['keydown', keydown], ['keyup', keyup]];
+    this._keyboardHandlers.forEach(([type, handler]) => window.addEventListener(type, handler));
+  }
+
+  destroy() {
+    this._keyboardHandlers.forEach(([type, handler]) => window.removeEventListener(type, handler));
+    this._keyboardHandlers = [];
+    this.keys = {};
+    this.touch = { active: false, dx: 0, dy: 0, jump: false, sprint: false, slide: false };
   }
 
   _setupTouch() {
@@ -724,6 +739,29 @@ class Player {
     } else {
       this.mesh.scale.y = lerp(this.mesh.scale.y, 1, dt * 10);
     }
+  }
+
+  dispose() {
+    const disposeObject = (object) => {
+      if (!object) return;
+      object.traverse((child) => {
+        child.geometry?.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => material.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      if (object.parent) object.parent.remove(object);
+    };
+
+    disposeObject(this.mesh);
+    disposeObject(this.trailMesh);
+    this.mesh = null;
+    this.trailMesh = null;
+    this.trail = [];
   }
 }
 
@@ -1655,6 +1693,13 @@ class ParticleSystem {
     this.geometry.attributes.color.needsUpdate = true;
     this.geometry.attributes.size.needsUpdate = true;
   }
+
+  dispose() {
+    if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
+    this.geometry.dispose();
+    this.mesh.material.dispose();
+    this.particles = [];
+  }
 }
 
 // ─── UI Manager ───
@@ -1662,6 +1707,8 @@ class UIManager {
   constructor(game) {
     this.game = game;
     this.screens = {};
+    this.hud = null;
+    this.touchControls = null;
     this._createScreens();
     this._createHUD();
     this._createTouchControls();
@@ -1673,7 +1720,7 @@ class UIManager {
       el.id = id;
       el.className = 'screen';
       el.style.display = 'none';
-      document.body.appendChild(el);
+      this.game.container.appendChild(el);
       this.screens[id] = el;
       return el;
     };
@@ -1799,7 +1846,8 @@ class UIManager {
         <div class="hud-speed" id="hud-speed">0 m/s</div>
       </div>
     `;
-    document.body.appendChild(hud);
+    this.hud = hud;
+    this.game.container.appendChild(hud);
   }
 
   _createTouchControls() {
@@ -1816,7 +1864,17 @@ class UIManager {
         <button id="touch-jump" class="touch-btn jump-btn">JUMP</button>
       </div>
     `;
-    document.body.appendChild(touchControls);
+    this.touchControls = touchControls;
+    this.game.container.appendChild(touchControls);
+  }
+
+  destroy() {
+    Object.values(this.screens).forEach(screen => screen.remove());
+    this.hud?.remove();
+    this.touchControls?.remove();
+    this.screens = {};
+    this.hud = null;
+    this.touchControls = null;
   }
 
   showScreen(name) {
@@ -1896,58 +1954,6 @@ class UIManager {
       grid.appendChild(card);
     });
   }
-}
-
-    // Game Over
-    const gameOver = createScreen('screen-gameover');
-    gameOver.innerHTML = `
-      <div class="screen-content">
-        <h2>Fallen Into the Void</h2>
-        <p class="funny-text" id="funny-text">Gravity: 1, You: 0</p>
-        <div class="menu-buttons">
-          <button id="btn-try-again" class="menu-btn primary">Try Again</button>
-          <button id="btn-give-up" class="menu-btn">Give Up (Weak)</button>
-        </div>
-      </div>
-    `;
-
-    // Settings
-    const settings = createScreen('screen-settings');
-    settings.innerHTML = `
-      <div class="screen-content">
-        <h2>Settings</h2>
-        <div class="setting-row">
-          <label>Audio</label>
-          <input type="checkbox" id="setting-audio" checked>
-        </div>
-        <div class="setting-row">
-          <label>Particles</label>
-          <input type="checkbox" id="setting-particles" checked>
-        </div>
-        <div class="setting-row">
-          <label>Show Timer</label>
-          <input type="checkbox" id="setting-timer" checked>
-        </div>
-        <button id="btn-back-settings" class="menu-btn">Back</button>
-      </div>
-    `;
-
-    // Bind events
-    document.getElementById('btn-story').addEventListener('click', () => this.game.showStageSelect('story'));
-    document.getElementById('btn-time-trial').addEventListener('click', () => this.game.showStageSelect('time-trial'));
-    document.getElementById('btn-settings').addEventListener('click', () => this.showScreen('settings'));
-    document.getElementById('btn-back-start').addEventListener('click', () => this.showScreen('start'));
-    document.getElementById('btn-back-settings').addEventListener('click', () => this.showScreen('start'));
-    document.getElementById('btn-resume').addEventListener('click', () => this.game.resume());
-    document.getElementById('btn-restart').addEventListener('click', () => this.game.restartStage());
-    document.getElementById('btn-quit').addEventListener('click', () => this.game.quitToMenu());
-    document.getElementById('btn-next-stage').addEventListener('click', () => this.game.nextStage());
-    document.getElementById('btn-retry').addEventListener('click', () => this.game.restartStage());
-    document.getElementById('btn-menu').addEventListener('click', () => this.game.showStageSelect(this.game.mode));
-    document.getElementById('btn-try-again').addEventListener('click', () => this.game.restartStage());
-    document.getElementById('btn-give-up').addEventListener('click', () => this.game.showStageSelect(this.game.mode));
-  }
-
   _createHUD() {
     const hud = document.createElement('div');
     hud.id = 'hud';
@@ -1962,7 +1968,8 @@ class UIManager {
         <div class="hud-speed" id="hud-speed">0 m/s</div>
       </div>
     `;
-    document.body.appendChild(hud);
+    this.hud = hud;
+    this.game.container.appendChild(hud);
   }
 
   _createTouchControls() {
@@ -1979,7 +1986,8 @@ class UIManager {
         <button id="touch-jump" class="touch-btn jump-btn">JUMP</button>
       </div>
     `;
-    document.body.appendChild(touchControls);
+    this.touchControls = touchControls;
+    this.game.container.appendChild(touchControls);
   }
 
   showScreen(name) {
@@ -2085,6 +2093,8 @@ class CosmicRunGame {
     this.scene = null;
     this.clock = new THREE.Clock();
     this.animFrame = null;
+    this._deathTimer = null;
+    this._destroyed = false;
     this.progress = this._loadProgress();
     this.settings = this._loadSettings();
 
@@ -2107,7 +2117,8 @@ class CosmicRunGame {
     this.renderer.toneMappingExposure = 1.0;
     this.container.appendChild(this.renderer.domElement);
 
-    window.addEventListener('resize', () => this._onResize());
+    this._resizeHandler = () => this._onResize();
+    window.addEventListener('resize', this._resizeHandler);
   }
 
   _initScene() {
@@ -2184,6 +2195,7 @@ class CosmicRunGame {
 
   _addStyles() {
     const style = document.createElement('style');
+    style.dataset.cosmicRun = 'true';
     style.textContent = `
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { overflow: hidden; background: #0a0e27; font-family: 'Segoe UI', system-ui, sans-serif; color: white; }
@@ -2438,6 +2450,7 @@ class CosmicRunGame {
         .hud-timer, .hud-collectibles { font-size: 0.85rem; }
       }
     `;
+    this.styleElement = style;
     document.head.appendChild(style);
   }
 
@@ -2497,8 +2510,7 @@ class CosmicRunGame {
 
     // Create player
     if (this.player) {
-      if (this.player.mesh && this.player.mesh.parent) this.player.mesh.parent.remove(this.player.mesh);
-      if (this.player.trailMesh && this.player.trailMesh.parent) this.player.trailMesh.parent.remove(this.player.trailMesh);
+      this.player.dispose();
     }
     this.player = new Player(this.scene, this.audio);
     this.player.reset(this.stage.startPos.clone());
@@ -2653,18 +2665,50 @@ class CosmicRunGame {
       this.stage.dispose();
       this.stage = null;
     }
+    this.player?.dispose();
+    this.player = null;
     this.ui.showScreen('start');
   }
 
   destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     if (this.animFrame) cancelAnimationFrame(this.animFrame);
-    if (this.stage) this.stage.dispose();
+    this.animFrame = null;
+    if (this._deathTimer) {
+      clearTimeout(this._deathTimer);
+      this._deathTimer = null;
+    }
+    this.stage?.dispose();
+    this.stage = null;
+    this.player?.dispose();
+    this.player = null;
+    this.particles?.dispose();
+    this.particles = null;
+    if (this.starfield) {
+      this.starfield.parent?.remove(this.starfield);
+      this.starfield.geometry.dispose();
+      this.starfield.material.dispose();
+      this.starfield = null;
+    }
+    this.input?.destroy();
+    this.input = null;
+    this.ui?.destroy();
+    this.ui = null;
+    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
     if (this.renderer) {
       this.renderer.dispose();
-      this.container.removeChild(this.renderer.domElement);
+      this.renderer.domElement.remove();
+      this.renderer = null;
     }
-    // Clean up UI
-    document.querySelectorAll('.screen, #hud, #touch-controls, style').forEach(el => el.remove());
+    if (this.styleElement) this.styleElement.remove();
+    if (this.audio?.ctx && this.audio.ctx.state !== 'closed') {
+      this.audio.ctx.close().catch(() => {});
+    }
+    this.audio = null;
+    this.scene?.clear();
+    this.scene = null;
+    if (gameInstance === this) gameInstance = null;
   }
 }
 

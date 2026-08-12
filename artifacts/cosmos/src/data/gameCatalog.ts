@@ -52,6 +52,17 @@ function thumbnail(title: string, category: string, index: number): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+export const COSMIC_RUN_GAME: GameItem = {
+  id: 'cosmic-run',
+  title: 'Cosmic Run',
+  description: 'Run, jump, slide, and wall-jump through futuristic space stations.',
+  category: '3D',
+  thumbnail: thumbnail('Cosmic Run', '3d', 0),
+  source: 'Cosmic Ocean',
+  playableUrl: '#',
+  license: 'MIT',
+};
+
 type VerifiedGame = {
   slug: string;
   title: string;

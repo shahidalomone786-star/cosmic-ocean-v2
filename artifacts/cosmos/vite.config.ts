@@ -71,6 +71,7 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+      allow: [path.resolve(import.meta.dirname, '..', '..')],
     },
     // Proxy /api/* to the Express API server during development
     proxy: {

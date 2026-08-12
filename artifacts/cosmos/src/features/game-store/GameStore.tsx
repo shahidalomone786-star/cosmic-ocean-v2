@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { GameItem } from '../../data/gameCatalog';
 
-type CatalogGame = GameItem & {
+export type CatalogGame = GameItem & {
   playableUrl?: string;
 };
 
@@ -128,7 +128,7 @@ function GameThumbnail({ game, lm, index }: { game: CatalogGame; lm: boolean; in
   );
 }
 
-function GameCard({ game, index, lm, onPlay }: { game: CatalogGame; index: number; lm: boolean; onPlay: (game: CatalogGame) => void }) {
+export function GameCard({ game, index, lm, onPlay }: { game: CatalogGame; index: number; lm: boolean; onPlay: (game: CatalogGame) => void }) {
   const theme = themeClasses(lm);
   const playableUrl = game.playableUrl;
   const sourceLabel = `${game.license} verified · source linked`;
