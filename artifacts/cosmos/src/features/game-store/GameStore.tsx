@@ -30,6 +30,7 @@ type GameStoreProps = {
 };
 
 const CATALOG_LIMIT = 100;
+const INITIAL_GAME_LIMIT = 15;
 
 function themeClasses(lm: boolean) {
   return lm
@@ -97,7 +98,7 @@ function GameThumbnail({ game, lm, index }: { game: CatalogGame; lm: boolean; in
   const theme = themeClasses(lm);
 
   return (
-    <div className="relative aspect-[16/10] overflow-hidden bg-[#111827]">
+    <div className="relative aspect-[16/9] max-h-[82px] overflow-hidden bg-[#111827] sm:max-h-[96px]">
       <img
         src={game.thumbnail}
         alt=""
@@ -112,13 +113,13 @@ function GameThumbnail({ game, lm, index }: { game: CatalogGame; lm: boolean; in
         aria-hidden="true"
       />
       <span
-        className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] ${
+        className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-[0.1em] ${
           lm ? 'border-white/70 bg-white/85 text-[#24304a]' : 'border-white/20 bg-[#070a12]/45 text-white/80 backdrop-blur-md'
         }`}
         data-testid={`badge-free-game-${game.id}`}
       >
-        <Check size={10} strokeWidth={2.2} />
-        Free to play
+        <Check size={9} strokeWidth={2.2} />
+        Free
       </span>
       <span className={`absolute bottom-3 right-3 font-mono text-[9px] tracking-[0.14em] ${lm ? 'text-white/80' : 'text-white/55'}`}>
         {String(index + 1).padStart(2, '0')}
@@ -138,36 +139,36 @@ function GameCard({ game, index, lm, onPlay }: { game: CatalogGame; index: numbe
       data-testid={`card-free-game-${game.id}`}
     >
       <GameThumbnail game={game} lm={lm} index={index} />
-      <div className="flex min-h-[188px] flex-1 flex-col p-4">
-        <div className="mb-2 flex items-start justify-between gap-3">
+      <div className="flex min-h-[130px] flex-1 flex-col p-2 sm:min-h-[142px] sm:p-2.5">
+        <div className="mb-1 flex items-start justify-between gap-1.5">
           <h3
-            className={`min-w-0 text-[15px] font-medium leading-tight tracking-[-0.025em] ${theme.ink}`}
+            className={`min-w-0 truncate text-[12px] font-semibold leading-tight tracking-[-0.02em] sm:text-[13px] ${theme.ink}`}
             data-testid={`text-game-title-${game.id}`}
           >
             {game.title}
           </h3>
-          <span className={`shrink-0 pt-0.5 font-mono text-[8px] uppercase tracking-[0.12em] ${theme.accent}`} data-testid={`text-game-category-${game.id}`}>
+          <span className={`max-w-[48%] shrink-0 truncate pt-0.5 font-mono text-[8px] uppercase tracking-[0.08em] ${theme.accent}`} data-testid={`text-game-category-${game.id}`}>
             {game.category}
           </span>
         </div>
-        <p className={`line-clamp-3 text-[11px] leading-[1.55] ${theme.muted}`} data-testid={`text-game-description-${game.id}`}>
+        <p className={`line-clamp-1 text-[9px] leading-tight ${theme.muted}`} data-testid={`text-game-description-${game.id}`}>
           {game.description}
         </p>
         <div className={`mt-auto border-t pt-3 ${theme.line}`}>
-          <div className={`mb-3 flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.1em] ${theme.faint}`} data-testid={`badge-mit-source-${game.id}`}>
-            <BadgeCheck size={12} strokeWidth={1.8} className={theme.accent} />
-            {sourceLabel}
+          <div className={`mb-1.5 flex items-center gap-1 font-mono text-[7px] uppercase tracking-[0.06em] ${theme.faint}`} data-testid={`badge-mit-source-${game.id}`}>
+            <BadgeCheck size={10} strokeWidth={1.8} className={theme.accent} />
+            <span className="truncate">{sourceLabel}</span>
           </div>
           <button
             type="button"
             onClick={() => onPlay(game)}
             disabled={!playableUrl}
-            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 font-mono text-[10px] font-medium uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${theme.button}`}
+            className={`flex min-h-8 w-full items-center justify-center gap-1.5 rounded-lg border px-2 font-mono text-[9px] font-medium uppercase tracking-[0.14em] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${theme.button}`}
             data-testid={`button-play-game-${game.id}`}
           >
-            <Gamepad2 size={14} strokeWidth={1.8} />
+            <Gamepad2 size={12} strokeWidth={1.8} />
             Play
-            <ArrowUpRight size={13} strokeWidth={1.8} />
+            <ArrowUpRight size={11} strokeWidth={1.8} />
           </button>
         </div>
       </div>
@@ -200,6 +201,7 @@ export default function GameStore({ catalog, games: legacyGames, freeGames = [],
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const theme = themeClasses(lm);
 
   const games = useMemo(() => {
@@ -220,6 +222,8 @@ export default function GameStore({ catalog, games: legacyGames, freeGames = [],
       return matchesCategory && matchesQuery;
     });
   }, [category, games, query]);
+  const displayedGames = isExpanded ? visibleGames : visibleGames.slice(0, INITIAL_GAME_LIMIT);
+  const hasMoreGames = visibleGames.length > INITIAL_GAME_LIMIT;
 
   const handlePlay = (game: CatalogGame) => {
     const playableUrl = game.playableUrl;
@@ -315,13 +319,26 @@ export default function GameStore({ catalog, games: legacyGames, freeGames = [],
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="free-games-grid">
-        {visibleGames.length ? (
-          visibleGames.map((game, index) => <GameCard key={game.id} game={game} index={index} lm={lm} onPlay={handlePlay} />)
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6" data-testid="free-games-grid">
+        {displayedGames.length ? (
+          displayedGames.map((game, index) => <GameCard key={game.id} game={game} index={index} lm={lm} onPlay={handlePlay} />)
         ) : (
           <EmptyCatalog lm={lm} query={query} category={category} />
         )}
       </div>
+
+      {hasMoreGames && (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(expanded => !expanded)}
+          className={`mx-auto mt-4 flex min-h-9 items-center justify-center gap-2 rounded-full border px-4 font-mono text-[9px] font-medium uppercase tracking-[0.13em] transition-colors ${theme.panelStrong} ${theme.muted} ${lm ? 'hover:border-[#087f85] hover:text-[#087f85]' : 'hover:border-[#83d9d4]/45 hover:text-[#c9fffa]'}`}
+          aria-expanded={isExpanded}
+          data-testid="button-toggle-all-games"
+        >
+          {isExpanded ? 'Show Less' : `Show More · View All ${games.length} Games`}
+          <ChevronDown size={12} strokeWidth={1.8} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </button>
+      )}
 
       <footer className={`mt-7 flex flex-col gap-2 border-t pt-4 font-mono text-[9px] uppercase tracking-[0.12em] sm:flex-row sm:items-center sm:justify-between ${theme.line} ${theme.faint}`}>
         <span className="flex items-center gap-2">
