@@ -12,6 +12,14 @@ export default function CosmicGalaxyBanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
   const [isPlaying, setIsPlaying] = useState(false);
+  const setVideoRef = (video: HTMLVideoElement | null) => {
+    videoRef.current = video;
+    if (video) {
+      video.defaultMuted = true;
+      video.muted = true;
+      video.volume = 0;
+    }
+  };
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -32,6 +40,9 @@ export default function CosmicGalaxyBanner() {
     }
 
     const startPlayback = () => {
+      video.defaultMuted = true;
+      video.muted = true;
+      video.volume = 0;
       void video.play().catch(() => {
         // The poster remains visible when autoplay is unavailable.
         setIsPlaying(false);
@@ -57,8 +68,8 @@ export default function CosmicGalaxyBanner() {
         style={{ backgroundImage: `url(${GALAXY_POSTER})` }}
       >
         <video
-          ref={videoRef}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+          ref={setVideoRef}
+          className={`absolute inset-0 h-full w-full scale-[1.2] object-cover object-center transition-opacity duration-700 ${
             isPlaying ? 'opacity-100' : 'opacity-0'
           }`}
           src={GALAXY_VIDEO}
