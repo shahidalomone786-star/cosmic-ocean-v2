@@ -68,6 +68,28 @@
     // Initialize game when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
       const container = document.getElementById('game-container');
+      const loading = document.getElementById('loading');
+
+      const showRuntimeError = (error) => {
+        const details = error instanceof Error
+          ? (error.stack || `${error.name}: ${error.message}`)
+          : String(error);
+        loading.style.opacity = '1';
+        loading.innerHTML = '';
+
+        const heading = document.createElement('p');
+        heading.textContent = 'Cosmic Run could not start';
+        heading.style.cssText = 'margin:0;color:#ff5252;font-size:1rem;font-weight:600;';
+
+        const message = document.createElement('p');
+        message.textContent = 'The exact runtime error is shown below.';
+        message.style.cssText = 'margin:0.75rem 0 0;color:#a0a8c0;font-size:0.85rem;';
+
+        const stack = document.createElement('pre');
+        stack.textContent = details;
+        stack.style.cssText = 'width:min(90vw,900px);max-height:45vh;overflow:auto;margin:1rem 0 0;padding:1rem;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(0,0,0,0.35);border:1px solid rgba(255,82,82,0.35);border-radius:8px;color:#ffb3b3;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;';
+        loading.append(heading, message, stack);
+      };
 
       // Wait for Three.js to load
       const checkThree = setInterval(() => {
@@ -80,12 +102,11 @@
               window.game = startGame(container);
 
               // Hide loading screen
-              const loading = document.getElementById('loading');
               loading.style.opacity = '0';
               setTimeout(() => loading.remove(), 500);
             } catch (err) {
               console.error('Failed to start game:', err);
-              document.getElementById('loading').innerHTML = '<p style="color:#ff5252">Failed to load game. Please refresh.</p>';
+              showRuntimeError(err);
             }
           }, 100);
         }
@@ -94,7 +115,7 @@
       // Timeout fallback
       setTimeout(() => {
         if (typeof THREE === 'undefined') {
-          document.getElementById('loading').innerHTML = '<p style="color:#ff5252">Failed to load 3D engine. Check your connection.</p>';
+          showRuntimeError(new Error('Three.js did not become available before the 10 second loading timeout'));
         }
       }, 10000);
     });
