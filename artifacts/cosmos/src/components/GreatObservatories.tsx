@@ -109,6 +109,9 @@ function ArchiveLightbox({
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const lightboxRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setIsImageLoading(true);
@@ -116,10 +119,36 @@ function ArchiveLightbox({
   }, [image?.id]);
 
   useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    return () => {
+      previouslyFocusedRef.current?.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
       if (event.key === 'ArrowLeft' && selectedIndex > 0) onSelect(selectedIndex - 1);
       if (event.key === 'ArrowRight' && selectedIndex < images.length - 1) onSelect(selectedIndex + 1);
+      if (event.key === 'Tab' && lightboxRef.current) {
+        const focusable = Array.from(
+          lightboxRef.current.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+          ),
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -141,14 +170,21 @@ function ArchiveLightbox({
   const canGoNext = selectedIndex < images.length - 1;
 
   return (
-    <div className="great-observatory-lightbox" role="dialog" aria-modal="true" aria-label={`${image.title} archive image`} data-testid="observatory-lightbox">
+    <div
+      ref={lightboxRef}
+      className="great-observatory-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="great-observatory-lightbox-title"
+      data-testid="observatory-lightbox"
+    >
       <button type="button" className="great-observatory-lightbox-backdrop" onClick={onClose} aria-label="Close image viewer" />
       <div className="great-observatory-lightbox-shell">
         <header className="great-observatory-lightbox-topbar">
           <span className="great-observatory-lightbox-count">
             Plate {String(selectedIndex + 1).padStart(2, '0')} / {String(images.length).padStart(2, '0')}
           </span>
-          <button type="button" className="great-observatory-lightbox-close" onClick={onClose} aria-label="Close image viewer" data-testid="button-observatory-lightbox-close">
+          <button ref={closeButtonRef} type="button" className="great-observatory-lightbox-close" onClick={onClose} aria-label="Close image viewer" data-testid="button-observatory-lightbox-close">
             <X size={21} strokeWidth={1.4} />
           </button>
         </header>
@@ -220,7 +256,7 @@ function ArchiveLightbox({
         <footer className="great-observatory-lightbox-details">
           <div className="great-observatory-lightbox-heading">
             <p className="great-observatories-eyebrow"><span className="great-observatories-eyebrow-line" aria-hidden="true" /> Archive plate</p>
-            <h2>{image.title}</h2>
+            <h2 id="great-observatory-lightbox-title">{image.title}</h2>
           </div>
           <dl className="great-observatory-lightbox-meta">
             {date && <div><dt>Observation date</dt><dd>{date}</dd></div>}
@@ -313,7 +349,7 @@ function ObservatoryArchive({ observatory }: { observatory: Observatory }) {
                   data-testid={`button-observatory-archive-image-${image.id}`}
                 >
                   <span className="great-observatory-archive-image-frame">
-                    <img src={image.thumbnailUrl} alt="" loading="lazy" decoding="async" />
+                    <img src={image.thumbnailUrl} alt={image.title} loading="lazy" decoding="async" />
                     <span className="great-observatory-archive-card-shade" />
                     <span className="great-observatory-archive-card-index">{String(index + 1).padStart(2, '0')}</span>
                     <span className="great-observatory-archive-card-expand" aria-hidden="true"><ArrowUpRight size={15} strokeWidth={1.4} /></span>
