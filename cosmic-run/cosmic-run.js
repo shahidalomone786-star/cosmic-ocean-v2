@@ -1721,7 +1721,9 @@ class UIManager {
       el.className = 'screen';
       el.style.display = 'none';
       this.game.container.appendChild(el);
-      this.screens[id] = el;
+      // Navigation uses logical names ("start", "stages", ...), while the
+      // DOM ids keep the "screen-" prefix for stable selectors.
+      this.screens[id.replace(/^screen-/, '')] = el;
       return el;
     };
 
