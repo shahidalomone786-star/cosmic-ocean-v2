@@ -1996,7 +1996,29 @@ class CosmicRunGame {
   }
 
   _initRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: false,
+        powerPreference: 'default',
+        failIfMajorPerformanceCaveat: false,
+        precision: 'mediump',
+      });
+    } catch (error) {
+      console.error('WebGL Context Creation Failed:', error);
+      try {
+        this.renderer = new THREE.WebGLRenderer({
+          antialias: false,
+          alpha: false,
+          powerPreference: 'low-power',
+          failIfMajorPerformanceCaveat: false,
+          precision: 'lowp',
+        });
+      } catch (fallbackError) {
+        console.error('WebGL fallback context creation failed:', fallbackError);
+        throw fallbackError;
+      }
+    }
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(width, height, false);

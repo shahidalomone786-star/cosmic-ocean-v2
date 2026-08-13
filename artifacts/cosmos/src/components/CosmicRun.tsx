@@ -17,8 +17,8 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
         src="/cosmic-run/index.html"
         title="Cosmic Run"
         className="absolute inset-0 h-full w-full border-0 bg-[#0a0e27]"
-        allow="autoplay; fullscreen"
-        style={{ border: 'none', background: '#0a0e27' }}
+        allow="accelerated; autoplay"
+        style={{ width: '100%', height: '100%', border: 'none', background: '#0a0e27', display: 'block' }}
       />
 
       <button
