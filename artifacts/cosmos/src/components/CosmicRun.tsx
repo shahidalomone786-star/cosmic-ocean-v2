@@ -21,18 +21,91 @@ type CosmicRunProps = {
   onClose: () => void;
 };
 
+const THREE_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+let threeCdnPromise: Promise<typeof Three> | null = null;
+
+function formatRuntimeError(error: unknown): string {
+  if (error instanceof Error) return error.stack || `${error.name}: ${error.message}`;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error, null, 2);
+  } catch {
+    return String(error);
+  }
+}
+
+function loadThreeFromCdn(gameWindow: CosmicRunWindow): Promise<typeof Three> {
+  if (gameWindow.THREE) return Promise.resolve(gameWindow.THREE);
+  if (threeCdnPromise) return threeCdnPromise;
+
+  threeCdnPromise = new Promise<typeof Three>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = THREE_CDN_URL;
+    script.async = true;
+    script.dataset.cosmicRunThree = 'true';
+    script.onload = () => {
+      if (gameWindow.THREE) {
+        resolve(gameWindow.THREE);
+      } else {
+        reject(new Error(`Three.js loaded from ${THREE_CDN_URL}, but window.THREE is still undefined`));
+      }
+    };
+    script.onerror = () => reject(new Error(`Unable to load Three.js from ${THREE_CDN_URL}`));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    threeCdnPromise = null;
+    throw error;
+  });
+
+  return threeCdnPromise;
+}
+
 export default function CosmicRun({ onClose }: CosmicRunProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorDetails, setErrorDetails] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     let game: { destroy: () => void } | null = null;
 
+    const showRuntimeError = (error: unknown) => {
+      const details = formatRuntimeError(error);
+      console.error('Cosmic Run runtime error:', error);
+      try {
+        game?.destroy();
+      } catch (destroyError) {
+        console.error('Cosmic Run cleanup error:', destroyError);
+      }
+      game = null;
+      if (!cancelled) {
+        setErrorDetails(details);
+        setStatus('error');
+      }
+    };
+
+    const handleWindowError = (event: ErrorEvent) => {
+      if (event.error || event.message) showRuntimeError(event.error || new Error(event.message));
+    };
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      showRuntimeError(event.reason);
+    };
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     const mountGame = async () => {
       try {
         const gameWindow = window as CosmicRunWindow;
-        gameWindow.THREE = Three;
+        if (!gameWindow.THREE) {
+          try {
+            await loadThreeFromCdn(gameWindow);
+          } catch (cdnError) {
+            // The bundled module is a local fallback when a browser blocks the CDN.
+            gameWindow.THREE = Three;
+            console.warn('Falling back to bundled Three.js after CDN load failure:', cdnError);
+          }
+        }
+        if (!gameWindow.THREE) throw new Error('Three.js is missing: window.THREE is undefined');
 
         // Keep the original engine as the single source of gameplay truth.
         // It is loaded only after this modal opens.
@@ -54,10 +127,7 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
         }
         if (!cancelled) setStatus('ready');
       } catch (error) {
-        if (!cancelled) {
-          console.error('Failed to mount Cosmic Run:', error);
-          setStatus('error');
-        }
+        showRuntimeError(error);
       }
     };
 
@@ -65,6 +135,8 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
 
     return () => {
       cancelled = true;
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       game?.destroy();
     };
   }, []);
@@ -99,14 +171,20 @@ export default function CosmicRun({ onClose }: CosmicRunProps) {
       )}
 
       {status === 'error' && (
-        <div className="absolute inset-0 z-[210] grid place-items-center bg-[#0a0e27] px-6 text-center text-white">
-          <div>
+        <div className="absolute inset-0 z-[210] overflow-auto bg-[#0a0e27] px-6 py-20 text-white">
+          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-red-300">Cosmic Run unavailable</p>
-            <p className="mt-2 max-w-sm text-sm text-white/55">The 3D engine could not be mounted. Close this view and try again.</p>
+            <p className="mt-2 max-w-xl text-sm text-white/55">The 3D engine threw the following runtime error:</p>
+            <pre
+              data-testid="cosmic-run-error"
+              className="mt-5 max-h-[50vh] w-full overflow-auto rounded-lg border border-red-400/30 bg-black/40 p-4 text-left font-mono text-xs leading-relaxed text-red-200 shadow-inner whitespace-pre-wrap break-words"
+            >
+              {errorDetails || 'Unknown Cosmic Run runtime error'}
+            </pre>
             <button
               type="button"
               onClick={onClose}
-              className="mt-5 rounded-full border border-white/20 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80 transition-colors hover:border-cyan-300/60 hover:text-white"
+              className="mt-6 rounded-full border border-white/20 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80 transition-colors hover:border-cyan-300/60 hover:text-white"
             >
               Return to Free Games
             </button>
