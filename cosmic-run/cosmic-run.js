@@ -1993,32 +1993,92 @@ class CosmicRunGame {
     this._createStarfield();
 
     this.ui.showScreen('start');
+    this.clock.start();
+    this._gameLoop();
+    console.info('[Cosmic Run] Initial render loop started', JSON.stringify({
+      state: this.state,
+      animationFrameScheduled: this.animFrame !== null,
+      rendererCreated: !!this.renderer,
+      canvasAttached: !!this.renderer?.domElement.parentElement,
+    }));
   }
 
   _initRenderer() {
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') ||
-      canvas.getContext('webgl') ||
-      canvas.getContext('experimental-webgl');
+    const container = this.container;
+    const dimensions = {
+      canvas: { width: canvas.width, height: canvas.height },
+      container: container
+        ? { width: container.clientWidth, height: container.clientHeight }
+        : null,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    };
+    const threeAvailable = typeof window !== 'undefined' && typeof window.THREE !== 'undefined';
+    let webgl2 = null;
+    let webgl = null;
+    let experimentalWebgl = null;
+    const contextErrors = {};
 
-    if (!gl) {
-      throw new Error('WebGL is not supported or disabled on this device/browser.');
+    try {
+      webgl2 = canvas.getContext('webgl2', {
+        alpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (error) {
+      contextErrors.webgl2 = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     }
+    try {
+      webgl = canvas.getContext('webgl', {
+        alpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (error) {
+      contextErrors.webgl = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    }
+    try {
+      experimentalWebgl = canvas.getContext('experimental-webgl', {
+        alpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (error) {
+      contextErrors.experimentalWebgl = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    }
+
+    console.info('[Cosmic Run] Renderer diagnostics', JSON.stringify({
+      canvasExists: !!canvas,
+      containerExists: !!container,
+      canvasAttachedBeforeRenderer: !!canvas.parentElement,
+      dimensions,
+      threeAvailable,
+      webgl2Available: !!webgl2,
+      webglAvailable: !!webgl,
+      experimentalWebglAvailable: !!experimentalWebgl,
+      contextErrors,
+    }));
 
     try {
       this.renderer = new THREE.WebGLRenderer({
         canvas,
-        context: gl,
         antialias: false,
+        alpha: true,
+        powerPreference: 'default',
+        failIfMajorPerformanceCaveat: false,
         precision: 'mediump',
-        powerPreference: 'low-power',
       });
     } catch (error) {
-      console.error('WebGL Context Creation Failed:', error);
+      console.error('[Cosmic Run] THREE.WebGLRenderer failed', {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        canvasAttached: !!canvas.parentElement,
+        dimensions,
+        threeAvailable,
+      });
       throw error;
     }
-    const width = this.container.clientWidth || window.innerWidth;
-    const height = this.container.clientHeight || window.innerHeight;
+
+    const width = Math.max(1, container.clientWidth || window.innerWidth);
+    const height = Math.max(1, container.clientHeight || window.innerHeight);
     this.renderer.setSize(width, height, false);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
@@ -2027,7 +2087,20 @@ class CosmicRunGame {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
-    this.container.appendChild(this.renderer.domElement);
+    container.appendChild(this.renderer.domElement);
+
+      console.info('[Cosmic Run] Renderer initialized', JSON.stringify({
+      rendererCreated: !!this.renderer,
+      canvasAttached: this.renderer.domElement.parentElement === container,
+      canvasDimensions: {
+        width: this.renderer.domElement.width,
+        height: this.renderer.domElement.height,
+      },
+      containerDimensions: {
+        width: container.clientWidth,
+        height: container.clientHeight,
+      },
+      }));
 
     this._resizeHandler = () => this._onResize();
     window.addEventListener('resize', this._resizeHandler);
