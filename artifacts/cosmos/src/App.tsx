@@ -33,6 +33,7 @@ const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 import BannerCarousel from './components/BannerCarousel';
 import CosmicGalaxyBanner from './components/CosmicGalaxyBanner';
+import { GreatObservatories, ObservatoryExplorer } from './components/GreatObservatories';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
 import { COSMIC_ATELIER_CATALOG, type CosmicAvatarDefinition } from './components/cosmic-atelier/cosmicAtelierCatalog';
@@ -2480,6 +2481,11 @@ export default function App() {
     );
   }
 
+  if (location.startsWith('/observatories/')) {
+    const observatoryId = location.slice('/observatories/'.length).split('/')[0];
+    return <ObservatoryExplorer id={observatoryId} lm={lm} />;
+  }
+
   return (
     <div
       className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden transition-all duration-700"
@@ -3108,6 +3114,8 @@ export default function App() {
               </div>
 
               <CosmicGalaxyBanner />
+
+              <GreatObservatories lm={lm} />
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>
