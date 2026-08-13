@@ -344,7 +344,9 @@ class Player {
     const group = new THREE.Group();
 
     // Body
-    const bodyGeo = new THREE.CapsuleGeometry(0.3, 0.8, 4, 8);
+    // Three.js r128 does not include CapsuleGeometry; keep the same body
+    // footprint with a core primitive available in the pinned CDN build.
+    const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 8);
     const bodyMat = new THREE.MeshStandardMaterial({
       color: COLORS.player,
       roughness: 0.3,
