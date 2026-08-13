@@ -32,6 +32,7 @@ import LoginScreen from './components/LoginScreen';
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 import BannerCarousel from './components/BannerCarousel';
+import CosmicGalaxyBanner from './components/CosmicGalaxyBanner';
 import BioHeroCard from './components/biology-hub/BioHeroCard';
 import { CosmicAtelierEntry } from './components/cosmic-atelier/CosmicAtelierEntry';
 import { COSMIC_ATELIER_CATALOG, type CosmicAvatarDefinition } from './components/cosmic-atelier/cosmicAtelierCatalog';
@@ -3105,6 +3106,8 @@ export default function App() {
                       ))}
                 </div>
               </div>
+
+              <CosmicGalaxyBanner />
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>
