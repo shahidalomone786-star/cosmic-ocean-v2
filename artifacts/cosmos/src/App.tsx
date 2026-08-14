@@ -24,9 +24,6 @@ const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModa
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
 const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
 const CosmicAtelier         = lazy(() => import('./components/cosmic-atelier/CosmicAtelier'));
-const CosmicAtlas           = lazy(() => import('./components/CosmicAtlas'));
-const AstronomyObjectView   = lazy(() => import('./components/AstronomyObjectView'));
-const CosmicMap             = lazy(() => import('./features/cosmic-map/CosmicMap'));
 const MissionQuizController = lazy(() => import('./features/mission-quiz/MissionQuizController'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
@@ -2490,47 +2487,6 @@ export default function App() {
     return <ObservatoryExplorer id={observatoryId} lm={lm} />;
   }
 
-  if (routePath.startsWith('/cosmic-map/object/')) {
-    const objectId = decodeURIComponent(routePath.slice('/cosmic-map/object/'.length));
-    const returnTo = new URLSearchParams(location.split('?')[1] ?? '').get('returnTo');
-    const backToMap = returnTo && returnTo.startsWith('/') ? returnTo : '/';
-    return (
-      <Suspense fallback={<div className="cosmic-map-loading" aria-label="Loading Cosmic Map"><span>Loading Cosmic Map…</span></div>}>
-        <CosmicMap
-          mapFocus={objectId}
-          onOpenObject={item => setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent(`/cosmic-map/object/${encodeURIComponent(item.id)}`)}`)}
-          onBackToMap={() => setLocation(backToMap)}
-        />
-      </Suspense>
-    );
-  }
-
-  if (routePath.startsWith('/atlas/object/')) {
-    const objectId = decodeURIComponent(routePath.slice('/atlas/object/'.length));
-    return (
-      <Suspense fallback={<div className="cosmic-atlas-loading"><span>Loading scientific record…</span></div>}>
-        <AstronomyObjectView lm={lm} objectId={objectId} />
-      </Suspense>
-    );
-  }
-
-  if (routePath === '/atlas' || routePath.startsWith('/atlas/')) {
-    const categorySlug = routePath.startsWith('/atlas/')
-      ? routePath.slice('/atlas/'.length).split('/')[0]
-      : undefined;
-    return (
-      <Suspense
-        fallback={
-          <div className="cosmic-atlas-loading">
-            <span>Loading Atlas foundation…</span>
-          </div>
-        }
-      >
-        <CosmicAtlas lm={lm} standalone categorySlug={categorySlug} />
-      </Suspense>
-    );
-  }
-
   return (
     <div
       className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden transition-all duration-700"
@@ -3161,17 +3117,6 @@ export default function App() {
               <CosmicGalaxyBanner />
 
               <GreatObservatories lm={lm} />
-
-              <Suspense fallback={null}>
-                <CosmicAtlas lm={lm} />
-              </Suspense>
-
-               <Suspense fallback={<div className="cosmic-map-loading" aria-label="Loading Cosmic Map"><span>Loading Cosmic Map…</span></div>}>
-                 <CosmicMap
-                  onTravelToObject={item => setLocation(`/cosmic-map/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/')}`)}
-                   onOpenObject={item => setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/')}`)}
-                 />
-               </Suspense>
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>
