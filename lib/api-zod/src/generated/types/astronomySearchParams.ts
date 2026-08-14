@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AstronomyCategoryId } from './astronomyCategoryId';
+import type { AstronomySourceId } from './astronomySourceId';
 
 export type AstronomySearchParams = {
 /**
@@ -19,4 +20,10 @@ cursor?: string;
  * @maximum 24
  */
 pageSize?: number;
+source?: AstronomySourceId;
+objectType?: string;
+minDistance?: number;
+maxDistance?: number;
+discoveryYear?: number;
+observationSource?: string;
 };

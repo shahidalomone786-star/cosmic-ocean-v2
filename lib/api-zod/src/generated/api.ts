@@ -89,7 +89,13 @@ export const AstronomySearchQueryParams = zod.object({
   "q": zod.coerce.string().min(astronomySearchQueryQMin),
   "category": zod.enum(['universe', 'galaxies', 'stars', 'exoplanets', 'solar-system', 'moons', 'nebulae', 'black-holes', 'star-clusters', 'deep-sky-objects', 'missions', 'spacecraft', 'supernovae', 'nearby-objects']).optional(),
   "cursor": zod.coerce.string().optional(),
-  "pageSize": zod.coerce.number().min(astronomySearchQueryPageSizeMin).max(astronomySearchQueryPageSizeMax).default(astronomySearchQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().min(astronomySearchQueryPageSizeMin).max(astronomySearchQueryPageSizeMax).default(astronomySearchQueryPageSizeDefault),
+  "source": zod.enum(['nasa', 'nasa-exoplanet-archive', 'esa', 'gaia', 'mast', 'simbad', 'sdss', 'other']).optional(),
+  "objectType": zod.coerce.string().optional(),
+  "minDistance": zod.coerce.number().optional(),
+  "maxDistance": zod.coerce.number().optional(),
+  "discoveryYear": zod.coerce.number().optional(),
+  "observationSource": zod.coerce.string().optional()
 })
 
 export const AstronomySearchResponse = zod.object({
@@ -117,7 +123,8 @@ export const AstronomySearchResponse = zod.object({
   "sourceId": zod.string(),
   "metadata": zod.record(zod.string(), zod.unknown()),
   "imageReferences": zod.array(zod.string()),
-  "observationReferences": zod.array(zod.string())
+  "observationReferences": zod.array(zod.string()),
+  "relatedObjects": zod.array(zod.unknown())
 })),
   "nextCursor": zod.string().nullable(),
   "hasMore": zod.boolean(),
@@ -159,12 +166,37 @@ export const AstronomyObjectResponse = zod.object({
   "sourceId": zod.string(),
   "metadata": zod.record(zod.string(), zod.unknown()),
   "imageReferences": zod.array(zod.string()),
-  "observationReferences": zod.array(zod.string())
+  "observationReferences": zod.array(zod.string()),
+  "relatedObjects": zod.array(zod.unknown())
 }),
   "sourceStatus": zod.array(zod.object({
   "source": zod.string(),
   "status": zod.enum(['ready', 'unavailable']),
   "message": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Suggest real astronomical records from provider archives
+ */
+export const astronomySuggestionsQueryQMin = 2;
+
+
+
+export const AstronomySuggestionsQueryParams = zod.object({
+  "q": zod.coerce.string().min(astronomySuggestionsQueryQMin),
+  "category": zod.enum(['universe', 'galaxies', 'stars', 'exoplanets', 'solar-system', 'moons', 'nebulae', 'black-holes', 'star-clusters', 'deep-sky-objects', 'missions', 'spacecraft', 'supernovae', 'nearby-objects']).optional()
+})
+
+export const AstronomySuggestionsResponse = zod.object({
+  "query": zod.string(),
+  "suggestions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['object', 'alias', 'catalog', 'type']),
+  "source": zod.enum(['nasa', 'nasa-exoplanet-archive', 'esa', 'gaia', 'mast', 'simbad', 'sdss', 'other']),
+  "objectId": zod.string()
 }))
 })
 

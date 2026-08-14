@@ -26,4 +26,5 @@ export interface AstronomyObject {
   metadata: AstronomyObjectMetadata;
   imageReferences: string[];
   observationReferences: string[];
+  relatedObjects: AstronomyObject[];
 }

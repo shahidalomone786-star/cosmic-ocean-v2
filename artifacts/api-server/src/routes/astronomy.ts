@@ -3,7 +3,9 @@ import {
   getAstronomyObject,
   isAstronomyCategory,
   searchAstronomy,
+  suggestAstronomy,
   type AstronomyCategory,
+  type AstronomySource,
 } from "../lib/astronomy";
 
 const router = Router();
@@ -13,6 +15,9 @@ router.get("/astronomy/search", async (req, res) => {
   const categoryParam = String(req.query.category ?? "").trim() || undefined;
   const pageSize = Math.min(Math.max(Number(req.query.pageSize ?? 12) || 12, 6), 24);
   const page = Math.max(1, Number(req.query.cursor ?? "1") || 1);
+  const minDistance = req.query.minDistance === undefined ? undefined : Number(req.query.minDistance);
+  const maxDistance = req.query.maxDistance === undefined ? undefined : Number(req.query.maxDistance);
+  const discoveryYear = req.query.discoveryYear === undefined ? undefined : Number(req.query.discoveryYear);
 
   if (query.length < 2) {
     res.status(400).json({ error: "Search query must be at least 2 characters." });
@@ -29,6 +34,12 @@ router.get("/astronomy/search", async (req, res) => {
       category: categoryParam as AstronomyCategory | undefined,
       page,
       pageSize,
+      source: String(req.query.source ?? "").trim() as AstronomySource | undefined || undefined,
+      objectType: String(req.query.objectType ?? "").trim() || undefined,
+      minDistance: Number.isFinite(minDistance) ? minDistance : undefined,
+      maxDistance: Number.isFinite(maxDistance) ? maxDistance : undefined,
+      discoveryYear: Number.isFinite(discoveryYear) ? discoveryYear : undefined,
+      observationSource: String(req.query.observationSource ?? "").trim() || undefined,
     });
     res.json({
       query,
@@ -38,6 +49,29 @@ router.get("/astronomy/search", async (req, res) => {
     });
   } catch (error) {
     req.log.warn({ err: error }, "astronomy search failed");
+    res.status(503).json({ error: "Scientific data temporarily unavailable." });
+  }
+});
+
+router.get("/astronomy/suggestions", async (req, res) => {
+  const query = String(req.query.q ?? "").trim();
+  const categoryParam = String(req.query.category ?? "").trim() || undefined;
+  if (query.length < 2) {
+    res.json({ query, suggestions: [] });
+    return;
+  }
+  if (categoryParam && !isAstronomyCategory(categoryParam)) {
+    res.status(400).json({ error: "Unknown astronomy category." });
+    return;
+  }
+  try {
+    const suggestions = await suggestAstronomy({
+      query,
+      category: categoryParam as AstronomyCategory | undefined,
+    });
+    res.json({ query, suggestions });
+  } catch (error) {
+    req.log.warn({ err: error }, "astronomy suggestions failed");
     res.status(503).json({ error: "Scientific data temporarily unavailable." });
   }
 });

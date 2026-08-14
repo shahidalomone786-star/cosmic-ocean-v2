@@ -19,6 +19,8 @@ import type {
   AstronomyObjectPayload,
   AstronomySearchParams,
   AstronomySearchPayload,
+  AstronomySuggestionsParams,
+  AstronomySuggestionsPayload,
   BiologySearchParams,
   BiologySearchPayload,
   ErrorResponse,
@@ -365,6 +367,90 @@ export function useAstronomyObject<TData = Awaited<ReturnType<typeof astronomyOb
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getAstronomyObjectQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAstronomySuggestionsUrl = (params: AstronomySuggestionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/astronomy/suggestions?${stringifiedParams}` : `/api/astronomy/suggestions`
+}
+
+/**
+ * @summary Suggest real astronomical records from provider archives
+ */
+export const astronomySuggestions = async (params: AstronomySuggestionsParams, options?: RequestInit): Promise<AstronomySuggestionsPayload> => {
+
+  return customFetch<AstronomySuggestionsPayload>(getAstronomySuggestionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAstronomySuggestionsQueryKey = (params?: AstronomySuggestionsParams,) => {
+    return [
+    `/api/astronomy/suggestions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAstronomySuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof astronomySuggestions>>, TError = ErrorType<ErrorResponse>>(params: AstronomySuggestionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomySuggestions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAstronomySuggestionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof astronomySuggestions>>> = ({ signal }) => astronomySuggestions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof astronomySuggestions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AstronomySuggestionsQueryResult = NonNullable<Awaited<ReturnType<typeof astronomySuggestions>>>
+export type AstronomySuggestionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Suggest real astronomical records from provider archives
+ */
+
+export function useAstronomySuggestions<TData = Awaited<ReturnType<typeof astronomySuggestions>>, TError = ErrorType<ErrorResponse>>(
+ params: AstronomySuggestionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomySuggestions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAstronomySuggestionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

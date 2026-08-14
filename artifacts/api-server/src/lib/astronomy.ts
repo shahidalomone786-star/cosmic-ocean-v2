@@ -47,6 +47,7 @@ export type NormalizedAstronomyObject = {
   metadata: Record<string, unknown>;
   imageReferences: string[];
   observationReferences: string[];
+  relatedObjects: NormalizedAstronomyObject[];
 };
 
 export type AstronomySourceStatus = {
@@ -60,6 +61,12 @@ export type AstronomyRequest = {
   category?: AstronomyCategory;
   page: number;
   pageSize: number;
+  source?: AstronomySource;
+  objectType?: string;
+  minDistance?: number;
+  maxDistance?: number;
+  discoveryYear?: number;
+  observationSource?: string;
 };
 
 export type AstronomyPage = {
@@ -68,11 +75,20 @@ export type AstronomyPage = {
   sourceStatus: AstronomySourceStatus[];
 };
 
+export type AstronomySuggestion = {
+  value: string;
+  label: string;
+  kind: "object" | "alias" | "catalog" | "type";
+  source: AstronomySource;
+  objectId: string;
+};
+
 type AstronomyProvider = {
   id: AstronomySource;
   label: string;
   search(request: AstronomyRequest): Promise<AstronomyPage>;
   getById(sourceId: string, category: AstronomyCategory): Promise<NormalizedAstronomyObject | undefined>;
+  getRelated?(item: NormalizedAstronomyObject): Promise<NormalizedAstronomyObject[]>;
 };
 
 const TIMEOUT_MS = 20_000;
@@ -135,6 +151,7 @@ function simbadObject(
     observationReferences: [
       `https://simbad.cds.unistra.fr/simbad/sim-id?Ident=${encodeURIComponent(sourceId)}`,
     ],
+    relatedObjects: [],
   };
 }
 
@@ -236,6 +253,7 @@ function exoplanetObject(row: ExoplanetRow): NormalizedAstronomyObject | undefin
       hostStar: firstText(row.hostname),
       discoveryMethod: firstText(row.discoverymethod),
       discoveryFacility: firstText(row.disc_facility),
+      discoveryYear: numberOrNull(row.disc_year),
       orbitalPeriodDays: numberOrNull(row.pl_orbper),
       radiusEarth: numberOrNull(row.pl_rade),
       massEarth: numberOrNull(row.pl_bmasse),
@@ -247,6 +265,7 @@ function exoplanetObject(row: ExoplanetRow): NormalizedAstronomyObject | undefin
     observationReferences: [
       `https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(sourceId)}`,
     ],
+    relatedObjects: [],
   };
 }
 
@@ -258,7 +277,7 @@ const exoplanetProvider: AstronomyProvider = {
     const offset = (page - 1) * pageSize;
     const rows = await exoplanetQuery(
       `SELECT TOP ${offset + pageSize} pl_name, hostname, ra, dec, sy_dist, discoverymethod, disc_facility, ` +
-      `pl_orbper, pl_rade, pl_bmasse, pl_eqt FROM pscomppars ` +
+      `pl_orbper, pl_rade, pl_bmasse, pl_eqt, disc_year FROM pscomppars ` +
       `WHERE REPLACE(LOWER(pl_name), ' ', '') LIKE REPLACE(LOWER('%${safeQuery}%'), ' ', '') ` +
       `OR REPLACE(LOWER(hostname), ' ', '') LIKE REPLACE(LOWER('%${safeQuery}%'), ' ', '') ` +
       `ORDER BY pl_name`,
@@ -275,10 +294,24 @@ const exoplanetProvider: AstronomyProvider = {
   async getById(sourceId) {
     const rows = await exoplanetQuery(
       `SELECT TOP 1 pl_name, hostname, ra, dec, sy_dist, discoverymethod, disc_facility, ` +
-      `pl_orbper, pl_rade, pl_bmasse, pl_eqt FROM pscomppars ` +
+      `pl_orbper, pl_rade, pl_bmasse, pl_eqt, disc_year FROM pscomppars ` +
       `WHERE pl_name = '${escapeAdql(sourceId)}'`,
     );
     return rows[0] ? exoplanetObject(rows[0]) : undefined;
+  },
+  async getRelated(item) {
+    const hostStar = typeof item.metadata.hostStar === "string" ? item.metadata.hostStar : "";
+    if (!hostStar) return [];
+    const rows = await exoplanetQuery(
+      `SELECT TOP 7 pl_name, hostname, ra, dec, sy_dist, discoverymethod, disc_facility, ` +
+      `pl_orbper, pl_rade, pl_bmasse, pl_eqt, disc_year FROM pscomppars ` +
+      `WHERE hostname = '${escapeAdql(hostStar)}' ORDER BY pl_name`,
+    );
+    return rows
+      .map(exoplanetObject)
+      .filter((related): related is NormalizedAstronomyObject => Boolean(related))
+      .filter(related => related.id !== item.id)
+      .slice(0, 6);
   },
 };
 
@@ -335,6 +368,7 @@ const nasaMediaProvider: AstronomyProvider = {
         },
         imageReferences: preview ? [preview] : [],
         observationReferences: [`https://images.nasa.gov/details/${encodeURIComponent(sourceId)}`],
+        relatedObjects: [],
       } satisfies NormalizedAstronomyObject;
     }).filter((item): item is NormalizedAstronomyObject => Boolean(item));
     return {
@@ -367,7 +401,18 @@ function selectedProviders(category?: AstronomyCategory): AstronomyProvider[] {
 }
 
 function cacheKey(request: AstronomyRequest): string {
-  return `${request.query.toLowerCase()}:${request.category ?? "universe"}:${request.page}:${request.pageSize}`;
+  return [
+    request.query.toLowerCase(),
+    request.category ?? "universe",
+    request.page,
+    request.pageSize,
+    request.source ?? "",
+    request.objectType?.toLowerCase() ?? "",
+    request.minDistance ?? "",
+    request.maxDistance ?? "",
+    request.discoveryYear ?? "",
+    request.observationSource?.toLowerCase() ?? "",
+  ].join(":");
 }
 
 function getCached(key: string): AstronomyPage | undefined {
@@ -401,7 +446,31 @@ export async function searchAstronomy(request: AstronomyRequest): Promise<Astron
       sourceStatus.push({ source: provider.label, status: "unavailable", message: "Scientific data temporarily unavailable." });
     }
   }
-  const deduped = [...new Map(items.map(item => [item.id, item])).values()].slice(0, request.pageSize);
+  const filtered = items.filter(item => {
+    if (request.source && item.source !== request.source) return false;
+    if (request.objectType && item.type.toLowerCase() !== request.objectType.toLowerCase()) return false;
+    if (request.minDistance !== undefined) {
+      if (item.distance?.value == null || item.distance.value < request.minDistance) return false;
+    }
+    if (request.maxDistance !== undefined) {
+      if (item.distance?.value == null || item.distance.value > request.maxDistance) return false;
+    }
+    if (request.discoveryYear !== undefined) {
+      const discoveryYear = numberOrNull(item.metadata.discoveryYear);
+      if (discoveryYear !== request.discoveryYear) return false;
+    }
+    if (request.observationSource) {
+      const observationSource = [
+        item.source,
+        item.metadata.discoveryFacility,
+        item.metadata.center,
+        item.metadata.observationSource,
+      ].find(value => typeof value === "string" && value.trim().toLowerCase() === request.observationSource?.toLowerCase());
+      if (!observationSource) return false;
+    }
+    return true;
+  });
+  const deduped = [...new Map(filtered.map(item => [item.id, item])).values()].slice(0, request.pageSize);
   const value = {
     items: deduped,
     hasMore: results.some(result => result.status === "fulfilled" && result.value.hasMore),
@@ -411,13 +480,43 @@ export async function searchAstronomy(request: AstronomyRequest): Promise<Astron
   return value;
 }
 
+export async function suggestAstronomy(
+  request: Omit<AstronomyRequest, "page" | "pageSize">,
+): Promise<AstronomySuggestion[]> {
+  const result = await searchAstronomy({ ...request, page: 1, pageSize: 8 });
+  const suggestions: AstronomySuggestion[] = [];
+  const seen = new Set<string>();
+  const add = (suggestion: AstronomySuggestion) => {
+    const key = `${suggestion.kind}:${suggestion.value.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    suggestions.push(suggestion);
+  };
+  for (const item of result.items) {
+    add({ value: item.name, label: item.name, kind: "object", source: item.source, objectId: item.id });
+    if (item.sourceId !== item.name) {
+      add({ value: item.sourceId, label: `${item.sourceId} · catalog ID`, kind: "catalog", source: item.source, objectId: item.id });
+    }
+    for (const alias of item.aliases) {
+      add({ value: alias, label: `${alias} · alias`, kind: "alias", source: item.source, objectId: item.id });
+    }
+    if (item.type) {
+      add({ value: item.type, label: `${item.type} · object type`, kind: "type", source: item.source, objectId: item.id });
+    }
+  }
+  return suggestions.slice(0, 8);
+}
+
 export async function getAstronomyObject(id: string, category: AstronomyCategory): Promise<NormalizedAstronomyObject | undefined> {
   const separator = id.indexOf(":");
   if (separator < 0) return undefined;
   const source = id.slice(0, separator);
   const sourceId = id.slice(separator + 1);
   const provider = providers.find(candidate => candidate.id === source);
-  return provider?.getById(sourceId, category);
+  const item = await provider?.getById(sourceId, category);
+  if (!item) return undefined;
+  if (provider?.getRelated) item.relatedObjects = await provider.getRelated(item);
+  return item;
 }
 
 export function isAstronomyCategory(value: string | undefined): value is AstronomyCategory {

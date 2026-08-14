@@ -1,7 +1,27 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowUpRight, Database, Orbit, Search, Telescope, RotateCw, ExternalLink } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Clock3,
+  Database,
+  ExternalLink,
+  Filter,
+  Orbit,
+  RotateCw,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Telescope,
+  X,
+} from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { getAstronomySearchQueryKey, useAstronomySearch, type AstronomyObject as ApiAstronomyObject } from '@workspace/api-client-react';
+import {
+  getAstronomySearchQueryKey,
+  getAstronomySuggestionsQueryKey,
+  useAstronomySearch,
+  useAstronomySuggestions,
+  type AstronomyObject as ApiAstronomyObject,
+  type AstronomySearchParams,
+} from '@workspace/api-client-react';
 import {
   ASTRONOMY_CATEGORIES,
   getAstronomyCategory,
@@ -17,12 +37,24 @@ type CosmicAtlasProps = {
 
 function queryFromLocation(location: string): string {
   const query = location.split('?')[1] ?? '';
-  return new URLSearchParams(query).get('query') ?? '';
+  return new URLSearchParams(query).get('query') ?? new URLSearchParams(query).get('q') ?? '';
 }
 
 function queryFromBrowserUrl(): string {
   if (typeof window === 'undefined') return '';
   return new URLSearchParams(window.location.search).get('query') ?? '';
+}
+
+function filtersFromLocation(location: string): FilterState {
+  const params = new URLSearchParams(location.split('?')[1] ?? '');
+  return {
+    source: (params.get('source') as FilterState['source']) ?? '',
+    objectType: params.get('objectType') ?? '',
+    minDistance: params.get('minDistance') ?? '',
+    maxDistance: params.get('maxDistance') ?? '',
+    discoveryYear: params.get('discoveryYear') ?? '',
+    observationSource: params.get('observationSource') ?? '',
+  };
 }
 
 function categoryFromLocation(location: string): AstronomyCategory {
@@ -33,13 +65,60 @@ function categoryFromLocation(location: string): AstronomyCategory {
   return getAstronomyCategory(slug);
 }
 
+type FilterState = {
+  source: AstronomySearchParams['source'] | '';
+  objectType: string;
+  minDistance: string;
+  maxDistance: string;
+  discoveryYear: string;
+  observationSource: string;
+};
+
+const EMPTY_FILTERS: FilterState = {
+  source: '',
+  objectType: '',
+  minDistance: '',
+  maxDistance: '',
+  discoveryYear: '',
+  observationSource: '',
+};
+
+const FILTER_LABELS: Array<[keyof FilterState, string]> = [
+  ['source', 'Provider'],
+  ['objectType', 'Object type'],
+  ['minDistance', 'Min distance'],
+  ['maxDistance', 'Max distance'],
+  ['discoveryYear', 'Discovery year'],
+  ['observationSource', 'Observation source'],
+];
+
+function readRecentSearches(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('cosmic-atlas-recent-searches') ?? '[]');
+    return Array.isArray(saved) ? saved.filter((value): value is string => typeof value === 'string').slice(0, 5) : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatDistance(item: ApiAstronomyObject): string {
+  if (item.distance?.value == null) return 'Not available';
+  return `${item.distance.value} ${item.distance.unit ?? ''}`.trim();
+}
+
 export default function CosmicAtlas({ lm = false, standalone = false, categorySlug }: CosmicAtlasProps) {
   const [location, setLocation] = useLocation();
   const [searchValue, setSearchValue] = useState(() => queryFromLocation(location) || queryFromBrowserUrl());
   const [submittedQuery, setSubmittedQuery] = useState(() => queryFromLocation(location) || queryFromBrowserUrl());
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [page, setPage] = useState(1);
+  const [debouncedSuggestionQuery, setDebouncedSuggestionQuery] = useState('');
+  const [cursor, setCursor] = useState<string | undefined>();
   const [loadedItems, setLoadedItems] = useState<ApiAstronomyObject[]>([]);
+  const [filters, setFilters] = useState<FilterState>(() => filtersFromLocation(location));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>(readRecentSearches);
   const routeCategory = categoryFromLocation(location);
   const activeCategory = categorySlug ? getAstronomyCategory(categorySlug) : routeCategory;
   const routePath = location.split('?')[0];
@@ -51,25 +130,33 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
   }, [submittedQuery]);
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => setDebouncedSuggestionQuery(searchValue.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchValue]);
+
+  useEffect(() => {
+    setCursor(undefined);
     setLoadedItems([]);
-  }, [debouncedQuery, activeCategory.id]);
+  }, [debouncedQuery, activeCategory.id, filters.source, filters.objectType, filters.minDistance, filters.maxDistance, filters.discoveryYear, filters.observationSource]);
+
+  const searchParams = useMemo<AstronomySearchParams>(() => ({
+    q: debouncedQuery,
+    category: activeCategory.id,
+    ...(cursor ? { cursor } : {}),
+    pageSize: 12,
+    ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.objectType ? { objectType: filters.objectType } : {}),
+    ...(filters.minDistance ? { minDistance: Number(filters.minDistance) } : {}),
+    ...(filters.maxDistance ? { maxDistance: Number(filters.maxDistance) } : {}),
+    ...(filters.discoveryYear ? { discoveryYear: Number(filters.discoveryYear) } : {}),
+    ...(filters.observationSource ? { observationSource: filters.observationSource } : {}),
+  }), [activeCategory.id, cursor, debouncedQuery, filters]);
 
   const astronomySearch = useAstronomySearch(
-    {
-      q: debouncedQuery,
-      category: activeCategory.id,
-      cursor: String(page),
-      pageSize: 12,
-    },
+    searchParams,
     {
       query: {
-        queryKey: getAstronomySearchQueryKey({
-          q: debouncedQuery,
-          category: activeCategory.id,
-          cursor: String(page),
-          pageSize: 12,
-        }),
+        queryKey: getAstronomySearchQueryKey(searchParams),
         enabled: debouncedQuery.length >= 2,
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
@@ -78,20 +165,34 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
     },
   );
 
+  const suggestionParams = useMemo(() => ({ q: debouncedSuggestionQuery, category: activeCategory.id }), [activeCategory.id, debouncedSuggestionQuery]);
+  const astronomySuggestions = useAstronomySuggestions(
+    suggestionParams,
+    {
+      query: {
+        queryKey: getAstronomySuggestionsQueryKey(suggestionParams),
+        enabled: suggestionsOpen && suggestionParams.q.length >= 2,
+        staleTime: 5 * 60 * 1000,
+        retry: 1,
+      },
+    },
+  );
+
   useEffect(() => {
     if (!astronomySearch.data) return;
     setLoadedItems(current => {
-      if (page === 1) return astronomySearch.data.items;
+      if (!cursor) return astronomySearch.data.items;
       const known = new Set(current.map(item => item.id));
       return [...current, ...astronomySearch.data.items.filter(item => !known.has(item.id))];
     });
-  }, [astronomySearch.data, page]);
+  }, [astronomySearch.data, cursor]);
 
   useEffect(() => {
     const syncBrowserQuery = () => {
       const nextQuery = queryFromLocation(location) || queryFromBrowserUrl();
       setSearchValue(nextQuery);
       setSubmittedQuery(nextQuery);
+      setFilters(filtersFromLocation(location));
     };
     syncBrowserQuery();
     window.addEventListener('popstate', syncBrowserQuery);
@@ -106,19 +207,79 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextQuery = searchValue.trim();
+    setSuggestionsOpen(false);
     if (!nextQuery) {
       setSubmittedQuery('');
+      setSearchValue('');
+      setFilters(EMPTY_FILTERS);
       setLocation(activeCategory.route);
       return;
     }
-    setPage(1);
+    setCursor(undefined);
     setLoadedItems([]);
     setSubmittedQuery(nextQuery);
+    setRecentSearches(current => {
+      const next = [nextQuery, ...current.filter(value => value.toLowerCase() !== nextQuery.toLowerCase())].slice(0, 5);
+      window.localStorage.setItem('cosmic-atlas-recent-searches', JSON.stringify(next));
+      return next;
+    });
     setLocation(`${activeCategory.route}?query=${encodeURIComponent(nextQuery)}`);
+  };
+
+  const selectSuggestion = (value: string, objectId?: string, kind?: string) => {
+    setSearchValue(value);
+    setSuggestionsOpen(false);
+    if (objectId && kind !== 'type') {
+      const currentUrl = typeof window === 'undefined'
+        ? location
+        : `${window.location.pathname}${window.location.search}`;
+      setLocation(`/atlas/object/${encodeURIComponent(objectId)}?returnTo=${encodeURIComponent(currentUrl)}`);
+      return;
+    }
+    setSubmittedQuery(value);
+    setCursor(undefined);
+    setLocation(`${activeCategory.route}?query=${encodeURIComponent(value)}`);
+  };
+
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      Object.entries(nextFilters).forEach(([filterKey, filterValue]) => {
+        if (filterValue) params.set(filterKey, filterValue);
+        else params.delete(filterKey);
+      });
+      const queryString = params.toString();
+      window.history.replaceState(window.history.state, '', `${activeCategory.route}${queryString ? `?${queryString}` : ''}`);
+    }
+    setCursor(undefined);
+  };
+
+  const clearFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      FILTER_LABELS.forEach(([key]) => params.delete(key));
+      const queryString = params.toString();
+      window.history.replaceState(window.history.state, '', `${activeCategory.route}${queryString ? `?${queryString}` : ''}`);
+    }
+    setCursor(undefined);
   };
 
   const categoryRoute = (category: AstronomyCategory) =>
     category.id === 'universe' ? '/atlas' : category.route;
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const suggestions = astronomySuggestions.data?.suggestions ?? [];
+  const availableSources = ASTRONOMY_PROVIDER_DESCRIPTORS.filter(provider => provider.status === 'available');
+  const supportedFilters = {
+    source: true,
+    objectType: loadedItems.length > 0,
+    distance: loadedItems.some(item => item.distance?.value != null),
+    discoveryYear: loadedItems.some(item => item.metadata.discoveryYear != null),
+    observationSource: loadedItems.some(item => ['discoveryFacility', 'center', 'observationSource'].some(key => item.metadata[key])),
+  };
 
   return (
     <section
@@ -169,7 +330,7 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
           </div>
         </div>
 
-        <form className="cosmic-atlas-search" onSubmit={handleSearch} role="search">
+        <form className="cosmic-atlas-search cosmic-atlas-search-enhanced" onSubmit={handleSearch} role="search">
           <label htmlFor="cosmic-atlas-search-input">
             <Search size={16} strokeWidth={1.5} aria-hidden="true" />
             <span>Search the universe...</span>
@@ -179,15 +340,46 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
             type="search"
             value={searchValue}
             onChange={event => setSearchValue(event.target.value)}
+            onFocus={() => setSuggestionsOpen(true)}
             placeholder="Search the universe..."
             autoComplete="off"
             data-testid="input-atlas-search"
           />
           <button type="submit" data-testid="button-atlas-search">
-              <span>Search archives</span>
+            <span>Search archives</span>
             <ArrowUpRight size={15} strokeWidth={1.5} aria-hidden="true" />
           </button>
+          {suggestionsOpen && searchValue.trim().length >= 2 && (
+            <div className="cosmic-atlas-suggestion-popover" role="listbox" aria-label="Archive suggestions">
+              <div className="cosmic-atlas-suggestion-heading">
+                <span><Sparkles size={12} aria-hidden="true" /> Provider-backed suggestions</span>
+                {astronomySuggestions.isFetching && <span>Updating</span>}
+              </div>
+              {suggestions.length > 0 ? suggestions.map(suggestion => (
+                <button
+                  key={`${suggestion.source}-${suggestion.objectId}-${suggestion.value}`}
+                  type="button"
+                  className="cosmic-atlas-suggestion"
+                  onMouseDown={event => event.preventDefault()}
+                   onClick={() => selectSuggestion(suggestion.value, suggestion.objectId, suggestion.kind)}
+                  role="option"
+                  data-testid={`button-atlas-suggestion-${suggestion.objectId}`}
+                >
+                  <span className="cosmic-atlas-suggestion-kind">{suggestion.kind}</span>
+                  <span><strong>{suggestion.label}</strong><small>{suggestion.source} / {suggestion.objectId}</small></span>
+                  <ArrowUpRight size={13} aria-hidden="true" />
+                </button>
+              )) : !astronomySuggestions.isFetching && (
+                <div className="cosmic-atlas-suggestion-empty">No provider suggestions for this query.</div>
+              )}
+            </div>
+          )}
         </form>
+        {suggestionsOpen && (
+          <button type="button" className="cosmic-atlas-search-dismiss" onClick={() => setSuggestionsOpen(false)} aria-label="Close suggestions" data-testid="button-atlas-close-suggestions">
+            <X size={14} aria-hidden="true" /> Close suggestions
+          </button>
+        )}
 
         {submittedQuery && (
           <div className="cosmic-atlas-search-status" role="status" data-testid="status-atlas-search">
@@ -233,6 +425,43 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
             })}
           </div>
         </nav>
+
+        <section className="cosmic-atlas-query-tools" aria-label="Search tools">
+          <div className="cosmic-atlas-recent">
+            <div className="cosmic-atlas-tools-label"><Clock3 size={13} aria-hidden="true" /> Recent searches</div>
+             {recentSearches.length > 0 ? recentSearches.map(value => (
+               <button key={value} type="button" onClick={() => selectSuggestion(value)} data-testid={`button-atlas-recent-${value}`}>
+                {value}
+              </button>
+            )) : <span className="cosmic-atlas-tools-empty">Your archive trail will appear here.</span>}
+          </div>
+          <button type="button" className={`cosmic-atlas-filter-trigger ${activeFilterCount ? 'has-filters' : ''}`} onClick={() => setFiltersOpen(current => !current)} aria-expanded={filtersOpen} data-testid="button-atlas-filters">
+            <SlidersHorizontal size={14} aria-hidden="true" /> Filters {activeFilterCount ? `(${activeFilterCount})` : ''} <Filter size={12} aria-hidden="true" />
+          </button>
+        </section>
+
+        {filtersOpen && (
+          <section className="cosmic-atlas-filter-panel" aria-label="Supported archive filters">
+            <div className="cosmic-atlas-filter-header">
+              <div>
+                <p className="cosmic-atlas-eyebrow"><span aria-hidden="true" /> Supported filters</p>
+                <h2>Refine the <em>archive</em></h2>
+              </div>
+              <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters" data-testid="button-atlas-close-filters"><X size={16} aria-hidden="true" /></button>
+            </div>
+            <div className="cosmic-atlas-filter-grid">
+              {supportedFilters.source && <label><span>{FILTER_LABELS[0][1]}</span><select value={filters.source} onChange={event => updateFilter('source', event.target.value)} data-testid="select-atlas-source"><option value="">All available providers</option>{availableSources.map(provider => <option key={provider.id} value={provider.id}>{provider.label}</option>)}</select></label>}
+              {supportedFilters.objectType && <label><span>{FILTER_LABELS[1][1]}</span><input value={filters.objectType} onChange={event => updateFilter('objectType', event.target.value)} placeholder="Use a returned type" list="atlas-object-types" data-testid="input-atlas-object-type" /><datalist id="atlas-object-types">{[...new Set(loadedItems.map(item => item.type).filter(Boolean))].map(type => <option key={type} value={type} />)}</datalist></label>}
+              {supportedFilters.distance && <><label><span>{FILTER_LABELS[2][1]}</span><input type="number" min="0" value={filters.minDistance} onChange={event => updateFilter('minDistance', event.target.value)} placeholder="Any" data-testid="input-atlas-min-distance" /></label><label><span>{FILTER_LABELS[3][1]}</span><input type="number" min="0" value={filters.maxDistance} onChange={event => updateFilter('maxDistance', event.target.value)} placeholder="Any" data-testid="input-atlas-max-distance" /></label></>}
+              {supportedFilters.discoveryYear && <label><span>{FILTER_LABELS[4][1]}</span><input type="number" min="1000" max="9999" value={filters.discoveryYear} onChange={event => updateFilter('discoveryYear', event.target.value)} placeholder="Returned year" data-testid="input-atlas-discovery-year" /></label>}
+              {supportedFilters.observationSource && <label><span>{FILTER_LABELS[5][1]}</span><input value={filters.observationSource} onChange={event => updateFilter('observationSource', event.target.value)} placeholder="Returned facility or archive" data-testid="input-atlas-observation-source" /></label>}
+            </div>
+            <div className="cosmic-atlas-filter-footer">
+              <span><Database size={13} aria-hidden="true" /> Only filters supported by the archive contract are shown.</span>
+              <button type="button" onClick={clearFilters} disabled={!activeFilterCount} data-testid="button-atlas-clear-filters">Clear all</button>
+            </div>
+          </section>
+        )}
 
         <div className="cosmic-atlas-foundation-grid">
           <section className="cosmic-atlas-discovery-panel" aria-labelledby="atlas-discovery-title">
@@ -341,11 +570,12 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
                       <span>{item.source}</span>
                       <ExternalLink size={13} aria-hidden="true" />
                     </div>
+                    {item.imageReferences[0] && <div className="cosmic-atlas-result-card-image"><img src={item.imageReferences[0]} alt="" loading="lazy" /></div>}
                     <h3>{item.name}</h3>
                     <p>{item.description || 'Not available'}</p>
                     <dl>
                       <div><dt>Type</dt><dd>{item.type || 'Not available'}</dd></div>
-                      <div><dt>Distance</dt><dd>{item.distance?.value != null ? `${item.distance.value} ${item.distance.unit ?? ''}` : 'Not available'}</dd></div>
+                      <div><dt>Distance</dt><dd>{formatDistance(item)}</dd></div>
                     </dl>
                   </Link>
                 ))}
@@ -357,7 +587,7 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
                 type="button"
                 className="cosmic-atlas-load-more"
                 disabled={astronomySearch.isFetching}
-                onClick={() => setPage(current => current + 1)}
+                onClick={() => setCursor(astronomySearch.data?.nextCursor ?? undefined)}
               >
                 {astronomySearch.isFetching ? 'Loading next archive page…' : 'Load next archive page'}
                 <ArrowUpRight size={14} aria-hidden="true" />

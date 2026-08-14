@@ -143,6 +143,36 @@ paths:
             minimum: 6
             maximum: 24
             default: 12
+        - name: source
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AstronomySourceId"
+        - name: objectType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: minDistance
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: maxDistance
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: discoveryYear
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: observationSource
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Normalized astronomical search results
@@ -176,6 +206,36 @@ paths:
                 $ref: "#/components/schemas/AstronomyObjectPayload"
         "404":
           description: Astronomical object not found in its source archive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /astronomy/suggestions:
+    get:
+      operationId: astronomySuggestions
+      tags: [astronomy]
+      summary: Suggest real astronomical records from provider archives
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AstronomyCategoryId"
+      responses:
+        "200":
+          description: Provider-backed suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AstronomySuggestionsPayload"
+        "400":
+          description: Invalid search query
           content:
             application/json:
               schema:
@@ -326,7 +386,11 @@ components:
           type: array
           items:
             type: string
-      required: [id, name, type, category, aliases, description, coordinates, distance, source, sourceId, metadata, imageReferences, observationReferences]
+        relatedObjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomyObject"
+      required: [id, name, type, category, aliases, description, coordinates, distance, source, sourceId, metadata, imageReferences, observationReferences, relatedObjects]
     AstronomySourceStatus:
       type: object
       properties:
@@ -358,6 +422,31 @@ components:
           items:
             $ref: "#/components/schemas/AstronomySourceStatus"
       required: [query, category, items, nextCursor, hasMore, sourceStatus]
+    AstronomySuggestion:
+      type: object
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        kind:
+          type: string
+          enum: [object, alias, catalog, type]
+        source:
+          $ref: "#/components/schemas/AstronomySourceId"
+        objectId:
+          type: string
+      required: [value, label, kind, source, objectId]
+    AstronomySuggestionsPayload:
+      type: object
+      properties:
+        query:
+          type: string
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomySuggestion"
+      required: [query, suggestions]
     AstronomyObjectPayload:
       type: object
       properties:

@@ -149,6 +149,7 @@ export interface AstronomyObject {
   metadata: AstronomyObjectMetadata;
   imageReferences: string[];
   observationReferences: string[];
+  relatedObjects: AstronomyObject[];
 }
 
 export type AstronomySourceStatusStatus = typeof AstronomySourceStatusStatus[keyof typeof AstronomySourceStatusStatus];
@@ -174,6 +175,29 @@ export interface AstronomySearchPayload {
   nextCursor: string | null;
   hasMore: boolean;
   sourceStatus: AstronomySourceStatus[];
+}
+
+export type AstronomySuggestionKind = typeof AstronomySuggestionKind[keyof typeof AstronomySuggestionKind];
+
+
+export const AstronomySuggestionKind = {
+  object: 'object',
+  alias: 'alias',
+  catalog: 'catalog',
+  type: 'type',
+} as const;
+
+export interface AstronomySuggestion {
+  value: string;
+  label: string;
+  kind: AstronomySuggestionKind;
+  source: AstronomySourceId;
+  objectId: string;
+}
+
+export interface AstronomySuggestionsPayload {
+  query: string;
+  suggestions: AstronomySuggestion[];
 }
 
 export interface AstronomyObjectPayload {
@@ -239,5 +263,19 @@ cursor?: string;
  * @maximum 24
  */
 pageSize?: number;
+source?: AstronomySourceId;
+objectType?: string;
+minDistance?: number;
+maxDistance?: number;
+discoveryYear?: number;
+observationSource?: string;
+};
+
+export type AstronomySuggestionsParams = {
+/**
+ * @minLength 2
+ */
+q: string;
+category?: AstronomyCategoryId;
 };
 
