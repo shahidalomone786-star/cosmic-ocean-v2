@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: biology
     description: Biology Hub discovery operations
+  - name: astronomy
+    description: Cosmic Atlas astronomical object discovery operations
 paths:
   /healthz:
     get:
@@ -110,6 +112,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /astronomy/search:
+    get:
+      operationId: astronomySearch
+      tags: [astronomy]
+      summary: Search authoritative astronomical object archives
+      description: Searches server-side adapters for SIMBAD, the NASA Exoplanet Archive, and NASA's official Image and Video Library. Results are normalized without fabricated scientific values.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AstronomyCategoryId"
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 6
+            maximum: 24
+            default: 12
+      responses:
+        "200":
+          description: Normalized astronomical search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AstronomySearchPayload"
+        "400":
+          description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /astronomy/objects/{id}:
+    get:
+      operationId: astronomyObject
+      tags: [astronomy]
+      summary: Retrieve one normalized astronomical object
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Normalized astronomical object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AstronomyObjectPayload"
+        "404":
+          description: Astronomical object not found in its source archive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -188,4 +258,114 @@ components:
         hasMore:
           type: boolean
       required: [query, page, items, sourceStatus, hasMore]
+    AstronomyCategoryId:
+      type: string
+      enum: [universe, galaxies, stars, exoplanets, solar-system, moons, nebulae, black-holes, star-clusters, deep-sky-objects, missions, spacecraft, supernovae, nearby-objects]
+    AstronomySourceId:
+      type: string
+      enum: [nasa, nasa-exoplanet-archive, esa, gaia, mast, simbad, sdss, other]
+    AstronomyCoordinates:
+      type: object
+      properties:
+        rightAscension:
+          type: ["number", "null"]
+        declination:
+          type: ["number", "null"]
+        coordinateSystem:
+          type: ["string", "null"]
+        epoch:
+          type: ["string", "null"]
+      required: [rightAscension, declination, coordinateSystem, epoch]
+    AstronomyDistance:
+      type: object
+      properties:
+        value:
+          type: ["number", "null"]
+        unit:
+          type: ["string", "null"]
+        uncertainty:
+          type: ["number", "null"]
+      required: [value, unit, uncertainty]
+    AstronomyObject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        category:
+          $ref: "#/components/schemas/AstronomyCategoryId"
+        aliases:
+          type: array
+          items:
+            type: string
+        description:
+          type: ["string", "null"]
+        coordinates:
+          anyOf:
+            - $ref: "#/components/schemas/AstronomyCoordinates"
+            - type: "null"
+        distance:
+          anyOf:
+            - $ref: "#/components/schemas/AstronomyDistance"
+            - type: "null"
+        source:
+          $ref: "#/components/schemas/AstronomySourceId"
+        sourceId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        imageReferences:
+          type: array
+          items:
+            type: string
+        observationReferences:
+          type: array
+          items:
+            type: string
+      required: [id, name, type, category, aliases, description, coordinates, distance, source, sourceId, metadata, imageReferences, observationReferences]
+    AstronomySourceStatus:
+      type: object
+      properties:
+        source:
+          type: string
+        status:
+          type: string
+          enum: [ready, unavailable]
+        message:
+          type: ["string", "null"]
+      required: [source, status, message]
+    AstronomySearchPayload:
+      type: object
+      properties:
+        query:
+          type: string
+        category:
+          $ref: "#/components/schemas/AstronomyCategoryId"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomyObject"
+        nextCursor:
+          type: ["string", "null"]
+        hasMore:
+          type: boolean
+        sourceStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomySourceStatus"
+      required: [query, category, items, nextCursor, hasMore, sourceStatus]
+    AstronomyObjectPayload:
+      type: object
+      properties:
+        item:
+          $ref: "#/components/schemas/AstronomyObject"
+        sourceStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomySourceStatus"
+      required: [item, sourceStatus]
 

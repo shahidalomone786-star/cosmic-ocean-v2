@@ -78,6 +78,109 @@ export interface BiologySearchPayload {
   hasMore: boolean;
 }
 
+export type AstronomyCategoryId = typeof AstronomyCategoryId[keyof typeof AstronomyCategoryId];
+
+
+export const AstronomyCategoryId = {
+  universe: 'universe',
+  galaxies: 'galaxies',
+  stars: 'stars',
+  exoplanets: 'exoplanets',
+  'solar-system': 'solar-system',
+  moons: 'moons',
+  nebulae: 'nebulae',
+  'black-holes': 'black-holes',
+  'star-clusters': 'star-clusters',
+  'deep-sky-objects': 'deep-sky-objects',
+  missions: 'missions',
+  spacecraft: 'spacecraft',
+  supernovae: 'supernovae',
+  'nearby-objects': 'nearby-objects',
+} as const;
+
+export type AstronomySourceId = typeof AstronomySourceId[keyof typeof AstronomySourceId];
+
+
+export const AstronomySourceId = {
+  nasa: 'nasa',
+  'nasa-exoplanet-archive': 'nasa-exoplanet-archive',
+  esa: 'esa',
+  gaia: 'gaia',
+  mast: 'mast',
+  simbad: 'simbad',
+  sdss: 'sdss',
+  other: 'other',
+} as const;
+
+export interface AstronomyCoordinates {
+  /** @nullable */
+  rightAscension: number | null;
+  /** @nullable */
+  declination: number | null;
+  /** @nullable */
+  coordinateSystem: string | null;
+  /** @nullable */
+  epoch: string | null;
+}
+
+export interface AstronomyDistance {
+  /** @nullable */
+  value: number | null;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  uncertainty: number | null;
+}
+
+export type AstronomyObjectMetadata = { [key: string]: unknown };
+
+export interface AstronomyObject {
+  id: string;
+  name: string;
+  type: string;
+  category: AstronomyCategoryId;
+  aliases: string[];
+  /** @nullable */
+  description: string | null;
+  coordinates: AstronomyCoordinates | null;
+  distance: AstronomyDistance | null;
+  source: AstronomySourceId;
+  sourceId: string;
+  metadata: AstronomyObjectMetadata;
+  imageReferences: string[];
+  observationReferences: string[];
+}
+
+export type AstronomySourceStatusStatus = typeof AstronomySourceStatusStatus[keyof typeof AstronomySourceStatusStatus];
+
+
+export const AstronomySourceStatusStatus = {
+  ready: 'ready',
+  unavailable: 'unavailable',
+} as const;
+
+export interface AstronomySourceStatus {
+  source: string;
+  status: AstronomySourceStatusStatus;
+  /** @nullable */
+  message: string | null;
+}
+
+export interface AstronomySearchPayload {
+  query: string;
+  category: AstronomyCategoryId;
+  items: AstronomyObject[];
+  /** @nullable */
+  nextCursor: string | null;
+  hasMore: boolean;
+  sourceStatus: AstronomySourceStatus[];
+}
+
+export interface AstronomyObjectPayload {
+  item: AstronomyObject;
+  sourceStatus: AstronomySourceStatus[];
+}
+
 export type BiologySearchParams = {
 /**
  * @minLength 2
@@ -123,4 +226,18 @@ export const BiologySearchSort = {
   date: 'date',
   cited: 'cited',
 } as const;
+
+export type AstronomySearchParams = {
+/**
+ * @minLength 2
+ */
+q: string;
+category?: AstronomyCategoryId;
+cursor?: string;
+/**
+ * @minimum 6
+ * @maximum 24
+ */
+pageSize?: number;
+};
 

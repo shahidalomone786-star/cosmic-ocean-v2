@@ -14,6 +14,7 @@ import discoveryRouter from "./discovery";
 import transcribeRouter from "./transcribe";
 import visualReferencesRouter from "./visual-references";
 import imageSearchRouter from "./image-search";
+import astronomyRouter from "./astronomy";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,7 @@ router.use(transcribeRouter);
 router.use(visualReferencesRouter);
 router.use(imageSearchRouter);
 router.use(singularityRouter);
+router.use(astronomyRouter);
 
 
 export default router;

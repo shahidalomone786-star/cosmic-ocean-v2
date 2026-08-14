@@ -24,6 +24,8 @@ const Cosmic3DViewerModal   = lazy(() => import('./components/Cosmic3DViewerModa
 const CosmicNexus           = lazy(() => import('./components/CosmicNexus'));
 const BiologyHub            = lazy(() => import('./components/biology-hub/BiologyHub'));
 const CosmicAtelier         = lazy(() => import('./components/cosmic-atelier/CosmicAtelier'));
+const CosmicAtlas           = lazy(() => import('./components/CosmicAtlas'));
+const AstronomyObjectView   = lazy(() => import('./components/AstronomyObjectView'));
 const MissionQuizController = lazy(() => import('./features/mission-quiz/MissionQuizController'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
@@ -1913,6 +1915,7 @@ function UserBadge({ user, lm, onLogout }: { user: UserProfile; lm: boolean; onL
 export default function App() {
   // Wouter location — used to render the dedicated /nexus route
   const [location, setLocation] = useLocation();
+  const routePath = location.split('?')[0];
 
   // show3D = false → clean charcoal background, no iframe, no WarpIntro (default)
   // show3D = true  → WarpIntro + Sketchfab 3D animation active
@@ -2445,7 +2448,7 @@ export default function App() {
   }, []);
 
   // ── /chat — dedicated Singularity Chat page ───────────────────────────────
-  if (location === '/chat') {
+  if (routePath === '/chat') {
     return (
       <Suspense
         fallback={
@@ -2467,7 +2470,7 @@ export default function App() {
     );
   }
 
-  if (location === '/settings') {
+  if (routePath === '/settings') {
     return (
       <Suspense
         fallback={
@@ -2481,9 +2484,35 @@ export default function App() {
     );
   }
 
-  if (location.startsWith('/observatories/')) {
-    const observatoryId = location.slice('/observatories/'.length).split('/')[0];
+  if (routePath.startsWith('/observatories/')) {
+    const observatoryId = routePath.slice('/observatories/'.length).split('/')[0];
     return <ObservatoryExplorer id={observatoryId} lm={lm} />;
+  }
+
+  if (routePath.startsWith('/atlas/object/')) {
+    const objectId = decodeURIComponent(routePath.slice('/atlas/object/'.length));
+    return (
+      <Suspense fallback={<div className="cosmic-atlas-loading"><span>Loading scientific record…</span></div>}>
+        <AstronomyObjectView lm={lm} objectId={objectId} />
+      </Suspense>
+    );
+  }
+
+  if (routePath === '/atlas' || routePath.startsWith('/atlas/')) {
+    const categorySlug = routePath.startsWith('/atlas/')
+      ? routePath.slice('/atlas/'.length).split('/')[0]
+      : undefined;
+    return (
+      <Suspense
+        fallback={
+          <div className="cosmic-atlas-loading">
+            <span>Loading Atlas foundation…</span>
+          </div>
+        }
+      >
+        <CosmicAtlas lm={lm} standalone categorySlug={categorySlug} />
+      </Suspense>
+    );
   }
 
   return (
@@ -3116,6 +3145,10 @@ export default function App() {
               <CosmicGalaxyBanner />
 
               <GreatObservatories lm={lm} />
+
+              <Suspense fallback={null}>
+                <CosmicAtlas lm={lm} />
+              </Suspense>
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>

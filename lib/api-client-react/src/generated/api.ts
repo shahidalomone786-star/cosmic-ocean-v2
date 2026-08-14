@@ -16,6 +16,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AstronomyObjectPayload,
+  AstronomySearchParams,
+  AstronomySearchPayload,
   BiologySearchParams,
   BiologySearchPayload,
   ErrorResponse,
@@ -200,6 +203,168 @@ export function useBiologySearch<TData = Awaited<ReturnType<typeof biologySearch
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getBiologySearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAstronomySearchUrl = (params: AstronomySearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/astronomy/search?${stringifiedParams}` : `/api/astronomy/search`
+}
+
+/**
+ * Searches server-side adapters for SIMBAD, the NASA Exoplanet Archive, and NASA's official Image and Video Library. Results are normalized without fabricated scientific values.
+ * @summary Search authoritative astronomical object archives
+ */
+export const astronomySearch = async (params: AstronomySearchParams, options?: RequestInit): Promise<AstronomySearchPayload> => {
+
+  return customFetch<AstronomySearchPayload>(getAstronomySearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAstronomySearchQueryKey = (params?: AstronomySearchParams,) => {
+    return [
+    `/api/astronomy/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAstronomySearchQueryOptions = <TData = Awaited<ReturnType<typeof astronomySearch>>, TError = ErrorType<ErrorResponse>>(params: AstronomySearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomySearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAstronomySearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof astronomySearch>>> = ({ signal }) => astronomySearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof astronomySearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AstronomySearchQueryResult = NonNullable<Awaited<ReturnType<typeof astronomySearch>>>
+export type AstronomySearchQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Search authoritative astronomical object archives
+ */
+
+export function useAstronomySearch<TData = Awaited<ReturnType<typeof astronomySearch>>, TError = ErrorType<ErrorResponse>>(
+ params: AstronomySearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomySearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAstronomySearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAstronomyObjectUrl = (id: string,) => {
+
+
+
+
+  return `/api/astronomy/objects/${id}`
+}
+
+/**
+ * @summary Retrieve one normalized astronomical object
+ */
+export const astronomyObject = async (id: string, options?: RequestInit): Promise<AstronomyObjectPayload> => {
+
+  return customFetch<AstronomyObjectPayload>(getAstronomyObjectUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAstronomyObjectQueryKey = (id: string,) => {
+    return [
+    `/api/astronomy/objects/${id}`
+    ] as const;
+    }
+
+
+export const getAstronomyObjectQueryOptions = <TData = Awaited<ReturnType<typeof astronomyObject>>, TError = ErrorType<ErrorResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomyObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAstronomyObjectQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof astronomyObject>>> = ({ signal }) => astronomyObject(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof astronomyObject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AstronomyObjectQueryResult = NonNullable<Awaited<ReturnType<typeof astronomyObject>>>
+export type AstronomyObjectQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Retrieve one normalized astronomical object
+ */
+
+export function useAstronomyObject<TData = Awaited<ReturnType<typeof astronomyObject>>, TError = ErrorType<ErrorResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomyObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAstronomyObjectQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

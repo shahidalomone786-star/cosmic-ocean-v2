@@ -6,6 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './astronomyCategoryId';
+export * from './astronomyCoordinates';
+export * from './astronomyDistance';
+export * from './astronomyObject';
+export * from './astronomyObjectMetadata';
+export * from './astronomyObjectPayload';
+export * from './astronomySearchParams';
+export * from './astronomySearchPayload';
+export * from './astronomySourceId';
+export * from './astronomySourceStatus';
+export * from './astronomySourceStatusStatus';
 export * from './biologySearchItem';
 export * from './biologySearchItemKind';
 export * from './biologySearchItemSource';
