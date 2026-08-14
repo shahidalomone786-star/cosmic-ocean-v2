@@ -2490,6 +2490,21 @@ export default function App() {
     return <ObservatoryExplorer id={observatoryId} lm={lm} />;
   }
 
+  if (routePath.startsWith('/cosmic-map/object/')) {
+    const objectId = decodeURIComponent(routePath.slice('/cosmic-map/object/'.length));
+    const returnTo = new URLSearchParams(location.split('?')[1] ?? '').get('returnTo');
+    const backToMap = returnTo && returnTo.startsWith('/') ? returnTo : '/';
+    return (
+      <Suspense fallback={<div className="cosmic-map-loading" aria-label="Loading Cosmic Map"><span>Loading Cosmic Map…</span></div>}>
+        <CosmicMap
+          mapFocus={objectId}
+          onOpenObject={item => setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent(`/cosmic-map/object/${encodeURIComponent(item.id)}`)}`)}
+          onBackToMap={() => setLocation(backToMap)}
+        />
+      </Suspense>
+    );
+  }
+
   if (routePath.startsWith('/atlas/object/')) {
     const objectId = decodeURIComponent(routePath.slice('/atlas/object/'.length));
     return (
@@ -3153,6 +3168,7 @@ export default function App() {
 
                <Suspense fallback={<div className="cosmic-map-loading" aria-label="Loading Cosmic Map"><span>Loading Cosmic Map…</span></div>}>
                  <CosmicMap
+                  onTravelToObject={item => setLocation(`/cosmic-map/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/')}`)}
                    onOpenObject={item => setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/')}`)}
                  />
                </Suspense>

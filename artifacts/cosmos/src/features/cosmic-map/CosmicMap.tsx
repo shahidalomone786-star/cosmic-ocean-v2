@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Crosshair, Database, Orbit, RotateCw, Search, ShieldCheck } from 'lucide-react';
 import type { AstronomyObject, AstronomySearchParams } from '@workspace/api-client-react';
 import CosmicMapSelectionPanel from './components/CosmicMapSelectionPanel';
@@ -14,6 +14,8 @@ type CosmicMapProps = {
   mapFocus?: string;
   category?: AstronomySearchParams['category'];
   onOpenObject?: (record: AstronomyObject) => void;
+  onTravelToObject?: (record: AstronomyObject) => void;
+  onBackToMap?: () => void;
 };
 
 function readUrlValue(name: string): string {
@@ -26,6 +28,8 @@ export default function CosmicMap({
   mapFocus,
   category,
   onOpenObject,
+  onTravelToObject,
+  onBackToMap,
 }: CosmicMapProps) {
   const urlQuery = useMemo(() => readUrlValue('mapQuery') || readUrlValue('q'), []);
   const urlFocus = useMemo(() => readUrlValue('mapFocus'), []);
@@ -37,6 +41,7 @@ export default function CosmicMap({
   const [viewport, setViewport] = useState<MapViewport>({ zoom: 1, pan: { x: 0, y: 0 } });
   const mapData = useCosmicMapData({ query: submittedQuery, category, focusId, viewport });
   const travel = useCosmicMapTravel(viewport);
+  const autoTravelIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (travel.navigationViewport) setViewport(travel.navigationViewport);
@@ -64,6 +69,12 @@ export default function CosmicMap({
     [mapData.records, selectedObjectId],
   );
 
+  useEffect(() => {
+    if (!focusId || !selectedRecord || selectedRecord.id !== focusId || autoTravelIdRef.current === focusId) return;
+    autoTravelIdRef.current = focusId;
+    travel.travelTo(selectedRecord);
+  }, [focusId, selectedRecord, travel.travelTo]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     travel.cancel();
@@ -72,6 +83,11 @@ export default function CosmicMap({
     setSearchValue(normalizedQuery);
     setSubmittedQuery(normalizedQuery);
     setSelectedObjectId(null);
+  };
+
+  const handleTravel = (record: AstronomyObject) => {
+    travel.travelTo(record);
+    onTravelToObject?.(record);
   };
 
   const statusCopy = mapData.isLoading
@@ -148,7 +164,7 @@ export default function CosmicMap({
             <CosmicMapDestinationState
               record={travel.navigationState.target}
               onOpenObject={onOpenObject}
-              onBack={travel.cancel}
+              onBack={onBackToMap ?? travel.cancel}
             />
           ) : (
             <>
@@ -193,7 +209,7 @@ export default function CosmicMap({
                 <CosmicMapSelectionPanel
                   record={selectedRecord}
                   onOpenObject={onOpenObject}
-                  onTravel={travel.travelTo}
+                    onTravel={handleTravel}
                   isTraveling={travel.navigationState.isActive}
                 />
                 <section className="cosmic-map-panel" aria-labelledby="cosmic-map-method-title">
