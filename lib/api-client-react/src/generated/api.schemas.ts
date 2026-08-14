@@ -220,6 +220,56 @@ export interface AstronomyObjectPayload {
   sourceStatus: AstronomySourceStatus[];
 }
 
+export interface GalleryItem {
+  id: string;
+  title: string;
+  /** @nullable */
+  description: string | null;
+  imageUrl: string;
+  thumbnailUrl: string;
+  source: string;
+  sourceUrl: string;
+  /** @nullable */
+  creator: string | null;
+  /** @nullable */
+  date: string | null;
+  category: string;
+  tags: string[];
+  license: string;
+  /** @nullable */
+  licenseUrl: string | null;
+  /** @nullable */
+  attribution: string | null;
+  /** @nullable */
+  width: number | null;
+  /** @nullable */
+  height: number | null;
+}
+
+export type GalleryProviderStatusStatus = typeof GalleryProviderStatusStatus[keyof typeof GalleryProviderStatusStatus];
+
+
+export const GalleryProviderStatusStatus = {
+  ready: 'ready',
+  unavailable: 'unavailable',
+} as const;
+
+export interface GalleryProviderStatus {
+  provider: string;
+  status: GalleryProviderStatusStatus;
+  count: number;
+  /** @nullable */
+  message: string | null;
+}
+
+export interface GallerySearchPayload {
+  query: string;
+  page: number;
+  items: GalleryItem[];
+  providerStatus: GalleryProviderStatus[];
+  hasMore: boolean;
+}
+
 export type BiologySearchParams = {
 /**
  * @minLength 2
@@ -330,5 +380,27 @@ export type AstronomySuggestionsParams = {
  */
 q: string;
 category?: AstronomyCategoryId;
+};
+
+export type GallerySearchParams = {
+/**
+ * @minLength 1
+ * @maxLength 160
+ */
+q: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 6
+ * @maximum 60
+ */
+limit?: number;
+category?: string;
+/**
+ * Comma-separated provider ids. Omit to query all Phase A providers.
+ */
+providers?: string;
 };
 

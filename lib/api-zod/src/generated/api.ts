@@ -280,3 +280,56 @@ export const AstronomySuggestionsResponse = zod.object({
 })
 
 
+/**
+ * Searches the Phase A Universal Gallery providers in parallel and returns only assets with usable rights metadata. Individual provider failures are reported as unavailable without failing the aggregate response.
+ * @summary Search licensed image collections through isolated provider adapters
+ */
+export const gallerySearchQueryQMax = 160;
+
+export const gallerySearchQueryPageDefault = 1;
+
+export const gallerySearchQueryLimitDefault = 30;
+export const gallerySearchQueryLimitMin = 6;
+export const gallerySearchQueryLimitMax = 60;
+
+
+
+export const GallerySearchQueryParams = zod.object({
+  "q": zod.coerce.string().min(1).max(gallerySearchQueryQMax),
+  "page": zod.coerce.number().min(1).default(gallerySearchQueryPageDefault),
+  "limit": zod.coerce.number().min(gallerySearchQueryLimitMin).max(gallerySearchQueryLimitMax).default(gallerySearchQueryLimitDefault),
+  "category": zod.coerce.string().optional(),
+  "providers": zod.coerce.string().optional()
+})
+
+export const GallerySearchResponse = zod.object({
+  "query": zod.string(),
+  "page": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullable(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string(),
+  "source": zod.string(),
+  "sourceUrl": zod.string(),
+  "creator": zod.string().nullable(),
+  "date": zod.string().nullable(),
+  "category": zod.string(),
+  "tags": zod.array(zod.string()),
+  "license": zod.string(),
+  "licenseUrl": zod.string().nullable(),
+  "attribution": zod.string().nullable(),
+  "width": zod.number().nullable(),
+  "height": zod.number().nullable()
+})),
+  "providerStatus": zod.array(zod.object({
+  "provider": zod.string(),
+  "status": zod.enum(['ready', 'unavailable']),
+  "count": zod.number(),
+  "message": zod.string().nullable()
+})),
+  "hasMore": zod.boolean()
+})
+
+

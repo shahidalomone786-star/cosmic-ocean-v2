@@ -26,6 +26,8 @@ import type {
   BiologySearchParams,
   BiologySearchPayload,
   ErrorResponse,
+  GallerySearchParams,
+  GallerySearchPayload,
   HealthStatus
 } from './api.schemas';
 
@@ -538,6 +540,91 @@ export function useAstronomySuggestions<TData = Awaited<ReturnType<typeof astron
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getAstronomySuggestionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGallerySearchUrl = (params: GallerySearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/gallery/search?${stringifiedParams}` : `/api/gallery/search`
+}
+
+/**
+ * Searches the Phase A Universal Gallery providers in parallel and returns only assets with usable rights metadata. Individual provider failures are reported as unavailable without failing the aggregate response.
+ * @summary Search licensed image collections through isolated provider adapters
+ */
+export const gallerySearch = async (params: GallerySearchParams, options?: RequestInit): Promise<GallerySearchPayload> => {
+
+  return customFetch<GallerySearchPayload>(getGallerySearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGallerySearchQueryKey = (params?: GallerySearchParams,) => {
+    return [
+    `/api/gallery/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGallerySearchQueryOptions = <TData = Awaited<ReturnType<typeof gallerySearch>>, TError = ErrorType<ErrorResponse>>(params: GallerySearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof gallerySearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGallerySearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof gallerySearch>>> = ({ signal }) => gallerySearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof gallerySearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GallerySearchQueryResult = NonNullable<Awaited<ReturnType<typeof gallerySearch>>>
+export type GallerySearchQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Search licensed image collections through isolated provider adapters
+ */
+
+export function useGallerySearch<TData = Awaited<ReturnType<typeof gallerySearch>>, TError = ErrorType<ErrorResponse>>(
+ params: GallerySearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof gallerySearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGallerySearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

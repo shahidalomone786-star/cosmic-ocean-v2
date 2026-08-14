@@ -31,6 +31,7 @@ import type { VideoItem } from './components/VideoPlayerModal';
 import LoginScreen from './components/LoginScreen';
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
+const UniversalGallery = lazy(() => import('./components/UniversalGallery'));
 import BannerCarousel from './components/BannerCarousel';
 import CosmicGalaxyBanner from './components/CosmicGalaxyBanner';
 import { GreatObservatories, ObservatoryExplorer } from './components/GreatObservatories';
@@ -3117,6 +3118,11 @@ export default function App() {
               <CosmicGalaxyBanner />
 
               <GreatObservatories lm={lm} />
+
+              {/* ── Universal Gallery ── */}
+              <Suspense fallback={null}>
+                <UniversalGallery lm={lm} />
+              </Suspense>
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>

@@ -14,6 +14,8 @@ tags:
     description: Biology Hub discovery operations
   - name: astronomy
     description: Cosmic Atlas astronomical object discovery operations
+  - name: gallery
+    description: Universal Gallery provider-backed image discovery operations
 paths:
   /healthz:
     get:
@@ -314,6 +316,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /gallery/search:
+    get:
+      operationId: gallerySearch
+      tags: [gallery]
+      summary: Search licensed image collections through isolated provider adapters
+      description: Searches the Phase A Universal Gallery providers in parallel and returns only assets with usable rights metadata. Individual provider failures are reported as unavailable without failing the aggregate response.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 160
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 6
+            maximum: 60
+            default: 30
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: providers
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Comma-separated provider ids. Omit to query all Phase A providers.
+      responses:
+        "200":
+          description: Normalized licensed gallery results and non-blocking provider statuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GallerySearchPayload"
+        "400":
+          description: Invalid gallery query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -561,4 +616,73 @@ components:
           items:
             $ref: "#/components/schemas/AstronomySourceStatus"
       required: [item, sourceStatus]
+    GalleryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        imageUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+        source:
+          type: string
+        sourceUrl:
+          type: string
+        creator:
+          type: ["string", "null"]
+        date:
+          type: ["string", "null"]
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        license:
+          type: string
+        licenseUrl:
+          type: ["string", "null"]
+        attribution:
+          type: ["string", "null"]
+        width:
+          type: ["integer", "null"]
+        height:
+          type: ["integer", "null"]
+      required: [id, title, description, imageUrl, thumbnailUrl, source, sourceUrl, creator, date, category, tags, license, licenseUrl, attribution, width, height]
+    GalleryProviderStatus:
+      type: object
+      properties:
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [ready, unavailable]
+        count:
+          type: integer
+        message:
+          type: ["string", "null"]
+      required: [provider, status, count, message]
+    GallerySearchPayload:
+      type: object
+      properties:
+        query:
+          type: string
+        page:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GalleryItem"
+        providerStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/GalleryProviderStatus"
+        hasMore:
+          type: boolean
+      required: [query, page, items, providerStatus, hasMore]
 
