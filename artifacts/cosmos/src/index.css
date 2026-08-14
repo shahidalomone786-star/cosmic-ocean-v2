@@ -171,8 +171,8 @@
 }
 .great-observatories-card-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: clamp(.7rem, 1.4vw, 1.2rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(.75rem, 2vw, 1rem);
 }
 .great-observatories-card {
   display: block;
@@ -204,7 +204,7 @@
 }
 .great-observatories-card-media {
   position: relative;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   background: #080d18;
 }
@@ -212,7 +212,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   filter: saturate(.82) contrast(1.06);
   transition: transform 600ms cubic-bezier(.16, 1, .3, 1), filter 350ms ease;
@@ -268,10 +268,15 @@
   text-transform: uppercase;
 }
 .great-observatories-card-meta h3 {
+  display: -webkit-box;
+  overflow: hidden;
   margin: 0;
   color: #eef6ff;
-  font: 420 clamp(1.18rem, 2.2vw, 1.72rem)/.9 var(--app-font-heading, "Instrument Serif", serif);
+  font: 420 clamp(1rem, 2.2vw, 1.72rem)/.94 var(--app-font-heading, "Instrument Serif", serif);
   letter-spacing: -.055em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 .great-observatories-card-footer {
   display: flex;
@@ -1440,7 +1445,7 @@
 .great-observatory-archive-image-frame {
   position: relative;
   display: block;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #080e1b;
 }
@@ -1492,26 +1497,26 @@
 }
 .great-observatory-archive-card-info {
   display: block;
-  min-height: 5.05rem;
-  padding: .72rem .78rem .8rem;
+  min-height: 4.3rem;
+  padding: .58rem .68rem .64rem;
 }
 .great-observatory-archive-card-info strong {
   display: -webkit-box;
   overflow: hidden;
   color: var(--go-ink);
-  font-size: .7rem;
+  font-size: .66rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.28;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .great-observatory-archive-card-info > span {
   display: flex;
   flex-wrap: wrap;
-  gap: .35rem .7rem;
-  margin-top: .65rem;
+  gap: .3rem .55rem;
+  margin-top: .45rem;
   color: var(--go-faint);
-  font: .48rem/1.2 var(--app-font-mono, "Space Mono", monospace);
+  font: .44rem/1.2 var(--app-font-mono, "Space Mono", monospace);
   letter-spacing: .04em;
   text-transform: uppercase;
 }
@@ -1801,7 +1806,6 @@
 .great-observatory-lightbox-source:focus-visible { color: #fff; outline: none; }
 
 @media (max-width: 980px) {
-  .great-observatories-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .great-observatory-explorer-content { gap: clamp(2rem, 5vw, 4rem); }
   .great-observatory-archive-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .great-observatory-lightbox-details { grid-template-columns: minmax(0, 1fr) minmax(15rem, .9fr); }
@@ -1811,10 +1815,10 @@
   .great-observatory-archive { padding-top: 0; }
   .great-observatory-archive-heading { display: block; }
   .great-observatory-archive-intro { margin-top: 1.1rem; }
-  .great-observatory-archive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
-  .great-observatory-archive-card-info { min-height: 4.8rem; padding: .6rem .62rem .68rem; }
-  .great-observatory-archive-card-info strong { font-size: .62rem; }
-  .great-observatory-archive-card-info > span { margin-top: .5rem; font-size: .43rem; }
+  .great-observatory-archive-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+  .great-observatory-archive-card-info { min-height: 4rem; padding: .5rem .55rem .58rem; }
+  .great-observatory-archive-card-info strong { font-size: .59rem; line-height: 1.24; }
+  .great-observatory-archive-card-info > span { margin-top: .38rem; font-size: .4rem; }
   .great-observatory-archive-card-expand { right: .48rem; bottom: .48rem; width: 1.7rem; height: 1.7rem; }
   .great-observatory-lightbox-shell { padding: 0 .8rem; }
   .great-observatory-lightbox-topbar { min-height: 4rem; }
@@ -1830,6 +1834,15 @@
   .great-observatory-lightbox-heading h2 { font-size: 1.65rem; }
   .great-observatory-lightbox-meta { margin-top: 1.1rem; }
   .great-observatory-lightbox-source { display: inline-flex; margin-top: 1.15rem; }
+}
+@media (min-width: 640px) {
+  .great-observatories-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) {
+  .great-observatories-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .great-observatories-card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .great-observatory-archive-card,
