@@ -9,6 +9,7 @@
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "types": ["node", "vite/client"],
+    "lib": ["es2022", "dom", "dom.iterable"],
     "paths": {
       "@/*": ["./src/*"]
     }

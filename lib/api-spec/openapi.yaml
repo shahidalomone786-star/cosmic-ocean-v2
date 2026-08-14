@@ -186,6 +186,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /astronomy/map:
+    get:
+      operationId: astronomyMap
+      tags: [astronomy]
+      summary: Retrieve real astronomical objects for a sky viewport
+      description: Queries authoritative coordinate-bearing Atlas providers for only the requested right ascension and declination window. Results are normalized without fabricated scientific values.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AstronomyCategoryId"
+        - name: raMin
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: 0
+            maximum: 360
+        - name: raMax
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: 0
+            maximum: 360
+        - name: decMin
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - name: decMax
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - name: zoom
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 24
+            maximum: 180
+            default: 96
+      responses:
+        "200":
+          description: Real normalized astronomical objects in the requested viewport
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AstronomyMapPayload"
+        "400":
+          description: Invalid viewport
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /astronomy/objects/{id}:
     get:
       operationId: astronomyObject
@@ -422,6 +496,36 @@ components:
           items:
             $ref: "#/components/schemas/AstronomySourceStatus"
       required: [query, category, items, nextCursor, hasMore, sourceStatus]
+    AstronomyMapViewport:
+      type: object
+      properties:
+        raMin:
+          type: number
+        raMax:
+          type: number
+        decMin:
+          type: number
+        decMax:
+          type: number
+        zoom:
+          type: number
+      required: [raMin, raMax, decMin, decMax, zoom]
+    AstronomyMapPayload:
+      type: object
+      properties:
+        viewport:
+          $ref: "#/components/schemas/AstronomyMapViewport"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomyObject"
+        sourceStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/AstronomySourceStatus"
+        truncated:
+          type: boolean
+      required: [viewport, items, sourceStatus, truncated]
     AstronomySuggestion:
       type: object
       properties:

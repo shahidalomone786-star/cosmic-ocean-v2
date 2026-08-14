@@ -28,6 +28,7 @@ import {
   type AstronomyCategory,
 } from '../data/astronomy';
 import { ASTRONOMY_PROVIDER_DESCRIPTORS } from '../services/astronomyProvider';
+import CosmicAtlasVisualization from './CosmicAtlasVisualization';
 
 type CosmicAtlasProps = {
   lm?: boolean;
@@ -55,6 +56,10 @@ function filtersFromLocation(location: string): FilterState {
     discoveryYear: params.get('discoveryYear') ?? '',
     observationSource: params.get('observationSource') ?? '',
   };
+}
+
+function focusFromLocation(location: string): string {
+  return new URLSearchParams(location.split('?')[1] ?? '').get('focus') ?? '';
 }
 
 function categoryFromLocation(location: string): AstronomyCategory {
@@ -119,6 +124,7 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(readRecentSearches);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(() => focusFromLocation(location) || null);
   const routeCategory = categoryFromLocation(location);
   const activeCategory = categorySlug ? getAstronomyCategory(categorySlug) : routeCategory;
   const routePath = location.split('?')[0];
@@ -137,6 +143,7 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
   useEffect(() => {
     setCursor(undefined);
     setLoadedItems([]);
+    setSelectedObjectId(null);
   }, [debouncedQuery, activeCategory.id, filters.source, filters.objectType, filters.minDistance, filters.maxDistance, filters.discoveryYear, filters.observationSource]);
 
   const searchParams = useMemo<AstronomySearchParams>(() => ({
@@ -186,6 +193,15 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
       return [...current, ...astronomySearch.data.items.filter(item => !known.has(item.id))];
     });
   }, [astronomySearch.data, cursor]);
+
+  useEffect(() => {
+    const focusId = focusFromLocation(location);
+    if (!focusId || !loadedItems.some(item => item.id === focusId)) return;
+    setSelectedObjectId(focusId);
+    window.requestAnimationFrame(() => {
+      document.getElementById('cosmic-atlas-visualization-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [loadedItems, location]);
 
   useEffect(() => {
     const syncBrowserQuery = () => {
@@ -269,6 +285,25 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
 
   const categoryRoute = (category: AstronomyCategory) =>
     category.id === 'universe' ? '/atlas' : category.route;
+
+  const atlasReturnPath = (focusId?: string) => {
+    const currentPath = typeof window === 'undefined' ? routePath : window.location.pathname;
+    const params = new URLSearchParams(typeof window === 'undefined' ? location.split('?')[1] ?? '' : window.location.search);
+    if (focusId) params.set('focus', focusId);
+    const queryString = params.toString();
+    return `${currentPath}${queryString ? `?${queryString}` : ''}`;
+  };
+
+  const openObject = (item: ApiAstronomyObject) => {
+    setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent(atlasReturnPath(item.id))}`);
+  };
+
+  const locateOnCosmicMap = (item: ApiAstronomyObject) => {
+    const params = new URLSearchParams();
+    params.set('mapFocus', item.id);
+    params.set('mapQuery', item.name);
+    setLocation(`/?${params.toString()}`);
+  };
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const suggestions = astronomySuggestions.data?.suggestions ?? [];
@@ -463,6 +498,15 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
           </section>
         )}
 
+        <CosmicAtlasVisualization
+          items={loadedItems}
+          selectedObjectId={selectedObjectId}
+          onSelect={item => setSelectedObjectId(item.id)}
+          onExplore={openObject}
+          lm={lm}
+          isLoading={debouncedQuery.length >= 2 && astronomySearch.isLoading && loadedItems.length === 0}
+        />
+
         <div className="cosmic-atlas-foundation-grid">
           <section className="cosmic-atlas-discovery-panel" aria-labelledby="atlas-discovery-title">
             <div className="cosmic-atlas-panel-icon" aria-hidden="true">
@@ -560,12 +604,12 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
             {loadedItems.length > 0 && (
               <div className="cosmic-atlas-result-grid">
                 {loadedItems.map(item => (
-                  <Link
-                    key={item.id}
-                    href={`/atlas/object/${encodeURIComponent(item.id)}`}
-                    className="cosmic-atlas-result-card"
-                    data-testid={`link-atlas-object-${item.id}`}
-                  >
+                  <article key={item.id} className="cosmic-atlas-result-card">
+                    <Link
+                      href={`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent(atlasReturnPath(item.id))}`}
+                      className="cosmic-atlas-result-card-link"
+                      data-testid={`link-atlas-object-${item.id}`}
+                    >
                     <div className="cosmic-atlas-result-card-top">
                       <span>{item.source}</span>
                       <ExternalLink size={13} aria-hidden="true" />
@@ -577,7 +621,18 @@ export default function CosmicAtlas({ lm = false, standalone = false, categorySl
                       <div><dt>Type</dt><dd>{item.type || 'Not available'}</dd></div>
                       <div><dt>Distance</dt><dd>{formatDistance(item)}</dd></div>
                     </dl>
-                  </Link>
+                    </Link>
+                    {item.coordinates?.rightAscension != null && item.coordinates?.declination != null && (
+                      <button
+                        type="button"
+                        className="cosmic-atlas-locate-map-button"
+                        onClick={() => locateOnCosmicMap(item)}
+                        data-testid={`button-atlas-locate-map-${item.id}`}
+                      >
+                        Locate on Cosmic Map <ArrowUpRight size={13} aria-hidden="true" />
+                      </button>
+                    )}
+                  </article>
                 ))}
               </div>
             )}

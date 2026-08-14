@@ -137,6 +137,85 @@ export const AstronomySearchResponse = zod.object({
 
 
 /**
+ * Queries authoritative coordinate-bearing Atlas providers for only the requested right ascension and declination window. Results are normalized without fabricated scientific values.
+ * @summary Retrieve real astronomical objects for a sky viewport
+ */
+export const astronomyMapQueryQMin = 2;
+
+export const astronomyMapQueryRaMinMin = 0;
+export const astronomyMapQueryRaMinMax = 360;
+
+export const astronomyMapQueryRaMaxMin = 0;
+export const astronomyMapQueryRaMaxMax = 360;
+
+export const astronomyMapQueryDecMinMin = -90;
+export const astronomyMapQueryDecMinMax = 90;
+
+export const astronomyMapQueryDecMaxMin = -90;
+export const astronomyMapQueryDecMaxMax = 90;
+
+export const astronomyMapQueryZoomMax = 5;
+
+export const astronomyMapQueryLimitDefault = 96;
+export const astronomyMapQueryLimitMin = 24;
+export const astronomyMapQueryLimitMax = 180;
+
+
+
+export const AstronomyMapQueryParams = zod.object({
+  "q": zod.coerce.string().min(astronomyMapQueryQMin).optional(),
+  "category": zod.enum(['universe', 'galaxies', 'stars', 'exoplanets', 'solar-system', 'moons', 'nebulae', 'black-holes', 'star-clusters', 'deep-sky-objects', 'missions', 'spacecraft', 'supernovae', 'nearby-objects']).optional(),
+  "raMin": zod.coerce.number().min(astronomyMapQueryRaMinMin).max(astronomyMapQueryRaMinMax),
+  "raMax": zod.coerce.number().min(astronomyMapQueryRaMaxMin).max(astronomyMapQueryRaMaxMax),
+  "decMin": zod.coerce.number().min(astronomyMapQueryDecMinMin).max(astronomyMapQueryDecMinMax),
+  "decMax": zod.coerce.number().min(astronomyMapQueryDecMaxMin).max(astronomyMapQueryDecMaxMax),
+  "zoom": zod.coerce.number().min(1).max(astronomyMapQueryZoomMax),
+  "limit": zod.coerce.number().min(astronomyMapQueryLimitMin).max(astronomyMapQueryLimitMax).default(astronomyMapQueryLimitDefault)
+})
+
+export const AstronomyMapResponse = zod.object({
+  "viewport": zod.object({
+  "raMin": zod.number(),
+  "raMax": zod.number(),
+  "decMin": zod.number(),
+  "decMax": zod.number(),
+  "zoom": zod.number()
+}),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "category": zod.enum(['universe', 'galaxies', 'stars', 'exoplanets', 'solar-system', 'moons', 'nebulae', 'black-holes', 'star-clusters', 'deep-sky-objects', 'missions', 'spacecraft', 'supernovae', 'nearby-objects']),
+  "aliases": zod.array(zod.string()),
+  "description": zod.string().nullable(),
+  "coordinates": zod.union([zod.object({
+  "rightAscension": zod.number().nullable(),
+  "declination": zod.number().nullable(),
+  "coordinateSystem": zod.string().nullable(),
+  "epoch": zod.string().nullable()
+}),zod.null()]),
+  "distance": zod.union([zod.object({
+  "value": zod.number().nullable(),
+  "unit": zod.string().nullable(),
+  "uncertainty": zod.number().nullable()
+}),zod.null()]),
+  "source": zod.enum(['nasa', 'nasa-exoplanet-archive', 'esa', 'gaia', 'mast', 'simbad', 'sdss', 'other']),
+  "sourceId": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()),
+  "imageReferences": zod.array(zod.string()),
+  "observationReferences": zod.array(zod.string()),
+  "relatedObjects": zod.array(zod.unknown())
+})),
+  "sourceStatus": zod.array(zod.object({
+  "source": zod.string(),
+  "status": zod.enum(['ready', 'unavailable']),
+  "message": zod.string().nullable()
+})),
+  "truncated": zod.boolean()
+})
+
+
+/**
  * @summary Retrieve one normalized astronomical object
  */
 export const AstronomyObjectParams = zod.object({

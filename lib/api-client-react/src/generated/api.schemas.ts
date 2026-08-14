@@ -177,6 +177,21 @@ export interface AstronomySearchPayload {
   sourceStatus: AstronomySourceStatus[];
 }
 
+export interface AstronomyMapViewport {
+  raMin: number;
+  raMax: number;
+  decMin: number;
+  decMax: number;
+  zoom: number;
+}
+
+export interface AstronomyMapPayload {
+  viewport: AstronomyMapViewport;
+  items: AstronomyObject[];
+  sourceStatus: AstronomySourceStatus[];
+  truncated: boolean;
+}
+
 export type AstronomySuggestionKind = typeof AstronomySuggestionKind[keyof typeof AstronomySuggestionKind];
 
 
@@ -269,6 +284,44 @@ minDistance?: number;
 maxDistance?: number;
 discoveryYear?: number;
 observationSource?: string;
+};
+
+export type AstronomyMapParams = {
+/**
+ * @minLength 2
+ */
+q?: string;
+category?: AstronomyCategoryId;
+/**
+ * @minimum 0
+ * @maximum 360
+ */
+raMin: number;
+/**
+ * @minimum 0
+ * @maximum 360
+ */
+raMax: number;
+/**
+ * @minimum -90
+ * @maximum 90
+ */
+decMin: number;
+/**
+ * @minimum -90
+ * @maximum 90
+ */
+decMax: number;
+/**
+ * @minimum 1
+ * @maximum 5
+ */
+zoom: number;
+/**
+ * @minimum 24
+ * @maximum 180
+ */
+limit?: number;
 };
 
 export type AstronomySuggestionsParams = {

@@ -26,6 +26,7 @@ const BiologyHub            = lazy(() => import('./components/biology-hub/Biolog
 const CosmicAtelier         = lazy(() => import('./components/cosmic-atelier/CosmicAtelier'));
 const CosmicAtlas           = lazy(() => import('./components/CosmicAtlas'));
 const AstronomyObjectView   = lazy(() => import('./components/AstronomyObjectView'));
+const CosmicMap             = lazy(() => import('./features/cosmic-map/CosmicMap'));
 const MissionQuizController = lazy(() => import('./features/mission-quiz/MissionQuizController'));
 import type { MasterpieceItem } from './components/Cosmic3DViewerModal';
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'));
@@ -3149,6 +3150,12 @@ export default function App() {
               <Suspense fallback={null}>
                 <CosmicAtlas lm={lm} />
               </Suspense>
+
+               <Suspense fallback={<div className="cosmic-map-loading" aria-label="Loading Cosmic Map"><span>Loading Cosmic Map…</span></div>}>
+                 <CosmicMap
+                   onOpenObject={item => setLocation(`/atlas/object/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/')}`)}
+                 />
+               </Suspense>
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>

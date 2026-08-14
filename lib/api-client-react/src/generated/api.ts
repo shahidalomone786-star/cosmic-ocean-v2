@@ -16,6 +16,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AstronomyMapParams,
+  AstronomyMapPayload,
   AstronomyObjectPayload,
   AstronomySearchParams,
   AstronomySearchPayload,
@@ -290,6 +292,91 @@ export function useAstronomySearch<TData = Awaited<ReturnType<typeof astronomySe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getAstronomySearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAstronomyMapUrl = (params: AstronomyMapParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/astronomy/map?${stringifiedParams}` : `/api/astronomy/map`
+}
+
+/**
+ * Queries authoritative coordinate-bearing Atlas providers for only the requested right ascension and declination window. Results are normalized without fabricated scientific values.
+ * @summary Retrieve real astronomical objects for a sky viewport
+ */
+export const astronomyMap = async (params: AstronomyMapParams, options?: RequestInit): Promise<AstronomyMapPayload> => {
+
+  return customFetch<AstronomyMapPayload>(getAstronomyMapUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAstronomyMapQueryKey = (params?: AstronomyMapParams,) => {
+    return [
+    `/api/astronomy/map`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAstronomyMapQueryOptions = <TData = Awaited<ReturnType<typeof astronomyMap>>, TError = ErrorType<ErrorResponse>>(params: AstronomyMapParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomyMap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAstronomyMapQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof astronomyMap>>> = ({ signal }) => astronomyMap(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof astronomyMap>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AstronomyMapQueryResult = NonNullable<Awaited<ReturnType<typeof astronomyMap>>>
+export type AstronomyMapQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Retrieve real astronomical objects for a sky viewport
+ */
+
+export function useAstronomyMap<TData = Awaited<ReturnType<typeof astronomyMap>>, TError = ErrorType<ErrorResponse>>(
+ params: AstronomyMapParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof astronomyMap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAstronomyMapQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

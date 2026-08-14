@@ -75,6 +75,27 @@ export type AstronomyPage = {
   sourceStatus: AstronomySourceStatus[];
 };
 
+export type AstronomyMapViewport = {
+  raMin: number;
+  raMax: number;
+  decMin: number;
+  decMax: number;
+  zoom: number;
+};
+
+export type AstronomyMapRequest = {
+  query?: string;
+  category?: AstronomyCategory;
+  viewport: AstronomyMapViewport;
+  limit: number;
+};
+
+export type AstronomyMapPage = {
+  items: NormalizedAstronomyObject[];
+  sourceStatus: AstronomySourceStatus[];
+  truncated: boolean;
+};
+
 export type AstronomySuggestion = {
   value: string;
   label: string;
@@ -87,6 +108,7 @@ type AstronomyProvider = {
   id: AstronomySource;
   label: string;
   search(request: AstronomyRequest): Promise<AstronomyPage>;
+  searchViewport?(request: AstronomyMapRequest): Promise<AstronomyPage>;
   getById(sourceId: string, category: AstronomyCategory): Promise<NormalizedAstronomyObject | undefined>;
   getRelated?(item: NormalizedAstronomyObject): Promise<NormalizedAstronomyObject[]>;
 };
@@ -95,6 +117,7 @@ const TIMEOUT_MS = 20_000;
 const CACHE_TTL_MS = 10 * 60 * 1_000;
 const MAX_CACHE_ENTRIES = 200;
 const cache = new Map<string, { expiresAt: number; value: AstronomyPage }>();
+const mapCache = new Map<string, { expiresAt: number; value: AstronomyMapPage }>();
 
 type PrimaryObjectProfile = {
   key: string;
@@ -314,6 +337,39 @@ async function simbadQuery(adql: string): Promise<Record<string, unknown>[]> {
   return [];
 }
 
+const SIMBAD_CATEGORY_TYPES: Partial<Record<AstronomyCategory, readonly string[]>> = {
+  galaxies: ["G", "GCl", "AGN", "QSO"],
+  stars: ["*", "PM", "PM*", "V*"],
+  nebulae: ["HII", "PN", "SNR"],
+  supernovae: ["SN", "SNR"],
+  "star-clusters": ["GCl"],
+};
+
+function skyRangeCondition(column: string, minimum: number, maximum: number): string {
+  return minimum <= maximum
+    ? `${column} BETWEEN ${minimum} AND ${maximum}`
+    : `(${column} >= ${minimum} OR ${column} <= ${maximum})`;
+}
+
+function simbadViewportWhere(request: AstronomyMapRequest): string {
+  const { viewport } = request;
+  const conditions = [
+    "ra IS NOT NULL",
+    "dec IS NOT NULL",
+    skyRangeCondition("ra", viewport.raMin, viewport.raMax),
+    `dec BETWEEN ${viewport.decMin} AND ${viewport.decMax}`,
+  ];
+  const categoryTypes = request.category ? SIMBAD_CATEGORY_TYPES[request.category] : undefined;
+  if (categoryTypes?.length) {
+    conditions.push(`otype IN (${categoryTypes.map(type => `'${escapeAdql(type)}'`).join(", ")})`);
+  }
+  const terms = request.query ? queryTerms(request.query) : [];
+  if (terms.length) {
+    conditions.push(`(${terms.map(term => `main_id LIKE '%${escapeAdql(term)}%'`).join(" OR ")})`);
+  }
+  return conditions.join(" AND ");
+}
+
 const simbadProvider: AstronomyProvider = {
   id: "simbad",
   label: "SIMBAD",
@@ -346,6 +402,21 @@ const simbadProvider: AstronomyProvider = {
       .filter((item): item is NormalizedAstronomyObject => Boolean(item))
       .sort((left, right) => scoreAstronomyObject(right, query) - scoreAstronomyObject(left, query))
       .slice(offset, offset + pageSize);
+    return {
+      items,
+      hasMore: rows.length === limit,
+      sourceStatus: [{ source: "SIMBAD", status: "ready", message: null }],
+    };
+  },
+  async searchViewport({ category, limit, query, viewport }) {
+    const rows = await simbadQuery(
+      `SELECT TOP ${limit} main_id, otype, ra, dec, plx_value, sp_type ` +
+      `FROM basic WHERE ${simbadViewportWhere({ category, limit, query, viewport })} ` +
+      `ORDER BY ra, dec`,
+    );
+    const items = rows
+      .map(row => simbadObject(row, category ?? "universe"))
+      .filter((item): item is NormalizedAstronomyObject => Boolean(item));
     return {
       items,
       hasMore: rows.length === limit,
@@ -437,6 +508,34 @@ const exoplanetProvider: AstronomyProvider = {
     return {
       items,
       hasMore: rows.length === offset + pageSize,
+      sourceStatus: [{ source: "NASA Exoplanet Archive", status: "ready", message: null }],
+    };
+  },
+  async searchViewport({ limit, query, viewport }) {
+    const conditions = [
+      "ra IS NOT NULL",
+      "dec IS NOT NULL",
+      skyRangeCondition("ra", viewport.raMin, viewport.raMax),
+      `dec BETWEEN ${viewport.decMin} AND ${viewport.decMax}`,
+    ];
+    if (query) {
+      const safeQuery = escapeAdql(query);
+      conditions.push(
+        `(REPLACE(LOWER(pl_name), ' ', '') LIKE REPLACE(LOWER('%${safeQuery}%'), ' ', '') ` +
+        `OR REPLACE(LOWER(hostname), ' ', '') LIKE REPLACE(LOWER('%${safeQuery}%'), ' ', ''))`,
+      );
+    }
+    const rows = await exoplanetQuery(
+      `SELECT TOP ${limit} pl_name, hostname, ra, dec, sy_dist, discoverymethod, disc_facility, ` +
+      `pl_orbper, pl_rade, pl_bmasse, pl_eqt, disc_year FROM pscomppars ` +
+      `WHERE ${conditions.join(" AND ")} ORDER BY ra, dec`,
+    );
+    const items = rows
+      .map(exoplanetObject)
+      .filter((item): item is NormalizedAstronomyObject => Boolean(item));
+    return {
+      items,
+      hasMore: rows.length === limit,
       sourceStatus: [{ source: "NASA Exoplanet Archive", status: "ready", message: null }],
     };
   },
@@ -740,6 +839,97 @@ export async function searchAstronomy(request: AstronomyRequest): Promise<Astron
     sourceStatus,
   };
   setCached(key, value);
+  return value;
+}
+
+function mapCacheKey(request: AstronomyMapRequest): string {
+  const { viewport } = request;
+  return [
+    normalizeAstronomyQuery(request.query ?? ""),
+    request.category ?? "universe",
+    viewport.raMin.toFixed(3),
+    viewport.raMax.toFixed(3),
+    viewport.decMin.toFixed(3),
+    viewport.decMax.toFixed(3),
+    viewport.zoom.toFixed(2),
+    request.limit,
+  ].join(":");
+}
+
+function getCachedMap(key: string): AstronomyMapPage | undefined {
+  const entry = mapCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt < Date.now()) {
+    mapCache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function setCachedMap(key: string, value: AstronomyMapPage): void {
+  if (mapCache.size >= MAX_CACHE_ENTRIES) mapCache.delete(mapCache.keys().next().value!);
+  mapCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+function isInMapViewport(item: NormalizedAstronomyObject, viewport: AstronomyMapViewport): boolean {
+  const ra = item.coordinates?.rightAscension;
+  const dec = item.coordinates?.declination;
+  if (ra == null || dec == null) return false;
+  const inRa = viewport.raMin <= viewport.raMax
+    ? ra >= viewport.raMin && ra <= viewport.raMax
+    : ra >= viewport.raMin || ra <= viewport.raMax;
+  return inRa && dec >= viewport.decMin && dec <= viewport.decMax;
+}
+
+function selectedMapProviders(category?: AstronomyCategory): AstronomyProvider[] {
+  if (category === "exoplanets") return [exoplanetProvider];
+  if (category === "missions" || category === "spacecraft") return [];
+  return [simbadProvider];
+}
+
+export async function searchAstronomyMap(request: AstronomyMapRequest): Promise<AstronomyMapPage> {
+  const key = mapCacheKey(request);
+  const cached = getCachedMap(key);
+  if (cached) return cached;
+
+  const providersForRequest = selectedMapProviders(request.category);
+  const results = await Promise.allSettled(
+    providersForRequest.map(provider => provider.searchViewport?.(request) ?? Promise.resolve({
+      items: [],
+      hasMore: false,
+      sourceStatus: [{
+        source: provider.label,
+        status: "unavailable" as const,
+        message: "Coordinate query is not available for this provider.",
+      }],
+    })),
+  );
+  const items: NormalizedAstronomyObject[] = [];
+  const sourceStatus: AstronomySourceStatus[] = [];
+  let providerTruncated = false;
+  for (const [index, result] of results.entries()) {
+    const provider = providersForRequest[index];
+    if (result.status === "fulfilled") {
+      items.push(...result.value.items);
+      sourceStatus.push(...result.value.sourceStatus);
+      providerTruncated ||= result.value.hasMore;
+    } else {
+      sourceStatus.push({
+        source: provider.label,
+        status: "unavailable",
+        message: "Scientific data temporarily unavailable.",
+      });
+    }
+  }
+  const deduped = mergeAstronomyObjects(items)
+    .filter(item => isInMapViewport(item, request.viewport))
+    .slice(0, request.limit);
+  const value = {
+    items: deduped,
+    sourceStatus,
+    truncated: providerTruncated || items.length > request.limit,
+  };
+  setCachedMap(key, value);
   return value;
 }
 

@@ -95,6 +95,13 @@ export default function AstronomyObjectView({ objectId, lm = false }: AstronomyO
     window.setTimeout(() => setCopied(false), 1600);
   };
 
+  const locateOnCosmicMap = () => {
+    if (!item) return;
+    const params = new URLSearchParams({ mapFocus: item.id, mapQuery: item.name });
+    window.history.pushState({}, '', `/?${params.toString()}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <section className={`cosmic-atlas-surface is-standalone ${lm ? 'is-light' : ''} cosmic-atlas-object-surface`} aria-labelledby="atlas-object-title">
       <div className="cosmic-atlas-shell cosmic-atlas-object-shell">
@@ -150,6 +157,11 @@ export default function AstronomyObjectView({ objectId, lm = false }: AstronomyO
               <span><ScanLine size={13} aria-hidden="true" /> Provider normalized</span>
               <span><Database size={13} aria-hidden="true" /> {item.source}</span>
               <span><Telescope size={13} aria-hidden="true" /> Stable source ID</span>
+               {item.coordinates?.rightAscension != null && item.coordinates?.declination != null && (
+                 <button type="button" className="cosmic-atlas-object-map-link" onClick={locateOnCosmicMap} data-testid="button-object-locate-map">
+                   <MapPin size={13} aria-hidden="true" /> Locate on Cosmic Map
+                 </button>
+               )}
             </div>
 
             <section className="cosmic-atlas-object-section" aria-labelledby="object-identification-title">

@@ -3,12 +3,64 @@ import {
   getAstronomyObject,
   isAstronomyCategory,
   searchAstronomy,
+  searchAstronomyMap,
   suggestAstronomy,
   type AstronomyCategory,
   type AstronomySource,
 } from "../lib/astronomy";
 
 const router = Router();
+
+router.get("/astronomy/map", async (req, res): Promise<void> => {
+  const rawNumber = (value: unknown): number => {
+    const candidate = Array.isArray(value) ? value[0] : value;
+    return Number(candidate);
+  };
+  const raMin = rawNumber(req.query.raMin);
+  const raMax = rawNumber(req.query.raMax);
+  const decMin = rawNumber(req.query.decMin);
+  const decMax = rawNumber(req.query.decMax);
+  const zoom = rawNumber(req.query.zoom);
+  const limitValue = rawNumber(req.query.limit);
+  const limit = Number.isFinite(limitValue) ? Math.min(Math.max(limitValue, 24), 180) : 96;
+  const query = String(req.query.q ?? "").trim() || undefined;
+  const categoryParam = String(req.query.category ?? "").trim() || undefined;
+
+  if (
+    ![raMin, raMax, decMin, decMax, zoom].every(Number.isFinite)
+    || raMin < 0 || raMin > 360
+    || raMax < 0 || raMax > 360
+    || decMin < -90 || decMin > 90
+    || decMax < -90 || decMax > 90
+    || decMin > decMax
+    || zoom < 1 || zoom > 5
+  ) {
+    res.status(400).json({ error: "Invalid sky viewport." });
+    return;
+  }
+  if (query && query.length < 2) {
+    res.status(400).json({ error: "Map search query must be at least 2 characters." });
+    return;
+  }
+  if (categoryParam && !isAstronomyCategory(categoryParam)) {
+    res.status(400).json({ error: "Unknown astronomy category." });
+    return;
+  }
+
+  try {
+    const viewport = { raMin, raMax, decMin, decMax, zoom };
+    const result = await searchAstronomyMap({
+      query,
+      category: categoryParam as AstronomyCategory | undefined,
+      viewport,
+      limit: Math.round(limit),
+    });
+    res.json({ viewport, ...result });
+  } catch (error) {
+    req.log.warn({ err: error }, "astronomy map query failed");
+    res.status(503).json({ error: "Scientific map data temporarily unavailable." });
+  }
+});
 
 router.get("/astronomy/search", async (req, res) => {
   const query = String(req.query.q ?? "").trim();
