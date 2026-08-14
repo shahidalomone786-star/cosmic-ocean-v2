@@ -13,7 +13,7 @@ const met: GalleryProvider = {
     searchUrl.searchParams.set("hasImages", "true");
     searchUrl.searchParams.set("isPublicDomain", "true");
     const search = await fetchJson<MetSearch>(searchUrl.toString());
-    const ids = (search.objectIDs ?? []).slice((context.page - 1) * 6, (context.page - 1) * 6 + Math.min(context.limit, 6));
+    const ids = (search.objectIDs ?? []).slice((context.page - 1) * context.limit, (context.page - 1) * context.limit + Math.min(context.limit, 20));
     const objects = await Promise.all(ids.map((id) => fetchJson<MetObject>(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${id}`)));
     return objects.flatMap((item) => {
       const imageUrl = firstText(item.primaryImage);

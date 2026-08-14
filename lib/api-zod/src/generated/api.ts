@@ -298,7 +298,11 @@ export const GallerySearchQueryParams = zod.object({
   "q": zod.coerce.string().min(1).max(gallerySearchQueryQMax),
   "page": zod.coerce.number().min(1).default(gallerySearchQueryPageDefault),
   "limit": zod.coerce.number().min(gallerySearchQueryLimitMin).max(gallerySearchQueryLimitMax).default(gallerySearchQueryLimitDefault),
-  "category": zod.coerce.string().optional(),
+  "category": zod.enum(['all', 'space', 'nature', 'ocean', 'animals', 'plants', 'earth', 'science', 'medical', 'history', 'art', 'architecture', 'maps', 'culture']).optional(),
+  "media": zod.enum(['all', 'photos', 'illustrations', 'artwork', 'scientific-imagery', 'maps', '3d-molecular']).optional(),
+  "license": zod.enum(['all', 'public-domain', 'cc0', 'commercial', 'attribution']).optional(),
+  "quality": zod.enum(['any', 'hd', '2k', '4k']).optional(),
+  "orientation": zod.enum(['all', 'landscape', 'portrait', 'square']).optional(),
   "providers": zod.coerce.string().optional()
 })
 

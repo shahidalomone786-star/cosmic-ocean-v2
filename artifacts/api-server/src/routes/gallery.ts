@@ -19,6 +19,10 @@ router.get("/gallery/search", async (req, res): Promise<void> => {
     page: parsed.data.page,
     limit: parsed.data.limit,
     category: parsed.data.category,
+    media: parsed.data.media,
+    license: parsed.data.license,
+    quality: parsed.data.quality,
+    orientation: parsed.data.orientation,
   }, requestedProviderIds);
 
   res.json(GallerySearchResponse.parse({

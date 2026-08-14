@@ -5343,6 +5343,38 @@ body {
   background: rgba(135, 215, 207, .1);
   outline: none;
 }
+.universal-gallery-filter-select {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: .38rem;
+  min-height: 2rem;
+  padding: .2rem .55rem .2rem .68rem;
+  border: 1px solid var(--ug-line);
+  color: var(--ug-muted);
+  background: rgba(135, 215, 207, .035);
+}
+.universal-gallery-filter-select span {
+  color: var(--ug-faint);
+  font-size: .48rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.universal-gallery-filter-select select {
+  max-width: 8.5rem;
+  border: 0;
+  outline: 0;
+  color: var(--ug-teal);
+  background: transparent;
+  font: 500 .52rem/1 var(--app-font-mono, "Space Mono", monospace);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.universal-gallery-filter-select option {
+  color: #0b1b23;
+  background: #dcebe7;
+}
 .universal-gallery-provider-strip {
   display: flex;
   flex-wrap: wrap;

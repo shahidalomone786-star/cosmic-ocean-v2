@@ -20,6 +20,10 @@ export type GallerySearchContext = {
   page: number;
   limit: number;
   category?: string;
+  media?: string;
+  license?: string;
+  quality?: string;
+  orientation?: string;
 };
 
 export type GalleryItem = {

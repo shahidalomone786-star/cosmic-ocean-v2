@@ -350,6 +350,31 @@ paths:
           required: false
           schema:
             type: string
+            enum: [all, space, nature, ocean, animals, plants, earth, science, medical, history, art, architecture, maps, culture]
+        - name: media
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, photos, illustrations, artwork, scientific-imagery, maps, 3d-molecular]
+        - name: license
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, public-domain, cc0, commercial, attribution]
+        - name: quality
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [any, hd, 2k, 4k]
+        - name: orientation
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, landscape, portrait, square]
         - name: providers
           in: query
           required: false

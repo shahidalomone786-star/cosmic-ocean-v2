@@ -5,6 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GallerySearchCategory } from './gallerySearchCategory';
+import type { GallerySearchLicense } from './gallerySearchLicense';
+import type { GallerySearchMedia } from './gallerySearchMedia';
+import type { GallerySearchOrientation } from './gallerySearchOrientation';
+import type { GallerySearchQuality } from './gallerySearchQuality';
 
 export type GallerySearchParams = {
 /**
@@ -21,7 +26,11 @@ page?: number;
  * @maximum 60
  */
 limit?: number;
-category?: string;
+category?: GallerySearchCategory;
+media?: GallerySearchMedia;
+license?: GallerySearchLicense;
+quality?: GallerySearchQuality;
+orientation?: GallerySearchOrientation;
 /**
  * Comma-separated provider ids. Omit to query all Phase A providers.
  */

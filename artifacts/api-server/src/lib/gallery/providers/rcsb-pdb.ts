@@ -1,4 +1,4 @@
-import { fetchJson, firstText } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type SearchResponse = { result_set?: Array<{ identifier?: string }> };
@@ -21,11 +21,34 @@ const rcsbPdb: GalleryProvider = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(query),
     });
-    // PDB image endpoints are intentionally not emitted without per-entry rights metadata.
-    // The adapter remains isolated and reports no displayable assets until the archive returns rights.
     return (data.result_set ?? []).flatMap((entry): GalleryItem[] => {
       const id = firstText(entry.identifier);
-      return id ? [] : [];
+      if (!id) return [];
+      const normalizedId = id.toLowerCase();
+      const imageUrl = `https://cdn.rcsb.org/images/structures/${normalizedId}_assembly-1.jpeg`;
+      const rights = usableLicense(
+        "CC0 1.0 Universal Public Domain Dedication",
+        "https://www.wwpdb.org/policies/usage-of-pdbx/mmcif-data",
+      );
+      if (!rights) return [];
+      return [{
+        id: `rcsb-pdb:${id}`,
+        title: `Protein structure ${id}`,
+        description: "A molecular structure record from the Protein Data Bank.",
+        imageUrl,
+        thumbnailUrl: imageUrl,
+        source: "RCSB Protein Data Bank",
+        sourceUrl: `https://www.rcsb.org/structure/${id}`,
+        creator: "RCSB Protein Data Bank",
+        date: null,
+        category: categoryFromQuery(context.query, "science"),
+        tags: list("protein", "molecular structure", id),
+        license: rights.license,
+        licenseUrl: rights.licenseUrl,
+        attribution: "RCSB Protein Data Bank",
+        width: asNumber(800),
+        height: asNumber(800),
+      }];
     });
   },
 };

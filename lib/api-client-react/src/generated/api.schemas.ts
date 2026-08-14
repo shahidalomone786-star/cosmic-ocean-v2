@@ -397,10 +397,78 @@ page?: number;
  * @maximum 60
  */
 limit?: number;
-category?: string;
+category?: GallerySearchCategory;
+media?: GallerySearchMedia;
+license?: GallerySearchLicense;
+quality?: GallerySearchQuality;
+orientation?: GallerySearchOrientation;
 /**
  * Comma-separated provider ids. Omit to query all Phase A providers.
  */
 providers?: string;
 };
+
+export type GallerySearchCategory = typeof GallerySearchCategory[keyof typeof GallerySearchCategory];
+
+
+export const GallerySearchCategory = {
+  all: 'all',
+  space: 'space',
+  nature: 'nature',
+  ocean: 'ocean',
+  animals: 'animals',
+  plants: 'plants',
+  earth: 'earth',
+  science: 'science',
+  medical: 'medical',
+  history: 'history',
+  art: 'art',
+  architecture: 'architecture',
+  maps: 'maps',
+  culture: 'culture',
+} as const;
+
+export type GallerySearchMedia = typeof GallerySearchMedia[keyof typeof GallerySearchMedia];
+
+
+export const GallerySearchMedia = {
+  all: 'all',
+  photos: 'photos',
+  illustrations: 'illustrations',
+  artwork: 'artwork',
+  'scientific-imagery': 'scientific-imagery',
+  maps: 'maps',
+  '3d-molecular': '3d-molecular',
+} as const;
+
+export type GallerySearchLicense = typeof GallerySearchLicense[keyof typeof GallerySearchLicense];
+
+
+export const GallerySearchLicense = {
+  all: 'all',
+  'public-domain': 'public-domain',
+  cc0: 'cc0',
+  commercial: 'commercial',
+  attribution: 'attribution',
+} as const;
+
+export type GallerySearchQuality = typeof GallerySearchQuality[keyof typeof GallerySearchQuality];
+
+
+export const GallerySearchQuality = {
+  any: 'any',
+  hd: 'hd',
+  '2k': '2k',
+  '4k': '4k',
+} as const;
+
+export type GallerySearchOrientation = typeof GallerySearchOrientation[keyof typeof GallerySearchOrientation];
+
+
+export const GallerySearchOrientation = {
+  all: 'all',
+  landscape: 'landscape',
+  portrait: 'portrait',
+  square: 'square',
+} as const;
 

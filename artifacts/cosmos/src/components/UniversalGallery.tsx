@@ -15,7 +15,12 @@ import {
   useGallerySearch,
   type GalleryItem,
   type GalleryProviderStatus,
+  type GallerySearchCategory,
+  type GallerySearchLicense,
+  type GallerySearchMedia,
+  type GallerySearchOrientation,
   type GallerySearchParams,
+  type GallerySearchQuality,
 } from '@workspace/api-client-react';
 
 type UniversalGalleryProps = {
@@ -23,7 +28,56 @@ type UniversalGalleryProps = {
 };
 
 const INITIAL_QUERY = 'nebula';
-const PAGE_LIMIT = 24;
+const PAGE_LIMIT = 30;
+
+const CATEGORY_FILTERS: Array<{ value: GallerySearchCategory | ''; label: string }> = [
+  { value: '', label: 'All' },
+  { value: 'space', label: 'Space' },
+  { value: 'nature', label: 'Nature' },
+  { value: 'ocean', label: 'Ocean' },
+  { value: 'animals', label: 'Animals' },
+  { value: 'plants', label: 'Plants' },
+  { value: 'earth', label: 'Earth' },
+  { value: 'science', label: 'Science' },
+  { value: 'medical', label: 'Medical' },
+  { value: 'history', label: 'History' },
+  { value: 'art', label: 'Art' },
+  { value: 'architecture', label: 'Architecture' },
+  { value: 'maps', label: 'Maps' },
+  { value: 'culture', label: 'Culture' },
+];
+
+const MEDIA_FILTERS: Array<{ value: GallerySearchMedia | ''; label: string }> = [
+  { value: '', label: 'All media' },
+  { value: 'photos', label: 'Photos' },
+  { value: 'illustrations', label: 'Illustrations' },
+  { value: 'artwork', label: 'Artwork' },
+  { value: 'scientific-imagery', label: 'Scientific imagery' },
+  { value: 'maps', label: 'Maps' },
+  { value: '3d-molecular', label: '3D / Molecular' },
+];
+
+const LICENSE_FILTERS: Array<{ value: GallerySearchLicense | ''; label: string }> = [
+  { value: '', label: 'All licenses' },
+  { value: 'public-domain', label: 'Public Domain' },
+  { value: 'cc0', label: 'CC0' },
+  { value: 'commercial', label: 'Commercial use' },
+  { value: 'attribution', label: 'Attribution' },
+];
+
+const QUALITY_FILTERS: Array<{ value: GallerySearchQuality | ''; label: string }> = [
+  { value: '', label: 'Any quality' },
+  { value: 'hd', label: 'HD' },
+  { value: '2k', label: '2K+' },
+  { value: '4k', label: '4K+' },
+];
+
+const ORIENTATION_FILTERS: Array<{ value: GallerySearchOrientation | ''; label: string }> = [
+  { value: '', label: 'Any orientation' },
+  { value: 'landscape', label: 'Landscape' },
+  { value: 'portrait', label: 'Portrait' },
+  { value: 'square', label: 'Square' },
+];
 
 function displayValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return 'Not provided';
@@ -41,17 +95,38 @@ function formatProviderName(provider: string): string {
   return provider.replace(/[-_]/g, ' ');
 }
 
+function galleryItemKeys(item: GalleryItem): string[] {
+  const normalize = (value: string) => value
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return [
+    normalize(item.imageUrl),
+    normalize(item.thumbnailUrl),
+    `${normalize(item.title)}|${normalize(item.creator ?? '')}`,
+  ];
+}
+
 function GalleryImage({
   item,
   modal = false,
+  onFailed,
 }: {
   item: GalleryItem;
   modal?: boolean;
+  onFailed?: () => void;
 }) {
-  const [failed, setFailed] = useState(false);
-  const imageUrl = modal ? item.imageUrl : item.thumbnailUrl;
+  const [imageStage, setImageStage] = useState<'primary' | 'alternate' | 'placeholder'>('primary');
+  const imageUrl = imageStage === 'primary'
+    ? (modal ? item.imageUrl : item.thumbnailUrl)
+    : imageStage === 'alternate'
+      ? (modal ? item.thumbnailUrl : item.imageUrl)
+      : null;
 
-  if (failed) {
+  if (!imageUrl) {
     return (
       <div
         className={modal ? 'universal-gallery-modal-media' : 'universal-gallery-card-media'}
@@ -68,7 +143,11 @@ function GalleryImage({
       src={imageUrl}
       alt={item.title}
       loading={modal ? 'eager' : 'lazy'}
-      onError={() => setFailed(true)}
+      decoding="async"
+      onError={() => {
+        if (imageStage === 'alternate') onFailed?.();
+        setImageStage(imageStage === 'primary' ? 'alternate' : 'placeholder');
+      }}
       data-testid={`${modal ? 'img-gallery-detail' : 'img-gallery-thumbnail'}-${item.id}`}
     />
   );
@@ -213,7 +292,7 @@ function GalleryDetail({
               rel="noreferrer"
               data-testid={`link-gallery-source-${item.id}`}
             >
-              Open source <ArrowUpRight size={13} aria-hidden="true" />
+              Open original <ArrowUpRight size={13} aria-hidden="true" />
             </a>
             {item.licenseUrl && (
               <a
@@ -276,11 +355,16 @@ function GalleryDetail({
 export default function UniversalGallery({ lm = false }: UniversalGalleryProps) {
   const [draftQuery, setDraftQuery] = useState(INITIAL_QUERY);
   const [committedQuery, setCommittedQuery] = useState(INITIAL_QUERY);
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState<GallerySearchCategory | ''>('');
   const [provider, setProvider] = useState('');
+  const [media, setMedia] = useState<GallerySearchMedia | ''>('');
+  const [license, setLicense] = useState<GallerySearchLicense | ''>('');
+  const [quality, setQuality] = useState<GallerySearchQuality | ''>('');
+  const [orientation, setOrientation] = useState<GallerySearchOrientation | ''>('');
   const [page, setPage] = useState(1);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
+  const [failedItemIds, setFailedItemIds] = useState<Set<string>>(new Set());
   const loadedQueryRef = useRef('');
 
   const params = useMemo<GallerySearchParams>(() => ({
@@ -288,8 +372,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     page,
     limit: PAGE_LIMIT,
     ...(category ? { category } : {}),
+    ...(media ? { media } : {}),
+    ...(license ? { license } : {}),
+    ...(quality ? { quality } : {}),
+    ...(orientation ? { orientation } : {}),
     ...(provider ? { providers: provider } : {}),
-  }), [category, committedQuery, page, provider]);
+  }), [category, committedQuery, license, media, orientation, page, provider, quality]);
 
   const galleryQuery = useGallerySearch(params, {
     query: {
@@ -297,19 +385,13 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
       enabled: params.q.trim().length > 0,
     },
   });
-  const querySignature = `${committedQuery}|${category}|${provider}`;
-  const items = galleryItems;
+  const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
+  const items = galleryItems.filter((item) => !failedItemIds.has(item.id));
   const statuses = galleryQuery.data?.providerStatus ?? [];
-
-  const categories = useMemo(() => {
-    const values = new Set(items.map((item) => item.category).filter(Boolean));
-    if (category) values.add(category);
-    return Array.from(values);
-  }, [category, items]);
 
   const providers = useMemo(() => {
     const values = new Set(statuses.map((status) => status.provider));
-    items.forEach((item) => values.add(item.source));
+    items.forEach((item) => values.add(item.id.split(':', 1)[0]));
     if (provider) values.add(provider);
     return Array.from(values);
   }, [items, provider, statuses]);
@@ -317,8 +399,9 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   useEffect(() => {
     setPage(1);
     setGalleryItems([]);
+    setFailedItemIds(new Set());
     loadedQueryRef.current = '';
-  }, [category, committedQuery, provider]);
+  }, [category, committedQuery, license, media, orientation, provider, quality]);
 
   useEffect(() => {
     const incoming = galleryQuery.data?.items;
@@ -329,8 +412,14 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
       return;
     }
     setGalleryItems((previous) => {
-      const seen = new Set(previous.map((item) => item.id));
-      return [...previous, ...incoming.filter((item) => !seen.has(item.id))];
+      const seen = new Set(previous.flatMap(galleryItemKeys));
+      const nextItems = incoming.filter((item) => {
+        const keys = galleryItemKeys(item);
+        if (keys.some((key) => seen.has(key))) return false;
+        keys.forEach((key) => seen.add(key));
+        return true;
+      });
+      return [...previous, ...nextItems];
     });
   }, [galleryQuery.data, page, querySignature]);
 
@@ -341,8 +430,24 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
       setCommittedQuery(nextQuery);
       setCategory('');
       setProvider('');
+      setMedia('');
+      setLicense('');
+      setQuality('');
+      setOrientation('');
     }
   };
+
+  const clearFilters = () => {
+    setCategory('');
+    setProvider('');
+    setMedia('');
+    setLicense('');
+    setQuality('');
+    setOrientation('');
+  };
+
+  const activeFilterCount = [category, provider, media, license, quality, orientation].filter(Boolean).length;
+  const readySources = statuses.filter((status) => status.status === 'ready' && status.count > 0).length;
 
   return (
     <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
@@ -381,27 +486,38 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           </button>
         </form>
 
-        {(categories.length > 0 || providers.length > 0) && (
+        {((providers.length > 0 || galleryQuery.data) || activeFilterCount > 0) && (
           <div className="universal-gallery-filters" aria-label="Gallery filters">
-            <button
-              type="button"
-              className={`universal-gallery-filter ${!category ? 'is-active' : ''}`}
-              onClick={() => setCategory('')}
-              data-testid="button-gallery-category-all"
-            >
-              All fields
-            </button>
-            {categories.map((value) => (
-              <button
-                type="button"
-                key={`category-${value}`}
-                className={`universal-gallery-filter ${category === value ? 'is-active' : ''}`}
-                onClick={() => setCategory(value)}
-                data-testid={`button-gallery-category-${value}`}
-              >
-                {value}
-              </button>
-            ))}
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">Category</span>
+              <select value={category} onChange={(event) => setCategory(event.target.value as GallerySearchCategory | '')} data-testid="select-gallery-category">
+                {CATEGORY_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">Media</span>
+              <select value={media} onChange={(event) => setMedia(event.target.value as GallerySearchMedia | '')} data-testid="select-gallery-media">
+                {MEDIA_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">License</span>
+              <select value={license} onChange={(event) => setLicense(event.target.value as GallerySearchLicense | '')} data-testid="select-gallery-license">
+                {LICENSE_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">Quality</span>
+              <select value={quality} onChange={(event) => setQuality(event.target.value as GallerySearchQuality | '')} data-testid="select-gallery-quality">
+                {QUALITY_FILTERS.map((option) => <option key={option.value || 'any'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">View</span>
+              <select value={orientation} onChange={(event) => setOrientation(event.target.value as GallerySearchOrientation | '')} data-testid="select-gallery-orientation">
+                {ORIENTATION_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
             {providers.map((value) => (
               <button
                 type="button"
@@ -420,7 +536,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
         {galleryQuery.isFetching && !galleryQuery.isLoading && (
           <div className="universal-gallery-results-meta" role="status" data-testid="status-gallery-refreshing">
-            <span>Reading the archive</span>
+            <span>Searching across {statuses.length || 'selected'} sources…</span>
             <LoaderCircle size={12} aria-hidden="true" className="animate-spin" />
           </div>
         )}
@@ -446,13 +562,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
             <Search size={22} aria-hidden="true" />
             <strong>No frames matched this reading.</strong>
             <p>Try a broader subject or remove one of the active archive filters.</p>
-            {(category || provider) && (
+            {activeFilterCount > 0 && (
               <button
                 type="button"
                 className="universal-gallery-button is-quiet"
                 onClick={() => {
-                  setCategory('');
-                  setProvider('');
+                  clearFilters();
                 }}
                 data-testid="button-gallery-clear-filters"
               >
@@ -463,7 +578,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
         ) : (
           <>
             <div className="universal-gallery-results-meta" data-testid="text-gallery-results-count">
-              <span><strong>{items.length}</strong> frames in this reading</span>
+              <span><strong>{items.length}</strong> images found · <strong>{readySources}</strong> sources</span>
               <span className="universal-gallery-mono">Page {galleryQuery.data?.page ?? 1}{galleryQuery.data?.hasMore ? ' · More available' : ''}</span>
             </div>
             <div className="universal-gallery-masonry" data-testid="grid-gallery-results">
@@ -479,7 +594,11 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                   data-testid={`card-gallery-item-${item.id}`}
                 >
                   <div className="universal-gallery-card-media">
-                    <GalleryImage item={item} />
+                  <GalleryImage item={item} onFailed={() => setFailedItemIds((previous) => {
+                    const next = new Set(previous);
+                    next.add(item.id);
+                    return next;
+                  })} />
                     <div className="universal-gallery-card-shade" aria-hidden="true" />
                     <span className="universal-gallery-card-index universal-gallery-mono">
                       {String(index + 1).padStart(2, '0')}
