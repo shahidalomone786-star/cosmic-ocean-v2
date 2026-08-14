@@ -96,12 +96,118 @@ const CACHE_TTL_MS = 10 * 60 * 1_000;
 const MAX_CACHE_ENTRIES = 200;
 const cache = new Map<string, { expiresAt: number; value: AstronomyPage }>();
 
+type PrimaryObjectProfile = {
+  key: string;
+  canonicalName: string;
+  aliases: readonly string[];
+  simbadIdentifiers: readonly string[];
+  queryKeys: readonly string[];
+  simbadTypes: readonly string[];
+};
+
+/**
+ * These are canonical identifiers used by the scientific archives, not UI
+ * guesses. They let a well-known catalog lookup find the primary record
+ * before SIMBAD's component/object-within-object rows.
+ */
+const PRIMARY_OBJECT_PROFILES: readonly PrimaryObjectProfile[] = [
+  {
+    key: "andromeda-galaxy",
+    canonicalName: "Andromeda Galaxy",
+    aliases: ["M31", "NGC 224", "Andromeda Galaxy"],
+    simbadIdentifiers: ["M 31", "NGC 224"],
+    queryKeys: ["m31", "ngc 224", "andromeda", "andromeda galaxy"],
+    simbadTypes: ["G", "Galaxy"],
+  },
+  {
+    key: "orion-nebula",
+    canonicalName: "Orion Nebula",
+    aliases: ["M42", "NGC 1976", "Orion Nebula"],
+    simbadIdentifiers: ["M 42", "NGC 1976"],
+    queryKeys: ["m42", "ngc 1976", "orion", "orion nebula"],
+    simbadTypes: ["HII", "HII region", "Nebula"],
+  },
+  {
+    key: "messier-87",
+    canonicalName: "Messier 87",
+    aliases: ["M87", "NGC 4486", "Messier 87"],
+    simbadIdentifiers: ["M 87", "NGC 4486"],
+    queryKeys: ["m87", "ngc 4486", "messier 87"],
+    simbadTypes: ["G", "Galaxy", "AGN"],
+  },
+  {
+    key: "sirius",
+    canonicalName: "Sirius",
+    aliases: ["Sirius", "Alpha Canis Majoris", "α CMa"],
+    simbadIdentifiers: ["Sirius", "* alf CMa"],
+    queryKeys: ["sirius", "alpha canis majoris"],
+    simbadTypes: ["*", "Star", "PM*", "SB*"],
+  },
+  {
+    key: "polaris",
+    canonicalName: "Polaris",
+    aliases: ["Polaris", "Alpha Ursae Minoris", "α UMi"],
+    simbadIdentifiers: ["Polaris", "* alf UMi"],
+    queryKeys: ["polaris", "alpha ursae minoris"],
+    simbadTypes: ["*", "Star", "V*", "cC*"],
+  },
+];
+
 function timeout() {
   return AbortSignal.timeout(TIMEOUT_MS);
 }
 
 function escapeAdql(value: string): string {
   return value.replace(/'/g, "''").slice(0, 120);
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .trim()
+    .replace(/[\p{P}\p{S}]+/gu, " ")
+    .replace(/\s+/g, " ");
+}
+
+function compactSearchText(value: string): string {
+  return normalizeSearchText(value).replace(/\s+/g, "");
+}
+
+function exactSearchText(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function profileMatchesValue(profile: PrimaryObjectProfile, value: string): boolean {
+  const candidate = compactSearchText(value);
+  return [...profile.aliases, ...profile.simbadIdentifiers]
+    .some(alias => compactSearchText(alias) === candidate);
+}
+
+function profileForQuery(query: string): PrimaryObjectProfile | undefined {
+  const normalized = normalizeSearchText(query);
+  const compact = compactSearchText(query);
+  return PRIMARY_OBJECT_PROFILES.find(profile =>
+    profile.queryKeys.some(key => normalizeSearchText(key) === normalized || compactSearchText(key) === compact),
+  );
+}
+
+function profileForObjectValues(values: string[]): PrimaryObjectProfile | undefined {
+  return PRIMARY_OBJECT_PROFILES.find(profile => values.some(value => profileMatchesValue(profile, value)));
+}
+
+function queryTerms(query: string): string[] {
+  const trimmed = query.normalize("NFKC").trim();
+  const profile = profileForQuery(trimmed);
+  return [...new Set([
+    trimmed,
+    ...(profile?.aliases ?? []),
+    ...(profile?.simbadIdentifiers ?? []),
+  ].filter((term): term is string => Boolean(term) && /^[\x00-\x7F]*$/.test(term)))];
+}
+
+export function normalizeAstronomyQuery(query: string): string {
+  return normalizeSearchText(query);
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -113,8 +219,32 @@ function firstText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+const SIMBAD_TYPE_LABELS: Record<string, string> = {
+  G: "Galaxy",
+  GCl: "Galaxy cluster",
+  HII: "H II region",
+  PN: "Planetary nebula",
+  "*": "Star",
+  PM: "High proper-motion star",
+  "PM*": "High proper-motion star",
+  "V*": "Variable star",
+  AGN: "Active galaxy nucleus",
+  QSO: "Quasar",
+  SN: "Supernova",
+  SNR: "Supernova remnant",
+};
+
 function simbadType(value: string | null): string {
-  return value ?? "SIMBAD object";
+  return value ? SIMBAD_TYPE_LABELS[value] ?? value : "SIMBAD object";
+}
+
+function simbadCategory(category: AstronomyCategory, objectType: string | null): AstronomyCategory {
+  if (category !== "universe" || !objectType) return category;
+  if (["G", "GCl", "AGN", "QSO"].includes(objectType)) return "galaxies";
+  if (["*", "PM", "PM*", "V*"].includes(objectType)) return "stars";
+  if (["HII", "PN", "SNR"].includes(objectType)) return "nebulae";
+  if (objectType === "SN") return "supernovae";
+  return category;
 }
 
 function simbadObject(
@@ -127,12 +257,13 @@ function simbadObject(
   const ra = numberOrNull(row.ra);
   const dec = numberOrNull(row.dec);
   const parallax = numberOrNull(row.plx_value);
+  const profile = profileForObjectValues([sourceId]);
   return {
     id: `simbad:${sourceId}`,
     name: sourceId,
     type: simbadType(objectType),
-    category,
-    aliases: [],
+    category: simbadCategory(category, objectType),
+    aliases: profile ? profile.aliases.filter(alias => exactSearchText(alias) !== exactSearchText(sourceId)) : [],
     description: objectType ? `SIMBAD object type: ${objectType}.` : null,
     coordinates: ra !== null || dec !== null
       ? { rightAscension: ra, declination: dec, coordinateSystem: "ICRS", epoch: null }
@@ -187,19 +318,37 @@ const simbadProvider: AstronomyProvider = {
   id: "simbad",
   label: "SIMBAD",
   async search({ query, category, page, pageSize }) {
-    const safeQuery = escapeAdql(query);
     const offset = (page - 1) * pageSize;
-    const rows = await simbadQuery(
-      `SELECT TOP ${offset + pageSize} main_id, otype, ra, dec, plx_value, sp_type ` +
-      `FROM basic WHERE main_id LIKE '%${safeQuery}%' ORDER BY main_id ` +
-      ``,
+    const limit = Math.min(120, offset + pageSize + 48);
+    const terms = queryTerms(query);
+    const exactConditions = terms
+      .map(term => `main_id = '${escapeAdql(term)}'`)
+      .join(" OR ");
+    const broadConditions = terms
+      .map(term => `main_id LIKE '%${escapeAdql(term)}%'`)
+      .join(" OR ");
+    const exactRows = await simbadQuery(
+      `SELECT TOP ${Math.min(terms.length, 24)} main_id, otype, ra, dec, plx_value, sp_type ` +
+      `FROM basic WHERE ${exactConditions}`,
     );
-    const items = rows.slice(offset, offset + pageSize)
+    const broadRows = profileForQuery(query)?.key === "sirius" || profileForQuery(query)?.key === "polaris"
+      ? []
+      : await simbadQuery(
+        `SELECT TOP ${limit} main_id, otype, ra, dec, plx_value, sp_type ` +
+        `FROM basic WHERE ${broadConditions} ORDER BY main_id`,
+      );
+    const rows = [...new Map(
+      [...exactRows, ...broadRows]
+        .map(row => [firstText(row.main_id) ?? JSON.stringify(row), row] as const),
+    ).values()];
+    const items = rows
       .map(row => simbadObject(row, category ?? "universe"))
-      .filter((item): item is NormalizedAstronomyObject => Boolean(item));
+      .filter((item): item is NormalizedAstronomyObject => Boolean(item))
+      .sort((left, right) => scoreAstronomyObject(right, query) - scoreAstronomyObject(left, query))
+      .slice(offset, offset + pageSize);
     return {
       items,
-      hasMore: rows.length === offset + pageSize,
+      hasMore: rows.length === limit,
       sourceStatus: [{ source: "SIMBAD", status: "ready", message: null }],
     };
   },
@@ -393,16 +542,32 @@ const nasaMediaProvider: AstronomyProvider = {
 
 const providers: AstronomyProvider[] = [simbadProvider, exoplanetProvider, nasaMediaProvider];
 
-function selectedProviders(category?: AstronomyCategory): AstronomyProvider[] {
+function isExoplanetRelevantQuery(query: string, category?: AstronomyCategory): boolean {
+  if (category === "exoplanets") return true;
+  if (!query.trim()) return false;
+  return /^(?:kepler|k2|toi|wasp|hd|gj|gliese|trappist|hat|corot|epic|hip|xo|tres|55\s+cancri|proxima)\b/i.test(query.trim());
+}
+
+function selectedProviders(category?: AstronomyCategory, query = "", source?: AstronomySource): AstronomyProvider[] {
+  if (source) {
+    const provider = providers.find(candidate => candidate.id === source);
+    if (provider) return [provider];
+  }
   if (category === "exoplanets") return [exoplanetProvider];
   if (category === "missions" || category === "spacecraft") return [nasaMediaProvider];
-  if (!category || category === "universe") return [simbadProvider, exoplanetProvider, nasaMediaProvider];
+  if (!category || category === "universe") {
+    return [
+      simbadProvider,
+      ...(isExoplanetRelevantQuery(query, category) ? [exoplanetProvider] : []),
+      nasaMediaProvider,
+    ];
+  }
   return [simbadProvider];
 }
 
 function cacheKey(request: AstronomyRequest): string {
   return [
-    request.query.toLowerCase(),
+    normalizeAstronomyQuery(request.query),
     request.category ?? "universe",
     request.page,
     request.pageSize,
@@ -430,15 +595,111 @@ function setCached(key: string, value: AstronomyPage): void {
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+function objectProfile(item: NormalizedAstronomyObject): PrimaryObjectProfile | undefined {
+  return profileForObjectValues([item.name, item.sourceId, ...item.aliases]);
+}
+
+function candidateContainsQuery(item: NormalizedAstronomyObject, query: string): boolean {
+  const compactQuery = compactSearchText(query);
+  if (!compactQuery) return false;
+  return [item.name, item.sourceId, ...item.aliases]
+    .some(value => compactSearchText(value).includes(compactQuery));
+}
+
+function isComponentLikeObject(item: NormalizedAstronomyObject, query: string): boolean {
+  const name = item.name.trim();
+  const compactQuery = compactSearchText(query);
+  const compactName = compactSearchText(name);
+  return Boolean(
+    /^\[[^\]]+\]/.test(name) ||
+    (compactQuery && compactName.includes(compactQuery) && compactName !== compactQuery),
+  );
+}
+
+export function scoreAstronomyObject(item: NormalizedAstronomyObject, query: string): number {
+  const trimmedQuery = query.normalize("NFKC").trim();
+  const exactQuery = exactSearchText(trimmedQuery);
+  const normalizedQuery = normalizeSearchText(trimmedQuery);
+  if (!normalizedQuery) return 0;
+
+  const profile = profileForQuery(trimmedQuery);
+  const itemProfile = objectProfile(item);
+  const exactName = exactSearchText(item.name) === exactQuery;
+  const exactIdentifier = exactSearchText(item.sourceId) === exactQuery;
+  const exactAlias = item.aliases.some(alias => exactSearchText(alias) === exactQuery);
+  const normalizedName = normalizeSearchText(item.name) === normalizedQuery;
+  const normalizedIdentifier = normalizeSearchText(item.sourceId) === normalizedQuery;
+  const normalizedAlias = item.aliases.some(alias => normalizeSearchText(alias) === normalizedQuery);
+
+  let score = 0;
+  if (exactName) score = 12_000;
+  else if (exactIdentifier) score = 11_000;
+  else if (exactAlias) score = 10_000;
+  else if (normalizedName) score = 9_000;
+  else if (normalizedIdentifier) score = 8_800;
+  else if (normalizedAlias) score = 8_600;
+  else if (candidateContainsQuery(item, trimmedQuery)) score = 1_000;
+  else if (item.description?.toLocaleLowerCase().includes(normalizedQuery)) score = 400;
+
+  if (profile && itemProfile?.key === profile.key) {
+    score += profile.queryKeys.some(key => normalizeSearchText(key) === normalizedQuery) ? 1_200 : 700;
+    if (profile.simbadTypes.includes(item.metadata.simbadObjectType as string) || profile.simbadTypes.includes(item.type)) {
+      score += 250;
+    }
+  }
+  if (item.source === "simbad" && profile) score += 150;
+  if (isComponentLikeObject(item, trimmedQuery) && itemProfile?.key !== profile?.key) score -= 500;
+  return score;
+}
+
+function mergeAstronomyObjects(items: NormalizedAstronomyObject[]): NormalizedAstronomyObject[] {
+  const byIdentity = new Map<string, NormalizedAstronomyObject>();
+  for (const item of items) {
+    const profile = objectProfile(item);
+    const identity = profile
+      ? `profile:${profile.key}`
+      : `${item.source}:${compactSearchText(item.sourceId)}`;
+    const existing = byIdentity.get(identity);
+    if (!existing) {
+      byIdentity.set(identity, item);
+      continue;
+    }
+
+    const primary = existing.source === "nasa" && item.source !== "nasa" ? item : existing;
+    const secondary = primary === existing ? item : existing;
+    const sourceRecords = [
+      ...(Array.isArray(primary.metadata.sourceRecords) ? primary.metadata.sourceRecords : []),
+      ...(Array.isArray(secondary.metadata.sourceRecords) ? secondary.metadata.sourceRecords : []),
+      { source: secondary.source, sourceId: secondary.sourceId },
+    ];
+    byIdentity.set(identity, {
+      ...primary,
+      aliases: [...new Set([...primary.aliases, ...secondary.aliases])],
+      description: primary.description ?? secondary.description,
+      coordinates: primary.coordinates ?? secondary.coordinates,
+      distance: primary.distance ?? secondary.distance,
+      imageReferences: [...new Set([...primary.imageReferences, ...secondary.imageReferences])],
+      observationReferences: [...new Set([...primary.observationReferences, ...secondary.observationReferences])],
+      metadata: {
+        ...secondary.metadata,
+        ...primary.metadata,
+        ...(sourceRecords.length > 0 ? { sourceRecords } : {}),
+      },
+    });
+  }
+  return [...byIdentity.values()];
+}
+
 export async function searchAstronomy(request: AstronomyRequest): Promise<AstronomyPage> {
   const key = cacheKey(request);
   const cached = getCached(key);
   if (cached) return cached;
-  const results = await Promise.allSettled(selectedProviders(request.category).map(provider => provider.search(request)));
+  const providersForRequest = selectedProviders(request.category, request.query, request.source);
+  const results = await Promise.allSettled(providersForRequest.map(provider => provider.search(request)));
   const items: NormalizedAstronomyObject[] = [];
   const sourceStatus: AstronomySourceStatus[] = [];
   for (const [index, result] of results.entries()) {
-    const provider = selectedProviders(request.category)[index];
+    const provider = providersForRequest[index];
     if (result.status === "fulfilled") {
       items.push(...result.value.items);
       sourceStatus.push(...result.value.sourceStatus);
@@ -470,7 +731,9 @@ export async function searchAstronomy(request: AstronomyRequest): Promise<Astron
     }
     return true;
   });
-  const deduped = [...new Map(filtered.map(item => [item.id, item])).values()].slice(0, request.pageSize);
+  const deduped = mergeAstronomyObjects(filtered)
+    .sort((left, right) => scoreAstronomyObject(right, request.query) - scoreAstronomyObject(left, request.query))
+    .slice(0, request.pageSize);
   const value = {
     items: deduped,
     hasMore: results.some(result => result.status === "fulfilled" && result.value.hasMore),

@@ -1,4 +1,5 @@
 - [Cosmic Intelligence Engine](cosmic-intelligence-engine.md) — external_content UNION feed; source-dispatch cards; INSERT OR IGNORE dedup; SQLite FK off by default enables EC IDs in post_likes/bookmarks
+- [SIMBAD search accuracy](simbad-search-accuracy.md) — well-known star names need canonical IDs and ASCII-only ADQL terms to avoid provider failures
 - [Biology Hub Architecture](biology-hub-architecture.md) — multi-tab sections (Overview/Articles/Papers), LiveResultsFeed shared component, debounced search in BiologyHub, synonym expansion in biology.ts backend
 - [Document workspace verification](document-workspace-verification.md) — keep extracted context hidden from the composer while reusing the attachment for follow-up questions
 - [Edge Neural TTS](edge-neural-tts.md) — server-side Microsoft Edge synthesis with browser speech fallback; no API keys or paid quota
