@@ -19,6 +19,9 @@ type CosmicMapSkyPlotProps = {
   selectedObjectId: string | null;
   onSelect: (record: AstronomyObject) => void;
   onViewportChange: (viewport: MapViewport) => void;
+  initialViewport?: MapViewport;
+  navigationViewport?: MapViewport | null;
+  isNavigationActive?: boolean;
   isFetching?: boolean;
   requestError?: boolean;
   truncated?: boolean;
@@ -36,13 +39,17 @@ export default function CosmicMapSkyPlot({
   selectedObjectId,
   onSelect,
   onViewportChange,
+  initialViewport,
+  navigationViewport = null,
+  isNavigationActive = false,
   isFetching = false,
   requestError = false,
   truncated = false,
 }: CosmicMapSkyPlotProps) {
-  const [zoom, setZoom] = useState(MIN_ZOOM);
-  const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(initialViewport?.zoom ?? MIN_ZOOM);
+  const [pan, setPan] = useState<MapPan>(initialViewport?.pan ?? { x: 0, y: 0 });
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const navigationWasActiveRef = useRef(false);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const onViewportChangeRef = useRef(onViewportChange);
@@ -76,11 +83,20 @@ export default function CosmicMapSkyPlot({
   }, [pan, zoom]);
 
   useEffect(() => {
+    const navigationWasActive = navigationWasActiveRef.current;
+    navigationWasActiveRef.current = isNavigationActive;
     if (!selectedPoint) return;
+    if (isNavigationActive || navigationWasActive) return;
     const nextZoom = 2.2;
     setZoom(nextZoom);
     setPan(focusPan(selectedPoint, nextZoom));
-  }, [selectedObjectId, selectedPoint]);
+  }, [isNavigationActive, selectedObjectId, selectedPoint]);
+
+  useEffect(() => {
+    if (!navigationViewport) return;
+    setZoom(clampZoom(navigationViewport.zoom));
+    setPan(clampPan(navigationViewport.pan, navigationViewport.zoom));
+  }, [navigationViewport]);
 
   const setZoomAroundCenter = (nextZoom: number) => {
     const bounded = clampZoom(nextZoom);
@@ -103,11 +119,13 @@ export default function CosmicMapSkyPlot({
   };
 
   const handleWheel = (event: WheelEvent<SVGSVGElement>) => {
+    if (isNavigationActive) return;
     event.preventDefault();
     setZoomAroundCenter(zoom + (event.deltaY > 0 ? -.3 : .3));
   };
 
   const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    if (isNavigationActive) return;
     const target = event.target as Element;
     if (target.closest?.('[data-cosmic-map-marker="true"]')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -156,6 +174,7 @@ export default function CosmicMapSkyPlot({
   };
 
   const handleKeyboard = (event: KeyboardEvent<SVGSVGElement>) => {
+    if (isNavigationActive) return;
     const panStep = 42 / zoom;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       event.preventDefault();
@@ -201,7 +220,7 @@ export default function CosmicMapSkyPlot({
           </button>
         </div>
       </div>
-      <div className={`cosmic-map-stage ${dragState ? 'is-panning' : ''}`}>
+      <div className={`cosmic-map-stage ${dragState ? 'is-panning' : ''} ${isNavigationActive ? 'is-navigating' : ''}`}>
         <svg
           className="cosmic-map-svg"
           viewBox={`0 0 ${SKY_PLOT.width} ${SKY_PLOT.height}`}
@@ -305,7 +324,9 @@ export default function CosmicMapSkyPlot({
             <text className="cosmic-map-axis-label" x="16" y={SKY_PLOT.top + SKY_PLOT.heightInner}>−90°</text>
           </g>
         </svg>
-         <span className="cosmic-map-plot-hint"><Crosshair size={12} aria-hidden="true" /> Drag to pan · wheel to zoom</span>
+          <span className="cosmic-map-plot-hint">
+            <Crosshair size={12} aria-hidden="true" /> {isNavigationActive ? 'Navigation sequence active' : 'Drag to pan · wheel to zoom'}
+          </span>
       </div>
       <div className="cosmic-map-plot-caption">
          <span><ScanLine size={12} aria-hidden="true" /> {positionedRecords.length} records in viewport · {displayItems.filter(item => item.count > 1).length} clusters</span>

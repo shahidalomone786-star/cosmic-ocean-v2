@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Crosshair, Database, Orbit, RotateCw, Search, ShieldCheck } from 'lucide-react';
 import type { AstronomyObject, AstronomySearchParams } from '@workspace/api-client-react';
 import CosmicMapSelectionPanel from './components/CosmicMapSelectionPanel';
+import CosmicMapDestinationState from './components/CosmicMapDestinationState';
 import CosmicMapSkyPlot from './components/CosmicMapSkyPlot';
 import { useCosmicMapData } from './hooks/useCosmicMapData';
+import { useCosmicMapTravel } from './hooks/useCosmicMapTravel';
 import { DEFAULT_COSMIC_MAP_QUERY } from './services/cosmicMapService';
 import type { MapViewport } from './types';
 
@@ -34,6 +36,11 @@ export default function CosmicMap({
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(focusId ?? null);
   const [viewport, setViewport] = useState<MapViewport>({ zoom: 1, pan: { x: 0, y: 0 } });
   const mapData = useCosmicMapData({ query: submittedQuery, category, focusId, viewport });
+  const travel = useCosmicMapTravel(viewport);
+
+  useEffect(() => {
+    if (travel.navigationViewport) setViewport(travel.navigationViewport);
+  }, [travel.navigationViewport]);
 
   useEffect(() => {
     if (query?.trim()) {
@@ -59,8 +66,9 @@ export default function CosmicMap({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    travel.cancel();
     const nextQuery = searchValue.trim();
-     const normalizedQuery = nextQuery.length >= 2 ? nextQuery : DEFAULT_COSMIC_MAP_QUERY;
+    const normalizedQuery = nextQuery.length >= 2 ? nextQuery : DEFAULT_COSMIC_MAP_QUERY;
     setSearchValue(normalizedQuery);
     setSubmittedQuery(normalizedQuery);
     setSelectedObjectId(null);
@@ -73,6 +81,7 @@ export default function CosmicMap({
     : mapData.isError
       ? 'Archive response unavailable'
       : `${mapData.positionedRecords.length} positioned / ${mapData.cacheSize} cached`;
+  const isDestination = travel.navigationState.level === 'destination' && Boolean(travel.navigationState.target);
 
   return (
     <section className="cosmic-map" aria-labelledby="cosmic-map-title" data-testid="section-cosmic-map">
@@ -118,62 +127,91 @@ export default function CosmicMap({
 
         <div className="cosmic-map-data-strip" role="status" data-testid="status-cosmic-map-data">
           <span className="cosmic-map-live"><i aria-hidden="true" /> {statusCopy}</span>
-            <span>Query <strong>{submittedQuery || 'all coordinate-bearing records'}</strong></span>
-           {mapData.truncated && <span>Provider window truncated at request limit</span>}
+          <span>Query <strong>{submittedQuery || 'all coordinate-bearing records'}</strong></span>
+          {travel.navigationState.isActive && (
+            <>
+              <span className="cosmic-map-navigation-status" data-testid="status-cosmic-map-navigation">
+                {travel.navigationState.status} · {Math.round(travel.navigationState.progress * 100)}%
+              </span>
+              <button type="button" className="cosmic-map-cancel-navigation" onClick={travel.cancel} data-testid="button-cosmic-map-cancel-navigation">
+                Cancel navigation
+              </button>
+            </>
+          )}
+          {isDestination && <span className="cosmic-map-navigation-status" data-testid="status-cosmic-map-destination">Destination acquired</span>}
+          {mapData.truncated && <span>Provider window truncated at request limit</span>}
           {mapData.invalidCoordinateCount > 0 && <span>{mapData.invalidCoordinateCount} record{mapData.invalidCoordinateCount === 1 ? '' : 's'} withheld: invalid coordinates</span>}
         </div>
 
-        <div className="cosmic-map-workspace">
-          <section className="cosmic-map-plot-card" aria-labelledby="cosmic-map-plot-title">
-            <div className="cosmic-map-plot-card-heading" hidden>
-              <h2 id="cosmic-map-plot-title">Right ascension and declination plot</h2>
-            </div>
-            {(mapData.isLoading || (mapData.isFetching && mapData.positionedRecords.length === 0)) ? (
-              <div className="cosmic-map-skeleton" aria-label="Loading coordinate projection" data-testid="loading-cosmic-map-plot" />
-            ) : mapData.isError && mapData.positionedRecords.length === 0 ? (
-              <div className="cosmic-map-state cosmic-map-error" role="alert">
-                <Database size={21} aria-hidden="true" />
-                <strong>Scientific data could not be read.</strong>
-                <span>The bounded archive request did not complete. Try the query again.</span>
-                <button type="button" className="cosmic-map-button is-quiet" onClick={() => void mapData.refetch()} data-testid="button-cosmic-map-retry">
-                  Retry request <RotateCw size={13} aria-hidden="true" />
-                </button>
-              </div>
-            ) : mapData.positionedRecords.length === 0 ? (
-              <div className="cosmic-map-state" data-testid="empty-cosmic-map-plot">
-                <CrosshairIcon />
-                <strong>No valid positions returned.</strong>
-                <span>This query returned no records with both right ascension and declination.</span>
-              </div>
-            ) : (
-              <CosmicMapSkyPlot
-                 records={mapData.records}
-                selectedObjectId={selectedObjectId}
-                onSelect={record => setSelectedObjectId(record.id)}
-                 onViewportChange={setViewport}
-                 isFetching={mapData.isFetching}
-                 requestError={mapData.isError}
-                 truncated={mapData.truncated}
-              />
-            )}
-          </section>
-
-          <div className="cosmic-map-sidebar">
-            <CosmicMapSelectionPanel record={selectedRecord} onOpenObject={onOpenObject} />
-            <section className="cosmic-map-panel" aria-labelledby="cosmic-map-method-title">
-              <div className="cosmic-map-panel-heading">
-                <div>
-                  <p className="cosmic-map-panel-kicker">Method note</p>
-                  <h2 id="cosmic-map-method-title">Read the <em>frame</em></h2>
+        <div className={`cosmic-map-workspace ${isDestination ? 'is-destination' : ''}`}>
+          {isDestination && travel.navigationState.target ? (
+            <CosmicMapDestinationState
+              record={travel.navigationState.target}
+              onOpenObject={onOpenObject}
+              onBack={travel.cancel}
+            />
+          ) : (
+            <>
+              <section className="cosmic-map-plot-card" aria-labelledby="cosmic-map-plot-title">
+                <div className="cosmic-map-plot-card-heading" hidden>
+                  <h2 id="cosmic-map-plot-title">Right ascension and declination plot</h2>
                 </div>
-                <Database size={16} aria-hidden="true" />
+                {(mapData.isLoading || (mapData.isFetching && mapData.positionedRecords.length === 0)) ? (
+                  <div className="cosmic-map-skeleton" aria-label="Loading coordinate projection" data-testid="loading-cosmic-map-plot" />
+                ) : mapData.isError && mapData.positionedRecords.length === 0 ? (
+                  <div className="cosmic-map-state cosmic-map-error" role="alert">
+                    <Database size={21} aria-hidden="true" />
+                    <strong>Scientific data could not be read.</strong>
+                    <span>The bounded archive request did not complete. Try the query again.</span>
+                    <button type="button" className="cosmic-map-button is-quiet" onClick={() => void mapData.refetch()} data-testid="button-cosmic-map-retry">
+                      Retry request <RotateCw size={13} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : mapData.positionedRecords.length === 0 ? (
+                  <div className="cosmic-map-state" data-testid="empty-cosmic-map-plot">
+                    <CrosshairIcon />
+                    <strong>No valid positions returned.</strong>
+                    <span>This query returned no records with both right ascension and declination.</span>
+                  </div>
+                ) : (
+                  <CosmicMapSkyPlot
+                    records={mapData.records}
+                    selectedObjectId={selectedObjectId}
+                    onSelect={record => setSelectedObjectId(record.id)}
+                    onViewportChange={setViewport}
+                    initialViewport={viewport}
+                    navigationViewport={travel.navigationViewport}
+                    isNavigationActive={travel.navigationState.isActive}
+                    isFetching={mapData.isFetching}
+                    requestError={mapData.isError}
+                    truncated={mapData.truncated}
+                  />
+                )}
+              </section>
+
+              <div className="cosmic-map-sidebar">
+                <CosmicMapSelectionPanel
+                  record={selectedRecord}
+                  onOpenObject={onOpenObject}
+                  onTravel={travel.travelTo}
+                  isTraveling={travel.navigationState.isActive}
+                />
+                <section className="cosmic-map-panel" aria-labelledby="cosmic-map-method-title">
+                  <div className="cosmic-map-panel-heading">
+                    <div>
+                      <p className="cosmic-map-panel-kicker">Method note</p>
+                      <h2 id="cosmic-map-method-title">Read the <em>frame</em></h2>
+                    </div>
+                    <Database size={16} aria-hidden="true" />
+                  </div>
+                  <p className="cosmic-map-record-note">
+                    Right ascension runs from 0° to 360° along the horizontal axis. Declination runs from +90° to −90° vertically. This is a projection of catalog coordinates, not a distance model.
+                  </p>
+                  <p className="cosmic-map-footer-note"><ShieldCheck size={13} aria-hidden="true" /> Viewport requests are debounced; returned records remain in a bounded spatial cache.</p>
+                </section>
               </div>
-              <p className="cosmic-map-record-note">
-                Right ascension runs from 0° to 360° along the horizontal axis. Declination runs from +90° to −90° vertically. This is a projection of catalog coordinates, not a distance model.
-              </p>
-               <p className="cosmic-map-footer-note"><ShieldCheck size={13} aria-hidden="true" /> Viewport requests are debounced; returned records remain in a bounded spatial cache.</p>
-            </section>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </section>

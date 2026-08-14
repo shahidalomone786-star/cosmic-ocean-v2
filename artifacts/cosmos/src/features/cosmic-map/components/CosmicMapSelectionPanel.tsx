@@ -1,10 +1,12 @@
-import { ArrowUpRight, Crosshair, Info } from 'lucide-react';
+import { ArrowUpRight, Crosshair, Info, Navigation } from 'lucide-react';
 import type { AstronomyObject } from '@workspace/api-client-react';
 import { formatCoordinatePair, formatDegrees, isValidSkyCoordinate } from '../coordinates';
 
 type CosmicMapSelectionPanelProps = {
   record: AstronomyObject | null;
   onOpenObject?: (record: AstronomyObject) => void;
+  onTravel: (record: AstronomyObject) => void;
+  isTraveling?: boolean;
 };
 
 function formatDistance(record: AstronomyObject): string {
@@ -15,6 +17,8 @@ function formatDistance(record: AstronomyObject): string {
 export default function CosmicMapSelectionPanel({
   record,
   onOpenObject,
+  onTravel,
+  isTraveling = false,
 }: CosmicMapSelectionPanelProps) {
   return (
     <aside className="cosmic-map-panel" aria-labelledby="cosmic-map-selection-title" aria-live="polite">
@@ -39,13 +43,25 @@ export default function CosmicMapSelectionPanel({
           {!isValidSkyCoordinate(record) && (
             <p className="cosmic-map-record-note"><Crosshair size={13} aria-hidden="true" /> This source record has no valid RA/Dec pair for plotting.</p>
           )}
-          {onOpenObject && (
-            <div className="cosmic-map-selected-actions">
+          <div className="cosmic-map-selected-actions">
+            {isValidSkyCoordinate(record) && (
+              <button
+                type="button"
+                className="cosmic-map-button cosmic-map-travel-button"
+                onClick={() => onTravel(record)}
+                disabled={isTraveling}
+                data-testid={`button-cosmic-map-travel-${record.id}`}
+              >
+                <Navigation size={14} aria-hidden="true" />
+                {isTraveling ? 'TRAVEL IN PROGRESS' : 'TRAVEL TO OBJECT'}
+              </button>
+            )}
+            {onOpenObject && (
               <button type="button" className="cosmic-map-button" onClick={() => onOpenObject(record)} data-testid={`button-cosmic-map-open-${record.id}`}>
                 Open Atlas record <ArrowUpRight size={14} aria-hidden="true" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ) : (
         <div className="cosmic-map-selected-empty">
