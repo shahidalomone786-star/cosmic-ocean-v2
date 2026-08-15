@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -85,6 +85,16 @@ function displayValue(value: string | number | null | undefined): string {
   return String(value);
 }
 
+function isValidGalleryImageUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function licenseBadgeLabel(licenseClass: GalleryItemLicenseClass): string {
   const labels: Record<GalleryItemLicenseClass, string> = {
     PUBLIC_DOMAIN: 'PUBLIC DOMAIN',
@@ -136,15 +146,21 @@ function galleryItemKeys(item: GalleryItem): string[] {
 function GalleryImage({
   item,
   modal = false,
+  priority = false,
 }: {
   item: GalleryItem;
   modal?: boolean;
+  priority?: boolean;
 }) {
-  const [imageStage, setImageStage] = useState<'primary' | 'alternate' | 'placeholder'>('primary');
+  const [imageStage, setImageStage] = useState<'primary' | 'alternate' | 'placeholder'>(() => {
+    if (isValidGalleryImageUrl(item.imageUrl)) return 'primary';
+    if (isValidGalleryImageUrl(item.thumbnailUrl)) return 'alternate';
+    return 'placeholder';
+  });
   const imageUrl = imageStage === 'primary'
-    ? item.imageUrl
+    ? (isValidGalleryImageUrl(item.imageUrl) ? item.imageUrl : null)
     : imageStage === 'alternate'
-      ? item.thumbnailUrl
+      ? (isValidGalleryImageUrl(item.thumbnailUrl) ? item.thumbnailUrl : null)
       : null;
 
   if (!imageUrl) {
@@ -164,11 +180,17 @@ function GalleryImage({
       src={imageUrl}
       alt={item.title}
       className="w-full h-auto object-contain"
-      loading={modal ? 'eager' : 'lazy'}
+      width={item.width ?? undefined}
+      height={item.height ?? undefined}
+      sizes={modal
+        ? '(max-width: 760px) 100vw, 68vw'
+        : '(max-width: 520px) 50vw, (max-width: 900px) 33vw, 25vw'}
+      loading={modal || priority ? 'eager' : 'lazy'}
+      fetchPriority={modal || priority ? 'high' : 'auto'}
       decoding="async"
-      onError={() => {
-        setImageStage(imageStage === 'primary' ? 'alternate' : 'placeholder');
-      }}
+      onError={() => setImageStage((stage) => (
+        stage === 'primary' && item.thumbnailUrl !== item.imageUrl ? 'alternate' : 'placeholder'
+      ))}
       data-testid={`${modal ? 'img-gallery-detail' : 'img-gallery-thumbnail'}-${item.id}`}
     />
   );
@@ -289,7 +311,7 @@ function GalleryDetail({
         data-testid={`dialog-gallery-detail-${item.id}`}
       >
         <div className="universal-gallery-modal-media">
-          <GalleryImage item={item} modal />
+          <GalleryImage key={item.id} item={item} modal priority />
         </div>
         <div className="universal-gallery-modal-content">
           <button
@@ -400,6 +422,8 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const loadedQueryRef = useRef('');
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const loadMoreLockRef = useRef(false);
 
   const params = useMemo<GallerySearchParams>(() => ({
     q: committedQuery,
@@ -417,11 +441,16 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     query: {
       queryKey: getGallerySearchQueryKey(params),
       enabled: params.q.trim().length > 0,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
     },
   });
   const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
   const items = galleryItems;
   const statuses = galleryQuery.data?.providerStatus ?? [];
+  const hasMore = galleryQuery.data?.hasMore ?? false;
+  const isLoadingMore = page > 1 && galleryQuery.isFetching;
 
   const providers = useMemo(() => {
     const values = new Set(statuses.map((status) => status.provider));
@@ -455,6 +484,33 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
       return [...previous, ...nextItems];
     });
   }, [galleryQuery.data, page, querySignature]);
+
+  const loadNextPage = useCallback(() => {
+    if (!hasMore || galleryQuery.isFetching || loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    setPage((current) => current + 1);
+  }, [galleryQuery.isFetching, hasMore]);
+
+  useEffect(() => {
+    if (!hasMore) {
+      loadMoreLockRef.current = false;
+      return;
+    }
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) loadNextPage();
+      },
+      { rootMargin: '900px 0px', threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadNextPage]);
+
+  useEffect(() => {
+    if (!galleryQuery.isFetching) loadMoreLockRef.current = false;
+  }, [galleryQuery.isFetching]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -569,7 +625,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
         {galleryQuery.isFetching && !galleryQuery.isLoading && (
           <div className="universal-gallery-results-meta" role="status" data-testid="status-gallery-refreshing">
-            <span>Searching across {statuses.length || 'selected'} sources…</span>
+            <span>{isLoadingMore ? 'Loading more archive frames…' : `Searching across ${statuses.length || 'selected'} sources…`}</span>
             <LoaderCircle size={12} aria-hidden="true" className="animate-spin" />
           </div>
         )}
@@ -620,6 +676,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                   type="button"
                   key={item.id}
                   className="universal-gallery-card"
+                  aria-label={`View image details: ${item.title}`}
                   onClick={() => setSelectedItem(item)}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -627,48 +684,26 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                   data-testid={`card-gallery-item-${item.id}`}
                 >
                   <div className="universal-gallery-card-media">
-                    <GalleryImage item={item} />
-                  </div>
-                  <div className="universal-gallery-card-copy">
-                    <span className="universal-gallery-card-category universal-gallery-mono">{item.category}</span>
-                    <h3>{item.title}</h3>
-                    <div className="universal-gallery-card-metadata">
-                      <span>{item.creator ?? 'Creator unavailable'}</span>
-                      <span>{formatProviderName(item.source)}</span>
-                    </div>
-                    <div className="universal-gallery-card-metadata">
-                      <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
-                        {licenseBadgeLabel(item.licenseClass)}
-                      </span>
-                      <span>{item.license}</span>
-                    </div>
-                    {item.attribution && (
-                      <p className="universal-gallery-card-attribution">{item.attribution}</p>
-                    )}
-                  </div>
-                  <div className="universal-gallery-card-footer">
-                    <span>{item.width && item.height ? `${item.width} × ${item.height}` : 'Dimensions unavailable'}</span>
-                    <span className="universal-gallery-card-rule" aria-hidden="true" />
-                    <span className="universal-gallery-card-mark" aria-hidden="true">
-                      <ArrowUpRight size={12} />
-                    </span>
+                    <GalleryImage item={item} priority={index < 4} />
                   </div>
                 </motion.button>
               ))}
             </div>
-             {galleryQuery.data?.hasMore && (
-               <div className="universal-gallery-load-more">
-                 <button
-                   type="button"
-                   className="universal-gallery-button is-quiet"
-                   onClick={() => setPage((current) => current + 1)}
-                   disabled={galleryQuery.isFetching}
-                   data-testid="button-gallery-load-more"
-                 >
-                   {galleryQuery.isFetching ? 'Reading next page' : 'Load more frames'}
-                 </button>
-               </div>
-             )}
+            {hasMore && (
+              <div
+                ref={loadMoreRef}
+                className="universal-gallery-load-more"
+                aria-live="polite"
+                data-testid="sentinel-gallery-load-more"
+              >
+                {isLoadingMore && (
+                  <span className="universal-gallery-load-more-status">
+                    <LoaderCircle size={13} aria-hidden="true" className="animate-spin" />
+                    Reading the next archive page
+                  </span>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

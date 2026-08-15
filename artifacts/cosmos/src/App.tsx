@@ -1912,40 +1912,47 @@ function UserBadge({ user, lm, onLogout }: { user: UserProfile; lm: boolean; onL
 }
 
 // ─── Universal Gallery portal entry ───────────────────────────────────────────
-function PortalGalleryEntry({ onOpen }: { onOpen: () => void }) {
+function PortalGalleryEntry({ onOpen, lm }: { onOpen: () => void; lm?: boolean }) {
   return (
     <motion.section
-      className="portal-gallery-entry"
+      className={`portal-gallery-entry ${lm ? 'is-light' : ''}`}
       aria-labelledby="portal-gallery-entry-title"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
       data-testid="portal-gallery-entry"
     >
-      <img
-        src={galleryPortalImage}
-        alt="A lone figure crossing a windswept field beneath a dramatic sky"
-        className="portal-gallery-entry-image"
-        data-testid="image-gallery-portal"
-      />
-      <div className="portal-gallery-entry-overlay" aria-hidden="true" />
-      <div className="portal-gallery-entry-frame" aria-hidden="true" />
-      <button
-        type="button"
-        className="portal-gallery-launch"
-        onClick={onOpen}
-        aria-label="Open Universal Gallery"
-        data-testid="button-open-universal-gallery"
-      >
-        <span className="portal-gallery-launch-icon" aria-hidden="true">
-          <Archive size={18} strokeWidth={1.45} />
-        </span>
-        <span className="portal-gallery-launch-copy">
-          <span className="portal-gallery-launch-kicker">Visual archives</span>
-          <span id="portal-gallery-entry-title">Universal Gallery</span>
-        </span>
-        <ArrowUpRight className="portal-gallery-launch-arrow" size={15} strokeWidth={1.6} aria-hidden="true" />
-      </button>
+      <div className="portal-gallery-entry-visual">
+        <img
+          src={galleryPortalImage}
+          alt="A lone figure crossing a windswept field beneath a dramatic sky"
+          className="portal-gallery-entry-image"
+          data-testid="image-gallery-portal"
+        />
+        <div className="portal-gallery-entry-overlay" aria-hidden="true" />
+        <div className="portal-gallery-entry-frame" aria-hidden="true" />
+        <div className="portal-gallery-entry-copy">
+          <span className="portal-gallery-entry-index">ARCHIVE / 001</span>
+          <h2 id="portal-gallery-entry-title">UNIVERSAL GALLERY</h2>
+          <p>Where the visible world becomes a record of wonder.</p>
+        </div>
+      </div>
+      <div className="portal-gallery-entry-footer">
+        <span className="portal-gallery-entry-kicker">A living record of the cosmos</span>
+        <button
+          type="button"
+          className="portal-gallery-nav"
+          onClick={onOpen}
+          aria-label="Open Universal Gallery"
+          data-testid="button-open-universal-gallery"
+        >
+          <span className="portal-gallery-nav-icon" aria-hidden="true">
+            <Archive size={15} strokeWidth={1.45} />
+          </span>
+          <span>OPEN GALLERY</span>
+          <ArrowUpRight className="portal-gallery-nav-arrow" size={14} strokeWidth={1.6} aria-hidden="true" />
+        </button>
+      </div>
     </motion.section>
   );
 }
@@ -3092,6 +3099,9 @@ export default function App() {
                 <SingularityLaunchButton />
               </div>
 
+                {/* ── Universal Gallery — archival portal entry ── */}
+                <PortalGalleryEntry lm={lm} onOpen={() => setShowGallery(true)} />
+
               {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-3 mb-4">
@@ -3162,9 +3172,6 @@ export default function App() {
               <CosmicGalaxyBanner />
 
               <GreatObservatories lm={lm} />
-
-              {/* ── Universal Gallery launch image ── */}
-              <PortalGalleryEntry onOpen={() => setShowGallery(true)} />
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>
