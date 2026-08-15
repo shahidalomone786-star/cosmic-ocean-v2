@@ -1,8 +1,10 @@
 import { galleryProviderById, galleryProviders } from "./providers";
-import { classifyLicense, GalleryProviderError, isImageUrl, matchesGalleryFilters } from "./shared";
+import { classifyLicense, containsAdultContent, GalleryProviderError, isImageUrl, matchesGalleryFilters } from "./shared";
 import type { GalleryItem, GalleryLicenseClass, GalleryProviderAdapter, GalleryProviderId, GalleryProviderStatus, GallerySearchContext } from "./types";
 
-const FALLBACK_PROVIDERS: GalleryProviderId[] = ["openverse", "wikimedia", "google"];
+export const GENERAL_PROVIDERS: GalleryProviderId[] = ["openverse", "wikimedia", "flickr", "bing", "google"];
+export const ADULT_PROVIDERS: GalleryProviderId[] = ["danbooru", "reddit"];
+const FALLBACK_PROVIDERS: GalleryProviderId[] = GENERAL_PROVIDERS;
 const PROVIDER_AUTHORITY: Partial<Record<GalleryProviderId, number>> = {
   met: 1,
   artic: 1,
@@ -25,6 +27,10 @@ const PROVIDER_AUTHORITY: Partial<Record<GalleryProviderId, number>> = {
   vam: 1,
   "internet-archive": 0.85,
   pubchem: 0.9,
+  bing: 0.25,
+  flickr: 0.55,
+  danbooru: 0.2,
+  reddit: 0.15,
 };
 
 const LICENSE_QUALITY: Record<GalleryLicenseClass, number> = {
@@ -50,9 +56,50 @@ const ROUTES: Array<{ test: RegExp; providers: GalleryProviderId[] }> = [
   { test: /map|cartograph|atlas/i, providers: ["loc", "usgs-landsat", "nasa-earthdata", "europeana", "world-digital-library", "wikimedia", "openverse", "google"] },
 ];
 
+const ADULT_QUERY_TERMS = [
+  "nsfw",
+  "porn",
+  "pornography",
+  "hentai",
+  "rule34",
+  "r34",
+  "explicit",
+  "erotic",
+  "lewd",
+  "nude",
+  "naked",
+  "sexual",
+  "sex",
+  "boobs",
+  "tits",
+  "penis",
+  "dick",
+  "vagina",
+  "vulva",
+  "orgasm",
+  "blowjob",
+  "handjob",
+  "anal",
+  "bdsm",
+  "fetish",
+];
+
+const MINOR_SAFETY_TERMS = /\b(?:child|children|kid|kids|minor|underage|loli|lolita|shota|teen|teens|teenage|schoolgirl|schoolboy)\b/i;
+
+export function isAdultQuery(query: string): boolean {
+  const normalized = query.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized || MINOR_SAFETY_TERMS.test(normalized)) return false;
+  const terms = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
+  return ADULT_QUERY_TERMS.some((term) => terms.has(term));
+}
+
 function routeProviders(query: string): GalleryProviderAdapter[] {
   const route = ROUTES.find((candidate) => candidate.test.test(query));
-  const ids = route ? route.providers : FALLBACK_PROVIDERS;
+  const ids = [
+    ...(route ? route.providers : FALLBACK_PROVIDERS),
+    ...GENERAL_PROVIDERS,
+    ...(isAdultQuery(query) ? ADULT_PROVIDERS : []),
+  ];
   const uniqueIds = [...new Set(ids)];
   return uniqueIds.flatMap((id) => {
     const provider = galleryProviderById.get(id);
@@ -142,6 +189,11 @@ function qualityScore(item: GalleryItem): number {
 }
 
 function compareItems(a: GalleryItem, b: GalleryItem, query: string): number {
+  if (isAdultQuery(query)) {
+    const aIsAdultSource = ADULT_PROVIDERS.includes(providerIdFor(a));
+    const bIsAdultSource = ADULT_PROVIDERS.includes(providerIdFor(b));
+    if (aIsAdultSource !== bIsAdultSource) return aIsAdultSource ? -1 : 1;
+  }
   const aAuthority = exactQueryMatch(a, query) ? PROVIDER_AUTHORITY[providerIdFor(a)] ?? 0.5 : 0;
   const bAuthority = exactQueryMatch(b, query) ? PROVIDER_AUTHORITY[providerIdFor(b)] ?? 0.5 : 0;
   if (aAuthority !== bAuthority) return bAuthority - aAuthority;
@@ -217,17 +269,25 @@ export async function searchGallery(
   context: GallerySearchContext,
   requestedProviderIds?: string[],
 ): Promise<{ items: Awaited<ReturnType<typeof galleryProviders[number]["search"]>>; providerStatus: GalleryProviderStatus[]; hasMore: boolean }> {
+  const intentContext: GallerySearchContext = {
+    ...context,
+    safeSearch: context.safeSearch ?? !isAdultQuery(context.query),
+  };
   const providers: GalleryProviderAdapter[] = requestedProviderIds?.length
     ? [...new Set(requestedProviderIds)].flatMap((id) => {
+        if (intentContext.safeSearch && ADULT_PROVIDERS.includes(id as GalleryProviderId)) return [];
         const provider = galleryProviderById.get(id as GalleryProviderId);
         return provider ? [provider] : [];
       })
-    : routeProviders(context.query);
+    : routeProviders(intentContext.query);
 
-  const settled = await Promise.allSettled(providers.map((provider) => searchProviderWithTimeout(provider, context)));
+  const settled = await Promise.allSettled(providers.map((provider) => searchProviderWithTimeout(provider, intentContext)));
   const providerItems = settled.map((result, index) => result.status === "fulfilled"
     ? result.value
-      .map((item) => providerItemsForResult(item, providers[index]))
+      .map((item) => {
+        const normalized = providerItemsForResult(item, providers[index]);
+        return normalized ? normalizeAdultResult(normalized, intentContext.safeSearch) : null;
+      })
       .filter((item): item is GalleryItem => item !== null)
     : []);
   const providerStatus = settled.map((result, index): GalleryProviderStatus => {
@@ -252,11 +312,12 @@ export async function searchGallery(
 
   const filteredCandidates = providerItems
     .flat()
-    .filter((item) => matchesGalleryFilters(item, context));
+    .filter((item) => !intentContext.safeSearch || !containsAdultContent(item.title, item.description, item.category, item.tags))
+    .filter((item) => matchesGalleryFilters(item, intentContext));
   const uniqueItems = deduplicateCandidates(filteredCandidates)
-    .sort((a, b) => compareItems(a, b, context.query));
-  const items = uniqueItems.slice(0, context.limit);
-  const hasMore = providerItems.some((itemsForProvider, index) => providers[index].getNextPage(context, itemsForProvider) !== null);
+    .sort((a, b) => compareItems(a, b, intentContext.query));
+  const items = uniqueItems.slice(0, intentContext.limit);
+  const hasMore = providerItems.some((itemsForProvider, index) => providers[index].getNextPage(intentContext, itemsForProvider) !== null);
   return { items, providerStatus, hasMore };
 }
 
@@ -266,6 +327,19 @@ function providerItemsForResult(item: GalleryItem, provider: GalleryProviderAdap
   const image = provider.extractImage(normalized);
   if (!image) return null;
   return normalizeGalleryItem({ ...normalized, ...image });
+}
+
+function normalizeAdultResult(item: GalleryItem, safeSearch: boolean): GalleryItem {
+  const isAdultSource = ADULT_PROVIDERS.includes(providerIdFor(item));
+  const isAdultContent = containsAdultContent(item.title, item.description, item.category, item.tags);
+  if (safeSearch || (!isAdultSource && !isAdultContent)) return item;
+  return {
+    ...item,
+    license: "Unknown / Verify source",
+    licenseUrl: null,
+    licenseClass: "UNKNOWN",
+    attribution: "Verify source",
+  };
 }
 
 async function searchProviderWithTimeout(

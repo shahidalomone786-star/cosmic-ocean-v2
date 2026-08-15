@@ -8,6 +8,7 @@ import nasa from "./nasa";
 import openI from "./open-i";
 import openverse from "./openverse";
 import google from "./google";
+import bing from "./bing";
 import rijksmuseum from "./rijksmuseum";
 import rcsbPdb from "./rcsb-pdb";
 import smithsonian from "./smithsonian";
@@ -27,6 +28,8 @@ import dpla from "./dpla";
 import nationalArchives from "./national-archives";
 import nypl from "./nypl";
 import flickr from "./flickr";
+import danbooru from "./danbooru";
+import reddit from "./reddit";
 import pexels from "./pexels";
 import pixabay from "./pixabay";
 import biodiversityHeritageLibrary from "./biodiversity-heritage-library";
@@ -67,7 +70,10 @@ import usNationalArchives from "./us-national-archives";
 
 const providerDefinitions: GalleryProvider[] = [
   openverse,
+  bing,
   google,
+  danbooru,
+  reddit,
   nasa,
   met,
   artic,

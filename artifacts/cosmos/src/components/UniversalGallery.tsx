@@ -163,6 +163,7 @@ function GalleryImage({
     <img
       src={imageUrl}
       alt={item.title}
+      className="w-full h-auto object-contain"
       loading={modal ? 'eager' : 'lazy'}
       decoding="async"
       onError={() => {

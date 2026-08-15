@@ -5142,6 +5142,218 @@ body {
   }
 }
 
+/* ── Main Portal / Universal Gallery launch image ─────────────────────────── */
+.portal-gallery-entry {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 31rem);
+  aspect-ratio: 683 / 1024;
+  margin: .5rem auto 2rem;
+  overflow: hidden;
+  border: 1px solid rgba(143, 221, 216, .25);
+  background: #071316;
+  box-shadow:
+    0 20px 56px rgba(0, 0, 0, .38),
+    0 0 0 1px rgba(255, 255, 255, .035) inset;
+}
+.portal-gallery-entry-image,
+.portal-gallery-entry-overlay,
+.portal-gallery-entry-frame {
+  position: absolute;
+  inset: 0;
+}
+.portal-gallery-entry-image {
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(.76) contrast(1.05) brightness(.86);
+}
+.portal-gallery-entry-overlay {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 74% 22%, rgba(75, 195, 192, .14), transparent 29%),
+    linear-gradient(180deg, rgba(4, 12, 15, .14) 0%, rgba(4, 12, 15, .04) 37%, rgba(3, 12, 15, .44) 100%);
+  pointer-events: none;
+}
+.portal-gallery-entry-frame {
+  z-index: 2;
+  inset: .65rem;
+  border: 1px solid rgba(176, 230, 224, .18);
+  pointer-events: none;
+}
+.portal-gallery-launch {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: .7rem;
+  max-width: calc(100% - 2.5rem);
+  padding: .65rem .72rem .65rem .66rem;
+  border: 1px solid rgba(144, 224, 218, .44);
+  color: rgba(239, 252, 249, .94);
+  background: rgba(5, 22, 26, .72);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, .28),
+    0 0 20px rgba(91, 208, 200, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .1);
+  backdrop-filter: blur(18px) saturate(1.15);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.portal-gallery-launch:hover,
+.portal-gallery-launch:focus-visible {
+  border-color: rgba(144, 224, 218, .78);
+  background: rgba(7, 31, 35, .84);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, .34),
+    0 0 24px rgba(91, 208, 200, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .13);
+  outline: none;
+  transform: translateY(-2px);
+}
+.portal-gallery-launch:active { transform: translateY(0); }
+.portal-gallery-launch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.15rem;
+  height: 2.15rem;
+  border: 1px solid rgba(129, 220, 212, .48);
+  border-radius: 50%;
+  color: #9ae1d9;
+  background: rgba(90, 204, 196, .12);
+  box-shadow: 0 0 16px rgba(89, 205, 196, .12);
+}
+.portal-gallery-launch-copy {
+  display: flex;
+  flex-direction: column;
+  gap: .22rem;
+  min-width: 0;
+}
+.portal-gallery-launch-kicker {
+  color: rgba(155, 223, 217, .68);
+  font: 600 .47rem/1 var(--app-font-mono, "Space Mono", monospace);
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+.portal-gallery-launch-copy > span:last-child {
+  overflow: hidden;
+  color: rgba(248, 255, 253, .96);
+  font: 500 .72rem/1.1 var(--app-font-sans, "DM Sans", sans-serif);
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.portal-gallery-launch-arrow {
+  flex: 0 0 auto;
+  color: rgba(154, 225, 218, .76);
+  transition: transform 180ms ease;
+}
+.portal-gallery-launch:hover .portal-gallery-launch-arrow,
+.portal-gallery-launch:focus-visible .portal-gallery-launch-arrow { transform: translate(2px, -2px); }
+.portal-gallery-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(3, 12, 16, .97);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(135, 215, 207, .35) transparent;
+}
+.portal-gallery-overlay.is-light {
+  background: rgba(235, 244, 241, .98);
+}
+.portal-gallery-overlay-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .75rem 1.25rem;
+  border-bottom: 1px solid rgba(154, 197, 195, .14);
+  background: rgba(5, 20, 25, .82);
+  backdrop-filter: blur(20px);
+}
+.portal-gallery-overlay.is-light .portal-gallery-overlay-header {
+  border-bottom-color: rgba(36, 95, 102, .14);
+  background: rgba(235, 244, 241, .86);
+}
+.portal-gallery-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 2.15rem;
+  padding: .45rem .8rem;
+  border: 1px solid rgba(154, 197, 195, .25);
+  color: rgba(224, 242, 239, .78);
+  background: rgba(135, 215, 207, .06);
+  font: 600 .55rem/1 var(--app-font-mono, "Space Mono", monospace);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+.portal-gallery-back:hover,
+.portal-gallery-back:focus-visible {
+  border-color: rgba(135, 215, 207, .62);
+  color: #9ae1d9;
+  background: rgba(135, 215, 207, .12);
+  outline: none;
+}
+.portal-gallery-overlay.is-light .portal-gallery-back {
+  border-color: rgba(36, 95, 102, .22);
+  color: #285761;
+  background: rgba(36, 95, 102, .06);
+}
+.portal-gallery-overlay-label {
+  color: rgba(154, 225, 218, .62);
+  font: 600 .53rem/1 var(--app-font-mono, "Space Mono", monospace);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.portal-gallery-overlay.is-light .portal-gallery-overlay-label { color: #327b7d; }
+.portal-gallery-overlay > .universal-gallery {
+  margin-top: 0;
+}
+
+@media (max-width: 520px) {
+  .portal-gallery-entry {
+    width: 100%;
+    margin-top: .25rem;
+  }
+  .portal-gallery-entry-frame { inset: .45rem; }
+  .portal-gallery-launch {
+    top: .9rem;
+    right: .9rem;
+    max-width: calc(100% - 1.8rem);
+    gap: .55rem;
+    padding: .55rem .62rem .55rem .56rem;
+  }
+  .portal-gallery-launch-icon {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+  .portal-gallery-launch-copy > span:last-child { font-size: .65rem; }
+  .portal-gallery-overlay-header { padding: .65rem .85rem; }
+  .portal-gallery-overlay-label {
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* ── Universal Gallery / cinematic archive room ───────────────────────────── */
 .universal-gallery {
   --ug-ink: #e8f1ef;

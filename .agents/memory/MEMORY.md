@@ -18,3 +18,4 @@
 - [Cosmos performance optimization](performance-optimization.md) — keep chat/auth critical, defer secondary tools and PDF parsing, and cancel obsolete client requests
 - [Royalty wallet activation](royalty-wallet-activation.md) — Supabase wallet persistence requires applying the migration; browser reads are RLS-scoped and balance writes are server-owned
 - [Royalty inventory sync](royalty-inventory-sync.md) — Atelier ownership hydrates from authenticated RLS-scoped Supabase IDs into the existing Avatar flow with session-safe syncing
+- [Cosmic gallery safety routing](cosmic-gallery-safety.md) — adult sources are dispatched only for explicit intent and adult results keep unknown rights metadata

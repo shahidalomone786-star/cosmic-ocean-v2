@@ -1,6 +1,9 @@
 export type GalleryProviderId =
   | "openverse"
+  | "bing"
   | "google"
+  | "danbooru"
+  | "reddit"
   | "nasa"
   | "met"
   | "artic"
@@ -67,6 +70,7 @@ export type GallerySearchContext = {
   query: string;
   page: number;
   limit: number;
+  safeSearch: boolean;
   category?: string;
   media?: string;
   license?: string;

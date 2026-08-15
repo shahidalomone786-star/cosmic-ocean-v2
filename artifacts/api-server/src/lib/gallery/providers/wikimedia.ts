@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, filterSafeGalleryItems, firstText, list, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type WikimediaResponse = { query?: { pages?: Record<string, { pageid?: number; title?: string; imageinfo?: Array<Record<string, unknown>> }> } };
@@ -17,9 +17,12 @@ const wikimedia: GalleryProvider = {
     url.searchParams.set("prop", "imageinfo");
     url.searchParams.set("iiprop", "url|size|extmetadata");
     url.searchParams.set("iiurlwidth", "800");
+    // Wikimedia does not consistently enforce this flag across Commons
+    // search backends, so the adapter also applies the shared result filter.
+    url.searchParams.set("safesearch", context.safeSearch ? "1" : "0");
     url.searchParams.set("format", "json");
     const data = await fetchJson<WikimediaResponse>(url.toString());
-    return Object.values(data.query?.pages ?? {}).flatMap((item) => {
+    return filterSafeGalleryItems(Object.values(data.query?.pages ?? {}).flatMap((item) => {
       const info = item.imageinfo?.[0] ?? {};
       const metadata = (info.extmetadata ?? {}) as Record<string, unknown>;
       const rights = usableLicense(
@@ -48,7 +51,7 @@ const wikimedia: GalleryProvider = {
         width: asNumber(info.width),
         height: asNumber(info.height),
       }];
-    });
+    }), context.safeSearch);
   },
 };
 

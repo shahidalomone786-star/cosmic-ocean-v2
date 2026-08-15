@@ -212,6 +212,18 @@ export function firstImageUrl(...values: unknown[]): string | null {
   return null;
 }
 
+const ADULT_CONTENT_PATTERN = /\b(?:nsfw|porn(?:ography)?|hentai|rule34|r34|explicit|erotic|lewd|nude|naked|sex(?:ual)?|boob(?:s|ies)?|tits?|penis|dick|vagina|vulva|orgasm|blowjob|handjob|anal|bdsm|fetish)\b/i;
+
+export function containsAdultContent(...values: unknown[]): boolean {
+  return values.some((value) => ADULT_CONTENT_PATTERN.test(firstText(value) ?? ""));
+}
+
+export function filterSafeGalleryItems<T extends GalleryItem>(items: T[], safeSearch: boolean): T[] {
+  return safeSearch
+    ? items.filter((item) => !containsAdultContent(item.title, item.description, item.category, item.tags))
+    : items;
+}
+
 export function matchesGalleryFilters(
   item: { category: string; source: string; title: string; description: string | null; tags: string[]; licenseClass: GalleryLicenseClass; width: number | null; height: number | null },
   filters: Partial<Pick<GallerySearchContext, "category" | "media" | "license" | "quality" | "orientation">>,

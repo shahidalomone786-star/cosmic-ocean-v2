@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
+import { Globe, Orbit, Telescope, Sparkles, Satellite, BookOpen, Layers3, Sun, Moon, ChevronDown, Search, Atom, Waves, Star, Activity, Archive, ArrowUpRight, Brain, Compass, Cpu, Dices, Droplets, Flame, FlaskConical, Gamepad2, Gauge, Ghost, Leaf, Magnet, Microscope, Network, Puzzle, Radio, Rocket, RotateCw, Scale, Settings2, Sigma, Target, Thermometer, Timer, Wind, Zap } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { UnifiedItem, WikiItem, NasaItem, ArxivItem, SpaceXItem, CernItem, NasaStatus, SearchSections } from './components/NasaSearch';
 import SearchHeroCarousel, { type SearchImage } from './components/SearchHeroCarousel';
@@ -46,6 +46,7 @@ import { useAuthStore, PRESET_AVATARS, type UserProfile } from './store/authStor
 import { TtsPlaybackQueue } from './lib/edgeTts';
 import { toast } from './hooks/use-toast';
 import { fetchOwnedCosmicAvatarIds } from './features/royalty/ownership';
+import galleryPortalImage from '@assets/f8c427dde5450befda558774d5d7700f_1786790004020.jpg';
 
 // ─── 6 Cosmic Scenes ──────────────────────────────────────────────────────────
 const cosmicScenes = [
@@ -1910,6 +1911,45 @@ function UserBadge({ user, lm, onLogout }: { user: UserProfile; lm: boolean; onL
   );
 }
 
+// ─── Universal Gallery portal entry ───────────────────────────────────────────
+function PortalGalleryEntry({ onOpen }: { onOpen: () => void }) {
+  return (
+    <motion.section
+      className="portal-gallery-entry"
+      aria-labelledby="portal-gallery-entry-title"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      data-testid="portal-gallery-entry"
+    >
+      <img
+        src={galleryPortalImage}
+        alt="A lone figure crossing a windswept field beneath a dramatic sky"
+        className="portal-gallery-entry-image"
+        data-testid="image-gallery-portal"
+      />
+      <div className="portal-gallery-entry-overlay" aria-hidden="true" />
+      <div className="portal-gallery-entry-frame" aria-hidden="true" />
+      <button
+        type="button"
+        className="portal-gallery-launch"
+        onClick={onOpen}
+        aria-label="Open Universal Gallery"
+        data-testid="button-open-universal-gallery"
+      >
+        <span className="portal-gallery-launch-icon" aria-hidden="true">
+          <Archive size={18} strokeWidth={1.45} />
+        </span>
+        <span className="portal-gallery-launch-copy">
+          <span className="portal-gallery-launch-kicker">Visual archives</span>
+          <span id="portal-gallery-entry-title">Universal Gallery</span>
+        </span>
+        <ArrowUpRight className="portal-gallery-launch-arrow" size={15} strokeWidth={1.6} aria-hidden="true" />
+      </button>
+    </motion.section>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   // Wouter location — used to render the dedicated /nexus route
@@ -1930,6 +1970,7 @@ export default function App() {
   const [shareCopied,   setShareCopied]   = useState(false);
   const shareCopyTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPortal,   setShowPortal]  = useState(false);
+  const [showGallery,  setShowGallery] = useState(false);
   const [showLibrary,  setShowLibrary] = useState(false);
   const [language,     setLanguage]    = useState('English');
   const [langOpen,    setLangOpen]   = useState(false);
@@ -2953,7 +2994,10 @@ export default function App() {
             {/* Header */}
             <div className={`flex items-center justify-between px-5 pt-4 pb-3 flex-shrink-0 border-b ${lm ? 'border-slate-200' : 'border-white/[0.06]'}`}>
               <motion.button whileHover={{ x: -3 }} whileTap={{ scale: 0.95 }}
-                onClick={() => setShowPortal(false)}
+                onClick={() => {
+                  setShowPortal(false);
+                  setShowGallery(false);
+                }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 ${
                   lm
                     ? 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 hover:text-slate-900'
@@ -3119,10 +3163,8 @@ export default function App() {
 
               <GreatObservatories lm={lm} />
 
-              {/* ── Universal Gallery ── */}
-              <Suspense fallback={null}>
-                <UniversalGallery lm={lm} />
-              </Suspense>
+              {/* ── Universal Gallery launch image ── */}
+              <PortalGalleryEntry onOpen={() => setShowGallery(true)} />
 
               {/* ── Simulation Search ── */}
               <Suspense fallback={null}>
@@ -3436,6 +3478,38 @@ export default function App() {
               </div>
 
             </div>
+
+            {/* The existing Universal Gallery opens from the image without
+                changing its search, provider, filter, or licensing behavior. */}
+            <AnimatePresence>
+              {showGallery && (
+                <motion.div
+                  key="universal-gallery-overlay"
+                  className={`portal-gallery-overlay ${lm ? 'is-light' : ''}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  data-testid="universal-gallery-overlay"
+                >
+                  <div className="portal-gallery-overlay-header">
+                    <button
+                      type="button"
+                      className="portal-gallery-back"
+                      onClick={() => setShowGallery(false)}
+                      data-testid="button-back-from-universal-gallery"
+                    >
+                      <span aria-hidden="true">←</span>
+                      <span>Back to Portal</span>
+                    </button>
+                    <span className="portal-gallery-overlay-label">Universal Gallery</span>
+                  </div>
+                  <Suspense fallback={null}>
+                    <UniversalGallery lm={lm} />
+                  </Suspense>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

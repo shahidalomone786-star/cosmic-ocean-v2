@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { GallerySearchQueryParams, GallerySearchResponse } from "@workspace/api-zod";
-import { searchGallery } from "../lib/gallery/search";
+import { isAdultQuery, searchGallery } from "../lib/gallery/search";
 
 const router: IRouter = Router();
 
@@ -18,6 +18,7 @@ router.get("/gallery/search", async (req, res): Promise<void> => {
     query: parsed.data.q.trim(),
     page: parsed.data.page,
     limit: parsed.data.limit,
+    safeSearch: !isAdultQuery(parsed.data.q.trim()),
     category: parsed.data.category,
     media: parsed.data.media,
     license: parsed.data.license,

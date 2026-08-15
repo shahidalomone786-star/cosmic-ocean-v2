@@ -2,6 +2,7 @@ import {
   asNumber,
   categoryFromQuery,
   fetchJson,
+  filterSafeGalleryItems,
   firstText,
   list,
   providerNotConfigured,
@@ -67,7 +68,7 @@ const google: GalleryProvider = {
     url.searchParams.set("searchType", "image");
     url.searchParams.set("num", String(pageSize));
     url.searchParams.set("start", String((context.page - 1) * pageSize + 1));
-    url.searchParams.set("safe", "active");
+     url.searchParams.set("safe", context.safeSearch ? "active" : "off");
     if (context.quality === "hd" || context.quality === "2k" || context.quality === "4k") {
       url.searchParams.set("imgSize", context.quality === "hd" ? "large" : "xlarge");
     }
@@ -81,7 +82,7 @@ const google: GalleryProvider = {
         error instanceof Error ? error.message : "Google Custom Search request failed",
       );
     }
-    return (data.items ?? []).flatMap((item, index) => {
+     return filterSafeGalleryItems((data.items ?? []).flatMap((item, index) => {
       const imageUrl = firstText(item.link);
       const thumbnailUrl = firstText(item.image?.thumbnailLink, item.link);
       if (!imageUrl || !thumbnailUrl) return [];
@@ -110,7 +111,7 @@ const google: GalleryProvider = {
         width: asNumber(item.image?.width),
         height: asNumber(item.image?.height),
       }];
-    });
+     }), context.safeSearch);
   },
   getNextPage(context: GallerySearchContext, results: GalleryItem[]): number | null {
     const pageSize = Math.min(context.limit, 10);

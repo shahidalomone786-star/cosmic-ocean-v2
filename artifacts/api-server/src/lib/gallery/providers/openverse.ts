@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, filterSafeGalleryItems, firstText, list, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type OpenverseResponse = { results?: Array<Record<string, unknown>> };
@@ -11,9 +11,9 @@ const openverse: GalleryProvider = {
     url.searchParams.set("q", context.query);
     url.searchParams.set("page", String(context.page));
     url.searchParams.set("page_size", String(Math.min(context.limit, 20)));
-    url.searchParams.set("mature", "false");
+    url.searchParams.set("mature", String(!context.safeSearch));
     const data = await fetchJson<OpenverseResponse>(url.toString());
-    return (data.results ?? []).flatMap((item) => {
+    return filterSafeGalleryItems((data.results ?? []).flatMap((item) => {
       const rights = usableLicense(item.license, item.license_url);
       const imageUrl = firstText(item.url);
       const thumbnailUrl = firstText(item.thumbnail, item.url);
@@ -37,7 +37,7 @@ const openverse: GalleryProvider = {
         width: asNumber(item.width),
         height: asNumber(item.height),
       }];
-    });
+    }), context.safeSearch);
   },
 };
 
