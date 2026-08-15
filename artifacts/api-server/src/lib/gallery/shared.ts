@@ -4,9 +4,9 @@ import type { GalleryImage, GalleryItem, GalleryLicenseClass, GalleryProvider, G
 // Promise.allSettled still preserves successful providers as partial results.
 const DEFAULT_TIMEOUT_MS = 7000;
 
-export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function fetchJson<T>(url: string, init?: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const upstreamSignal = init?.signal;
   const abortFromUpstream = () => controller.abort();
   upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });

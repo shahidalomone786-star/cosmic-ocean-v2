@@ -4,28 +4,7 @@ import type { GalleryItem, GalleryProvider } from "../types";
 type DanbooruPost = Record<string, unknown>;
 
 function queryTags(query: string): string {
-  const routingTerms = new Set([
-    "nsfw",
-    "porn",
-    "pornography",
-    "hentai",
-    "rule34",
-    "r34",
-    "explicit",
-    "erotic",
-    "lewd",
-    "nude",
-    "naked",
-    "sexual",
-    "sex",
-  ]);
-  const tags = query
-    .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}_ -]+/gu, " ")
-    .split(/\s+/)
-    .filter((tag) => tag && !routingTerms.has(tag))
-    .slice(0, 8);
-  return [...new Set([...tags, "rating:explicit"])].join(" ");
+  return query.trim().toLowerCase().replace(/\s+/g, "_");
 }
 
 const danbooru: GalleryProvider = {
@@ -33,14 +12,13 @@ const danbooru: GalleryProvider = {
   label: "Danbooru",
   async search(context): Promise<GalleryItem[]> {
     if (context.safeSearch) return [];
-    const url = new URL("https://danbooru.donmai.us/posts.json");
-    url.searchParams.set("tags", queryTags(context.query));
-    url.searchParams.set("limit", String(Math.min(context.limit, 20)));
-    url.searchParams.set("page", String(context.page));
-    const posts = await fetchJson<DanbooruPost[]>(url.toString());
+    const sanitizedTag = queryTags(context.query);
+    const page = context.page > 1 ? `&page=${context.page}` : "";
+    const url = `https://danbooru.donmai.us/posts.json?tags=${encodeURIComponent(sanitizedTag)}+rating:explicit&limit=30${page}`;
+    const posts = await fetchJson<DanbooruPost[]>(url, undefined, 5000);
 
     return posts.flatMap((post) => {
-      const imageUrl = firstText(post.file_url, post.large_file_url, post.preview_file_url);
+      const imageUrl = firstText(post.large_file_url, post.file_url, post.preview_file_url);
       const thumbnailUrl = firstText(post.preview_file_url, post.large_file_url, post.file_url);
       if (!imageUrl || !thumbnailUrl || String(post.rating ?? "") !== "e") return [];
       const tags = String(post.tag_string ?? "").split(/\s+/).filter(Boolean);

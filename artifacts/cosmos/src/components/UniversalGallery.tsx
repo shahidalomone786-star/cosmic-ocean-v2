@@ -23,6 +23,8 @@ import {
   type GallerySearchParams,
   type GallerySearchQuality,
 } from '@workspace/api-client-react';
+import AgeGateModal, { isAdultQuery } from './AgeGateModal';
+import { toast } from '../hooks/use-toast';
 
 type UniversalGalleryProps = {
   lm?: boolean;
@@ -119,6 +121,8 @@ function formatProviderName(provider: string): string {
     wellcome: 'Wellcome Collection',
     vam: 'Victoria and Albert Museum',
     pubchem: 'PubChem',
+    eporner: 'Eporner',
+    danbooru: 'Danbooru',
   };
   if (labels[provider]) return labels[provider];
   return provider.replace(/[-_]/g, ' ');
@@ -499,6 +503,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [page, setPage] = useState(1);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
+  const [ageGateQuery, setAgeGateQuery] = useState<string | null>(null);
   const loadedQueryRef = useRef('');
   const loadedItemKeysRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -604,19 +609,44 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     }
   }, [galleryQuery.data?.page, galleryQuery.isError, page]);
 
+  const commitSearch = useCallback((nextQuery: string) => {
+    setDraftQuery(nextQuery);
+    setCommittedQuery(nextQuery);
+    setCategory('');
+    setProvider('');
+    setMedia('');
+    setLicense('');
+    setQuality('');
+    setOrientation('');
+  }, []);
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextQuery = draftQuery.trim();
-    if (nextQuery.length > 0) {
-      setCommittedQuery(nextQuery);
-      setCategory('');
-      setProvider('');
-      setMedia('');
-      setLicense('');
-      setQuality('');
-      setOrientation('');
+    if (nextQuery.length === 0) return;
+    const ageVerified = typeof window !== 'undefined'
+      && window.sessionStorage.getItem('cosmic_age_verified') === 'true';
+    if (isAdultQuery(nextQuery) && !ageVerified) {
+      setAgeGateQuery(nextQuery);
+      return;
     }
+    commitSearch(nextQuery);
   };
+
+  const confirmAgeGate = useCallback(() => {
+    if (!ageGateQuery) return;
+    window.sessionStorage.setItem('cosmic_age_verified', 'true');
+    const queuedQuery = ageGateQuery;
+    setAgeGateQuery(null);
+    commitSearch(queuedQuery);
+  }, [ageGateQuery, commitSearch]);
+
+  const cancelAgeGate = useCallback(() => {
+    setAgeGateQuery(null);
+    setDraftQuery('');
+    setCommittedQuery('');
+    toast({ title: 'Exhibit search cancelled.' });
+  }, []);
 
   const clearFilters = () => {
     setCategory('');
@@ -634,7 +664,8 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   }, []);
 
   return (
-    <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
+    <>
+      <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
       <div className="universal-gallery-shell">
         <header className="universal-gallery-heading">
           <div>
@@ -799,6 +830,10 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           <GalleryDetail item={selectedItem} onClose={() => setSelectedItem(null)} />
         )}
       </AnimatePresence>
-    </section>
+      </section>
+      {ageGateQuery !== null && (
+        <AgeGateModal onConfirm={confirmAgeGate} onCancel={cancelAgeGate} />
+      )}
+    </>
   );
 }

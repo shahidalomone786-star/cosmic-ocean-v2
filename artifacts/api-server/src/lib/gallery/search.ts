@@ -3,7 +3,7 @@ import { classifyLicense, containsAdultContent, GalleryProviderError, isImageUrl
 import type { GalleryItem, GalleryLicenseClass, GalleryProviderAdapter, GalleryProviderId, GalleryProviderStatus, GallerySearchContext } from "./types";
 
 export const GENERAL_PROVIDERS: GalleryProviderId[] = ["openverse", "wikimedia", "flickr", "bing", "google"];
-export const ADULT_PROVIDERS: GalleryProviderId[] = ["danbooru", "reddit"];
+export const ADULT_PROVIDERS: GalleryProviderId[] = ["eporner", "danbooru"];
 const FALLBACK_PROVIDERS: GalleryProviderId[] = GENERAL_PROVIDERS;
 const PROVIDER_AUTHORITY: Partial<Record<GalleryProviderId, number>> = {
   met: 1,
@@ -94,11 +94,16 @@ export function isAdultQuery(query: string): boolean {
 }
 
 function routeProviders(query: string): GalleryProviderAdapter[] {
+  if (isAdultQuery(query)) {
+    return ADULT_PROVIDERS.flatMap((id) => {
+      const provider = galleryProviderById.get(id);
+      return provider ? [provider] : [];
+    });
+  }
   const route = ROUTES.find((candidate) => candidate.test.test(query));
   const ids = [
     ...(route ? route.providers : FALLBACK_PROVIDERS),
     ...GENERAL_PROVIDERS,
-    ...(isAdultQuery(query) ? ADULT_PROVIDERS : []),
   ];
   const uniqueIds = [...new Set(ids)];
   return uniqueIds.flatMap((id) => {
@@ -273,7 +278,12 @@ export async function searchGallery(
     ...context,
     safeSearch: context.safeSearch ?? !isAdultQuery(context.query),
   };
-  const providers: GalleryProviderAdapter[] = requestedProviderIds?.length
+  const providers: GalleryProviderAdapter[] = isAdultQuery(intentContext.query)
+    ? ADULT_PROVIDERS.flatMap((id) => {
+      const provider = galleryProviderById.get(id);
+      return provider ? [provider] : [];
+    })
+    : requestedProviderIds?.length
     ? [...new Set(requestedProviderIds)].flatMap((id) => {
         if (intentContext.safeSearch && ADULT_PROVIDERS.includes(id as GalleryProviderId)) return [];
         const provider = galleryProviderById.get(id as GalleryProviderId);
@@ -310,15 +320,30 @@ export async function searchGallery(
     };
   });
 
-  const filteredCandidates = providerItems
-    .flat()
+  const filteredProviderItems = providerItems.map((items) => items
     .filter((item) => !intentContext.safeSearch || !containsAdultContent(item.title, item.description, item.category, item.tags))
-    .filter((item) => matchesGalleryFilters(item, intentContext));
-  const uniqueItems = deduplicateCandidates(filteredCandidates)
-    .sort((a, b) => compareItems(a, b, intentContext.query));
+    .filter((item) => matchesGalleryFilters(item, intentContext)));
+  const filteredCandidates = isAdultQuery(intentContext.query)
+    ? zipperInterleave(filteredProviderItems)
+    : filteredProviderItems.flat();
+  const uniqueItems = deduplicateCandidates(filteredCandidates);
+  if (!isAdultQuery(intentContext.query)) {
+    uniqueItems.sort((a, b) => compareItems(a, b, intentContext.query));
+  }
   const items = uniqueItems.slice(0, intentContext.limit);
   const hasMore = providerItems.some((itemsForProvider, index) => providers[index].getNextPage(intentContext, itemsForProvider) !== null);
   return { items, providerStatus, hasMore };
+}
+
+function zipperInterleave(providerItems: GalleryItem[][]): GalleryItem[] {
+  const items: GalleryItem[] = [];
+  const maxLength = Math.max(...providerItems.map((provider) => provider.length), 0);
+  for (let index = 0; index < maxLength; index += 1) {
+    for (const provider of providerItems) {
+      if (index < provider.length) items.push(provider[index]);
+    }
+  }
+  return items;
 }
 
 function providerItemsForResult(item: GalleryItem, provider: GalleryProviderAdapter): GalleryItem | null {

@@ -1,5 +1,6 @@
 export type GalleryProviderId =
   | "openverse"
+  | "eporner"
   | "bing"
   | "google"
   | "danbooru"

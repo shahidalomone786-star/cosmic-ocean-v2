@@ -7,6 +7,7 @@ import met from "./met";
 import nasa from "./nasa";
 import openI from "./open-i";
 import openverse from "./openverse";
+import eporner from "./eporner";
 import google from "./google";
 import bing from "./bing";
 import rijksmuseum from "./rijksmuseum";
@@ -70,6 +71,7 @@ import usNationalArchives from "./us-national-archives";
 
 const providerDefinitions: GalleryProvider[] = [
   openverse,
+  eporner,
   bing,
   google,
   danbooru,
