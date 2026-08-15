@@ -5218,6 +5218,21 @@ body {
   font: 400 clamp(.75rem, 1.5vw, .95rem)/1.35 var(--app-font-heading, "Instrument Serif", serif);
   letter-spacing: .015em;
 }
+.portal-gallery-entry-copy .portal-gallery-nav {
+  width: fit-content;
+  margin-top: 1.35rem;
+  border: 1px solid rgba(185, 231, 224, .28);
+  background: rgba(4, 13, 16, .48);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: blur(14px);
+}
+.portal-gallery-entry-copy .portal-gallery-nav:hover,
+.portal-gallery-entry-copy .portal-gallery-nav:focus-visible {
+  border-color: rgba(154, 225, 218, .62);
+  background: rgba(4, 20, 23, .66);
+}
 .portal-gallery-entry.is-light .portal-gallery-entry-copy {
   color: #f7fbf8;
 }
@@ -5370,16 +5385,15 @@ body {
     margin-top: .7rem;
     font-size: .82rem;
   }
+  .portal-gallery-entry-copy .portal-gallery-nav {
+    width: fit-content;
+    margin-top: 1.15rem;
+  }
   .portal-gallery-entry-footer {
     align-items: flex-start;
     flex-direction: column;
     gap: .55rem;
     padding-top: .6rem;
-  }
-  .portal-gallery-nav {
-    width: 100%;
-    justify-content: space-between;
-    padding-left: .3rem;
   }
   .portal-gallery-nav-icon {
     width: 1.9rem;

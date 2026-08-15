@@ -1935,23 +1935,23 @@ function PortalGalleryEntry({ onOpen, lm }: { onOpen: () => void; lm?: boolean }
           <span className="portal-gallery-entry-index">ARCHIVE / 001</span>
           <h2 id="portal-gallery-entry-title">UNIVERSAL GALLERY</h2>
           <p>Where the visible world becomes a record of wonder.</p>
+          <button
+            type="button"
+            className="portal-gallery-nav"
+            onClick={onOpen}
+            aria-label="Open Universal Gallery"
+            data-testid="button-open-universal-gallery"
+          >
+            <span className="portal-gallery-nav-icon" aria-hidden="true">
+              <Archive size={15} strokeWidth={1.45} />
+            </span>
+            <span>OPEN GALLERY</span>
+            <ArrowUpRight className="portal-gallery-nav-arrow" size={14} strokeWidth={1.6} aria-hidden="true" />
+          </button>
         </div>
       </div>
       <div className="portal-gallery-entry-footer">
         <span className="portal-gallery-entry-kicker">A living record of the cosmos</span>
-        <button
-          type="button"
-          className="portal-gallery-nav"
-          onClick={onOpen}
-          aria-label="Open Universal Gallery"
-          data-testid="button-open-universal-gallery"
-        >
-          <span className="portal-gallery-nav-icon" aria-hidden="true">
-            <Archive size={15} strokeWidth={1.45} />
-          </span>
-          <span>OPEN GALLERY</span>
-          <ArrowUpRight className="portal-gallery-nav-arrow" size={14} strokeWidth={1.6} aria-hidden="true" />
-        </button>
       </div>
     </motion.section>
   );
