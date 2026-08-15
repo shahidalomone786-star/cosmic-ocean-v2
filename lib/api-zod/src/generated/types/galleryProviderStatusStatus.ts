@@ -10,6 +10,9 @@ export type GalleryProviderStatusStatus = typeof GalleryProviderStatusStatus[key
 
 
 export const GalleryProviderStatusStatus = {
-  ready: 'ready',
-  unavailable: 'unavailable',
+  AVAILABLE: 'AVAILABLE',
+  UNAVAILABLE: 'UNAVAILABLE',
+  NOT_CONFIGURED: 'NOT_CONFIGURED',
+  ERROR: 'ERROR',
+  NO_RESULTS: 'NO_RESULTS',
 } as const;

@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, firstText, list, providerNotConfigured, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type SmithsonianResponse = { response?: { rows?: Array<Record<string, unknown>> } };
@@ -8,7 +8,7 @@ const smithsonian: GalleryProvider = {
   label: "Smithsonian Open Access",
   async search(context): Promise<GalleryItem[]> {
     const key = process.env.SMITHSONIAN_API_KEY;
-    if (!key) throw new Error("SMITHSONIAN_API_KEY is not configured");
+    if (!key) providerNotConfigured("Smithsonian Open Access", "SMITHSONIAN_API_KEY");
     const url = new URL("https://api.si.edu/openaccess/api/v1.0/search");
     url.searchParams.set("q", context.query);
     url.searchParams.set("api_key", key);

@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("nlm-digital-collections", "National Library of Medicine Digital Collections", "No stable public image-search endpoint is configured.");

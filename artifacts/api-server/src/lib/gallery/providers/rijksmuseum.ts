@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, firstText, list, providerNotConfigured, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type RijksResponse = { artObjects?: Array<Record<string, unknown>> };
@@ -8,7 +8,7 @@ const rijksmuseum: GalleryProvider = {
   label: "Rijksmuseum",
   async search(context): Promise<GalleryItem[]> {
     const key = process.env.RIJKSMUSEUM_API_KEY;
-    if (!key) throw new Error("RIJKSMUSEUM_API_KEY is not configured");
+    if (!key) providerNotConfigured("Rijksmuseum", "RIJKSMUSEUM_API_KEY");
     const url = new URL("https://www.rijksmuseum.nl/api/en/collection");
     url.searchParams.set("key", key);
     url.searchParams.set("q", context.query);

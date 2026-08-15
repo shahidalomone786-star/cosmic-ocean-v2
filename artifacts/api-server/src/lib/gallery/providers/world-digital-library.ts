@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("world-digital-library", "World Digital Library", "The legacy service is not available as a stable public API.");

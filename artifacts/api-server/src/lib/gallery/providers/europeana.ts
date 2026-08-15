@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, firstText, list, providerNotConfigured, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type EuropeanaResponse = { items?: Array<Record<string, unknown>> };
@@ -8,7 +8,7 @@ const europeana: GalleryProvider = {
   label: "Europeana",
   async search(context): Promise<GalleryItem[]> {
     const key = process.env.EUROPEANA_API_KEY;
-    if (!key) throw new Error("EUROPEANA_API_KEY is not configured");
+    if (!key) providerNotConfigured("Europeana", "EUROPEANA_API_KEY");
     const url = new URL("https://api.europeana.eu/record/v2/search.json");
     url.searchParams.set("wskey", key);
     url.searchParams.set("query", context.query);

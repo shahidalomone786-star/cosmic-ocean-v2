@@ -281,7 +281,7 @@ export const AstronomySuggestionsResponse = zod.object({
 
 
 /**
- * Searches the Phase A Universal Gallery providers in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures are reported as unavailable without failing the aggregate response.
+ * Searches only semantically relevant registered Universal Gallery connectors in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures never fail the aggregate response.
  * @summary Search licensed image collections through isolated provider adapters
  */
 export const gallerySearchQueryQMax = 160;
@@ -330,7 +330,7 @@ export const GallerySearchResponse = zod.object({
 })),
   "providerStatus": zod.array(zod.object({
   "provider": zod.string(),
-  "status": zod.enum(['ready', 'unavailable']),
+  "status": zod.enum(['AVAILABLE', 'UNAVAILABLE', 'NOT_CONFIGURED', 'ERROR', 'NO_RESULTS']),
   "count": zod.number(),
   "message": zod.string().nullable()
 })),

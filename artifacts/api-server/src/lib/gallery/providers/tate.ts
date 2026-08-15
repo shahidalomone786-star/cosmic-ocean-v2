@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("tate", "Tate Collection", "The public collection endpoint does not expose a stable image search contract.");

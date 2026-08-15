@@ -1,4 +1,4 @@
-import { asNumber, categoryFromQuery, fetchJson, firstText, list, usableLicense } from "../shared";
+import { asNumber, categoryFromQuery, fetchJson, firstText, list, providerNotConfigured, usableLicense } from "../shared";
 import type { GalleryItem, GalleryProvider } from "../types";
 
 type UnsplashResponse = { results?: Array<Record<string, unknown>> };
@@ -8,7 +8,7 @@ const unsplash: GalleryProvider = {
   label: "Unsplash",
   async search(context): Promise<GalleryItem[]> {
     const key = process.env.UNSPLASH_ACCESS_KEY;
-    if (!key) throw new Error("UNSPLASH_ACCESS_KEY is not configured");
+    if (!key) providerNotConfigured("Unsplash", "UNSPLASH_ACCESS_KEY");
     const url = new URL("https://api.unsplash.com/search/photos");
     url.searchParams.set("query", context.query);
     url.searchParams.set("page", String(context.page));

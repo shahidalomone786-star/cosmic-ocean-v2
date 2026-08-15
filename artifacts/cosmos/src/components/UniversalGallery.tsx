@@ -99,10 +99,16 @@ function licenseBadgeLabel(licenseClass: GalleryItemLicenseClass): string {
 
 function formatProviderName(provider: string): string {
   const labels: Record<string, string> = {
+    google: 'Google',
     artic: 'Art Institute of Chicago',
     'open-i': 'Open-i / NIH',
     'rcsb-pdb': 'RCSB Protein Data Bank',
     'usgs-landsat': 'USGS Landsat',
+    cleveland: 'Cleveland Museum of Art',
+    'internet-archive': 'Internet Archive',
+    wellcome: 'Wellcome Collection',
+    vam: 'Victoria and Albert Museum',
+    pubchem: 'PubChem',
   };
   if (labels[provider]) return labels[provider];
   return provider.replace(/[-_]/g, ' ');
@@ -110,15 +116,19 @@ function formatProviderName(provider: string): string {
 
 function galleryItemKeys(item: GalleryItem): string[] {
   const normalize = (value: string) => value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/[?#].*$/, '')
     .replace(/\/+$/, '')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return [
-    normalize(item.imageUrl),
-    normalize(item.thumbnailUrl),
+    `image:${normalize(item.imageUrl)}`,
+    `thumbnail:${normalize(item.thumbnailUrl)}`,
+    `record:${item.id.toLowerCase()}`,
     `${normalize(item.title)}|${normalize(item.creator ?? '')}`,
   ];
 }
@@ -126,23 +136,21 @@ function galleryItemKeys(item: GalleryItem): string[] {
 function GalleryImage({
   item,
   modal = false,
-  onFailed,
 }: {
   item: GalleryItem;
   modal?: boolean;
-  onFailed?: () => void;
 }) {
   const [imageStage, setImageStage] = useState<'primary' | 'alternate' | 'placeholder'>('primary');
   const imageUrl = imageStage === 'primary'
-    ? (modal ? item.imageUrl : item.thumbnailUrl)
+    ? item.imageUrl
     : imageStage === 'alternate'
-      ? (modal ? item.thumbnailUrl : item.imageUrl)
+      ? item.thumbnailUrl
       : null;
 
   if (!imageUrl) {
     return (
       <div
-        className={modal ? 'universal-gallery-modal-media' : 'universal-gallery-card-media'}
+        className={`universal-gallery-image-placeholder ${modal ? 'is-modal' : ''}`}
         data-testid={`${modal ? 'empty-image' : 'empty-thumbnail'}-${item.id}`}
         aria-label="Image unavailable"
       >
@@ -158,7 +166,6 @@ function GalleryImage({
       loading={modal ? 'eager' : 'lazy'}
       decoding="async"
       onError={() => {
-        if (imageStage === 'alternate') onFailed?.();
         setImageStage(imageStage === 'primary' ? 'alternate' : 'placeholder');
       }}
       data-testid={`${modal ? 'img-gallery-detail' : 'img-gallery-thumbnail'}-${item.id}`}
@@ -178,14 +185,20 @@ function ProviderStrip({ statuses }: { statuses: GalleryProviderStatus[] }) {
         <span
           key={status.provider}
           className={`universal-gallery-provider-status universal-gallery-mono ${
-            status.status === 'ready' ? 'is-ready' : 'is-unavailable'
+            status.status === 'AVAILABLE' ? 'is-ready' : 'is-unavailable'
           }`}
           title={status.message ?? undefined}
           data-testid={`status-gallery-provider-${status.provider}`}
         >
           <i aria-hidden="true" />
           {formatProviderName(status.provider)}
-          <small>{status.status === 'ready' ? `${status.count} records` : 'unavailable'}</small>
+          <small>
+            {status.status === 'AVAILABLE'
+              ? `${status.count} records`
+              : status.status === 'NO_RESULTS'
+                ? 'no results'
+                : status.status.toLowerCase().replace('_', ' ')}
+          </small>
         </span>
       ))}
     </div>
@@ -385,7 +398,6 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [page, setPage] = useState(1);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
-  const [failedItemIds, setFailedItemIds] = useState<Set<string>>(new Set());
   const loadedQueryRef = useRef('');
 
   const params = useMemo<GallerySearchParams>(() => ({
@@ -407,7 +419,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     },
   });
   const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
-  const items = galleryItems.filter((item) => !failedItemIds.has(item.id));
+  const items = galleryItems;
   const statuses = galleryQuery.data?.providerStatus ?? [];
 
   const providers = useMemo(() => {
@@ -420,7 +432,6 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   useEffect(() => {
     setPage(1);
     setGalleryItems([]);
-    setFailedItemIds(new Set());
     loadedQueryRef.current = '';
   }, [category, committedQuery, license, media, orientation, provider, quality]);
 
@@ -468,7 +479,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   };
 
   const activeFilterCount = [category, provider, media, license, quality, orientation].filter(Boolean).length;
-  const readySources = statuses.filter((status) => status.status === 'ready' && status.count > 0).length;
+  const readySources = statuses.filter((status) => status.status === 'AVAILABLE' && status.count > 0).length;
 
   return (
     <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
@@ -615,28 +626,27 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                   data-testid={`card-gallery-item-${item.id}`}
                 >
                   <div className="universal-gallery-card-media">
-                  <GalleryImage item={item} onFailed={() => setFailedItemIds((previous) => {
-                    const next = new Set(previous);
-                    next.add(item.id);
-                    return next;
-                  })} />
-                    <div className="universal-gallery-card-shade" aria-hidden="true" />
-                    <span className="universal-gallery-card-index universal-gallery-mono">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <span className="universal-gallery-card-source universal-gallery-mono">
-                      {formatProviderName(item.source)}
-                    </span>
-                    <div className="universal-gallery-card-copy">
-                      <span className="universal-gallery-card-category universal-gallery-mono">{item.category}</span>
-                       <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
-                         {licenseBadgeLabel(item.licenseClass)}
-                       </span>
-                      <h3>{item.title}</h3>
+                    <GalleryImage item={item} />
+                  </div>
+                  <div className="universal-gallery-card-copy">
+                    <span className="universal-gallery-card-category universal-gallery-mono">{item.category}</span>
+                    <h3>{item.title}</h3>
+                    <div className="universal-gallery-card-metadata">
+                      <span>{item.creator ?? 'Creator unavailable'}</span>
+                      <span>{formatProviderName(item.source)}</span>
                     </div>
+                    <div className="universal-gallery-card-metadata">
+                      <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
+                        {licenseBadgeLabel(item.licenseClass)}
+                      </span>
+                      <span>{item.license}</span>
+                    </div>
+                    {item.attribution && (
+                      <p className="universal-gallery-card-attribution">{item.attribution}</p>
+                    )}
                   </div>
                   <div className="universal-gallery-card-footer">
-                    <span>{item.creator ?? item.license}</span>
+                    <span>{item.width && item.height ? `${item.width} × ${item.height}` : 'Dimensions unavailable'}</span>
                     <span className="universal-gallery-card-rule" aria-hidden="true" />
                     <span className="universal-gallery-card-mark" aria-hidden="true">
                       <ArrowUpRight size={12} />

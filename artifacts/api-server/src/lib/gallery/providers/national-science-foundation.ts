@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("national-science-foundation", "National Science Foundation", "The public service is not a licensed image-search API.");

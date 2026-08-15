@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("dryad", "Dryad", "The repository API is data-focused and does not provide a stable image-search contract.");

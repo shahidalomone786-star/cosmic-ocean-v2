@@ -1,4 +1,4 @@
-import type { GalleryLicenseClass, GallerySearchContext } from "./types";
+import type { GalleryImage, GalleryItem, GalleryLicenseClass, GalleryProvider, GalleryProviderAdapter, GalleryProviderStatusCode, GallerySearchContext } from "./types";
 
 // Keep the aggregate gallery responsive when an optional archive is slow.
 // Promise.allSettled still preserves successful providers as partial results.
@@ -30,6 +30,74 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
   }
 }
 
+export class GalleryProviderError extends Error {
+  readonly status: GalleryProviderStatusCode;
+
+  constructor(status: GalleryProviderStatusCode, message: string) {
+    super(message);
+    this.name = "GalleryProviderError";
+    this.status = status;
+  }
+}
+
+export function providerNotConfigured(provider: string, envName: string): never {
+  throw new GalleryProviderError("NOT_CONFIGURED", `${provider} is not configured (${envName})`);
+}
+
+export function providerUnavailable(provider: string, message = "Provider is unavailable"): never {
+  throw new GalleryProviderError("UNAVAILABLE", `${provider}: ${message}`);
+}
+
+export function defaultExtractImage(item: GalleryItem): GalleryImage | null {
+  if (!isImageUrl(item.imageUrl) && !isImageUrl(item.thumbnailUrl)) return null;
+  const imageUrl = isImageUrl(item.imageUrl) ? item.imageUrl : item.thumbnailUrl;
+  const thumbnailUrl = isImageUrl(item.thumbnailUrl) ? item.thumbnailUrl : imageUrl;
+  return { imageUrl, thumbnailUrl };
+}
+
+export function hasProviderNextPage(context: GallerySearchContext, results: GalleryItem[]): number | null {
+  return results.length >= Math.min(context.limit, 20) ? context.page + 1 : null;
+}
+
+export function completeGalleryProvider(provider: GalleryProvider): GalleryProviderAdapter {
+  return {
+    ...provider,
+    normalize: (result) => result,
+    extractImage: defaultExtractImage,
+    getNextPage: provider.getNextPage ?? hasProviderNextPage,
+  };
+}
+
+export function createNotConfiguredProvider(
+  id: GalleryProvider["id"],
+  label: string,
+  envName: string,
+): GalleryProvider {
+  return {
+    id,
+    label,
+    availability: "NOT_CONFIGURED",
+    async search() {
+      return providerNotConfigured(label, envName);
+    },
+  };
+}
+
+export function createUnavailableProvider(
+  id: GalleryProvider["id"],
+  label: string,
+  message: string,
+): GalleryProvider {
+  return {
+    id,
+    label,
+    availability: "UNAVAILABLE",
+    async search() {
+      return providerUnavailable(label, message);
+    },
+  };
+}
+
 export function asText(value: unknown): string | null {
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) {
@@ -53,7 +121,9 @@ export function firstText(...values: unknown[]): string | null {
 }
 
 export function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Math.round(Number(value));
+  return null;
 }
 
 export function list(...values: unknown[]): string[] {

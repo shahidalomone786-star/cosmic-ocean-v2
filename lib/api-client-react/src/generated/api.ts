@@ -568,7 +568,7 @@ export const getGallerySearchUrl = (params: GallerySearchParams,) => {
 }
 
 /**
- * Searches the Phase A Universal Gallery providers in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures are reported as unavailable without failing the aggregate response.
+ * Searches only semantically relevant registered Universal Gallery connectors in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures never fail the aggregate response.
  * @summary Search licensed image collections through isolated provider adapters
  */
 export const gallerySearch = async (params: GallerySearchParams, options?: RequestInit): Promise<GallerySearchPayload> => {

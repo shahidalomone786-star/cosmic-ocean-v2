@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("google-arts-culture", "Google Arts & Culture", "No public image-search API is available for this connector.");

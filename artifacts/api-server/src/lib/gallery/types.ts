@@ -1,5 +1,6 @@
 export type GalleryProviderId =
   | "openverse"
+  | "google"
   | "nasa"
   | "met"
   | "artic"
@@ -13,7 +14,54 @@ export type GalleryProviderId =
   | "rijksmuseum"
   | "gbif"
   | "unsplash"
-  | "wikimedia";
+  | "wikimedia"
+  | "cleveland"
+  | "internet-archive"
+  | "wellcome"
+  | "vam"
+  | "pubchem"
+  | "harvard-art-museums"
+  | "dpla"
+  | "national-archives"
+  | "nypl"
+  | "flickr"
+  | "pexels"
+  | "pixabay"
+  | "biodiversity-heritage-library"
+  | "plantnet"
+  | "digitalnz"
+  | "trove"
+  | "tate"
+  | "getty"
+  | "british-library"
+  | "bfi"
+  | "geograph"
+  | "esa"
+  | "jpl"
+  | "noaa"
+  | "usgs-eros"
+  | "planetary-data-system"
+  | "nlm-digital-collections"
+  | "cdc-public-health-image-library"
+  | "medlineplus"
+  | "bioimages"
+  | "idigbio"
+  | "morphosource"
+  | "fishbase"
+  | "dryad"
+  | "figshare"
+  | "zenodo"
+  | "arxiv"
+  | "crossref"
+  | "openalex"
+  | "google-arts-culture"
+  | "researchgate"
+  | "world-digital-library"
+  | "digital-public-library"
+  | "national-science-foundation"
+  | "nasa-earthdata"
+  | "noaa-photo-library"
+  | "us-national-archives";
 
 export type GallerySearchContext = {
   query: string;
@@ -56,13 +104,33 @@ export type GalleryItem = {
 
 export type GalleryProviderStatus = {
   provider: string;
-  status: "ready" | "unavailable";
+  status: GalleryProviderStatusCode;
   count: number;
   message: string | null;
+};
+
+export type GalleryProviderStatusCode =
+  | "AVAILABLE"
+  | "UNAVAILABLE"
+  | "NOT_CONFIGURED"
+  | "ERROR"
+  | "NO_RESULTS";
+
+export type GalleryImage = {
+  imageUrl: string;
+  thumbnailUrl: string;
 };
 
 export type GalleryProvider = {
   id: GalleryProviderId;
   label: string;
   search: (context: GallerySearchContext) => Promise<GalleryItem[]>;
+  availability?: GalleryProviderStatusCode;
+  getNextPage?: (context: GallerySearchContext, results: GalleryItem[]) => number | null;
+};
+
+export type GalleryProviderAdapter = GalleryProvider & {
+  normalize: (result: GalleryItem) => GalleryItem | null;
+  extractImage: (result: GalleryItem) => GalleryImage | null;
+  getNextPage: (context: GallerySearchContext, results: GalleryItem[]) => number | null;
 };

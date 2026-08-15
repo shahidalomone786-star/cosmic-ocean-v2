@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("zenodo", "Zenodo", "The repository API requires a file-level media and license policy before activation.");

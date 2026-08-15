@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("planetary-data-system", "NASA Planetary Data System", "No stable public image-search endpoint is configured.");

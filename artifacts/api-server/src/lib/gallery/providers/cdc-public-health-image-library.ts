@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("cdc-public-health-image-library", "CDC Public Health Image Library", "The public image library does not expose a stable search API.");

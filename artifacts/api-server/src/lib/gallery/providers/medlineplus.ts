@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("medlineplus", "MedlinePlus", "The service is primarily a health information API, not a licensed image archive.");

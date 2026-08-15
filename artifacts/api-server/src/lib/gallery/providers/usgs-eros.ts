@@ -1,0 +1,2 @@
+import { createUnavailableProvider } from "../shared";
+export default createUnavailableProvider("usgs-eros", "USGS Earth Resources Observation and Science", "The public archive requires a catalog-specific request contract.");
