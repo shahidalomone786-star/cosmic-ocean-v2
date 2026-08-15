@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -143,7 +143,15 @@ function galleryItemKeys(item: GalleryItem): string[] {
   ];
 }
 
-function GalleryImage({
+function galleryItemAspectRatio(item: GalleryItem): string | undefined {
+  const width = Number(item.width);
+  const height = Number(item.height);
+  return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+    ? `${width} / ${height}`
+    : undefined;
+}
+
+const GalleryImage = memo(function GalleryImage({
   item,
   modal = false,
   priority = false,
@@ -152,11 +160,17 @@ function GalleryImage({
   modal?: boolean;
   priority?: boolean;
 }) {
+  const initialStage = modal
+    ? (isValidGalleryImageUrl(item.imageUrl)
+      ? 'primary'
+      : isValidGalleryImageUrl(item.thumbnailUrl) ? 'alternate' : 'placeholder')
+    : (isValidGalleryImageUrl(item.thumbnailUrl)
+      ? 'alternate'
+      : isValidGalleryImageUrl(item.imageUrl) ? 'primary' : 'placeholder');
   const [imageStage, setImageStage] = useState<'primary' | 'alternate' | 'placeholder'>(() => {
-    if (isValidGalleryImageUrl(item.imageUrl)) return 'primary';
-    if (isValidGalleryImageUrl(item.thumbnailUrl)) return 'alternate';
-    return 'placeholder';
+    return initialStage;
   });
+  const [imageLoaded, setImageLoaded] = useState(false);
   const imageUrl = imageStage === 'primary'
     ? (isValidGalleryImageUrl(item.imageUrl) ? item.imageUrl : null)
     : imageStage === 'alternate'
@@ -167,6 +181,7 @@ function GalleryImage({
     return (
       <div
         className={`universal-gallery-image-placeholder ${modal ? 'is-modal' : ''}`}
+        style={{ aspectRatio: galleryItemAspectRatio(item) }}
         data-testid={`${modal ? 'empty-image' : 'empty-thumbnail'}-${item.id}`}
         aria-label="Image unavailable"
       >
@@ -179,7 +194,8 @@ function GalleryImage({
     <img
       src={imageUrl}
       alt={item.title}
-      className="w-full h-auto object-contain"
+      className={`w-full h-auto object-contain ${imageLoaded ? 'is-loaded' : ''}`}
+      style={{ aspectRatio: galleryItemAspectRatio(item) }}
       width={item.width ?? undefined}
       height={item.height ?? undefined}
       sizes={modal
@@ -188,13 +204,60 @@ function GalleryImage({
       loading={modal || priority ? 'eager' : 'lazy'}
       fetchPriority={modal || priority ? 'high' : 'auto'}
       decoding="async"
-      onError={() => setImageStage((stage) => (
-        stage === 'primary' && item.thumbnailUrl !== item.imageUrl ? 'alternate' : 'placeholder'
-      ))}
+      onLoad={() => setImageLoaded(true)}
+      onError={() => {
+        setImageLoaded(false);
+        setImageStage((stage) => {
+          if (
+            stage === 'alternate' &&
+            isValidGalleryImageUrl(item.imageUrl) &&
+            item.imageUrl !== item.thumbnailUrl
+          ) return 'primary';
+          if (
+            stage === 'primary' &&
+            isValidGalleryImageUrl(item.thumbnailUrl) &&
+            item.thumbnailUrl !== item.imageUrl
+          ) return 'alternate';
+          return 'placeholder';
+        });
+      }}
       data-testid={`${modal ? 'img-gallery-detail' : 'img-gallery-thumbnail'}-${item.id}`}
     />
   );
-}
+});
+
+GalleryImage.displayName = 'GalleryImage';
+
+const GalleryCard = memo(function GalleryCard({
+  item,
+  priority,
+  onSelect,
+}: {
+  item: GalleryItem;
+  priority: boolean;
+  onSelect: (item: GalleryItem) => void;
+}) {
+  const handleSelect = useCallback(() => onSelect(item), [item, onSelect]);
+
+  return (
+    <button
+      type="button"
+      className="universal-gallery-card"
+      aria-label={`View image details: ${item.title}`}
+      onClick={handleSelect}
+      data-testid={`card-gallery-item-${item.id}`}
+    >
+      <div
+        className="universal-gallery-card-media"
+        style={{ aspectRatio: galleryItemAspectRatio(item) }}
+      >
+        <GalleryImage item={item} priority={priority} />
+      </div>
+    </button>
+  );
+});
+
+GalleryCard.displayName = 'GalleryCard';
 
 function ProviderStrip({ statuses }: { statuses: GalleryProviderStatus[] }) {
   if (statuses.length === 0) return null;
@@ -409,6 +472,21 @@ function GalleryDetail({
   );
 }
 
+function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
+  let parent = element.parentElement;
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY;
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+      parent.scrollHeight > parent.clientHeight
+    ) {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
 export default function UniversalGallery({ lm = false }: UniversalGalleryProps) {
   const [draftQuery, setDraftQuery] = useState(INITIAL_QUERY);
   const [committedQuery, setCommittedQuery] = useState(INITIAL_QUERY);
@@ -422,6 +500,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const loadedQueryRef = useRef('');
+  const loadedItemKeysRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadMoreLockRef = useRef(false);
 
@@ -449,7 +528,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
   const items = galleryItems;
   const statuses = galleryQuery.data?.providerStatus ?? [];
-  const hasMore = galleryQuery.data?.hasMore ?? false;
+  const hasMore = galleryQuery.data?.hasMore ?? (page > 1 && !galleryQuery.isError);
   const isLoadingMore = page > 1 && galleryQuery.isFetching;
 
   const providers = useMemo(() => {
@@ -463,26 +542,36 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     setPage(1);
     setGalleryItems([]);
     loadedQueryRef.current = '';
+    loadedItemKeysRef.current.clear();
+    loadMoreLockRef.current = false;
   }, [category, committedQuery, license, media, orientation, provider, quality]);
 
   useEffect(() => {
     const incoming = galleryQuery.data?.items;
-    if (!incoming) return;
+    if (!incoming || galleryQuery.data?.page !== page) return;
     if (loadedQueryRef.current !== querySignature || page === 1) {
       loadedQueryRef.current = querySignature;
-      setGalleryItems(incoming);
+      const initialItems: GalleryItem[] = [];
+      loadedItemKeysRef.current.clear();
+      incoming.forEach((item) => {
+        const keys = galleryItemKeys(item);
+        if (keys.some((key) => loadedItemKeysRef.current.has(key))) return;
+        keys.forEach((key) => loadedItemKeysRef.current.add(key));
+        initialItems.push(item);
+      });
+      setGalleryItems(initialItems);
       return;
     }
-    setGalleryItems((previous) => {
-      const seen = new Set(previous.flatMap(galleryItemKeys));
-      const nextItems = incoming.filter((item) => {
-        const keys = galleryItemKeys(item);
-        if (keys.some((key) => seen.has(key))) return false;
-        keys.forEach((key) => seen.add(key));
-        return true;
-      });
-      return [...previous, ...nextItems];
+    const nextItems: GalleryItem[] = [];
+    incoming.forEach((item) => {
+      const keys = galleryItemKeys(item);
+      if (keys.some((key) => loadedItemKeysRef.current.has(key))) return;
+      keys.forEach((key) => loadedItemKeysRef.current.add(key));
+      nextItems.push(item);
     });
+    if (nextItems.length > 0) {
+      setGalleryItems((previous) => [...previous, ...nextItems]);
+    }
   }, [galleryQuery.data, page, querySignature]);
 
   const loadNextPage = useCallback(() => {
@@ -498,19 +587,22 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     }
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
+    const scrollRoot = findScrollableAncestor(sentinel);
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) loadNextPage();
       },
-      { rootMargin: '900px 0px', threshold: 0 },
+      { root: scrollRoot, rootMargin: '900px 0px', threshold: 0 },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [hasMore, loadNextPage]);
 
   useEffect(() => {
-    if (!galleryQuery.isFetching) loadMoreLockRef.current = false;
-  }, [galleryQuery.isFetching]);
+    if (galleryQuery.isError || galleryQuery.data?.page === page) {
+      loadMoreLockRef.current = false;
+    }
+  }, [galleryQuery.data?.page, galleryQuery.isError, page]);
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -537,6 +629,9 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
   const activeFilterCount = [category, provider, media, license, quality, orientation].filter(Boolean).length;
   const readySources = statuses.filter((status) => status.status === 'AVAILABLE' && status.count > 0).length;
+  const handleSelectItem = useCallback((item: GalleryItem) => {
+    setSelectedItem(item);
+  }, []);
 
   return (
     <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
@@ -630,9 +725,9 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           </div>
         )}
 
-        {galleryQuery.isLoading ? (
+        {galleryQuery.isLoading && items.length === 0 ? (
           <GallerySkeleton />
-        ) : galleryQuery.isError ? (
+        ) : galleryQuery.isError && items.length === 0 ? (
           <div className="universal-gallery-state" role="alert" data-testid="state-gallery-error">
             <AlertTriangle size={22} aria-hidden="true" />
             <strong>The archive is momentarily out of reach.</strong>
@@ -672,21 +767,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
             </div>
             <div className="universal-gallery-masonry" data-testid="grid-gallery-results">
               {items.map((item, index) => (
-                <motion.button
-                  type="button"
+                <GalleryCard
                   key={item.id}
-                  className="universal-gallery-card"
-                  aria-label={`View image details: ${item.title}`}
-                  onClick={() => setSelectedItem(item)}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: .3, delay: Math.min(index * .035, .3) }}
-                  data-testid={`card-gallery-item-${item.id}`}
-                >
-                  <div className="universal-gallery-card-media">
-                    <GalleryImage item={item} priority={index < 4} />
-                  </div>
-                </motion.button>
+                  item={item}
+                  priority={index < 6}
+                  onSelect={handleSelectItem}
+                />
               ))}
             </div>
             {hasMore && (

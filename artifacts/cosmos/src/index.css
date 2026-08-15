@@ -5737,10 +5737,14 @@ body {
   width: 100%;
   height: auto;
   max-width: 100%;
+  opacity: .001;
   object-fit: contain;
   filter: saturate(.82) contrast(1.06);
   content-visibility: auto;
-  transition: filter 350ms ease, transform 350ms ease;
+  transition: opacity 220ms ease, filter 220ms ease, transform 220ms ease;
+}
+.universal-gallery-card-media img.is-loaded {
+  opacity: 1;
 }
 .universal-gallery-card:hover .universal-gallery-card-media img,
 .universal-gallery-card:focus-visible .universal-gallery-card-media img {
