@@ -35,6 +35,7 @@ const unsplash: GalleryProvider = {
         tags: list(item.tags),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(user?.name),
         width: asNumber(item.width),
         height: asNumber(item.height),

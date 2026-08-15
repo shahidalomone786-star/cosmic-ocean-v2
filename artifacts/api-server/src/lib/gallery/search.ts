@@ -1,5 +1,5 @@
 import { galleryProviderById, galleryProviders } from "./providers";
-import { isImageUrl, matchesGalleryFilters } from "./shared";
+import { classifyLicense, isImageUrl, matchesGalleryFilters } from "./shared";
 import type { GalleryItem, GalleryProvider, GalleryProviderId, GalleryProviderStatus, GallerySearchContext } from "./types";
 
 const FALLBACK_PROVIDERS: GalleryProviderId[] = ["openverse", "wikimedia"];
@@ -53,7 +53,7 @@ function normalizeKey(item: GalleryItem): string[] {
 
 function scoreItem(item: GalleryItem, query: string): number {
   const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 2);
-  const text = [item.title, item.description ?? "", item.category, ...item.tags].join(" ").toLowerCase();
+  const text = [item.title, item.creator ?? "", item.description ?? "", item.category, ...item.tags].join(" ").toLowerCase();
   const relevance = terms.reduce((score, term) => score + (text.includes(term) ? 12 : 0), 0);
   const dimensions = item.width && item.height ? Math.min(20, Math.log10(item.width * item.height) * 3) : 0;
   const metadata = [item.description, item.creator, item.date, item.licenseUrl, item.attribution].filter(Boolean).length * 1.5;
@@ -61,6 +61,14 @@ function scoreItem(item: GalleryItem, query: string): number {
   // Specialist/authoritative archives should win over aggregator copies when
   // both match, while relevance and image quality still decide within a source.
   return relevance + dimensions + metadata + (PROVIDER_AUTHORITY[providerId] ?? 0.5) * 80;
+}
+
+function normalizeGalleryItem(item: GalleryItem): GalleryItem {
+  return {
+    ...item,
+    license: item.license || "Unknown / Verify source",
+    licenseClass: classifyLicense(item.license, item.licenseUrl),
+  };
 }
 
 export async function searchGallery(
@@ -75,7 +83,11 @@ export async function searchGallery(
     : routeProviders(context.query);
 
   const settled = await Promise.allSettled(providers.map((provider) => provider.search(context)));
-  const providerItems = settled.map((result) => result.status === "fulfilled" ? result.value.filter((item) => isImageUrl(item.imageUrl) && isImageUrl(item.thumbnailUrl)) : []);
+  const providerItems = settled.map((result) => result.status === "fulfilled"
+    ? result.value
+      .map(normalizeGalleryItem)
+      .filter((item) => isImageUrl(item.imageUrl) && isImageUrl(item.thumbnailUrl))
+    : []);
   const providerStatus = settled.map((result, index): GalleryProviderStatus => {
     const provider = providers[index];
     if (result.status === "fulfilled") {
@@ -84,14 +96,17 @@ export async function searchGallery(
     return { provider: provider.id, status: "unavailable", count: 0, message: "Provider temporarily unavailable" };
   });
 
+  const rankedCandidates = providerItems
+    .flat()
+    .filter((item) => matchesGalleryFilters(item, context))
+    .sort((a, b) => scoreItem(b, context.query) - scoreItem(a, context.query));
   const seen = new Set<string>();
   const uniqueItems: GalleryItem[] = [];
-  for (const item of providerItems.flat()) {
-    if (!matchesGalleryFilters(item, context) || normalizeKey(item).some((key) => seen.has(key))) continue;
+  for (const item of rankedCandidates) {
+    if (normalizeKey(item).some((key) => seen.has(key))) continue;
     normalizeKey(item).forEach((key) => seen.add(key));
     uniqueItems.push(item);
   }
-  uniqueItems.sort((a, b) => scoreItem(b, context.query) - scoreItem(a, context.query));
   const items = uniqueItems.slice(0, context.limit);
   const hasMore = providerItems.some((providerItemsForPage) => providerItemsForPage.length >= Math.min(context.limit, 20));
   return { items, providerStatus, hasMore };

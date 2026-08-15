@@ -281,7 +281,7 @@ export const AstronomySuggestionsResponse = zod.object({
 
 
 /**
- * Searches the Phase A Universal Gallery providers in parallel and returns only assets with usable rights metadata. Individual provider failures are reported as unavailable without failing the aggregate response.
+ * Searches the Phase A Universal Gallery providers in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures are reported as unavailable without failing the aggregate response.
  * @summary Search licensed image collections through isolated provider adapters
  */
 export const gallerySearchQueryQMax = 160;
@@ -300,7 +300,7 @@ export const GallerySearchQueryParams = zod.object({
   "limit": zod.coerce.number().min(gallerySearchQueryLimitMin).max(gallerySearchQueryLimitMax).default(gallerySearchQueryLimitDefault),
   "category": zod.enum(['all', 'space', 'nature', 'ocean', 'animals', 'plants', 'earth', 'science', 'medical', 'history', 'art', 'architecture', 'maps', 'culture']).optional(),
   "media": zod.enum(['all', 'photos', 'illustrations', 'artwork', 'scientific-imagery', 'maps', '3d-molecular']).optional(),
-  "license": zod.enum(['all', 'public-domain', 'cc0', 'commercial', 'attribution']).optional(),
+  "license": zod.enum(['all', 'public-domain', 'cc0', 'commercial', 'attribution', 'open-license']).optional(),
   "quality": zod.enum(['any', 'hd', '2k', '4k']).optional(),
   "orientation": zod.enum(['all', 'landscape', 'portrait', 'square']).optional(),
   "providers": zod.coerce.string().optional()
@@ -324,6 +324,7 @@ export const GallerySearchResponse = zod.object({
   "license": zod.string(),
   "licenseUrl": zod.string().nullable(),
   "attribution": zod.string().nullable(),
+  "licenseClass": zod.enum(['PUBLIC_DOMAIN', 'CC0', 'COMMERCIAL_USE', 'ATTRIBUTION_REQUIRED', 'OPEN_LICENSE', 'UNKNOWN']),
   "width": zod.number().nullable(),
   "height": zod.number().nullable()
 })),

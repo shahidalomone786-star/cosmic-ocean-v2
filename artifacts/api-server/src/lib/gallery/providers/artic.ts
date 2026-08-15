@@ -34,6 +34,7 @@ const artic: GalleryProvider = {
         tags: [],
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.credit_line),
         width: asNumber(thumbnail?.width),
         height: asNumber(thumbnail?.height),

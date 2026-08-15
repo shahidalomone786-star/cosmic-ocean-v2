@@ -32,6 +32,7 @@ const loc: GalleryProvider = {
         tags: list(item.subject),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.credit, item.repository),
         width: asNumber(item.width),
         height: asNumber(item.height),

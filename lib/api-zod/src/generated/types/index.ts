@@ -35,6 +35,7 @@ export * from './biologySourceStatus';
 export * from './biologySourceStatusStatus';
 export * from './errorResponse';
 export * from './galleryItem';
+export * from './galleryItemLicenseClass';
 export * from './galleryProviderStatus';
 export * from './galleryProviderStatusStatus';
 export * from './gallerySearchCategory';

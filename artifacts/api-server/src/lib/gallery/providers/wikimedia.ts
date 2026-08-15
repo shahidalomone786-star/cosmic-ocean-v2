@@ -43,6 +43,7 @@ const wikimedia: GalleryProvider = {
         tags: list((metadata.Categories as Record<string, unknown> | undefined)?.value),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText((metadata.Credit as Record<string, unknown> | undefined)?.value, (metadata.Artist as Record<string, unknown> | undefined)?.value),
         width: asNumber(info.width),
         height: asNumber(info.height),

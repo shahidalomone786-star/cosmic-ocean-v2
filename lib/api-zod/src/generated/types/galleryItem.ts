@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GalleryItemLicenseClass } from './galleryItemLicenseClass';
 
 export interface GalleryItem {
   id: string;
@@ -26,6 +27,7 @@ export interface GalleryItem {
   licenseUrl: string | null;
   /** @nullable */
   attribution: string | null;
+  licenseClass: GalleryItemLicenseClass;
   /** @nullable */
   width: number | null;
   /** @nullable */

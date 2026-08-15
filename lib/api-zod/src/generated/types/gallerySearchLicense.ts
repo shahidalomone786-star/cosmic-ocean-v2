@@ -15,4 +15,5 @@ export const GallerySearchLicense = {
   cc0: 'cc0',
   commercial: 'commercial',
   attribution: 'attribution',
+  'open-license': 'open-license',
 } as const;

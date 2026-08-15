@@ -321,7 +321,7 @@ paths:
       operationId: gallerySearch
       tags: [gallery]
       summary: Search licensed image collections through isolated provider adapters
-      description: Searches the Phase A Universal Gallery providers in parallel and returns only assets with usable rights metadata. Individual provider failures are reported as unavailable without failing the aggregate response.
+      description: Searches the Phase A Universal Gallery providers in parallel, preserves provider rights metadata, and classifies each result without inventing unavailable license information. Individual provider failures are reported as unavailable without failing the aggregate response.
       parameters:
         - name: q
           in: query
@@ -362,7 +362,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [all, public-domain, cc0, commercial, attribution]
+            enum: [all, public-domain, cc0, commercial, attribution, open-license]
         - name: quality
           in: query
           required: false
@@ -674,11 +674,14 @@ components:
           type: ["string", "null"]
         attribution:
           type: ["string", "null"]
+        licenseClass:
+          type: string
+          enum: [PUBLIC_DOMAIN, CC0, COMMERCIAL_USE, ATTRIBUTION_REQUIRED, OPEN_LICENSE, UNKNOWN]
         width:
           type: ["integer", "null"]
         height:
           type: ["integer", "null"]
-      required: [id, title, description, imageUrl, thumbnailUrl, source, sourceUrl, creator, date, category, tags, license, licenseUrl, attribution, width, height]
+      required: [id, title, description, imageUrl, thumbnailUrl, source, sourceUrl, creator, date, category, tags, license, licenseUrl, licenseClass, attribution, width, height]
     GalleryProviderStatus:
       type: object
       properties:

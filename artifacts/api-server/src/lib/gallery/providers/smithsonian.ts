@@ -36,6 +36,7 @@ const smithsonian: GalleryProvider = {
         tags: list(item.tags),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.attribution, item.credit_line),
         width: asNumber(media?.width),
         height: asNumber(media?.height),

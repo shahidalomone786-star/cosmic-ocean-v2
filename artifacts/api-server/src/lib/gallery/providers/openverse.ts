@@ -32,6 +32,7 @@ const openverse: GalleryProvider = {
         tags: list(item.tags),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.attribution),
         width: asNumber(item.width),
         height: asNumber(item.height),

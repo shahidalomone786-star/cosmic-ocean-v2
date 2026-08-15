@@ -33,6 +33,7 @@ const nasa: GalleryProvider = {
         tags: list(metadata.keywords),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(metadata.center, metadata.photographer),
         width: asNumber(metadata.width),
         height: asNumber(metadata.height),

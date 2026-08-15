@@ -26,6 +26,14 @@ export type GallerySearchContext = {
   orientation?: string;
 };
 
+export type GalleryLicenseClass =
+  | "PUBLIC_DOMAIN"
+  | "CC0"
+  | "COMMERCIAL_USE"
+  | "ATTRIBUTION_REQUIRED"
+  | "OPEN_LICENSE"
+  | "UNKNOWN";
+
 export type GalleryItem = {
   id: string;
   title: string;
@@ -40,6 +48,7 @@ export type GalleryItem = {
   tags: string[];
   license: string;
   licenseUrl: string | null;
+  licenseClass: GalleryLicenseClass;
   attribution: string | null;
   width: number | null;
   height: number | null;

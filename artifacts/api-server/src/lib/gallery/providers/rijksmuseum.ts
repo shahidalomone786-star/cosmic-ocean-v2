@@ -35,6 +35,7 @@ const rijksmuseum: GalleryProvider = {
         tags: list(item.materials, item.objectTypes),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.principalOrFirstMaker),
         width: asNumber(webImage?.width),
         height: asNumber(webImage?.height),

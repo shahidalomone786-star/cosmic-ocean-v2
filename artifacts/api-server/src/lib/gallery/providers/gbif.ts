@@ -32,6 +32,7 @@ const gbif: GalleryProvider = {
         tags: list(item.species, item.genus, item.family),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(media?.creator, item.recordedBy),
         width: asNumber(media?.width),
         height: asNumber(media?.height),

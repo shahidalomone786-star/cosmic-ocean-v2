@@ -34,6 +34,7 @@ const met: GalleryProvider = {
         tags: list(item.tags),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.creditLine),
         width: asNumber(item.measurementsWidth),
         height: asNumber(item.measurementsHeight),

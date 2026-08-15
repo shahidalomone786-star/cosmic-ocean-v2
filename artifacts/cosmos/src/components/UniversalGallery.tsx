@@ -14,6 +14,7 @@ import {
   getGallerySearchQueryKey,
   useGallerySearch,
   type GalleryItem,
+  type GalleryItemLicenseClass,
   type GalleryProviderStatus,
   type GallerySearchCategory,
   type GallerySearchLicense,
@@ -59,10 +60,10 @@ const MEDIA_FILTERS: Array<{ value: GallerySearchMedia | ''; label: string }> = 
 
 const LICENSE_FILTERS: Array<{ value: GallerySearchLicense | ''; label: string }> = [
   { value: '', label: 'All licenses' },
-  { value: 'public-domain', label: 'Public Domain' },
-  { value: 'cc0', label: 'CC0' },
+  { value: 'public-domain', label: 'Public Domain / CC0' },
   { value: 'commercial', label: 'Commercial use' },
-  { value: 'attribution', label: 'Attribution' },
+  { value: 'attribution', label: 'Attribution required' },
+  { value: 'open-license', label: 'Open license' },
 ];
 
 const QUALITY_FILTERS: Array<{ value: GallerySearchQuality | ''; label: string }> = [
@@ -80,8 +81,20 @@ const ORIENTATION_FILTERS: Array<{ value: GallerySearchOrientation | ''; label: 
 ];
 
 function displayValue(value: string | number | null | undefined): string {
-  if (value === null || value === undefined || value === '') return 'Not provided';
+  if (value === null || value === undefined || value === '') return 'Not available';
   return String(value);
+}
+
+function licenseBadgeLabel(licenseClass: GalleryItemLicenseClass): string {
+  const labels: Record<GalleryItemLicenseClass, string> = {
+    PUBLIC_DOMAIN: 'PUBLIC DOMAIN',
+    CC0: 'CC0',
+    COMMERCIAL_USE: 'COMMERCIAL',
+    ATTRIBUTION_REQUIRED: 'ATTRIBUTION',
+    OPEN_LICENSE: 'OPEN LICENSE',
+    UNKNOWN: 'VERIFY LICENSE',
+  };
+  return labels[licenseClass];
 }
 
 function formatProviderName(provider: string): string {
@@ -278,6 +291,14 @@ function GalleryDetail({
           <p className="universal-gallery-modal-eyebrow universal-gallery-mono">
             {formatProviderName(item.source)} / {item.category}
           </p>
+          <div className="universal-gallery-license-summary">
+            <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
+              {licenseBadgeLabel(item.licenseClass)}
+            </span>
+            {item.licenseClass === 'ATTRIBUTION_REQUIRED' && (
+              <strong className="universal-gallery-attribution-required">Attribution required</strong>
+            )}
+          </div>
           <h3 id="universal-gallery-detail-title" data-testid={`text-gallery-title-${item.id}`}>
             {item.title}
           </h3>
@@ -292,7 +313,7 @@ function GalleryDetail({
               rel="noreferrer"
               data-testid={`link-gallery-source-${item.id}`}
             >
-              Open original <ArrowUpRight size={13} aria-hidden="true" />
+              OPEN ORIGINAL <ArrowUpRight size={13} aria-hidden="true" />
             </a>
             {item.licenseUrl && (
               <a
@@ -608,6 +629,9 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                     </span>
                     <div className="universal-gallery-card-copy">
                       <span className="universal-gallery-card-category universal-gallery-mono">{item.category}</span>
+                       <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
+                         {licenseBadgeLabel(item.licenseClass)}
+                       </span>
                       <h3>{item.title}</h3>
                     </div>
                   </div>

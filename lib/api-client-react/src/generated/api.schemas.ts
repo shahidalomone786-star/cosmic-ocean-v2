@@ -220,6 +220,18 @@ export interface AstronomyObjectPayload {
   sourceStatus: AstronomySourceStatus[];
 }
 
+export type GalleryItemLicenseClass = typeof GalleryItemLicenseClass[keyof typeof GalleryItemLicenseClass];
+
+
+export const GalleryItemLicenseClass = {
+  PUBLIC_DOMAIN: 'PUBLIC_DOMAIN',
+  CC0: 'CC0',
+  COMMERCIAL_USE: 'COMMERCIAL_USE',
+  ATTRIBUTION_REQUIRED: 'ATTRIBUTION_REQUIRED',
+  OPEN_LICENSE: 'OPEN_LICENSE',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
 export interface GalleryItem {
   id: string;
   title: string;
@@ -240,6 +252,7 @@ export interface GalleryItem {
   licenseUrl: string | null;
   /** @nullable */
   attribution: string | null;
+  licenseClass: GalleryItemLicenseClass;
   /** @nullable */
   width: number | null;
   /** @nullable */
@@ -450,6 +463,7 @@ export const GallerySearchLicense = {
   cc0: 'cc0',
   commercial: 'commercial',
   attribution: 'attribution',
+  'open-license': 'open-license',
 } as const;
 
 export type GallerySearchQuality = typeof GallerySearchQuality[keyof typeof GallerySearchQuality];

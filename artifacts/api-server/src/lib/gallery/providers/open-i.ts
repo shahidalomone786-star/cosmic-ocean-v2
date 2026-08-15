@@ -32,6 +32,7 @@ const openI: GalleryProvider = {
         tags: list(item.mesh_terms, item.keywords),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.attribution),
         width: asNumber(item.width),
         height: asNumber(item.height),

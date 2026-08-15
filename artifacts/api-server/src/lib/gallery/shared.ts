@@ -1,4 +1,4 @@
-import type { GallerySearchContext } from "./types";
+import type { GalleryLicenseClass, GallerySearchContext } from "./types";
 
 // Keep the aggregate gallery responsive when an optional archive is slow.
 // Promise.allSettled still preserves successful providers as partial results.
@@ -70,13 +70,42 @@ export function pageOffset(context: { page: number; limit: number }): number {
   return (context.page - 1) * context.limit;
 }
 
+export type NormalizedLicense = {
+  license: string;
+  licenseUrl: string | null;
+  licenseClass: GalleryLicenseClass;
+};
+
+export function classifyLicense(license: unknown, licenseUrl: unknown): GalleryLicenseClass {
+  const text = `${firstText(license) ?? ""} ${firstText(licenseUrl) ?? ""}`.toLowerCase();
+  if (!text.trim() || /unknown|verify|rights reserved|all rights reserved|no information|not provided/.test(text)) {
+    return "UNKNOWN";
+  }
+  if (/cc0|creative commons zero|publicdomain\/zero|public-domain\/zero/.test(text)) {
+    return "CC0";
+  }
+  if (/public domain|no known copyright|government work|u\.?s\.? government|noc-us|publicdomain\//.test(text)) {
+    return "PUBLIC_DOMAIN";
+  }
+  if (/commercial use|commercial license|royalty[- ]free|unsplash license/.test(text)) {
+    return "COMMERCIAL_USE";
+  }
+  if (/\b(?:by|by-sa|by-nd|by-nc)\b|cc[- ]?(by|by-sa|by-nd|by-nc)|creative commons|attribution|required attribution/.test(text)) {
+    return "ATTRIBUTION_REQUIRED";
+  }
+  if (/open license|open access|free cultural work|gnu|mit license|apache license|odbl|open government/.test(text)) {
+    return "OPEN_LICENSE";
+  }
+  return "UNKNOWN";
+}
+
 export function usableLicense(
   license: unknown,
   licenseUrl: unknown,
-): { license: string; licenseUrl: string | null } | null {
-  const label = firstText(license);
-  if (!label) return null;
-  return { license: label, licenseUrl: firstText(licenseUrl) };
+): NormalizedLicense {
+  const label = firstText(license) ?? "Unknown / Verify source";
+  const url = firstText(licenseUrl);
+  return { license: label, licenseUrl: url, licenseClass: classifyLicense(label, url) };
 }
 
 export function categoryFromQuery(query: string, fallback: string): string {
@@ -114,7 +143,7 @@ export function firstImageUrl(...values: unknown[]): string | null {
 }
 
 export function matchesGalleryFilters(
-  item: { category: string; source: string; title: string; description: string | null; tags: string[]; license: string; width: number | null; height: number | null },
+  item: { category: string; source: string; title: string; description: string | null; tags: string[]; licenseClass: GalleryLicenseClass; width: number | null; height: number | null },
   filters: Partial<Pick<GallerySearchContext, "category" | "media" | "license" | "quality" | "orientation">>,
 ): boolean {
   const haystack = [item.category, item.source, item.title, item.description ?? "", ...item.tags].join(" ").toLowerCase();
@@ -133,14 +162,14 @@ export function matchesGalleryFilters(
   }
 
   if (filters.license && filters.license !== "all") {
-    const license = item.license.toLowerCase();
-    const licenseMatches: Record<string, RegExp> = {
-      "public-domain": /public domain|no known copyright|government work|open government/i,
-      cc0: /\bcc0\b|creative commons zero/i,
-      commercial: /commercial|unsplash license|public domain|cc0|creative commons/i,
-      attribution: /by|attribution|creative commons/i,
+    const licenseMatches: Record<string, GalleryLicenseClass[]> = {
+      "public-domain": ["PUBLIC_DOMAIN", "CC0"],
+      cc0: ["CC0"],
+      commercial: ["COMMERCIAL_USE"],
+      attribution: ["ATTRIBUTION_REQUIRED"],
+      "open-license": ["OPEN_LICENSE"],
     };
-    if (!licenseMatches[filters.license]?.test(license)) return false;
+    if (!licenseMatches[filters.license]?.includes(item.licenseClass)) return false;
   }
 
   if (filters.quality && filters.quality !== "any") {

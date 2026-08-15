@@ -45,6 +45,7 @@ const rcsbPdb: GalleryProvider = {
         tags: list("protein", "molecular structure", id),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: "RCSB Protein Data Bank",
         width: asNumber(800),
         height: asNumber(800),

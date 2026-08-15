@@ -38,6 +38,7 @@ const inaturalist: GalleryProvider = {
         tags: [firstText(taxon?.name)].filter((tag): tag is string => Boolean(tag)),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(photo?.attribution),
         width: asNumber(photo?.width),
         height: asNumber(photo?.height),

@@ -34,6 +34,7 @@ const europeana: GalleryProvider = {
         tags: list(item.dcSubject, item.type),
         license: rights.license,
         licenseUrl: rights.licenseUrl,
+        licenseClass: rights.licenseClass,
         attribution: firstText(item.provider, item.dataProvider),
         width: asNumber(item.edmPhysicalSize),
         height: null,
