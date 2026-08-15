@@ -5221,6 +5221,7 @@ body {
 .portal-gallery-entry-copy .portal-gallery-nav {
   width: fit-content;
   margin-top: 1.35rem;
+  pointer-events: auto;
   border: 1px solid rgba(185, 231, 224, .28);
   background: rgba(4, 13, 16, .48);
   box-shadow:

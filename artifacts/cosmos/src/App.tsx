@@ -1917,6 +1917,15 @@ function PortalGalleryEntry({ onOpen, lm }: { onOpen: () => void; lm?: boolean }
     <motion.section
       className={`portal-gallery-entry ${lm ? 'is-light' : ''}`}
       aria-labelledby="portal-gallery-entry-title"
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
@@ -1938,7 +1947,10 @@ function PortalGalleryEntry({ onOpen, lm }: { onOpen: () => void; lm?: boolean }
           <button
             type="button"
             className="portal-gallery-nav"
-            onClick={onOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
             aria-label="Open Universal Gallery"
             data-testid="button-open-universal-gallery"
           >
@@ -2041,6 +2053,15 @@ export default function App() {
   const [ownedAtelierAvatarIds, setOwnedAtelierAvatarIds] = useState<Set<string>>(() => new Set());
   const [avatarOwnershipStatus, setAvatarOwnershipStatus] = useState<'idle' | 'syncing' | 'ready' | 'error'>('idle');
   const ownershipRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (routePath === '/gallery') {
+      setShowPortal(true);
+      setShowGallery(true);
+    } else if (routePath === '/') {
+      setShowGallery(false);
+    }
+  }, [routePath]);
   const confirmAtelierOwnership = useCallback((avatarId: string) => {
     setOwnedAtelierAvatarIds(previous => {
       const next = new Set(previous);
@@ -2462,6 +2483,12 @@ export default function App() {
   const handleSearchImageShare = useCallback((image: SearchImage) => {
     setPendingChatImage(image);
     setLocation('/chat');
+  }, [setLocation]);
+
+  const openGallery = useCallback(() => {
+    setShowPortal(true);
+    setShowGallery(true);
+    setLocation('/gallery');
   }, [setLocation]);
 
   // Open chat WITH shared context (from "Discuss with a Scientist")
@@ -3004,6 +3031,7 @@ export default function App() {
                 onClick={() => {
                   setShowPortal(false);
                   setShowGallery(false);
+                   setLocation('/');
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-[13px] transition-all duration-200 ${
                   lm
@@ -3100,7 +3128,7 @@ export default function App() {
               </div>
 
                 {/* ── Universal Gallery — archival portal entry ── */}
-                <PortalGalleryEntry lm={lm} onOpen={() => setShowGallery(true)} />
+                <PortalGalleryEntry lm={lm} onOpen={openGallery} />
 
               {/* Cosmic Pix — avatar cards */}
               <div className="mb-6">
@@ -3503,7 +3531,11 @@ export default function App() {
                     <button
                       type="button"
                       className="portal-gallery-back"
-                      onClick={() => setShowGallery(false)}
+                      onClick={() => {
+                        setShowGallery(false);
+                        setShowPortal(true);
+                        setLocation('/');
+                      }}
                       data-testid="button-back-from-universal-gallery"
                     >
                       <span aria-hidden="true">←</span>
