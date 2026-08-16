@@ -270,23 +270,35 @@ GalleryCard.displayName = 'GalleryCard';
 
 function ProviderStrip({ statuses }: { statuses: GalleryProviderStatus[] }) {
   if (statuses.length === 0) return null;
+  const activeSources = statuses.filter((status) => status.status === 'AVAILABLE').length;
+  const archiveCount = statuses.reduce((total, status) => (
+    status.status === 'AVAILABLE' ? total + Math.max(0, Number(status.count) || 0) : total
+  ), 0);
 
   return (
     <div className="universal-gallery-provider-strip" data-testid="status-gallery-providers">
-      <span className="universal-gallery-provider-label universal-gallery-mono">
-        Archive channels
-      </span>
+      <div className="universal-gallery-provider-heading">
+        <span className="universal-gallery-provider-label universal-gallery-mono">
+          Archive sources
+        </span>
+        <span className="universal-gallery-provider-summary universal-gallery-mono">
+          {activeSources} active · {archiveCount > 0 ? `${archiveCount}+ archives` : 'archive status'}
+        </span>
+      </div>
       {statuses.map((status) => (
         <span
           key={status.provider}
           className={`universal-gallery-provider-status universal-gallery-mono ${
-            status.status === 'AVAILABLE' ? 'is-ready' : 'is-unavailable'
+            status.status === 'AVAILABLE' ? 'is-ready is-active' : 'is-unavailable'
+          }`}
+          aria-label={`${formatProviderName(status.provider)}: ${
+            status.status === 'AVAILABLE' ? 'active' : 'unavailable'
           }`}
           title={status.message ?? undefined}
           data-testid={`status-gallery-provider-${status.provider}`}
         >
           <i aria-hidden="true" />
-          {formatProviderName(status.provider)}
+          <span>{formatProviderName(status.provider)}</span>
           <small>
             {status.status === 'AVAILABLE'
               ? `${status.count} records`
@@ -516,6 +528,8 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const loadedItemKeysRef = useRef<Set<string>>(new Set());
   const loadedPagesRef = useRef<Set<number>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const searchFormRef = useRef<HTMLFormElement>(null);
+  const pendingSuggestionRef = useRef<string | null>(null);
   const loadMoreLockRef = useRef(false);
   const pageFetchRef = useRef(false);
 
@@ -666,7 +680,8 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextQuery = draftQuery.trim();
+    const nextQuery = (pendingSuggestionRef.current ?? draftQuery).trim();
+    pendingSuggestionRef.current = null;
     if (nextQuery.length === 0) return;
     const ageVerified = typeof window !== 'undefined'
       && window.sessionStorage.getItem('cosmic_age_verified') === 'true';
@@ -676,6 +691,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     }
     commitSearch(nextQuery);
   };
+
+  const submitSuggestion = useCallback((suggestion: string) => {
+    pendingSuggestionRef.current = suggestion;
+    setDraftQuery(suggestion);
+    window.requestAnimationFrame(() => searchFormRef.current?.requestSubmit());
+  }, []);
 
   const confirmAgeGate = useCallback(() => {
     if (!ageGateQuery) return;
@@ -723,15 +744,22 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           </p>
         </header>
 
-        <form className="universal-gallery-search" onSubmit={submitSearch} data-testid="form-gallery-search">
+        <div className="universal-gallery-search-chamber" data-testid="panel-gallery-search-chamber">
+        <form
+          ref={searchFormRef}
+          className="universal-gallery-search"
+          onSubmit={submitSearch}
+          aria-busy={galleryQuery.isFetching}
+          data-testid="form-gallery-search"
+        >
           <label>
             <Search size={16} aria-hidden="true" />
             <input
               type="search"
               value={draftQuery}
               onChange={(event) => setDraftQuery(event.target.value)}
-              placeholder="Search the visual archives"
-              aria-label="Search the visual archives"
+              placeholder="Explore the visual universe…"
+              aria-label="Explore the visual universe"
               data-testid="input-gallery-search"
             />
           </label>
@@ -741,24 +769,64 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
             disabled={!draftQuery.trim()}
             data-testid="button-gallery-search"
           >
-            Search archive
+            <span>{galleryQuery.isFetching ? (isLoadingMore ? 'Loading page' : 'Searching') : 'Search'}</span>
+            {galleryQuery.isFetching
+              ? <LoaderCircle size={14} aria-hidden="true" className="animate-spin" />
+              : <ArrowUpRight size={14} aria-hidden="true" />}
           </button>
         </form>
 
-        {((providers.length > 0 || galleryQuery.data) || activeFilterCount > 0) && (
+        <div className="universal-gallery-search-readout" aria-live="polite" data-testid="status-gallery-query">
+          <span className={`universal-gallery-query-state ${galleryQuery.isFetching ? 'is-searching' : ''}`}>
+            <i aria-hidden="true" />
+            {galleryQuery.isFetching
+              ? (isLoadingMore ? 'Reading the next archive page' : 'Reading distributed archive')
+              : draftQuery.trim() !== committedQuery.trim()
+                ? 'Query staged — press search to read'
+                : `Index open: ${committedQuery}`}
+          </span>
+          <span className="universal-gallery-search-readout-code universal-gallery-mono">
+            {galleryQuery.isFetching ? 'LIVE / QUERY' : `QRY / ${String(committedQuery.length).padStart(2, '0')}`}
+          </span>
+        </div>
+
+        <div className="universal-gallery-suggestions" aria-label="Suggested searches" data-testid="list-gallery-suggestions">
+          <span className="universal-gallery-suggestions-label universal-gallery-mono">Suggested vectors</span>
+          {['NEBULA', 'BLACK HOLES', 'GALAXIES', 'ANCIENT ART', 'WILDLIFE', 'HUMAN ANATOMY'].map((suggestion) => (
+            <button
+              type="button"
+              key={suggestion}
+              className={`universal-gallery-suggestion ${draftQuery.toUpperCase() === suggestion ? 'is-current' : ''}`}
+              onClick={() => submitSuggestion(suggestion)}
+              data-testid={`chip-gallery-suggestion-${suggestion.toLowerCase().replace(/ /g, '-')}`}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+        <p className="universal-gallery-search-support" data-testid="text-gallery-search-support">
+          Search across art · science · nature · history · space
+        </p>
+        </div>
+
+        <div className="universal-gallery-filter-deck" aria-label="Gallery filters" data-testid="deck-gallery-filters">
+          <div className="universal-gallery-filter-deck-heading">
+            <span className="universal-gallery-filter-deck-title universal-gallery-mono">Filters</span>
+            <span className="universal-gallery-filter-deck-note">
+              {activeFilterCount > 0 ? `${activeFilterCount} active` : 'Refine the reading'}
+            </span>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                className="universal-gallery-clear-filters"
+                onClick={clearFilters}
+                data-testid="button-gallery-clear-filters-deck"
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <div className="universal-gallery-filters" aria-label="Gallery filters">
-            <label className="universal-gallery-filter-select">
-              <span className="universal-gallery-mono">Category</span>
-              <select value={category} onChange={(event) => setCategory(event.target.value as GallerySearchCategory | '')} data-testid="select-gallery-category">
-                {CATEGORY_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
-            <label className="universal-gallery-filter-select">
-              <span className="universal-gallery-mono">Media</span>
-              <select value={media} onChange={(event) => setMedia(event.target.value as GallerySearchMedia | '')} data-testid="select-gallery-media">
-                {MEDIA_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
             <label className="universal-gallery-filter-select">
               <span className="universal-gallery-mono">License</span>
               <select value={license} onChange={(event) => setLicense(event.target.value as GallerySearchLicense | '')} data-testid="select-gallery-license">
@@ -772,11 +840,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
               </select>
             </label>
             <label className="universal-gallery-filter-select">
-              <span className="universal-gallery-mono">View</span>
+              <span className="universal-gallery-mono">Orientation</span>
               <select value={orientation} onChange={(event) => setOrientation(event.target.value as GallerySearchOrientation | '')} data-testid="select-gallery-orientation">
                 {ORIENTATION_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
               </select>
             </label>
+            <span className="universal-gallery-filter-group-label universal-gallery-mono">Source</span>
             {providers.map((value) => (
               <button
                 type="button"
@@ -788,8 +857,20 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
                 {formatProviderName(value)}
               </button>
             ))}
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">Media</span>
+              <select value={media} onChange={(event) => setMedia(event.target.value as GallerySearchMedia | '')} data-testid="select-gallery-media">
+                {MEDIA_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="universal-gallery-filter-select">
+              <span className="universal-gallery-mono">Category</span>
+              <select value={category} onChange={(event) => setCategory(event.target.value as GallerySearchCategory | '')} data-testid="select-gallery-category">
+                {CATEGORY_FILTERS.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
           </div>
-        )}
+        </div>
 
         <ProviderStrip statuses={statuses} />
 
