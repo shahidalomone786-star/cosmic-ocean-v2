@@ -30,6 +30,11 @@ type UniversalGalleryProps = {
   lm?: boolean;
 };
 
+type GalleryBatch = {
+  page: number;
+  items: GalleryItem[];
+};
+
 const INITIAL_QUERY = 'nebula';
 const PAGE_LIMIT = 30;
 
@@ -502,10 +507,12 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [orientation, setOrientation] = useState<GallerySearchOrientation | ''>('');
   const [page, setPage] = useState(1);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [galleryBatches, setGalleryBatches] = useState<GalleryBatch[]>([]);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [ageGateQuery, setAgeGateQuery] = useState<string | null>(null);
   const loadedQueryRef = useRef('');
   const loadedItemKeysRef = useRef<Set<string>>(new Set());
+  const loadedPagesRef = useRef<Set<number>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadMoreLockRef = useRef(false);
 
@@ -546,14 +553,19 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   useEffect(() => {
     setPage(1);
     setGalleryItems([]);
+    setGalleryBatches([]);
     loadedQueryRef.current = '';
     loadedItemKeysRef.current.clear();
+    loadedPagesRef.current.clear();
     loadMoreLockRef.current = false;
   }, [category, committedQuery, license, media, orientation, provider, quality]);
 
   useEffect(() => {
     const incoming = galleryQuery.data?.items;
     if (!incoming || galleryQuery.data?.page !== page) return;
+    if (loadedPagesRef.current.has(page)) return;
+    loadedPagesRef.current.add(page);
+
     if (loadedQueryRef.current !== querySignature || page === 1) {
       loadedQueryRef.current = querySignature;
       const initialItems: GalleryItem[] = [];
@@ -565,6 +577,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
         initialItems.push(item);
       });
       setGalleryItems(initialItems);
+      setGalleryBatches([{ page, items: initialItems }]);
       return;
     }
     const nextItems: GalleryItem[] = [];
@@ -576,6 +589,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     });
     if (nextItems.length > 0) {
       setGalleryItems((previous) => [...previous, ...nextItems]);
+      setGalleryBatches((previous) => [...previous, { page, items: nextItems }]);
     }
   }, [galleryQuery.data, page, querySignature]);
 
@@ -796,14 +810,18 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
               <span><strong>{items.length}</strong> images found · <strong>{readySources}</strong> sources</span>
               <span className="universal-gallery-mono">Page {galleryQuery.data?.page ?? 1}{galleryQuery.data?.hasMore ? ' · More available' : ''}</span>
             </div>
-            <div className="universal-gallery-masonry" data-testid="grid-gallery-results">
-              {items.map((item, index) => (
-                <GalleryCard
-                  key={item.id}
-                  item={item}
-                  priority={index < 6}
-                  onSelect={handleSelectItem}
-                />
+            <div data-testid="grid-gallery-results">
+              {galleryBatches.map((batch, batchIndex) => (
+                <div className="universal-gallery-masonry" key={`${querySignature}-page-${batch.page}`}>
+                  {batch.items.map((item, itemIndex) => (
+                    <GalleryCard
+                      key={item.id}
+                      item={item}
+                      priority={batchIndex === 0 && itemIndex < 6}
+                      onSelect={handleSelectItem}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
             {hasMore && (
