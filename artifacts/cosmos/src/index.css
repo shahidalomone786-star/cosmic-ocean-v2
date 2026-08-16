@@ -5145,7 +5145,7 @@ body {
 /* ── Main Portal / Universal Gallery launch image ─────────────────────────── */
 .portal-gallery-entry {
   position: relative;
-  width: min(100%, 36rem);
+  width: min(100%, 40rem);
   margin: .5rem auto 2rem;
 }
 .portal-gallery-entry-visual {
@@ -5154,10 +5154,10 @@ body {
   width: 100%;
   aspect-ratio: 683 / 1024;
   overflow: hidden;
-  border: 1px solid rgba(143, 221, 216, .25);
+  border: 1px solid rgba(143, 221, 216, .3);
   background: #071316;
   box-shadow:
-    0 20px 56px rgba(0, 0, 0, .38),
+    0 24px 64px rgba(0, 0, 0, .42),
     0 0 0 1px rgba(255, 255, 255, .035) inset;
 }
 .portal-gallery-entry-image,
@@ -5173,26 +5173,38 @@ body {
   height: 100%;
   object-fit: contain;
   object-position: center;
-  filter: saturate(.76) contrast(1.05) brightness(.86);
+  filter: saturate(.8) contrast(1.05) brightness(.88);
+  mask-image: radial-gradient(ellipse at center, #000 0%, #000 67%, rgba(0, 0, 0, .88) 82%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, #000 67%, rgba(0, 0, 0, .88) 82%, transparent 100%);
 }
 .portal-gallery-entry-overlay {
   z-index: 1;
   background:
-    radial-gradient(circle at 74% 22%, rgba(75, 195, 192, .14), transparent 29%),
-    linear-gradient(180deg, rgba(4, 12, 15, .14) 0%, rgba(4, 12, 15, .04) 37%, rgba(3, 12, 15, .44) 100%);
+    radial-gradient(circle at 74% 22%, rgba(75, 195, 192, .12), transparent 29%),
+    linear-gradient(90deg, rgba(4, 12, 15, .22), transparent 13%, transparent 87%, rgba(4, 12, 15, .22)),
+    linear-gradient(180deg, rgba(4, 12, 15, .16) 0%, rgba(4, 12, 15, .02) 37%, rgba(3, 12, 15, .48) 100%);
   pointer-events: none;
 }
 .portal-gallery-entry-frame {
   z-index: 2;
-  inset: .65rem;
-  border: 1px solid rgba(176, 230, 224, .18);
+  inset: .72rem;
+  border: 1px solid rgba(176, 230, 224, .14);
   pointer-events: none;
 }
 .portal-gallery-entry-copy {
   position: absolute;
   z-index: 3;
-  inset: auto 12% 11%;
+  inset: auto 9% 8%;
+  max-width: 31rem;
+  padding: clamp(1rem, 2.5vw, 1.45rem) clamp(1rem, 3vw, 1.7rem) clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid rgba(145, 221, 218, .18);
+  border-radius: .9rem;
   color: #f0f8f5;
+  background: linear-gradient(135deg, rgba(8, 24, 29, .68), rgba(5, 14, 19, .38));
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, .22),
+    inset 0 1px 0 rgba(235, 255, 251, .08);
+  backdrop-filter: blur(11px) saturate(1.08);
   text-shadow: 0 2px 22px rgba(0, 0, 0, .5);
   pointer-events: none;
 }
@@ -5220,19 +5232,25 @@ body {
 }
 .portal-gallery-entry-copy .portal-gallery-nav {
   width: fit-content;
-  margin-top: 1.35rem;
+  margin-top: 1.15rem;
   pointer-events: auto;
-  border: 1px solid rgba(185, 231, 224, .28);
-  background: rgba(4, 13, 16, .48);
+  border: 1px solid rgba(151, 221, 229, .5);
+  border-radius: 999px;
+  background: rgba(7, 25, 32, .62);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, .22),
+    0 10px 25px rgba(0, 0, 0, .25),
+    0 0 18px rgba(77, 190, 215, .08),
     inset 0 1px 0 rgba(255, 255, 255, .08);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(12px);
 }
 .portal-gallery-entry-copy .portal-gallery-nav:hover,
 .portal-gallery-entry-copy .portal-gallery-nav:focus-visible {
-  border-color: rgba(154, 225, 218, .62);
-  background: rgba(4, 20, 23, .66);
+  border-color: rgba(177, 239, 239, .86);
+  background: rgba(9, 34, 42, .72);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, .27),
+    0 0 24px rgba(77, 190, 215, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .1);
 }
 .portal-gallery-entry.is-light .portal-gallery-entry-copy {
   color: #f7fbf8;
@@ -5254,24 +5272,30 @@ body {
 .portal-gallery-nav {
   display: inline-flex;
   align-items: center;
-  gap: .7rem;
-  min-height: 2.35rem;
-  padding: .4rem .1rem .4rem .55rem;
-  border: 0;
-  color: rgba(239, 252, 249, .9);
-  background: transparent;
+  gap: .58rem;
+  min-height: 2.65rem;
+  padding: .42rem .78rem .42rem .64rem;
+  border: 1px solid rgba(151, 221, 229, .44);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(7, 25, 32, .46);
   box-shadow:
-    0 0 0 1px rgba(135, 215, 207, .02) inset;
+    0 8px 20px rgba(0, 0, 0, .18),
+    0 0 14px rgba(77, 190, 215, .06);
   font: 600 .56rem/1 var(--app-font-mono, "Space Mono", monospace);
   letter-spacing: .1em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  transition: color 220ms ease, border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 .portal-gallery-nav:hover,
 .portal-gallery-nav:focus-visible {
-  color: #9ae1d9;
-  background: rgba(135, 215, 207, .07);
+  color: #fff;
+  border-color: rgba(177, 239, 239, .86);
+  background: rgba(9, 34, 42, .64);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, .22),
+    0 0 22px rgba(77, 190, 215, .14);
   outline: none;
   transform: translateX(2px);
 }
@@ -5281,18 +5305,24 @@ body {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 1.8rem;
-  height: 1.8rem;
-  border: 1px solid rgba(129, 220, 212, .42);
+  width: 1.72rem;
+  height: 1.72rem;
+  border: 1px solid rgba(227, 250, 249, .7);
   border-radius: 50%;
-  color: #9ae1d9;
-  background: rgba(90, 204, 196, .12);
+  color: #fff;
+  background: rgba(113, 206, 222, .1);
   box-shadow: 0 0 14px rgba(89, 205, 196, .08);
+  transition: transform 220ms ease, background-color 220ms ease;
 }
 .portal-gallery-nav-arrow {
   flex: 0 0 auto;
-  color: rgba(154, 225, 218, .76);
-  transition: transform 180ms ease;
+  color: rgba(227, 250, 249, .88);
+  transition: transform 220ms ease;
+}
+.portal-gallery-nav:hover .portal-gallery-nav-icon,
+.portal-gallery-nav:focus-visible .portal-gallery-nav-icon {
+  background: rgba(113, 206, 222, .18);
+  transform: translateX(1px);
 }
 .portal-gallery-nav:hover .portal-gallery-nav-arrow,
 .portal-gallery-nav:focus-visible .portal-gallery-nav-arrow { transform: translate(2px, -2px); }
@@ -5371,7 +5401,8 @@ body {
   }
   .portal-gallery-entry-frame { inset: .45rem; }
   .portal-gallery-entry-copy {
-    inset: auto 10% 10%;
+    inset: auto 7% 7%;
+    padding: .9rem .85rem .95rem;
   }
   .portal-gallery-entry-index {
     margin-bottom: .7rem;
@@ -5388,7 +5419,7 @@ body {
   }
   .portal-gallery-entry-copy .portal-gallery-nav {
     width: fit-content;
-    margin-top: 1.15rem;
+    margin-top: 1rem;
   }
   .portal-gallery-entry-footer {
     align-items: flex-start;
