@@ -206,8 +206,8 @@ const GalleryImage = memo(function GalleryImage({
       alt={item.title}
       className={`w-full h-auto object-contain ${imageLoaded ? 'is-loaded' : ''}`}
       style={displayAspectRatio ? { aspectRatio: displayAspectRatio } : undefined}
-      width={modal ? undefined : item.width ?? undefined}
-      height={modal ? undefined : item.height ?? undefined}
+      width={item.width ?? undefined}
+      height={item.height ?? undefined}
       sizes={modal
         ? '(max-width: 760px) 100vw, 68vw'
         : '(max-width: 520px) 50vw, (max-width: 900px) 33vw, 25vw'}
@@ -348,16 +348,16 @@ function GalleryDetail({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);
-    document.body.style.overflow = 'hidden';
+    detailRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
     };
   }, [onClose]);
 
@@ -375,6 +375,7 @@ function GalleryDetail({
   return (
     <motion.div
       className="universal-gallery-modal-backdrop"
+      ref={detailRef}
       role="presentation"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -395,10 +396,10 @@ function GalleryDetail({
         transition={{ duration: .24, ease: [0.16, 1, 0.3, 1] }}
         data-testid={`dialog-gallery-detail-${item.id}`}
       >
-        <div className="universal-gallery-modal-media">
-          <GalleryImage key={item.id} item={item} modal priority />
-        </div>
-        <div className="universal-gallery-modal-content">
+        <div className="universal-gallery-modal-header">
+          <p className="universal-gallery-modal-eyebrow universal-gallery-mono">
+            {formatProviderName(item.source)} / {item.category}
+          </p>
           <button
             type="button"
             className="universal-gallery-modal-close"
@@ -408,10 +409,11 @@ function GalleryDetail({
           >
             <X size={16} aria-hidden="true" />
           </button>
-
-          <p className="universal-gallery-modal-eyebrow universal-gallery-mono">
-            {formatProviderName(item.source)} / {item.category}
-          </p>
+        </div>
+        <div className="universal-gallery-modal-media">
+          <GalleryImage key={item.id} item={item} modal priority />
+        </div>
+        <div className="universal-gallery-modal-content">
           <div className="universal-gallery-license-summary">
             <span className={`universal-gallery-license-badge is-${item.licenseClass.toLowerCase()}`}>
               {licenseBadgeLabel(item.licenseClass)}

@@ -1932,10 +1932,17 @@ function PortalGalleryEntry({ onOpen, lm }: { onOpen: () => void; lm?: boolean }
       data-testid="portal-gallery-entry"
     >
       <div className="portal-gallery-entry-visual">
+        <div
+          className="portal-gallery-entry-atmosphere"
+          style={{ backgroundImage: `url("${galleryPortalImage}")` }}
+          aria-hidden="true"
+        />
         <img
           src={galleryPortalImage}
           alt="A lone figure crossing a windswept field beneath a dramatic sky"
           className="portal-gallery-entry-image"
+          decoding="async"
+          fetchPriority="high"
           data-testid="image-gallery-portal"
         />
         <div className="portal-gallery-entry-overlay" aria-hidden="true" />
