@@ -482,18 +482,19 @@ function GalleryDetail({
 }
 
 function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
+  let firstScrollableAncestor: HTMLElement | null = null;
   let parent = element.parentElement;
   while (parent) {
     const overflowY = window.getComputedStyle(parent).overflowY;
     if (
-      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
-      parent.scrollHeight > parent.clientHeight
+      overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay'
     ) {
-      return parent;
+      firstScrollableAncestor ??= parent;
+      if (parent.scrollHeight > parent.clientHeight) return parent;
     }
     parent = parent.parentElement;
   }
-  return null;
+  return firstScrollableAncestor;
 }
 
 export default function UniversalGallery({ lm = false }: UniversalGalleryProps) {
@@ -508,6 +509,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [page, setPage] = useState(1);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [galleryBatches, setGalleryBatches] = useState<GalleryBatch[]>([]);
+  const [loadedHasMore, setLoadedHasMore] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [ageGateQuery, setAgeGateQuery] = useState<string | null>(null);
   const loadedQueryRef = useRef('');
@@ -515,6 +517,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const loadedPagesRef = useRef<Set<number>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadMoreLockRef = useRef(false);
+  const pageFetchRef = useRef(false);
 
   const params = useMemo<GallerySearchParams>(() => ({
     q: committedQuery,
@@ -540,7 +543,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
   const items = galleryItems;
   const statuses = galleryQuery.data?.providerStatus ?? [];
-  const hasMore = galleryQuery.data?.hasMore ?? (page > 1 && !galleryQuery.isError);
+  const hasMore = loadedHasMore;
   const isLoadingMore = page > 1 && galleryQuery.isFetching;
 
   const providers = useMemo(() => {
@@ -554,17 +557,33 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     setPage(1);
     setGalleryItems([]);
     setGalleryBatches([]);
+    setLoadedHasMore(false);
     loadedQueryRef.current = '';
     loadedItemKeysRef.current.clear();
     loadedPagesRef.current.clear();
     loadMoreLockRef.current = false;
+    pageFetchRef.current = false;
   }, [category, committedQuery, license, media, orientation, provider, quality]);
 
+  const loadNextPage = useCallback(() => {
+    if (
+      !hasMore
+      || galleryQuery.isFetching
+      || loadMoreLockRef.current
+      || pageFetchRef.current
+    ) return;
+    loadMoreLockRef.current = true;
+    pageFetchRef.current = true;
+    setPage((current) => current + 1);
+  }, [galleryQuery.isFetching, hasMore]);
+
   useEffect(() => {
-    const incoming = galleryQuery.data?.items;
-    if (!incoming || galleryQuery.data?.page !== page) return;
+    const response = galleryQuery.data;
+    const incoming = response?.items;
+    if (!response || !incoming || response.page !== page) return;
     if (loadedPagesRef.current.has(page)) return;
     loadedPagesRef.current.add(page);
+    setLoadedHasMore(response.hasMore);
 
     if (loadedQueryRef.current !== querySignature || page === 1) {
       loadedQueryRef.current = querySignature;
@@ -591,34 +610,45 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
       setGalleryItems((previous) => [...previous, ...nextItems]);
       setGalleryBatches((previous) => [...previous, { page, items: nextItems }]);
     }
+    pageFetchRef.current = false;
+    loadMoreLockRef.current = false;
   }, [galleryQuery.data, page, querySignature]);
 
-  const loadNextPage = useCallback(() => {
-    if (!hasMore || galleryQuery.isFetching || loadMoreLockRef.current) return;
-    loadMoreLockRef.current = true;
-    setPage((current) => current + 1);
-  }, [galleryQuery.isFetching, hasMore]);
-
   useEffect(() => {
-    if (!hasMore) {
-      loadMoreLockRef.current = false;
-      return;
-    }
     const sentinel = loadMoreRef.current;
-    if (!sentinel) return;
-    const scrollRoot = findScrollableAncestor(sentinel);
+    if (!sentinel || !hasMore) return;
+    const scrollRoot = sentinel.closest<HTMLElement>('.portal-gallery-overlay')
+      ?? findScrollableAncestor(sentinel);
+    let frame = 0;
+    const requestIfNearBottom = () => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const sentinelRect = sentinel.getBoundingClientRect();
+        const rootBottom = scrollRoot?.getBoundingClientRect().bottom ?? window.innerHeight;
+        if (sentinelRect.top <= rootBottom + 900 && sentinelRect.bottom >= 0) loadNextPage();
+      });
+    };
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) loadNextPage();
-      },
-      { root: scrollRoot, rootMargin: '900px 0px', threshold: 0 },
+      ([entry]) => { if (entry?.isIntersecting) loadNextPage(); },
+      { root: scrollRoot, rootMargin: '0px 0px 900px 0px', threshold: 0 },
     );
     observer.observe(sentinel);
-    return () => observer.disconnect();
+    const scrollTarget: Window | HTMLElement = scrollRoot ?? window;
+    scrollTarget.addEventListener('scroll', requestIfNearBottom, { passive: true });
+    window.addEventListener('resize', requestIfNearBottom, { passive: true });
+    requestIfNearBottom();
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener('scroll', requestIfNearBottom);
+      window.removeEventListener('resize', requestIfNearBottom);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
   }, [hasMore, loadNextPage]);
 
   useEffect(() => {
     if (galleryQuery.isError || galleryQuery.data?.page === page) {
+      pageFetchRef.current = false;
       loadMoreLockRef.current = false;
     }
   }, [galleryQuery.data?.page, galleryQuery.isError, page]);
