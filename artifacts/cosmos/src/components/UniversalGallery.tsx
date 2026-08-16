@@ -185,12 +185,13 @@ const GalleryImage = memo(function GalleryImage({
     : imageStage === 'alternate'
       ? (isValidGalleryImageUrl(item.thumbnailUrl) ? item.thumbnailUrl : null)
       : null;
+  const displayAspectRatio = modal ? undefined : galleryItemAspectRatio(item);
 
   if (!imageUrl) {
     return (
       <div
         className={`universal-gallery-image-placeholder ${modal ? 'is-modal' : ''}`}
-        style={{ aspectRatio: galleryItemAspectRatio(item) }}
+        style={displayAspectRatio ? { aspectRatio: displayAspectRatio } : undefined}
         data-testid={`${modal ? 'empty-image' : 'empty-thumbnail'}-${item.id}`}
         aria-label="Image unavailable"
       >
@@ -204,9 +205,9 @@ const GalleryImage = memo(function GalleryImage({
       src={imageUrl}
       alt={item.title}
       className={`w-full h-auto object-contain ${imageLoaded ? 'is-loaded' : ''}`}
-      style={{ aspectRatio: galleryItemAspectRatio(item) }}
-      width={item.width ?? undefined}
-      height={item.height ?? undefined}
+      style={displayAspectRatio ? { aspectRatio: displayAspectRatio } : undefined}
+      width={modal ? undefined : item.width ?? undefined}
+      height={modal ? undefined : item.height ?? undefined}
       sizes={modal
         ? '(max-width: 760px) 100vw, 68vw'
         : '(max-width: 520px) 50vw, (max-width: 900px) 33vw, 25vw'}

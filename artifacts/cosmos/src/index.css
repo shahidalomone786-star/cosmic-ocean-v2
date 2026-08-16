@@ -6152,8 +6152,10 @@ body {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: 100%;
+  max-height: calc(94dvh - 7rem);
+  aspect-ratio: auto;
   object-fit: contain;
+  object-position: center;
 }
 .universal-gallery-image-placeholder {
   display: grid;
@@ -6270,6 +6272,9 @@ body {
   .universal-gallery-modal-media {
     height: min(58dvh, 40rem);
     min-height: 18rem;
+  }
+  .universal-gallery-modal-media img {
+    max-height: calc(58dvh - 2rem);
   }
   .universal-gallery-modal-content {
     max-height: 38dvh;
