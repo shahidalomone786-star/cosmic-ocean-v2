@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { GameItem } from '../../data/gameCatalog';
+import { loadGameStoreMonetagAd } from './monetagGameAds';
 
 export type CatalogGame = GameItem & {
   playableUrl?: string;
@@ -228,7 +229,20 @@ export default function GameStore({ catalog, games: legacyGames, freeGames = [],
   const handlePlay = (game: CatalogGame) => {
     const playableUrl = game.playableUrl;
     if (!playableUrl) return;
-    window.open(playableUrl, '_blank', 'noopener,noreferrer');
+
+    const gameWindow = window.open('about:blank', '_blank');
+    if (gameWindow) {
+      gameWindow.opener = null;
+    }
+
+    void loadGameStoreMonetagAd().finally(() => {
+      if (gameWindow) {
+        gameWindow.location.href = playableUrl;
+        return;
+      }
+
+      window.location.assign(playableUrl);
+    });
   };
 
   const clearFilters = () => {

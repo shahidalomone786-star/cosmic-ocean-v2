@@ -1,6 +1,2 @@
-self.options = {
-    "domain": "5gvci.com",
-    "zoneId": "11603132"
-}
-self.lary = ""
-importScripts('https://5gvci.com/act/files/service-worker.min.js?r=sw')
+// Intentionally left without Monetag push-notification integration.
+// Cosmic Ocean only loads game ads from the 100-game GameStore launch flow.
