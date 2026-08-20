@@ -32,6 +32,7 @@ import LoginScreen from './components/LoginScreen';
 const ProfileModal = lazy(() => import('./components/ProfileModal'));
 const SimulationSearch = lazy(() => import('./components/SimulationSearch'));
 const UniversalGallery = lazy(() => import('./components/UniversalGallery'));
+const CosmicOceanCinematicHero = lazy(() => import('./components/CosmicOceanCinematicHero'));
 import BannerCarousel from './components/BannerCarousel';
 import CosmicGalaxyBanner from './components/CosmicGalaxyBanner';
 import { GreatObservatories, ObservatoryExplorer } from './components/GreatObservatories';
@@ -2650,6 +2651,9 @@ export default function App() {
               hasSearchResults ? 'justify-start overflow-y-auto overflow-x-hidden pt-10 pb-16' : 'justify-center'
             }`}
           >
+            <Suspense fallback={null}>
+              <CosmicOceanCinematicHero />
+            </Suspense>
             {/* ── Premium floating pill nav — hidden in search-results view ── */}
             {!hasSearchResults && (
               <div className="absolute top-5 left-0 right-0 z-30 pointer-events-auto flex justify-center px-4">
