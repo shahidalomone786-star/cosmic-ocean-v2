@@ -5156,6 +5156,7 @@ body {
   aspect-ratio: 683 / 1024;
   overflow: hidden;
   border: 1px solid rgba(143, 221, 216, .46);
+  border-radius: .35rem;
   background: #050b0e;
   box-shadow:
     0 30px 78px rgba(0, 0, 0, .52),
@@ -5474,9 +5475,9 @@ body {
   padding: clamp(3.5rem, 7vw, 6.5rem) 1.25rem clamp(3.8rem, 8vw, 7rem);
   color: var(--ug-ink);
   background:
-    radial-gradient(ellipse 58% 50% at 90% 2%, rgba(37, 139, 151, .23), transparent 72%),
-    radial-gradient(ellipse 52% 48% at 0% 94%, rgba(139, 103, 67, .1), transparent 76%),
-    linear-gradient(180deg, #091c26 0%, var(--ug-deep) 58%, #050e15 100%);
+    radial-gradient(ellipse 58% 50% at 90% 2%, rgba(37, 139, 151, .14), transparent 72%),
+    radial-gradient(ellipse 52% 48% at 0% 94%, rgba(139, 103, 67, .07), transparent 76%),
+    linear-gradient(180deg, #071117 0%, var(--ug-deep) 58%, #03080d 100%);
   font-family: var(--app-font-sans, "DM Sans", sans-serif);
 }
 .universal-gallery.is-light {
@@ -6059,8 +6060,9 @@ body {
   overflow: hidden;
   break-inside: avoid;
   border: 1px solid var(--ug-line);
+  border-radius: .2rem;
   color: var(--ug-ink);
-  background: transparent;
+  background: linear-gradient(180deg, rgba(10, 28, 35, .72), rgba(4, 13, 18, .9));
   text-align: left;
   cursor: pointer;
   transition: border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
@@ -6098,7 +6100,7 @@ body {
   object-fit: contain;
   filter: saturate(.82) contrast(1.06);
   content-visibility: auto;
-  transition: opacity 220ms ease, filter 220ms ease, transform 220ms ease;
+  transition: opacity 320ms ease, filter 320ms ease, transform 320ms ease;
 }
 .universal-gallery-card-media img.is-loaded {
   opacity: 1;
@@ -6109,7 +6111,7 @@ body {
   transform: scale(1.012);
 }
 .universal-gallery-card-copy {
-  padding: .8rem .7rem .72rem;
+  padding: .9rem .8rem .78rem;
 }
 .universal-gallery-card-category {
   display: block;
@@ -6122,7 +6124,7 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: .45rem;
-  margin-top: .55rem;
+  margin-top: .65rem;
   color: var(--ug-muted);
   font: .48rem/1.35 var(--app-font-mono, "Space Mono", monospace);
 }
@@ -6259,7 +6261,9 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--ug-line-strong);
-  background: rgba(3, 11, 15, .94);
+  background:
+    radial-gradient(ellipse 70% 48% at 50% 0%, rgba(37, 139, 151, .08), transparent 72%),
+    rgba(3, 11, 15, .96);
   box-sizing: border-box;
 }
 .universal-gallery-modal {
@@ -6268,6 +6272,8 @@ body {
   max-width: 100%;
   margin: 0 auto;
   overflow: visible;
+  border: 1px solid rgba(139, 194, 196, .16);
+  border-radius: .25rem;
   color: var(--ug-ink);
   background: #0b2028;
   box-shadow: 0 2rem 5rem rgba(0, 0, 0, .32);

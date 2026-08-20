@@ -188,6 +188,52 @@ function galleryItemAspectRatio(item: GalleryItem): string | undefined {
     : undefined;
 }
 
+function galleryContentQualityScore(item: GalleryItem, query: string): number {
+  const normalizedQuery = query.trim().toLowerCase();
+  const queryTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const title = item.title.trim().toLowerCase();
+  const creator = item.creator?.trim().toLowerCase() ?? '';
+  const description = item.description?.trim().toLowerCase() ?? '';
+  const category = item.category.trim().toLowerCase();
+  const tags = item.tags.map((tag) => tag.trim().toLowerCase());
+  let score = 0;
+
+  if (normalizedQuery && title.includes(normalizedQuery)) score += 24;
+  queryTerms.forEach((term) => {
+    if (title.includes(term)) score += 10;
+    if (tags.some((tag) => tag.includes(term))) score += 5;
+    if (category.includes(term)) score += 4;
+    if (creator.includes(term)) score += 3;
+    if (description.includes(term)) score += 2;
+  });
+
+  if (title && !/^untitled|^image$|^thumbnail$|^download$/i.test(title)) score += 3;
+  if (description) score += 2;
+  if (creator) score += 1;
+  if (item.date) score += 1;
+  if (item.sourceUrl) score += 2;
+  if (item.licenseUrl || item.licenseClass !== 'UNKNOWN') score += 2;
+  if (isValidGalleryImageUrl(item.imageUrl)) score += 4;
+  if (isValidGalleryImageUrl(item.thumbnailUrl)) score += 2;
+
+  const width = Number(item.width);
+  const height = Number(item.height);
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+    score += 2;
+    if (width * height >= 2_000_000) score += 3;
+    else if (width * height < 320_000) score -= 2;
+  }
+
+  return score;
+}
+
+function sortGalleryBatchForDisplay(items: GalleryItem[], query: string): GalleryItem[] {
+  return items
+    .map((item, index) => ({ item, index, score: galleryContentQualityScore(item, query) }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map(({ item }) => item);
+}
+
 const GalleryImage = memo(function GalleryImage({
   item,
   modal = false,
@@ -603,6 +649,13 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   });
   const querySignature = `${committedQuery}|${category}|${provider}|${media}|${license}|${quality}|${orientation}`;
   const items = galleryItems;
+  const displayBatches = useMemo(
+    () => galleryBatches.map((batch) => ({
+      ...batch,
+      items: sortGalleryBatchForDisplay(batch.items, committedQuery),
+    })),
+    [committedQuery, galleryBatches],
+  );
   const statuses = galleryQuery.data?.providerStatus ?? [];
   const hasMore = loadedHasMore;
   const isLoadingMore = page > 1 && galleryQuery.isFetching;
@@ -1029,7 +1082,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
               <span className="universal-gallery-mono">Page {galleryQuery.data?.page ?? 1}{galleryQuery.data?.hasMore ? ' · More available' : ''}</span>
             </div>
             <div className={`universal-gallery-results-grid is-${displayMode}`} data-testid="grid-gallery-results">
-              {galleryBatches.map((batch, batchIndex) => (
+              {displayBatches.map((batch, batchIndex) => (
                 <div className={`universal-gallery-masonry is-${displayMode}`} key={`${querySignature}-page-${batch.page}`}>
                   {batch.items.map((item, itemIndex) => (
                     <GalleryCard
