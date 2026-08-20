@@ -310,14 +310,10 @@ Physical UTF-8 lines, including blanks and comments. Excludes caches, node_modul
 
 | LOC | File |
 |---:|---|
-| 27 | artifacts/cosmos-video/.replit-artifact/artifact.toml |
 | 27 | artifacts/cosmos-video/index.html |
 | 36 | artifacts/cosmos-video/package.json |
-| 44 | artifacts/cosmos-video/scripts/validate-recording.sh |
 | 5 | artifacts/cosmos-video/src/App.tsx |
-| 111 | artifacts/cosmos-video/src/components/video/ReplitLoadingScene.tsx |
 | 63 | artifacts/cosmos-video/src/components/video/VideoTemplate.tsx |
-| 1 | artifacts/cosmos-video/src/components/video/index.ts |
 | 86 | artifacts/cosmos-video/src/components/video/video_scenes/Scene1.tsx |
 | 104 | artifacts/cosmos-video/src/components/video/video_scenes/Scene2.tsx |
 | 127 | artifacts/cosmos-video/src/components/video/video_scenes/Scene3.tsx |
@@ -339,7 +335,6 @@ Physical UTF-8 lines, including blanks and comments. Excludes caches, node_modul
 
 | LOC | File |
 |---:|---|
-| 17 | artifacts/mockup-sandbox/.replit-artifact/artifact.toml |
 | 21 | artifacts/mockup-sandbox/components.json |
 | 31 | artifacts/mockup-sandbox/index.html |
 | 180 | artifacts/mockup-sandbox/mockupPreviewPlugin.ts |

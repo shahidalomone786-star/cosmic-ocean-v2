@@ -2,14 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-declare global {
-  interface Window {
-    __replitVideoPlayerMounted?: boolean;
-    startRecording?: () => Promise<void>;
-    stopRecording?: () => void;
-  }
-}
-
 export interface SceneDurations {
   [key: string]: number;
 }
@@ -40,16 +32,6 @@ export function useVideoPlayer(
   const [currentScene, setCurrentScene] = useState(0);
   const [hasEnded, setHasEnded] = useState(false);
 
-  // Start recording on mount
-  useEffect(() => {
-    window.__replitVideoPlayerMounted = true;
-    window.startRecording?.();
-
-    return () => {
-      window.__replitVideoPlayerMounted = false;
-    };
-  }, []);
-
   // Scene advancement -- loops independently of recording
   useEffect(() => {
     if (hasEnded && !loop) return;
@@ -60,7 +42,6 @@ export function useVideoPlayer(
       // Last scene just finished playing
       if (currentScene >= totalScenes - 1) {
         if (!hasEnded) {
-          window.stopRecording?.();
           setHasEnded(true);
           onVideoEnd?.();
         }

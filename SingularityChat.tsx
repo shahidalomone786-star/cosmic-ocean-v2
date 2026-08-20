@@ -1,7 +1,7 @@
 /**
  * SingularityChat — Premium GPT-OSS-120B reasoning chat widget
  * ────────────────────────────────────────────────────────────
- * NEW DEPENDENCIES (run in Replit shell before this compiles):
+ * Dependencies:
  *   npm install react-markdown remark-gfm remark-math rehype-katex katex
  *
  * PHASE 3 (Groq model wiring) — search this file for "PHASE 3":

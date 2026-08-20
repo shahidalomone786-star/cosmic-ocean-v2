@@ -303,7 +303,7 @@ async function fetchOpenAlex(
   const url =
     `https://api.openalex.org/works?search=${encodeURIComponent(query)}` +
     `&per-page=15&page=${page}&filter=${encodeURIComponent(filter)}` +
-    `&sort=relevance_score:desc&mailto=cosmos%40replit.app`;
+    `&sort=relevance_score:desc&mailto=cosmos%40biohub.app`;
   const resp = await fetch(url, { signal: timeout(9_000) });
   if (!resp.ok) return { items: [], concepts: [] };
 

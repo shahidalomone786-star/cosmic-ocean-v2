@@ -119,7 +119,7 @@ async function topicsFromOpenAlexConcepts(
   const url =
     `https://api.openalex.org/concepts?search=${encodeURIComponent(query)}` +
     `&per-page=12&select=display_name,level,score,related_concepts` +
-    `&mailto=cosmos%40replit.app`;
+    `&mailto=cosmos%40biohub.app`;
 
   const resp = await fetch(url, { signal: sig(8_000) });
   if (!resp.ok) return [];
@@ -157,7 +157,7 @@ async function topicsFromOpenAlexWorks(
   const url =
     `https://api.openalex.org/works?search=${encodeURIComponent(query)}` +
     `&per-page=10&sort=relevance_score:desc&select=concepts` +
-    `&mailto=cosmos%40replit.app`;
+    `&mailto=cosmos%40biohub.app`;
 
   const resp = await fetch(url, { signal: sig(8_000) });
   if (!resp.ok) return [];
@@ -226,7 +226,7 @@ async function authorsFromOpenAlex(query: string): Promise<AuthorResult[]> {
   const url =
     `https://api.openalex.org/authors?search=${encodeURIComponent(query)}` +
     `&per-page=10&select=display_name,works_count,cited_by_count,ids` +
-    `&mailto=cosmos%40replit.app`;
+    `&mailto=cosmos%40biohub.app`;
 
   const resp = await fetch(url, { signal: sig(8_000) });
   if (!resp.ok) return [];
@@ -349,7 +349,7 @@ async function connectionsFromOpenAlex(query: string): Promise<Connection[]> {
   const url =
     `https://api.openalex.org/concepts?search=${encodeURIComponent(query)}` +
     `&per-page=5&select=display_name,ancestors,related_concepts,level` +
-    `&mailto=cosmos%40replit.app`;
+    `&mailto=cosmos%40biohub.app`;
 
   const resp = await fetch(url, { signal: sig(8_000) });
   if (!resp.ok) return [];

@@ -31,7 +31,7 @@ app.use(
 app.use(
   cors({
     credentials: true,
-    origin: true, // reflect the request origin — safe behind the Replit proxy
+    origin: true, // reflect the request origin for the frontend
   }),
 );
 app.use(cookieParser());
