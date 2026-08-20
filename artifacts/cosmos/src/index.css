@@ -5145,7 +5145,8 @@ body {
 /* ── Main Portal / Universal Gallery launch image ─────────────────────────── */
 .portal-gallery-entry {
   position: relative;
-  width: min(100%, 56rem);
+  width: min(100%, 70rem);
+  max-width: 100%;
   margin: .5rem auto 2rem;
 }
 .portal-gallery-entry-visual {
@@ -5171,9 +5172,9 @@ body {
   z-index: 0;
   background-position: center;
   background-size: cover;
-  filter: blur(24px) saturate(.74) brightness(.7);
-  opacity: .58;
-  transform: scale(1.08);
+  filter: blur(26px) saturate(.74) brightness(.66);
+  opacity: .62;
+  transform: scale(1.1);
 }
 .portal-gallery-entry-image {
   z-index: 1;
@@ -5213,7 +5214,7 @@ body {
   box-shadow:
     0 18px 40px rgba(0, 0, 0, .22),
     inset 0 1px 0 rgba(235, 255, 251, .08);
-  backdrop-filter: blur(11px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.04);
   text-shadow: 0 2px 22px rgba(0, 0, 0, .5);
   pointer-events: none;
 }
@@ -5348,6 +5349,7 @@ body {
 .portal-gallery-overlay > .universal-gallery {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   margin-right: 0;
   margin-left: 0;
   box-sizing: border-box;
@@ -5518,7 +5520,19 @@ body {
   align-items: end;
   justify-content: space-between;
   gap: 2.5rem;
+  min-width: 0;
   padding-bottom: clamp(2rem, 4vw, 3.4rem);
+}
+.universal-gallery-heading > *,
+.universal-gallery-intro,
+.universal-gallery-search-chamber,
+.universal-gallery-filter-deck,
+.universal-gallery-provider-strip,
+.universal-gallery-results-meta,
+.universal-gallery-modal,
+.universal-gallery-modal-content {
+  min-width: 0;
+  max-width: 100%;
 }
 .universal-gallery-eyebrow,
 .universal-gallery-mono {
@@ -5564,6 +5578,7 @@ body {
 }
 .universal-gallery-search-chamber {
   position: relative;
+  min-width: 0;
   margin-bottom: clamp(1.65rem, 4vw, 2.6rem);
   padding: clamp(1rem, 2.2vw, 1.55rem);
   border: 1px solid var(--ug-line-strong);
@@ -5768,6 +5783,7 @@ body {
   letter-spacing: .025em;
 }
 .universal-gallery-filter-deck {
+  min-width: 0;
   margin-bottom: 1rem;
   padding: .85rem .9rem .2rem;
   border: 1px solid var(--ug-line);
@@ -6288,14 +6304,40 @@ body {
 }
 @media (max-width: 760px) {
   .universal-gallery-heading { display: block; }
-  .universal-gallery-intro { margin-top: 2rem; }
+  .universal-gallery-intro {
+    max-width: 24rem;
+    margin-top: 1.35rem;
+    padding-left: .85rem;
+  }
+  .universal-gallery-modal-backdrop {
+    margin-top: 1rem;
+    padding: .55rem;
+  }
   .universal-gallery-modal-content {
     padding: 1.15rem clamp(1rem, 4vw, 2rem) 1.5rem;
   }
 }
 @media (max-width: 520px) {
-  .universal-gallery { padding-right: .85rem; padding-left: .85rem; }
-  .portal-gallery-entry { margin-right: 0; margin-left: 0; }
+  .universal-gallery {
+    width: 100%;
+    padding-right: .85rem;
+    padding-left: .85rem;
+  }
+  .portal-gallery-entry {
+    width: 100%;
+    margin-right: 0;
+    margin-left: 0;
+  }
+  .portal-gallery-entry-visual { border-radius: .15rem; }
+  .portal-gallery-entry-copy {
+    inset: auto 5% 5%;
+    max-width: 90%;
+  }
+  .portal-gallery-entry-copy .portal-gallery-nav {
+    min-height: 2.9rem;
+    padding-right: .95rem;
+    padding-left: .75rem;
+  }
   .universal-gallery-search-chamber { padding: .82rem; }
   .universal-gallery-search { display: block; }
   .universal-gallery-search .universal-gallery-button { width: 100%; margin-top: .55rem; }
@@ -6311,10 +6353,13 @@ body {
   .universal-gallery-skeleton-grid { columns: 2 9rem; column-gap: .55rem; }
   .universal-gallery-card { margin-bottom: .55rem; }
   .universal-gallery-metadata { grid-template-columns: 1fr; }
-  .universal-gallery-modal-backdrop { padding: .45rem; }
+  .universal-gallery-modal-backdrop { padding: .35rem; }
   .universal-gallery-modal-header { padding-right: .75rem; padding-left: .75rem; }
-  .universal-gallery-modal-media { padding: .45rem; }
-  .universal-gallery-modal-content { padding-right: .8rem; padding-left: .8rem; }
+  .universal-gallery-modal-media { padding: .25rem; }
+  .universal-gallery-modal-content { padding: 1rem .8rem 1.35rem; }
+  .universal-gallery-modal h3 { font-size: clamp(1.8rem, 10vw, 2.7rem); }
+  .universal-gallery-modal-actions a,
+  .universal-gallery-modal-actions button { min-height: 2.7rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .universal-gallery *,
