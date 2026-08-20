@@ -8,6 +8,8 @@ import {
   Image as ImageIcon,
   LoaderCircle,
   Search,
+  SlidersHorizontal,
+  Sparkles,
   X,
 } from 'lucide-react';
 import {
@@ -35,8 +37,34 @@ type GalleryBatch = {
   items: GalleryItem[];
 };
 
+type GalleryDisplayMode = 'masonry' | 'grid' | 'editorial' | 'compact' | 'immersive';
+
+type GallerySuggestion = {
+  label: string;
+  query: string;
+  terms: string[];
+};
+
 const INITIAL_QUERY = 'nebula';
 const PAGE_LIMIT = 30;
+
+const GALLERY_SUGGESTIONS: GallerySuggestion[] = [
+  { label: 'Black holes', query: 'black holes', terms: ['black', 'hole', 'space'] },
+  { label: 'Black hole simulations', query: 'black hole simulations', terms: ['black', 'simulation'] },
+  { label: 'Black hole NASA', query: 'black hole NASA', terms: ['black', 'nasa'] },
+  { label: 'Black hole astronomy', query: 'black hole astronomy', terms: ['black', 'astronomy'] },
+  { label: 'Cats', query: 'cats', terms: ['cat', 'animal', 'wildlife'] },
+  { label: 'Wildlife', query: 'wildlife', terms: ['wildlife', 'animal'] },
+  { label: 'Domestic animals', query: 'domestic animals', terms: ['cat', 'animal', 'domestic'] },
+  { label: 'Cat anatomy', query: 'cat anatomy', terms: ['cat', 'anatomy', 'medical'] },
+  { label: 'Nebulae', query: 'nebulae', terms: ['nebula', 'space'] },
+  { label: 'Galaxies', query: 'galaxies', terms: ['galaxy', 'space'] },
+  { label: 'Ocean life', query: 'ocean life', terms: ['ocean', 'life', 'nature'] },
+  { label: 'Ancient art', query: 'ancient art', terms: ['ancient', 'art', 'history'] },
+  { label: 'Human anatomy', query: 'human anatomy', terms: ['human', 'anatomy', 'medical'] },
+];
+
+const DEFAULT_GALLERY_SUGGESTIONS = ['nebula', 'black holes', 'galaxies', 'ancient art', 'wildlife', 'human anatomy'];
 
 const CATEGORY_FILTERS: Array<{ value: GallerySearchCategory | ''; label: string }> = [
   { value: '', label: 'All' },
@@ -521,14 +549,36 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const [loadedHasMore, setLoadedHasMore] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [ageGateQuery, setAgeGateQuery] = useState<string | null>(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [displayMode, setDisplayMode] = useState<GalleryDisplayMode>('masonry');
+  const [displayPanelOpen, setDisplayPanelOpen] = useState(false);
+  const [aestheticMode, setAestheticMode] = useState(false);
   const loadedQueryRef = useRef('');
   const loadedItemKeysRef = useRef<Set<string>>(new Set());
   const loadedPagesRef = useRef<Set<number>>(new Set());
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const searchFormRef = useRef<HTMLFormElement>(null);
+  const searchChamberRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionRef = useRef<string | null>(null);
   const loadMoreLockRef = useRef(false);
   const pageFetchRef = useRef(false);
+
+  const contextualSuggestions = useMemo(() => {
+    const normalizedQuery = draftQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return DEFAULT_GALLERY_SUGGESTIONS.map((query) => ({
+        label: query.replace(/\b\w/g, (character) => character.toUpperCase()),
+        query,
+        terms: [query],
+      }));
+    }
+    if (normalizedQuery.length < 2) return [];
+    return GALLERY_SUGGESTIONS.filter((suggestion) => (
+      suggestion.label.toLowerCase().includes(normalizedQuery)
+      || suggestion.query.toLowerCase().includes(normalizedQuery)
+      || suggestion.terms.some((term) => term.includes(normalizedQuery) || normalizedQuery.includes(term))
+    )).slice(0, 6);
+  }, [draftQuery]);
 
   const params = useMemo<GallerySearchParams>(() => ({
     q: committedQuery,
@@ -664,6 +714,17 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
     }
   }, [galleryQuery.data?.page, galleryQuery.isError, page]);
 
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    const dismissSuggestions = (event: PointerEvent) => {
+      if (!searchChamberRef.current?.contains(event.target as Node)) {
+        setSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', dismissSuggestions);
+    return () => document.removeEventListener('pointerdown', dismissSuggestions);
+  }, [suggestionsOpen]);
+
   const commitSearch = useCallback((nextQuery: string) => {
     setDraftQuery(nextQuery);
     setCommittedQuery(nextQuery);
@@ -677,6 +738,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSuggestionsOpen(false);
     const nextQuery = (pendingSuggestionRef.current ?? draftQuery).trim();
     pendingSuggestionRef.current = null;
     if (nextQuery.length === 0) return;
@@ -692,6 +754,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
   const submitSuggestion = useCallback((suggestion: string) => {
     pendingSuggestionRef.current = suggestion;
     setDraftQuery(suggestion);
+    setSuggestionsOpen(false);
     window.requestAnimationFrame(() => searchFormRef.current?.requestSubmit());
   }, []);
 
@@ -727,7 +790,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
 
   return (
     <>
-      <section className={`universal-gallery ${lm ? 'is-light' : ''}`} aria-labelledby="universal-gallery-heading">
+      <section className={`universal-gallery ${lm ? 'is-light' : ''} ${aestheticMode ? 'is-aesthetic' : ''}`} aria-labelledby="universal-gallery-heading">
       <div className="universal-gallery-shell">
         <header className="universal-gallery-heading">
           <div>
@@ -741,7 +804,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           </p>
         </header>
 
-        <div className="universal-gallery-search-chamber" data-testid="panel-gallery-search-chamber">
+        <div ref={searchChamberRef} className="universal-gallery-search-chamber" data-testid="panel-gallery-search-chamber">
         <form
           ref={searchFormRef}
           className="universal-gallery-search"
@@ -755,6 +818,7 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
               type="search"
               value={draftQuery}
               onChange={(event) => setDraftQuery(event.target.value)}
+              onFocus={() => setSuggestionsOpen(true)}
               placeholder="Explore the visual universe…"
               aria-label="Explore the visual universe"
               data-testid="input-gallery-search"
@@ -787,23 +851,69 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
           </span>
         </div>
 
-        <div className="universal-gallery-suggestions" aria-label="Suggested searches" data-testid="list-gallery-suggestions">
-          <span className="universal-gallery-suggestions-label universal-gallery-mono">Suggested vectors</span>
-          {['NEBULA', 'BLACK HOLES', 'GALAXIES', 'ANCIENT ART', 'WILDLIFE', 'HUMAN ANATOMY'].map((suggestion) => (
-            <button
-              type="button"
-              key={suggestion}
-              className={`universal-gallery-suggestion ${draftQuery.toUpperCase() === suggestion ? 'is-current' : ''}`}
-              onClick={() => submitSuggestion(suggestion)}
-              data-testid={`chip-gallery-suggestion-${suggestion.toLowerCase().replace(/ /g, '-')}`}
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
+        {suggestionsOpen && contextualSuggestions.length > 0 && (
+          <div className="universal-gallery-suggestions is-contextual" aria-label="Suggested searches" data-testid="list-gallery-suggestions">
+            <span className="universal-gallery-suggestions-label universal-gallery-mono">Suggested vectors</span>
+            {contextualSuggestions.map((suggestion) => (
+              <button
+                type="button"
+                key={suggestion.query}
+                className={`universal-gallery-suggestion ${draftQuery.toLowerCase() === suggestion.query ? 'is-current' : ''}`}
+                onClick={() => submitSuggestion(suggestion.query)}
+                data-testid={`chip-gallery-suggestion-${suggestion.query.toLowerCase().replace(/ /g, '-')}`}
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="universal-gallery-search-support" data-testid="text-gallery-search-support">
           Search across art · science · nature · history · space
         </p>
+        </div>
+
+        <div className="universal-gallery-presentation-bar" aria-label="Gallery presentation controls">
+          <button
+            type="button"
+            className={`universal-gallery-presentation-toggle ${aestheticMode ? 'is-active' : ''}`}
+            aria-pressed={aestheticMode}
+            onClick={() => setAestheticMode((active) => !active)}
+            data-testid="button-gallery-aesthetic-mode"
+          >
+            <Sparkles size={13} aria-hidden="true" />
+            <span>Aesthetic mode</span>
+          </button>
+          <button
+            type="button"
+            className={`universal-gallery-presentation-toggle ${displayPanelOpen ? 'is-active' : ''}`}
+            aria-expanded={displayPanelOpen}
+            aria-controls="universal-gallery-display-panel"
+            onClick={() => setDisplayPanelOpen((open) => !open)}
+            data-testid="button-gallery-display-mode"
+          >
+            <SlidersHorizontal size={13} aria-hidden="true" />
+            <span>Display mode</span>
+            <span className="universal-gallery-presentation-value">{displayMode}</span>
+          </button>
+          {displayPanelOpen && (
+            <div id="universal-gallery-display-panel" className="universal-gallery-display-panel" role="group" aria-label="Display mode options">
+              {(['masonry', 'grid', 'editorial', 'compact', 'immersive'] as GalleryDisplayMode[]).map((mode) => (
+                <button
+                  type="button"
+                  key={mode}
+                  className={`universal-gallery-display-option ${displayMode === mode ? 'is-active' : ''}`}
+                  aria-pressed={displayMode === mode}
+                  onClick={() => {
+                    setDisplayMode(mode);
+                    setDisplayPanelOpen(false);
+                  }}
+                  data-testid={`button-gallery-display-${mode}`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="universal-gallery-filter-deck" aria-label="Gallery filters" data-testid="deck-gallery-filters">
@@ -918,9 +1028,9 @@ export default function UniversalGallery({ lm = false }: UniversalGalleryProps) 
               <span><strong>{items.length}</strong> images found · <strong>{readySources}</strong> sources</span>
               <span className="universal-gallery-mono">Page {galleryQuery.data?.page ?? 1}{galleryQuery.data?.hasMore ? ' · More available' : ''}</span>
             </div>
-            <div data-testid="grid-gallery-results">
+            <div className={`universal-gallery-results-grid is-${displayMode}`} data-testid="grid-gallery-results">
               {galleryBatches.map((batch, batchIndex) => (
-                <div className="universal-gallery-masonry" key={`${querySignature}-page-${batch.page}`}>
+                <div className={`universal-gallery-masonry is-${displayMode}`} key={`${querySignature}-page-${batch.page}`}>
                   {batch.items.map((item, itemIndex) => (
                     <GalleryCard
                       key={item.id}
