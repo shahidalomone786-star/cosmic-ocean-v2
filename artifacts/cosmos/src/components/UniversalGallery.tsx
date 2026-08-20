@@ -348,14 +348,12 @@ function GalleryDetail({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKeyDown);
-    detailRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     return () => {
       document.removeEventListener('keydown', onKeyDown);
     };
@@ -375,7 +373,6 @@ function GalleryDetail({
   return (
     <motion.div
       className="universal-gallery-modal-backdrop"
-      ref={detailRef}
       role="presentation"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -386,14 +383,11 @@ function GalleryDetail({
       data-testid="overlay-gallery-detail"
     >
       <motion.div
-        className="universal-gallery-modal"
+        className="universal-gallery-modal universal-gallery-modal-enter"
         role="dialog"
         aria-modal="true"
         aria-labelledby="universal-gallery-detail-title"
-        initial={{ opacity: 0, y: 16, scale: .98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 16, scale: .98 }}
-        transition={{ duration: .24, ease: [0.16, 1, 0.3, 1] }}
         data-testid={`dialog-gallery-detail-${item.id}`}
       >
         <div className="universal-gallery-modal-header">
