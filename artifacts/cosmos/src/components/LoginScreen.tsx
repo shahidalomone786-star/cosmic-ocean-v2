@@ -141,6 +141,18 @@ export default function LoginScreen({ onClose }: { onClose?: () => void }) {
         }}
       >
         <ScanLines />
+{onClose && (
+  <button
+    type="button"
+    onClick={onClose}
+    aria-label="Close"
+    className="absolute top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 backdrop-blur-md transition hover:bg-white/15 hover:text-white"
+  >
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+)}
 
         {/* Header */}
         <div className="relative z-10 text-center pt-10 pb-8 px-8 border-b border-white/[0.05]">
