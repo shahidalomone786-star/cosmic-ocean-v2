@@ -66,7 +66,7 @@ function Field({
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function LoginScreen() {
+export default function LoginScreen({ onClose }: { onClose?: () => void }) {
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [email,    setEmail]    = useState('');
   const [username, setUsername] = useState('');
